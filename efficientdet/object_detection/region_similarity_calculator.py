@@ -93,7 +93,7 @@ class RegionSimilarityCalculator(object):
   def compare(self, boxlist1, boxlist2, scope=None):
     """Computes matrix of pairwise similarity between BoxLists.
 
-    This op (to be overriden) computes a measure of pairwise similarity between
+    This op (to be overridden) computes a measure of pairwise similarity between
     the boxes in the given BoxLists. Higher values indicate more similarity.
 
     Note that this method simply measures similarity and does not explicitly

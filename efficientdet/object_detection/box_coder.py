@@ -86,7 +86,7 @@ class BoxCoder(object):
 
   @abstractmethod
   def _encode(self, boxes, anchors):
-    """Method to be overriden by implementations.
+    """Method to be overridden by implementations.
 
     Args:
       boxes: BoxList holding N boxes to be encoded
@@ -99,7 +99,7 @@ class BoxCoder(object):
 
   @abstractmethod
   def _decode(self, rel_codes, anchors):
-    """Method to be overriden by implementations.
+    """Method to be overridden by implementations.
 
     Args:
       rel_codes: a tensor representing N relative-encoded boxes

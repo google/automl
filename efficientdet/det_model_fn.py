@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Model function defination, including both architecture and loss."""
+"""Model function definition, including both architecture and loss."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -221,14 +221,14 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
       representing box regression targets in
       [batch_size, height, width, num_anchors * 4].
     labels: the dictionary that returned from dataloader that includes
-      groundturth targets.
+      groundtruth targets.
     params: the dictionary including training parameters specified in
       default_haprams function in this file.
   Returns:
-    total_loss: an integar tensor representing total loss reducing from
+    total_loss: an integer tensor representing total loss reducing from
       class and box losses from all levels.
-    cls_loss: an integar tensor representing total class loss.
-    box_loss: an integar tensor representing total box regression loss.
+    cls_loss: an integer tensor representing total class loss.
+    box_loss: an integer tensor representing total box regression loss.
   """
   # Sum all positives in a batch for normalization and avoid zero
   # num_positives_sum, which would lead to inf loss during training
@@ -366,7 +366,7 @@ def reg_l2_loss(weight_decay, regex=r'.*(kernel|weight):0$'):
 
 
 def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
-  """Model defination entry.
+  """Model definition entry.
 
   Args:
     features: the input image tensor with shape [batch_size, height, width, 3].

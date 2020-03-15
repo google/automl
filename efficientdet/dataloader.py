@@ -253,7 +253,7 @@ class InputReader(object):
         value: A dictionary contains an image and groundtruth annotations.
 
       Returns:
-        image: Image tensor that is preproessed to have normalized value and
+        image: Image tensor that is preprocessed to have normalized value and
           fixed dimension [image_size, image_size, 3]
         cls_targets_dict: ordered dictionary with keys
           [min_level, min_level+1, ..., max_level]. The values are tensor with
@@ -267,16 +267,16 @@ class InputReader(object):
         num_positives: Number of positive anchors in the image.
         source_id: Source image id. Default value -1 if the source id is empty
           in the groundtruth annotation.
-        image_scale: Scale of the proccessed image to the original image.
+        image_scale: Scale of the processed image to the original image.
         boxes: Groundtruth bounding box annotations. The box is represented in
-          [y1, x1, y2, x2] format. The tennsor is padded with -1 to the fixed
+          [y1, x1, y2, x2] format. The tensor is padded with -1 to the fixed
           dimension [self._max_num_instances, 4].
         is_crowds: Groundtruth annotations to indicate if an annotation
-          represents a group of instances by value {0, 1}. The tennsor is
+          represents a group of instances by value {0, 1}. The tensor is
           padded with 0 to the fixed dimension [self._max_num_instances].
-        areas: Groundtruth areas annotations. The tennsor is padded with -1
+        areas: Groundtruth areas annotations. The tensor is padded with -1
           to the fixed dimension [self._max_num_instances].
-        classes: Groundtruth classes annotations. The tennsor is padded with -1
+        classes: Groundtruth classes annotations. The tensor is padded with -1
           to the fixed dimension [self._max_num_instances].
       """
       with tf.name_scope('parser'):
@@ -408,7 +408,7 @@ class SegmentationInputReader(object):
 
       Returns:
         A list of the following elements in order:
-        image: Image tensor that is preproessed to have normalized value and
+        image: Image tensor that is preprocessed to have normalized value and
           fixed dimension [image_size, image_size, 3]
         label: label tensor of the same spatial dimension as the image.
       """

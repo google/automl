@@ -81,7 +81,7 @@ def decode_box_outputs(rel_codes, anchors):
 
 
 def nms(dets, thresh):
-  """Non-maximum supression."""
+  """Non-maximum suppression."""
   x1 = dets[:, 0]
   y1 = dets[:, 1]
   x2 = dets[:, 2]
@@ -121,7 +121,7 @@ def _generate_anchor_configs(min_level, max_level, num_scales, aspect_ratios):
       num_scales: integer number representing intermediate scales added
         on each level. For instances, num_scales=2 adds two additional
         anchor scales [2^0, 2^0.5] on each level.
-      aspect_ratios: list of tuples representing the aspect raito anchors added
+      aspect_ratios: list of tuples representing the aspect ratio anchors added
         on each level. For instances, aspect_ratios =
         [(1, 1), (1.4, 0.7), (0.7, 1.4)] adds three anchors on each level.
   Returns:
@@ -277,7 +277,7 @@ class Anchors(object):
       num_scales: integer number representing intermediate scales added
         on each level. For instances, num_scales=2 adds two additional
         anchor scales [2^0, 2^0.5] on each level.
-      aspect_ratios: list of tuples representing the aspect raito anchors added
+      aspect_ratios: list of tuples representing the aspect ratio anchors added
         on each level. For instances, aspect_ratios =
         [(1, 1), (1.4, 0.7), (0.7, 1.4)] adds three anchors on each level.
       anchor_scale: float number representing the scale of size of the base
