@@ -105,7 +105,7 @@ def resample_feature_map(feat, name, target_width, target_num_channels,
     # downsampling for efficiency.
     if width > target_width:
       if width % target_width != 0:
-        raise ValueError('wdith ({}) is not divisible by '
+        raise ValueError('width ({}) is not divisible by '
                          'target_width ({}).'.format(width, target_width))
       if not conv_after_downsample:
         feat = _maybe_apply_1x1(feat)
@@ -131,7 +131,7 @@ def resample_feature_map(feat, name, target_width, target_num_channels,
         feat = _maybe_apply_1x1(feat)
     else:
       if target_width % width != 0:
-        raise ValueError('target_wdith ({}) is not divisible by '
+        raise ValueError('target_width ({}) is not divisible by '
                          'width ({}).'.format(target_width, width))
       feat = _maybe_apply_1x1(feat)
       if width < target_width:

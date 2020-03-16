@@ -43,7 +43,7 @@ class EvaluationMetric(object):
     The class provides the interface to metrics_fn in TPUEstimator. The
     _update_op() takes detections from each image and push them to
     self.detections. The _evaluate() loads a JSON file in COCO annotation format
-    as the groundtruths and runs COCO evaluation.
+    as the groundtruth and runs COCO evaluation.
 
     Args:
       filename: Ground truth JSON file name. If filename is None, use
@@ -120,7 +120,7 @@ class EvaluationMetric(object):
 
       Append detection results to self.detections to aggregate results from
       all validation set. The groundtruth_data is parsed and added into a
-      dictinoary with the same format as COCO dataset, which can be used for
+      dictionary with the same format as COCO dataset, which can be used for
       evaluation.
 
       Args:

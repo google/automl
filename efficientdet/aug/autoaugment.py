@@ -563,7 +563,7 @@ def _apply_bbox_augmentation(image, bbox, augmentation_func, *args):
 
 
 def _concat_bbox(bbox, bboxes):
-  """Helper function that concates bbox to bboxes along the first dimension."""
+  """Helper function that concats bbox to bboxes along the first dimension."""
 
   # Note if all elements in bboxes are -1 (_INVALID_BOX), then this means
   # we discard bboxes and start the bboxes Tensor with the current bbox.

@@ -136,10 +136,10 @@ class BlockDecoder(object):
 def swish(features, use_native=True, use_hard=False):
   """Computes the Swish activation function.
 
-  We provide three alternnatives:
+  We provide three alternatives:
     - Native tf.nn.swish, use less memory during training than composable swish.
     - Quantization friendly hard swish.
-    - A composable swish, equivalant to tf.nn.swish, but more general for
+    - A composable swish, equivalent to tf.nn.swish, but more general for
       finetuning and TF-Hub.
 
   Args:

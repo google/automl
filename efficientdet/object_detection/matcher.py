@@ -127,7 +127,7 @@ class Match(object):
     return self._reshape_and_cast(tf.where(self.ignored_column_indicator()))
 
   def ignored_column_indicator(self):
-    """Returns boolean column indicator where True means the colum is ignored.
+    """Returns boolean column indicator where True means the column is ignored.
 
     Returns:
       column_indicator: boolean vector which is True for all ignored column

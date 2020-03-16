@@ -66,7 +66,7 @@ class ArgMaxMatcher(matcher.Matcher):
         when set to None.
       negatives_lower_than_unmatched: Boolean which defaults to True. If True
         then negative matches are the ones below the unmatched_threshold,
-        whereas ignored matches are in between the matched and umatched
+        whereas ignored matches are in between the matched and unmatched
         threshold. If False, then negative matches are in between the matched
         and unmatched threshold, and everything lower than unmatched is ignored.
       force_match_for_each_row: If True, ensures that each row is matched to
