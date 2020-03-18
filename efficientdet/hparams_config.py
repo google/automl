@@ -98,10 +98,12 @@ class Config(object):
     config_dict = {}
     try:
       for kv_pair in config_str.split(','):
+        if not kv_pair:  # skip empty string
+          continue
         k, v = kv_pair.split('=')
         config_dict[k.strip()] = eval_str_fn(v.strip())
       return config_dict
-    except:
+    except ValueError:
       raise ValueError('Invalid config_str: {}'.format(config_str))
 
   def as_dict(self):
