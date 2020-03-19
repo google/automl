@@ -18,7 +18,7 @@ This module is borrowed from TPU RetinaNet implementation:
 https://github.com/tensorflow/tpu/blob/master/models/official/retinanet/anchors.py
 """
 
-import tensorflow.google as tf
+import tensorflow.compat.v1 as tf
 
 import anchors
 from aug import autoaugment
