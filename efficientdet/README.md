@@ -64,7 +64,7 @@ A quick way to load these checkpoints is to run:
     $ export MODEL=efficientdet-d0
     $ wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/${MODEL}.tar.gz
     $ tar xf ${MODEL}.tar.gz
-    $ python model_inspect.py --runmode=eval_ckpt --model_name=$MODEL --ckpt_path=$MODEL
+    $ python model_inspect.py --input_image_size=512 --runmode=ckpt --model_name=$MODEL --ckpt_path=$MODEL
 
 TODO: add a colab for more examples.
 
