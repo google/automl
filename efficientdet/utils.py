@@ -30,9 +30,6 @@ from tensorflow.python.tpu import tpu_function  # pylint:disable=g-direct-tensor
 relu_fn = tf.nn.swish
 backbone_relu_fn = relu_fn
 
-_BATCH_NORM_DECAY = 0.997
-_BATCH_NORM_EPSILON = 1e-4
-
 
 class DepthwiseConv2D(tf.keras.layers.DepthwiseConv2D, tf.layers.Layer):
   """Wrap keras DepthwiseConv2D to tf.layers."""
@@ -198,6 +195,8 @@ def batch_norm_relu(inputs,
                     relu=True,
                     init_zero=False,
                     data_format='channels_last',
+                    momentum=0.99,
+                    epsilon=1e-3,
                     name=None):
   """Performs a batch normalization followed by a ReLU.
 
@@ -209,6 +208,8 @@ def batch_norm_relu(inputs,
         normalization with 0 instead of 1 (default).
     data_format: `str` either "channels_first" for `[batch, channels, height,
         width]` or "channels_last for `[batch, height, width, channels]`.
+    momentum: `float`, momentume of batch norm.
+    epsilon: `float`, small value for numerical stability.
     name: the name of the batch normalization layer
 
   Returns:
@@ -227,8 +228,8 @@ def batch_norm_relu(inputs,
   inputs = tpu_batch_normalization(
       inputs=inputs,
       axis=axis,
-      momentum=_BATCH_NORM_DECAY,
-      epsilon=_BATCH_NORM_EPSILON,
+      momentum=momentum,
+      epsilon=epsilon,
       center=True,
       scale=True,
       training=is_training_bn,
