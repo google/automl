@@ -21,7 +21,6 @@ https://github.com/tensorflow/tpu/blob/master/models/official/retinanet/anchors.
 import tensorflow.compat.v1 as tf
 
 import anchors
-from aug import autoaugment
 from object_detection import preprocessor
 from object_detection import tf_example_decoder
 
@@ -299,6 +298,7 @@ class InputReader(object):
         # standard horizontal flipping of images along with size jittering
         # and normalization.
         if params.get('autoaugment_policy', None) and self._is_training:
+          from aug import autoaugment  # pylint: disable=g-import-not-at-top
           image, boxes = autoaugment.distort_image_with_autoaugment(
               image, boxes, params['autoaugment_policy'])
 
