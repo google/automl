@@ -305,4 +305,5 @@ def main(_):
 
 
 if __name__ == '__main__':
+  tf.disable_v2_behavior()
   tf.app.run(main)

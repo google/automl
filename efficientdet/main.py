@@ -374,5 +374,5 @@ def main(argv):
 
 
 if __name__ == '__main__':
-  tf.logging.set_verbosity(tf.logging.INFO)
+  tf.disable_v2_behavior()
   tf.app.run(main)
