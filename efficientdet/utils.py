@@ -195,8 +195,8 @@ def batch_norm_relu(inputs,
                     relu=True,
                     init_zero=False,
                     data_format='channels_last',
-                    momentum=0.99,
-                    epsilon=1e-3,
+                    momentum=0.997,
+                    epsilon=1e-4,
                     name=None):
   """Performs a batch normalization followed by a ReLU.
 

@@ -27,8 +27,9 @@ import numpy as np
 import tensorflow.compat.v1 as tf
 from typing import Text, Tuple, List
 
-import efficientdet_arch
-import retinanet_arch
+import det_model_fn
+import hparams_config
+import inference
 import utils
 
 
@@ -37,7 +38,7 @@ flags.DEFINE_string('logdir', '/tmp/deff/', 'log directory.')
 flags.DEFINE_string('runmode', 'dry', 'Run mode: {freeze, bm, dry}')
 flags.DEFINE_string('trace_filename', None, 'Trace file name.')
 flags.DEFINE_integer('num_classes', 90, 'Number of classes.')
-flags.DEFINE_integer('input_image_size', 640, 'Size of input image.')
+flags.DEFINE_integer('input_image_size', None, 'Size of input image.')
 flags.DEFINE_integer('threads', 0, 'Number of threads.')
 flags.DEFINE_integer('bm_runs', 20, 'Number of benchmark runs.')
 flags.DEFINE_string('tensorrt', None, 'TensorRT mode: {None, FP32, FP16, INT8}')
@@ -48,6 +49,9 @@ flags.DEFINE_bool('xla', False, 'Run with xla optimization.')
 flags.DEFINE_string('ckpt_path', None, 'checkpoint dir used for eval.')
 flags.DEFINE_string('export_ckpt', None, 'Path for exporting new models.')
 flags.DEFINE_bool('enable_ema', True, 'Use ema variables for eval.')
+
+flags.DEFINE_string('input_image', None, 'Input image path for inference.')
+flags.DEFINE_string('output_image_dir', None, 'Output dir for inference.')
 
 FLAGS = flags.FLAGS
 
@@ -66,13 +70,21 @@ class ModelInspector(object):
                enable_ema: bool = True,
                export_ckpt: Text = None):
     self.model_name = model_name
-    self.image_size = image_size
+    self.model_params = hparams_config.get_detection_config(model_name)
     self.logdir = logdir
     self.tensorrt = tensorrt
     self.use_xla = use_xla
     self.ckpt_path = ckpt_path
     self.enable_ema = enable_ema
     self.export_ckpt = export_ckpt
+
+    if image_size:
+      # Use user specified image size.
+      self.model_overrides = {'image_size': image_size}
+    else:
+      # Use default size.
+      image_size = hparams_config.get_detection_config(model_name).image_size
+      self.model_overrides = {}
 
     # A few fixed parameters.
     batch_size = 1
@@ -81,21 +93,16 @@ class ModelInspector(object):
     self.labels_shape = [batch_size, self.num_classes]
 
   def build_model(self, inputs: tf.Tensor,
-                  is_training: bool) -> List[tf.Tensor]:
+                  is_training: bool = False) -> List[tf.Tensor]:
     """Build model with inputs and labels and print out model stats."""
     tf.logging.info('start building model')
-    if self.model_name.startswith('efficientdet'):
-      cls_outputs, box_outputs = efficientdet_arch.efficientdet(
-          inputs,
-          model_name=self.model_name,
-          is_training_bn=is_training,
-          use_bfloat16=False)
-    elif self.model_name.startswith('retinanet'):
-      cls_outputs, box_outputs = retinanet_arch.retinanet(
-          inputs,
-          model_name=self.model_name,
-          is_training_bn=is_training,
-          use_bfloat16=False)
+    model_arch = det_model_fn.get_model_arch(self.model_name)
+    cls_outputs, box_outputs = model_arch(
+        inputs,
+        model_name=self.model_name,
+        is_training_bn=is_training,
+        use_bfloat16=False,
+        **self.model_overrides)
 
     print('backbone+fpn+box params/flops = {:.6f}M, {:.9f}B'.format(
         *utils.num_params_flops()))
@@ -157,6 +164,10 @@ class ModelInspector(object):
       self.build_model(inputs, is_training=False)
       self.restore_model(
           sess, self.ckpt_path, self.enable_ema, self.export_ckpt)
+
+  def inference_single_image(self, image_image_path, output_dir):
+    driver = inference.InferenceDriver(self.model_name, self.ckpt_path)
+    driver.inference(image_image_path, output_dir)
 
   def freeze_model(self) -> Tuple[Text, Text]:
     """Freeze model and convert them into tflite and tf graph."""
@@ -267,6 +278,8 @@ class ModelInspector(object):
       self.freeze_model()
     elif runmode == 'ckpt':
       self.eval_ckpt()
+    elif runmode == 'infer':
+      self.inference_single_image(FLAGS.input_image, FLAGS.output_image_dir)
     elif runmode == 'bm':
       self.benchmark_model(warmup_runs=5, bm_runs=FLAGS.bm_runs,
                            num_threads=threads,

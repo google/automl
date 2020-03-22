@@ -565,3 +565,23 @@ def efficientdet_model_fn(features, labels, mode, params):
       mode,
       params,
       model=efficientdet_arch.efficientdet)
+
+
+def get_model_arch(model_name='efficientdet-d0'):
+  """Get model architecture for a given model name."""
+  if 'retinanet' in model_name:
+    return retinanet_arch.retinanet
+  elif 'efficientdet' in model_name:
+    return efficientdet_arch.efficientdet
+  else:
+    raise ValueError('Invalide model name {}'.format(model_name))
+
+
+def get_model_fn(model_name='efficientdet-d0'):
+  """Get model fn for a given model name."""
+  if 'retinanet' in model_name:
+    return retinanet_model_fn
+  elif 'efficientdet' in model_name:
+    return efficientdet_model_fn
+  else:
+    raise ValueError('Invalide model name {}'.format(model_name))

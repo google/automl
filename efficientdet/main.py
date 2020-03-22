@@ -226,12 +226,7 @@ def main(argv):
       tpu_config=tpu_config,
   )
 
-  if 'retinanet' in FLAGS.model_name:
-    model_fn_instance = det_model_fn.retinanet_model_fn
-  elif 'efficientdet' in FLAGS.model_name:
-    model_fn_instance = det_model_fn.efficientdet_model_fn
-  else:
-    raise ValueError('Invalide model name {}'.format(FLAGS.model_name))
+  model_fn_instance = det_model_fn.get_model_fn(FLAGS.model_name)
 
   # TPU Estimator
   tf.logging.info(params)
