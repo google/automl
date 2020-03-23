@@ -374,11 +374,11 @@ class InferenceDriver(object):
           image_size = params['image_size']
           image = tf.io.decode_image(inputs[0], channels=3, dtype=tf.float32)
           image.set_shape([None, None, 3])
-          resized_image = tf.image.resize(image, [image_size, image_size])
-          scale = tf.reduce_max(tf.shape(image)[:2]) / image_size
+          image, scale = image_preprocess(
+              image, image_size)
           # Build model.
           class_outputs, box_outputs = build_model(
-              self.model_name, tf.expand_dims(resized_image,0), **self.params)
+              self.model_name, tf.expand_dims(image,0), **self.params)
 
           restore_ckpt(sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
           params.update(dict(batch_size=1))  # required by postprocessing.

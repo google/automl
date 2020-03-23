@@ -52,7 +52,7 @@ flags.DEFINE_bool('xla', False, 'Run with xla optimization.')
 flags.DEFINE_string('ckpt_path', None, 'checkpoint dir used for eval.')
 flags.DEFINE_string('export_ckpt', None, 'Path for exporting new models.')
 flags.DEFINE_bool('enable_ema', True, 'Use ema variables for eval.')
-flags.DEFINE_bool('model_dir', True, 'Saved model directory.')
+flags.DEFINE_string('model_dir', None, 'Saved model directory.')
 
 flags.DEFINE_string('input_image', None, 'Input image path for inference.')
 flags.DEFINE_string('output_image_dir', None, 'Output dir for inference.')
@@ -127,13 +127,15 @@ class ModelInspector(object):
     driver = inference.InferenceDriver(self.model_name, self.ckpt_path)
     driver.export_saved_model(os.path.join(self.logdir, self.model_name))
 
-  def saved_model_inference(self, image_image_path, output_dir, model_dir):
+  def saved_model_inference(self, image_path_pattern, output_dir, model_dir):
     with tf.Session() as sess:
       tf.saved_model.load(sess, ["serve"], model_dir)
-      with tf.io.gfile.GFile(image_image_path, 'rb') as file:
-        image = file.read()
-      raw_images=[image]
-      outputs_np = sess.run(["cond_798/Merge:0"], {'input:0': [image]})
+      raw_images = []
+      image = Image.open(image_path_pattern)
+      raw_images.append(image)
+      with tf.io.gfile.GFile(image_path_pattern, 'rb') as file:
+        image_bin = file.read()
+      outputs_np = sess.run(["cond_798/Merge:0"], {'input:0': [image_bin]})
       for i, output_np in enumerate(outputs_np):
         # output_np has format [image_id, y, x, height, width, score, class]
         boxes = output_np[:, 1:5]
@@ -141,7 +143,7 @@ class ModelInspector(object):
         scores = output_np[:, 5]
         boxes[:, 2:4] += boxes[:, 0:2]
         img = inference.visualize_image(
-            raw_images[i], boxes, classes, scores, self.label_id_mapping)
+            raw_images[i], boxes, classes, scores, inference.coco_id_mapping)
         output_image_path = os.path.join(output_dir, str(i) + '.jpg')
         Image.fromarray(img).save(output_image_path)
         tf.logging.info('writing file to {}'.format(output_image_path))
