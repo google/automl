@@ -367,6 +367,28 @@ class InferenceDriver(object):
     if image_size:
       self.params.update(dict(image_size=image_size))
 
+  def export_saved_model(self, output_dir):
+      params = copy.deepcopy(self.params)
+      with tf.Session() as sess:
+          inputs = tf.placeholder(tf.string, name='input', shape=(1))
+          image_size = params['image_size']
+          image = tf.io.decode_image(inputs[0], channels=3, dtype=tf.float32)
+          image.set_shape([None, None, 3])
+          resized_image = tf.image.resize(image, [image_size, image_size])
+          scale = tf.reduce_max(tf.shape(image)[:2]) / image_size
+          # Build model.
+          class_outputs, box_outputs = build_model(
+              self.model_name, tf.expand_dims(resized_image,0), **self.params)
+
+          restore_ckpt(sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
+          params.update(dict(batch_size=1))  # required by postprocessing.
+
+          # Build postprocessing.
+          detections_batch = det_post_process(
+              params, class_outputs, box_outputs, [scale])
+          tf.saved_model.simple_save(sess, output_dir, inputs={inputs.name: inputs},
+                                 outputs={item.name:item for item in detections_batch})
+
   def inference(self,
                 image_path_pattern: Text,
                 output_dir: Text,
@@ -402,13 +424,10 @@ class InferenceDriver(object):
 
       # Visualize results.
       for i, output_np in enumerate(outputs_np):
-        # output_np has format [image_id, x, y, width, height, score, class]
+        # output_np has format [image_id, y, x, height, width, score, class]
         boxes = output_np[:, 1:5]
         classes = output_np[:, 6].astype(int)
         scores = output_np[:, 5]
-        # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]
-        # TODO(tanmingxing): make this convertion more efficient.
-        boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
         boxes[:, 2:4] += boxes[:, 0:2]
         img = visualize_image(raw_images[i], boxes, classes, scores,
                               self.label_id_mapping, **kwargs)
