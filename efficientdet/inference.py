@@ -281,7 +281,7 @@ class InferenceDriver(object):
       class_outputs, box_outputs = build_model(
           self.model_name, images, **self.params)
       restore_ckpt(sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
-      params.update(dict(batch_size=1))  # required by postprocessing.
+      params.update(dict(batch_size=len(raw_images)))  # required by postprocessing.
 
       # Build postprocessing.
       detections_batch = det_post_process(
