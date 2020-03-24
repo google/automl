@@ -86,11 +86,14 @@ class ModelInspector(object):
 
     if image_size:
       # Use user specified image size.
-      self.model_overrides = {'image_size': image_size}
+      self.model_overrides = {
+          'image_size': image_size,
+          'num_classes': num_classes
+      }
     else:
       # Use default size.
       image_size = hparams_config.get_detection_config(model_name).image_size
-      self.model_overrides = {}
+      self.model_overrides = {'num_classes': num_classes}
 
     # A few fixed parameters.
     batch_size = 1
