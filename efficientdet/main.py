@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+from absl import logging
 
 from absl import flags
 import numpy as np
@@ -312,8 +313,12 @@ def main(argv):
         tf.logging.info('Eval results: %s' % eval_results)
         utils.archive_ckpt(eval_results, eval_results['AP'], ckpt)
 
-        # Terminate eval job when final checkpoint is reached
-        current_step = int(os.path.basename(ckpt).split('-')[1])
+        # Terminate eval job when final checkpoint is reached.
+        try:
+          current_step = int(os.path.basename(ckpt).split('-')[1])
+        except IndexError:
+          tf.logging.info('{} has no global step info: stop!'.format(ckpt))
+          break
         total_step = int((FLAGS.num_epochs * FLAGS.num_examples_per_epoch) /
                          FLAGS.train_batch_size)
         if current_step >= total_step:
@@ -374,5 +379,7 @@ def main(argv):
 
 
 if __name__ == '__main__':
+  logging.set_verbosity(logging.WARNING)
+  tf.logging.set_verbosity(tf.logging.WARN)
   tf.disable_v2_behavior()
   tf.app.run(main)

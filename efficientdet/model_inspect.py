@@ -22,6 +22,7 @@ from __future__ import print_function
 import os
 import time
 
+from absl import logging
 from absl import flags
 import numpy as np
 import tensorflow.compat.v1 as tf
@@ -320,5 +321,7 @@ def main(_):
 
 
 if __name__ == '__main__':
+  logging.set_verbosity(logging.WARNING)
+  tf.logging.set_verbosity(tf.logging.WARN)
   tf.disable_v2_behavior()
   tf.app.run(main)
