@@ -80,7 +80,7 @@ class CreateCocoTFRecordTest(tf.test.TestCase):
 
     (_, example,
      num_annotations_skipped) = create_coco_tfrecord.create_tf_example(
-         image, annotations_list, image_dir, category_index)
+         image, image_dir, annotations_list, category_index)
 
     self.assertEqual(num_annotations_skipped, 0)
     self._assertProtoEqual(
@@ -147,7 +147,7 @@ class CreateCocoTFRecordTest(tf.test.TestCase):
 
     (_, example,
      num_annotations_skipped) = create_coco_tfrecord.create_tf_example(
-         image, annotations_list, image_dir, category_index, include_masks=True)
+         image, image_dir, annotations_list, category_index, include_masks=True)
 
     self.assertEqual(num_annotations_skipped, 0)
     self._assertProtoEqual(
@@ -239,15 +239,15 @@ class CreateCocoTFRecordTest(tf.test.TestCase):
     with open(annotation_file, 'w') as annotation_fid:
       json.dump(groundtruth_data, annotation_fid)
 
-    output_path = os.path.join(tmp_dir, 'out.record')
+    output_path = os.path.join(tmp_dir, 'out')
     create_coco_tfrecord._create_tf_record_from_coco_annotations(
         annotation_file,
         tmp_dir,
         output_path,
-        False,
-        2)
-    self.assertTrue(os.path.exists(output_path + '-00000-of-00002'))
-    self.assertTrue(os.path.exists(output_path + '-00001-of-00002'))
+        num_shards=2,
+        include_masks=False)
+    self.assertTrue(os.path.exists(output_path + '-00000-of-00002.tfrecord'))
+    self.assertTrue(os.path.exists(output_path + '-00001-of-00002.tfrecord'))
 
 
 if __name__ == '__main__':

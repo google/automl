@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-r"""Convert raw COCO dataset to TFRecord for object_detection.
+r"""Convert raw COCO 2017 dataset to TFRecord.
+
 Example usage:
     python create_coco_tf_record.py --logtostderr \
       --image_dir="${TRAIN_IMAGE_DIR}" \
@@ -33,16 +34,16 @@ import json
 import logging
 import multiprocessing
 import os
-from absl import app
 from absl import flags
 import numpy as np
 import PIL.Image
 
 from pycocotools import mask
-from dataset import tfrecord_util
-from dataset import label_map_util
-
 import tensorflow.compat.v1 as tf
+from dataset import label_map_util
+from dataset import tfrecord_util
+
+
 flags.DEFINE_boolean(
     'include_masks', False, 'Whether to include instance segmentations masks '
     '(PNG encoded) in the result. default: False.')
@@ -60,11 +61,7 @@ flags.DEFINE_string('caption_annotations_file', '', 'File containing image '
                     'captions.')
 flags.DEFINE_string('output_file_prefix', '/tmp/train', 'Path to output file')
 flags.DEFINE_integer('num_shards', 32, 'Number of shards for output file.')
-
 FLAGS = flags.FLAGS
-
-logger = tf.get_logger()
-logger.setLevel(logging.INFO)
 
 
 def create_tf_example(image,
@@ -74,6 +71,7 @@ def create_tf_example(image,
                       caption_annotations=None,
                       include_masks=False):
   """Converts image and annotations to a tf.Example proto.
+
   Args:
     image: dict with keys: [u'license', u'file_name', u'coco_url', u'height',
       u'width', u'date_captured', u'flickr_url', u'id']
@@ -94,9 +92,11 @@ def create_tf_example(image,
       list of dict with keys: [u'id', u'image_id', u'str'].
     include_masks: Whether to include instance segmentations masks
       (PNG encoded) in the result. default: False.
+
   Returns:
     example: The converted tf.Example
     num_annotations_skipped: Number of (invalid) annotations that were ignored.
+
   Raises:
     ValueError: if the image pointed to by data['filename'] is not a valid JPEG
   """
@@ -266,6 +266,7 @@ def _create_tf_record_from_coco_annotations(images_info_file,
                                             caption_annotations_file=None,
                                             include_masks=False):
   """Loads COCO annotation json files and converts to tf.Record format.
+
   Args:
     images_info_file: JSON file containing image info. The number of tf.Examples
       in the output tf Record files is exactly equal to the number of image info
@@ -360,6 +361,4 @@ def main(_):
 
 
 if __name__ == '__main__':
-  logger = tf.get_logger()
-  logger.setLevel(logging.INFO)
-  app.run(main)
+  tf.app.run(main)

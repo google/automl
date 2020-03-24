@@ -53,6 +53,11 @@ flags.DEFINE_bool('enable_ema', True, 'Use ema variables for eval.')
 flags.DEFINE_string('input_image', None, 'Input image path for inference.')
 flags.DEFINE_string('output_image_dir', None, 'Output dir for inference.')
 
+# For visualization.
+flags.DEFINE_integer('line_thickness', None, 'Line thickness for box.')
+flags.DEFINE_integer('max_boxes_to_draw', None, 'Max number of boxes to draw.')
+flags.DEFINE_float('min_score_thresh', None, 'Score threshold to show box.')
+
 FLAGS = flags.FLAGS
 
 
@@ -166,10 +171,10 @@ class ModelInspector(object):
       self.restore_model(
           sess, self.ckpt_path, self.enable_ema, self.export_ckpt)
 
-  def inference_single_image(self, image_image_path, output_dir):
+  def inference_single_image(self, image_image_path, output_dir, **kwargs):
     driver = inference.InferenceDriver(self.model_name, self.ckpt_path,
                                        self.image_size)
-    driver.inference(image_image_path, output_dir)
+    driver.inference(image_image_path, output_dir, **kwargs)
 
   def freeze_model(self) -> Tuple[Text, Text]:
     """Freeze model and convert them into tflite and tf graph."""
@@ -281,7 +286,15 @@ class ModelInspector(object):
     elif runmode == 'ckpt':
       self.eval_ckpt()
     elif runmode == 'infer':
-      self.inference_single_image(FLAGS.input_image, FLAGS.output_image_dir)
+      config_dict = {}
+      if FLAGS.line_thickness:
+        config_dict['line_thickness'] = FLAGS.line_thickness
+      if FLAGS.max_boxes_to_draw:
+        config_dict['max_boxes_to_draw'] = FLAGS.max_boxes_to_draw
+      if FLAGS.min_score_thresh:
+        config_dict['min_score_thresh'] = FLAGS.min_score_thresh
+      self.inference_single_image(FLAGS.input_image, FLAGS.output_image_dir,
+                                  **config_dict)
     elif runmode == 'bm':
       self.benchmark_model(warmup_runs=5, bm_runs=FLAGS.bm_runs,
                            num_threads=threads,
