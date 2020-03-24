@@ -3,6 +3,10 @@
 [1] Mingxing Tan, Ruoming Pang, Quoc V. Le. EfficientDet: Scalable and Efficient Object Detection. CVPR 2020.
     Arxiv link: https://arxiv.org/abs/1911.09070
 
+Updates:
+
+  - **Mar24: Add tutorial with visualization and coco eval: [tutorial.ipynb](tutorial.ipynb)**
+  - Mar 13: release the code.
 
 ## 1. About EfficientDet Models
 
@@ -39,7 +43,7 @@ Our evaluation on COCO dataset show our EfficientDets outperform previous detect
 
 
 
-## 2. Using Pretrained EfficientDet Checkpoints
+## 2. Pretrained EfficientDet Checkpoints
 
 We have provided a list of EfficientNet checkpoints for EfficientNet checkpoints:.
 
@@ -58,19 +62,50 @@ We have provided a list of EfficientNet checkpoints for EfficientNet checkpoints
 
   ** All checkpoints are trained without autoaugmentation.
 
-
-A quick way to load these checkpoints is to run:
+## 3. Run inference.
 
     $ export MODEL=efficientdet-d0
+    $ export CKPT_PATH=efficientdet-d0
     $ wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/${MODEL}.tar.gz
     $ tar xf ${MODEL}.tar.gz
-    $ python model_inspect.py --input_image_size=512 --runmode=ckpt --model_name=$MODEL --ckpt_path=$MODEL
+    $ python model_inspect.py --runmode=infer --model_name=$MODEL --ckpt_path=$CKPT_PATH --input_image=testdata/img1.jpg --output_image_dir=/tmp
+    # you can visualize the output /tmp/0.jpg
 
-TODO: add a colab for more examples.
+Here is an example of EfficientDet-D0 visualization:
+[example image](https://user-images.githubusercontent.com/6027221/77340634-d16dc300-6cea-11ea-822c-63853f457329.jpg)
+
+## 3. Eval on COCO 2017 val.
+
+    // Download coco data.
+    $ wget http://images.cocodataset.org/zips/val2017.zip
+    $ wget http://images.cocodataset.org/annotations/annotations_trainval2017.zip
+    $ unzip val2017.zip
+    $ unzip annotations_trainval2017.zip
+
+    // convert coco data to tfrecord.
+    $ mkdir tfrecrod
+    $ PYTHONPATH=".:$PYTHONPATH"  python dataset/create_coco_tfrecord.py \
+        --image_dir=val2017 \
+        --caption_annotations_file=annotations/captions_val2017.json \
+        --output_file_prefix=tfrecord/val \
+        --num_shards=32
+
+    // Run eval.
+    $ python main.py --mode=eval  \
+        --model_name=${MODEL}  --model_dir=${CKPT_PATH}  \
+        --validation_file_pattern=tfrecord/val*  \
+        --val_json_file=annotations/instances_val2017.json  \
+        --hparams="use_bfloat16=false" --use_tpu=False
+
+## 4. Training EfficientDets on single GPU.
+
+    $ python main.py --training_file_pattern=/coco_tfrecord/train* \
+        --model_name=$MODEL \
+        --model_dir=/tmp/$MODEL \
+        --hparams="use_bfloat16=false" --use_tpu=False
 
 
-## 3. Training EfficientDets on TPUs.
-
+## 5. Training EfficientDets on TPUs.
 
 To train this model on Cloud TPU, you will need:
 
@@ -88,7 +123,7 @@ Then train the model:
     # DATA_DIR is a GCS location to which both the GCE VM and associated Cloud TPU have read access.
 
 
-For more instructions, please refer to the following tutorials:
+For more instructions about training on TPUs, please refer to the following tutorials:
 
   * EfficientNet tutorial: https://cloud.google.com/tpu/docs/tutorials/efficientnet
   * RetinaNet tutorial: https://cloud.google.com/tpu/docs/tutorials/retinanet
