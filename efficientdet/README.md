@@ -6,7 +6,7 @@
 Updates:
 
   - **Mar24: Add tutorial with visualization and coco eval: [tutorial.ipynb](tutorial.ipynb)**
-  - Mar 13: release the code.
+  - Mar 13: Release the code.
 
 ## 1. About EfficientDet Models
 
@@ -74,6 +74,10 @@ We have provided a list of EfficientNet checkpoints for EfficientNet checkpoints
 Here is an example of EfficientDet-D0 visualization:
 [example image](https://user-images.githubusercontent.com/6027221/77340634-d16dc300-6cea-11ea-822c-63853f457329.jpg)
 
+<p align="center">
+<img src="https://user-images.githubusercontent.com/6027221/77340634-d16dc300-6cea-11ea-822c-63853f457329.jpg" width="600" />
+</p>
+
 ## 3. Eval on COCO 2017 val.
 
     // Download coco data.
@@ -128,3 +132,4 @@ For more instructions about training on TPUs, please refer to the following tuto
   * EfficientNet tutorial: https://cloud.google.com/tpu/docs/tutorials/efficientnet
   * RetinaNet tutorial: https://cloud.google.com/tpu/docs/tutorials/retinanet
 
+NOTE: this is not an official Google product.
