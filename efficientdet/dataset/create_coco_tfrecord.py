@@ -42,8 +42,8 @@ import PIL.Image
 from pycocotools import mask
 import tensorflow.compat.v1 as tf
 
-import label_map_util
-import tfrecord_util
+from dataset import label_map_util
+from dataset import tfrecord_util
 
 flags = tf.app.flags
 tf.flags.DEFINE_boolean(

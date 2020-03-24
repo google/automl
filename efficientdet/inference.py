@@ -31,7 +31,7 @@ import dataloader
 import det_model_fn
 import hparams_config
 import utils
-from visualize import visualize
+from visualize import vis_utils
 
 
 coco_id_mapping = {
@@ -205,7 +205,7 @@ def visualize_image(image, boxes, classes, scores, id_mapping):
   """
   category_index = {k: {'id': k, 'name': id_mapping[k]} for k in id_mapping}
   img = np.array(image)
-  visualize.visualize_boxes_and_labels_on_image_array(
+  vis_utils.visualize_boxes_and_labels_on_image_array(
       img,
       boxes,
       classes,
@@ -221,7 +221,7 @@ def visualize_image(image, boxes, classes, scores, id_mapping):
 class InferenceDriver(object):
   """A driver for doing inference."""
 
-  def __init__(self, model_name: Text, ckpt_path: Text,
+  def __init__(self, model_name: Text, ckpt_path: Text, image_size: int = None,
                label_id_mapping: Dict[int, Text] = None):
     """Initialize the inference driver."""
     self.model_name = model_name
@@ -230,6 +230,8 @@ class InferenceDriver(object):
 
     self.params = hparams_config.get_detection_config(self.model_name).as_dict()
     self.params.update(dict(is_training_bn=False, use_bfloat16=False))
+    if image_size:
+      self.params.update(dict(image_size=image_size))
 
   def inference(self, image_path_pattern: Text, output_dir: Text):
     """Read and preprocess input images."""

@@ -33,5 +33,6 @@ class AutoaugmentTest(tf.test.TestCase):
 
 
 if __name__ == '__main__':
+  tf.disable_v2_behavior()
   tf.test.main()
 

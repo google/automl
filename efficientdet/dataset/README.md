@@ -2,7 +2,9 @@ This folder provide a tool to convert coco data to tfrecord.
 
 Example usage:
 
-    python create_coco_tfrecord.py \
+    $ pip install protoc
+    $ protoc string_int_label_map.proto --python_out=.
+    $ python create_coco_tfrecord.py \
       --train_image_dir="${TRAIN_IMAGE_DIR}" \
       --val_image_dir="${VAL_IMAGE_DIR}" \
       --test_image_dir="${TEST_IMAGE_DIR}" \

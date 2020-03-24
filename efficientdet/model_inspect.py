@@ -91,6 +91,7 @@ class ModelInspector(object):
     self.num_classes = num_classes
     self.inputs_shape = [batch_size, image_size, image_size, 3]
     self.labels_shape = [batch_size, self.num_classes]
+    self.image_size = image_size
 
   def build_model(self, inputs: tf.Tensor,
                   is_training: bool = False) -> List[tf.Tensor]:
@@ -166,7 +167,8 @@ class ModelInspector(object):
           sess, self.ckpt_path, self.enable_ema, self.export_ckpt)
 
   def inference_single_image(self, image_image_path, output_dir):
-    driver = inference.InferenceDriver(self.model_name, self.ckpt_path)
+    driver = inference.InferenceDriver(self.model_name, self.ckpt_path,
+                                       self.image_size)
     driver.inference(image_image_path, output_dir)
 
   def freeze_model(self) -> Tuple[Text, Text]:
