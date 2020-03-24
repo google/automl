@@ -75,10 +75,10 @@ Here is an example of EfficientDet-D0 visualization:
 [example image](https://user-images.githubusercontent.com/6027221/77340634-d16dc300-6cea-11ea-822c-63853f457329.jpg)
 
 <p align="center">
-<img src="https://user-images.githubusercontent.com/6027221/77340634-d16dc300-6cea-11ea-822c-63853f457329.jpg" width="600" />
+<img src="https://user-images.githubusercontent.com/6027221/77340634-d16dc300-6cea-11ea-822c-63853f457329.jpg" width="800" />
 </p>
 
-## 3. Eval on COCO 2017 val.
+## 4. Eval on COCO 2017 val.
 
     // Download coco data.
     $ wget http://images.cocodataset.org/zips/val2017.zip
@@ -101,7 +101,7 @@ Here is an example of EfficientDet-D0 visualization:
         --val_json_file=annotations/instances_val2017.json  \
         --hparams="use_bfloat16=false" --use_tpu=False
 
-## 4. Training EfficientDets on single GPU.
+## 5. Training EfficientDets on single GPU.
 
     $ python main.py --training_file_pattern=/coco_tfrecord/train* \
         --model_name=$MODEL \
@@ -109,7 +109,7 @@ Here is an example of EfficientDet-D0 visualization:
         --hparams="use_bfloat16=false" --use_tpu=False
 
 
-## 5. Training EfficientDets on TPUs.
+## 6. Training EfficientDets on TPUs.
 
 To train this model on Cloud TPU, you will need:
 
