@@ -19,8 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import re
+from absl import logging
 import numpy as np
-
 import tensorflow.compat.v1 as tf
 
 import anchors
@@ -56,7 +56,7 @@ def stepwise_lr_schedule(adjusted_learning_rate, lr_warmup_init,
   """Handles linear scaling rule, gradual warmup, and LR decay."""
   # lr_warmup_init is the starting learning rate; the learning rate is linearly
   # scaled up to the full learning rate after `lr_warmup_step` before decaying.
-  tf.logging.info('LR schedule method: stepwise')
+  logging.info('LR schedule method: stepwise')
   linear_warmup = (lr_warmup_init +
                    (tf.cast(global_step, dtype=tf.float32) / lr_warmup_step *
                     (adjusted_learning_rate - lr_warmup_init)))
@@ -74,7 +74,7 @@ def stepwise_lr_schedule(adjusted_learning_rate, lr_warmup_init,
 def cosine_lr_schedule_tf2(adjusted_lr, lr_warmup_init, lr_warmup_step,
                            total_steps, step):
   """TF2 friendly cosine learning rate schedule."""
-  tf.logging.info('LR schedule method: cosine')
+  logging.info('LR schedule method: cosine')
   def warmup_lr(step):
     return lr_warmup_init + (adjusted_lr - lr_warmup_init) * (
         tf.cast(step, tf.float32) / tf.cast(lr_warmup_step, tf.float32))
@@ -92,7 +92,7 @@ def cosine_lr_schedule_tf2(adjusted_lr, lr_warmup_init, lr_warmup_step,
 
 def cosine_lr_schedule(adjusted_lr, lr_warmup_init, lr_warmup_step,
                        total_steps, step):
-  tf.logging.info('LR schedule method: cosine')
+  logging.info('LR schedule method: cosine')
   linear_warmup = (
       lr_warmup_init +
       (tf.cast(step, dtype=tf.float32) / lr_warmup_step *
@@ -447,8 +447,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
       var_list = variable_filter_fn(var_list, params['resnet_depth'])
 
     if params.get('clip_gradients_norm', 0) > 0:
-      tf.logging.info('clip gradients norm by {}'.format(
-          params['clip_gradients_norm']))
+      logging.info('clip gradients norm by %f', params['clip_gradients_norm'])
       grads_and_vars = optimizer.compute_gradients(total_loss, var_list)
       with tf.name_scope('clip'):
         grads = [gv[0] for gv in grads_and_vars]
@@ -517,7 +516,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   if params['backbone_ckpt'] and mode == tf.estimator.ModeKeys.TRAIN:
     def scaffold_fn():
       """Loads pretrained model through scaffold function."""
-      tf.logging.info('restore variables from %s' % params['backbone_ckpt'])
+      logging.info('restore variables from %s', params['backbone_ckpt'])
       if params['ckpt_var_scope'] is None:
         ckpt_scope = params['backbone_name']  # Use backbone name in default.
       else:
@@ -530,7 +529,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   elif mode == tf.estimator.ModeKeys.EVAL and moving_average_decay:
     def scaffold_fn():
       """Load moving average variables for eval."""
-      tf.logging.info('Load EMA vars with ema_decay=%f' % moving_average_decay)
+      logging.info('Load EMA vars with ema_decay=%f', moving_average_decay)
       restore_vars_dict = ema.variables_to_restore(ema_vars)
       saver = tf.train.Saver(restore_vars_dict)
       return tf.train.Scaffold(saver=saver)

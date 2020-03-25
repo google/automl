@@ -18,8 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from absl import logging
 from six import string_types
 from six.moves import range
+
 import tensorflow.compat.v1 as tf
 from google.protobuf import text_format
 
@@ -114,9 +116,9 @@ def convert_label_map_to_categories(label_map,
     return categories
   for item in label_map.item:
     if not 0 < item.id <= max_num_classes:
-      tf.logging.info(
-          'Ignore item {} since it falls outside of requested '
-          'label range.'.format(item.id))
+      logging.info(
+          'Ignore item %d since it falls outside of requested '
+          'label range.', item.id)
       continue
     if use_display_name and item.HasField('display_name'):
       name = item.display_name

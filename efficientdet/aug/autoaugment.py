@@ -24,6 +24,7 @@ from __future__ import print_function
 
 import inspect
 import math
+from absl import logging
 import tensorflow.compat.v1 as tf
 
 import hparams_config
@@ -1612,7 +1613,7 @@ def distort_image_with_autoaugment(image, bboxes, augmentation_name):
   Returns:
     A tuple containing the augmented versions of `image` and `bboxes`.
   """
-  tf.logging.info('Using autoaugmention policy: {}'.format(augmentation_name))
+  logging.info('Using autoaugmention policy: %s', augmentation_name)
   available_policies = {'v0': policy_v0, 'v1': policy_v1, 'v2': policy_v2,
                         'v3': policy_v3, 'test': policy_vtest}
   if augmentation_name not in available_policies:
