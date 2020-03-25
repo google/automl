@@ -380,6 +380,6 @@ def main(argv):
 
 
 if __name__ == '__main__':
-  logging.set_verbosity(logging.warning)
+  logging.set_verbosity(logging.WARNING)
   tf.disable_v2_behavior()
   tf.app.run(main)
