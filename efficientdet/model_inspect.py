@@ -23,6 +23,8 @@ import os
 import time
 
 from absl import flags
+from absl import logging
+
 import numpy as np
 import tensorflow.compat.v1 as tf
 from typing import Text, Tuple, List
@@ -53,6 +55,11 @@ flags.DEFINE_bool('enable_ema', True, 'Use ema variables for eval.')
 flags.DEFINE_string('input_image', None, 'Input image path for inference.')
 flags.DEFINE_string('output_image_dir', None, 'Output dir for inference.')
 
+# For visualization.
+flags.DEFINE_integer('line_thickness', None, 'Line thickness for box.')
+flags.DEFINE_integer('max_boxes_to_draw', None, 'Max number of boxes to draw.')
+flags.DEFINE_float('min_score_thresh', None, 'Score threshold to show box.')
+
 FLAGS = flags.FLAGS
 
 
@@ -80,22 +87,26 @@ class ModelInspector(object):
 
     if image_size:
       # Use user specified image size.
-      self.model_overrides = {'image_size': image_size}
+      self.model_overrides = {
+          'image_size': image_size,
+          'num_classes': num_classes
+      }
     else:
       # Use default size.
       image_size = hparams_config.get_detection_config(model_name).image_size
-      self.model_overrides = {}
+      self.model_overrides = {'num_classes': num_classes}
 
     # A few fixed parameters.
     batch_size = 1
     self.num_classes = num_classes
     self.inputs_shape = [batch_size, image_size, image_size, 3]
     self.labels_shape = [batch_size, self.num_classes]
+    self.image_size = image_size
 
   def build_model(self, inputs: tf.Tensor,
                   is_training: bool = False) -> List[tf.Tensor]:
     """Build model with inputs and labels and print out model stats."""
-    tf.logging.info('start building model')
+    logging.info('start building model')
     model_arch = det_model_fn.get_model_arch(self.model_name)
     cls_outputs, box_outputs = model_arch(
         inputs,
@@ -165,9 +176,10 @@ class ModelInspector(object):
       self.restore_model(
           sess, self.ckpt_path, self.enable_ema, self.export_ckpt)
 
-  def inference_single_image(self, image_image_path, output_dir):
-    driver = inference.InferenceDriver(self.model_name, self.ckpt_path)
-    driver.inference(image_image_path, output_dir)
+  def inference_single_image(self, image_image_path, output_dir, **kwargs):
+    driver = inference.InferenceDriver(self.model_name, self.ckpt_path,
+                                       self.image_size)
+    driver.inference(image_image_path, output_dir, **kwargs)
 
   def freeze_model(self) -> Tuple[Text, Text]:
     """Freeze model and convert them into tflite and tf graph."""
@@ -176,7 +188,7 @@ class ModelInspector(object):
       outputs = self.build_model(inputs, is_training=False)
 
       checkpoint = tf.train.latest_checkpoint(self.logdir)
-      tf.logging.info('Loading checkpoint: {}'.format(checkpoint))
+      logging.info('Loading checkpoint: %s', checkpoint)
       saver = tf.train.Saver()
 
       # Restore the Variables from the checkpoint and freeze the Graph.
@@ -238,7 +250,7 @@ class ModelInspector(object):
           run_metadata = tf.RunMetadata()
           sess.run(output, feed_dict={inputs: img},
                    options=run_options, run_metadata=run_metadata)
-          tf.logging.info('Dumping trace to %s' % trace_filename)
+          logging.info('Dumping trace to %s', trace_filename)
           trace_dir = os.path.dirname(trace_filename)
           if not tf.io.gfile.exists(trace_dir):
             tf.io.gfile.makedirs(trace_dir)
@@ -279,7 +291,15 @@ class ModelInspector(object):
     elif runmode == 'ckpt':
       self.eval_ckpt()
     elif runmode == 'infer':
-      self.inference_single_image(FLAGS.input_image, FLAGS.output_image_dir)
+      config_dict = {}
+      if FLAGS.line_thickness:
+        config_dict['line_thickness'] = FLAGS.line_thickness
+      if FLAGS.max_boxes_to_draw:
+        config_dict['max_boxes_to_draw'] = FLAGS.max_boxes_to_draw
+      if FLAGS.min_score_thresh:
+        config_dict['min_score_thresh'] = FLAGS.min_score_thresh
+      self.inference_single_image(FLAGS.input_image, FLAGS.output_image_dir,
+                                  **config_dict)
     elif runmode == 'bm':
       self.benchmark_model(warmup_runs=5, bm_runs=FLAGS.bm_runs,
                            num_threads=threads,
@@ -288,7 +308,7 @@ class ModelInspector(object):
 
 def main(_):
   if tf.io.gfile.exists(FLAGS.logdir) and FLAGS.delete_logdir:
-    tf.logging.info('Deleting log dir ...')
+    logging.info('Deleting log dir ...')
     tf.io.gfile.rmtree(FLAGS.logdir)
 
   inspector = ModelInspector(
@@ -305,5 +325,6 @@ def main(_):
 
 
 if __name__ == '__main__':
+  logging.set_verbosity(logging.WARNING)
   tf.disable_v2_behavior()
   tf.app.run(main)

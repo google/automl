@@ -21,6 +21,7 @@ from __future__ import print_function
 
 import copy
 import os
+from absl import logging
 import numpy as np
 from PIL import Image
 import tensorflow.compat.v1 as tf
@@ -31,7 +32,7 @@ import dataloader
 import det_model_fn
 import hparams_config
 import utils
-from visualize import visualize
+from visualize import vis_utils
 
 
 coco_id_mapping = {
@@ -190,8 +191,16 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
   return detections_batch
 
 
-def visualize_image(image, boxes, classes, scores, id_mapping):
-  """Visualizes a list of images.
+def visualize_image(image,
+                    boxes,
+                    classes,
+                    scores,
+                    id_mapping,
+                    min_score_thresh=0.2,
+                    max_boxes_to_draw=50,
+                    line_thickness=4,
+                    **kwargs):
+  """Visualizes a given image.
 
   Args:
     image: a image with shape [H, W, C].
@@ -199,40 +208,70 @@ def visualize_image(image, boxes, classes, scores, id_mapping):
     classes: a class prediction with shape [N].
     scores: A list of float value with shape [N].
     id_mapping: a dictionary from class id to name.
+    min_score_thresh: minimal score for showing. If claass probability is below
+      this threshold, then the object will not show up.
+    max_boxes_to_draw: maximum bounding box to draw.
+    line_thickness: how thick is the bounding box line.
+    **kwargs: extra parameters.
 
   Returns:
     output_image: an output image with annotated boxes and classes.
   """
   category_index = {k: {'id': k, 'name': id_mapping[k]} for k in id_mapping}
   img = np.array(image)
-  visualize.visualize_boxes_and_labels_on_image_array(
+  vis_utils.visualize_boxes_and_labels_on_image_array(
       img,
       boxes,
       classes,
       scores,
       category_index,
-      min_score_thresh=0.5,
-      instance_masks=None,
-      use_normalized_coordinates=False,
-      line_thickness=4)
+      min_score_thresh=min_score_thresh,
+      max_boxes_to_draw=max_boxes_to_draw,
+      line_thickness=line_thickness,
+      **kwargs)
   return img
 
 
 class InferenceDriver(object):
   """A driver for doing inference."""
 
-  def __init__(self, model_name: Text, ckpt_path: Text,
+  def __init__(self, model_name: Text, ckpt_path: Text, image_size: int = None,
                label_id_mapping: Dict[int, Text] = None):
-    """Initialize the inference driver."""
+    """Initialize the inference driver.
+
+    Args:
+      model_name: target model name, such as efficientdet-d0.
+      ckpt_path: checkpoint path, such as /tmp/efficientdet-d0/.
+      image_size: user specified image size. If None, use the default image size
+        defined by model_name.
+      label_id_mapping: a dictionary from id to name. If None, use the default
+        coco_id_mapping (with 90 classes).
+    """
     self.model_name = model_name
     self.ckpt_path = ckpt_path
     self.label_id_mapping = label_id_mapping or coco_id_mapping
 
     self.params = hparams_config.get_detection_config(self.model_name).as_dict()
     self.params.update(dict(is_training_bn=False, use_bfloat16=False))
+    if image_size:
+      self.params.update(dict(image_size=image_size))
 
-  def inference(self, image_path_pattern: Text, output_dir: Text):
-    """Read and preprocess input images."""
+  def inference(self,
+                image_path_pattern: Text,
+                output_dir: Text,
+                **kwargs):
+    """Read and preprocess input images.
+
+    Args:
+      image_path_pattern: Image file pattern such as /tmp/img*.jpg
+      output_dir: the directory for output images. Output images will be named
+        as 0.jpg, 1.jpg, ....
+      **kwargs: extra parameters for for vistualization, such as
+        min_score_thresh, max_boxes_to_draw, and line_thickness.
+
+    Returns:
+      Annotated image.
+    """
     params = copy.deepcopy(self.params)
     with tf.Session() as sess:
       # Buid inputs and preprocessing.
@@ -243,7 +282,7 @@ class InferenceDriver(object):
       class_outputs, box_outputs = build_model(
           self.model_name, images, **self.params)
       restore_ckpt(sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
-      params.update(dict(batch_size=1))  # required by postprocessing.
+      params.update(dict(batch_size=len(raw_images)))  # for postprocessing.
 
       # Build postprocessing.
       detections_batch = det_post_process(
@@ -260,10 +299,10 @@ class InferenceDriver(object):
         # TODO(tanmingxing): make this convertion more efficient.
         boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
         boxes[:, 2:4] += boxes[:, 0:2]
-        img = visualize_image(
-            raw_images[i], boxes, classes, scores, self.label_id_mapping)
+        img = visualize_image(raw_images[i], boxes, classes, scores,
+                              self.label_id_mapping, **kwargs)
         output_image_path = os.path.join(output_dir, str(i) + '.jpg')
         Image.fromarray(img).save(output_image_path)
-        tf.logging.info('writing file to {}'.format(output_image_path))
+        logging.info('writing file to %s', output_image_path)
 
       return outputs_np
