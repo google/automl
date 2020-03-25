@@ -21,6 +21,7 @@ from __future__ import print_function
 
 import copy
 import os
+from absl import logging
 import numpy as np
 from PIL import Image
 import tensorflow.compat.v1 as tf
@@ -281,7 +282,7 @@ class InferenceDriver(object):
       class_outputs, box_outputs = build_model(
           self.model_name, images, **self.params)
       restore_ckpt(sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
-      params.update(dict(batch_size=len(raw_images)))  # required by postprocessing.
+      params.update(dict(batch_size=len(raw_images)))  # for postprocessing.
 
       # Build postprocessing.
       detections_batch = det_post_process(
@@ -302,6 +303,6 @@ class InferenceDriver(object):
                               self.label_id_mapping, **kwargs)
         output_image_path = os.path.join(output_dir, str(i) + '.jpg')
         Image.fromarray(img).save(output_image_path)
-        tf.logging.info('writing file to {}'.format(output_image_path))
+        logging.info('writing file to %s', output_image_path)
 
       return outputs_np

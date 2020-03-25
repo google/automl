@@ -5,8 +5,8 @@
 
 Updates:
 
-  - **Mar24: Add tutorial with visualization and coco eval: [tutorial.ipynb](tutorial.ipynb)**
-  - Mar 13: Release the code.
+  - **Mar24: Add [tutorial](tutorial.ipynb) (with visualization and coco eval)**
+  - Mar 13: Release the initial code and models.
 
 ## 1. About EfficientDet Models
 
@@ -71,11 +71,10 @@ We have provided a list of EfficientNet checkpoints for EfficientNet checkpoints
     $ python model_inspect.py --runmode=infer --model_name=$MODEL --ckpt_path=$CKPT_PATH --input_image=testdata/img1.jpg --output_image_dir=/tmp
     # you can visualize the output /tmp/0.jpg
 
-Here is an example of EfficientDet-D0 visualization:
-[example image](https://user-images.githubusercontent.com/6027221/77340634-d16dc300-6cea-11ea-822c-63853f457329.jpg)
+Here is an example of EfficientDet-D0 visualization: more on [tutorial](tutorial.ipynb)
 
 <p align="center">
-<img src="https://user-images.githubusercontent.com/6027221/77340634-d16dc300-6cea-11ea-822c-63853f457329.jpg" width="800" />
+<img src="https://user-images.githubusercontent.com/6027221/77340634-d16dc300-6cea-11ea-822c-63853f457329.jpg" width="600" />
 </p>
 
 ## 4. Eval on COCO 2017 val.
@@ -120,7 +119,7 @@ To train this model on Cloud TPU, you will need:
 Then train the model:
 
     $ export PYTHONPATH="$PYTHONPATH:/path/to/models"
-    $ python main.py --tpu=TPU_NAME --data_dir=DATA_DIR --model_dir=MODEL_DIR
+    $ python main.py --tpu=TPU_NAME --training_file_pattern=FILE_PATTERN --model_dir=MODEL_DIR
 
     # TPU_NAME is the name of the TPU node, the same name that appears when you run gcloud compute tpus list, or ctpu ls.
     # MODEL_DIR is a GCS location (a URL starting with gs:// where both the GCE VM and the associated Cloud TPU have write access.

@@ -23,6 +23,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
 
@@ -643,7 +644,7 @@ def retinanet(features, model_name='retinanet-50', config=None, **kwargs):
   # create feature pyramid networks
   feats = resnet_fpn(features, min_level, max_level, resnet_depth,
                      is_training_bn, use_nearest_upsampling)
-  tf.logging.info('backbone+fpn params/flops = {:.6f}M, {:.9f}B'.format(
+  logging.info('backbone+fpn params/flops = {:.6f}M, {:.9f}B'.format(
       *utils.num_params_flops()))
   # add class net and box net in RetinaNet. The class net and the box net are
   # shared among all the levels.
@@ -658,7 +659,7 @@ def retinanet(features, model_name='retinanet-50', config=None, **kwargs):
       for level in range(min_level, max_level + 1):
         box_outputs[level] = box_net(feats[level], level,
                                      num_anchors, is_training_bn)
-  tf.logging.info('backbone+fpn params/flops = {:.6f}M, {:.9f}B'.format(
+  logging.info('backbone+fpn params/flops = {:.6f}M, {:.9f}B'.format(
       *utils.num_params_flops()))
 
   return class_outputs, box_outputs

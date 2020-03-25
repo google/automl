@@ -16,7 +16,7 @@
 
 [1] Mingxing Tan, Ruoming Pang, Quoc Le.
     EfficientDet: Scalable and Efficient Object Detection.
-    https://arxiv.org/abs/1911.09070
+    CVPR 2020, https://arxiv.org/abs/1911.09070
 """
 
 from __future__ import absolute_import
@@ -24,6 +24,7 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
+from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
 
@@ -378,13 +379,12 @@ def build_feature_network(features, config):
   with tf.variable_scope('fpn_cells'):
     for rep in range(config.fpn_cell_repeats):
       with tf.variable_scope('cell_{}'.format(rep)):
-        tf.logging.info('building cell {}'.format(rep))
+        logging.info('building cell %d', rep)
         new_feats = build_bifpn_layer(
             feats=feats,
             fpn_name=config.fpn_name,
             fpn_config=config.fpn_config,
             input_size=config.image_size,
-            cell_ind=rep,
             fpn_num_filters=config.fpn_num_filters,
             min_level=config.min_level,
             max_level=config.max_level,
@@ -449,18 +449,17 @@ def get_fpn_config(fpn_name):
 
 
 def build_bifpn_layer(
-    feats, fpn_name, fpn_config, is_training, input_size, cell_ind,
+    feats, fpn_name, fpn_config, is_training, input_size,
     fpn_num_filters, min_level, max_level, separable_conv,
     apply_bn_for_resampling, conv_after_downsample,
     use_native_resize_op, conv_bn_relu_pattern, pooling_type):
   """Builds a feature pyramid given previous feature pyramid and config."""
   config = fpn_config or get_fpn_config(fpn_name)
-  tf.logging.info('building cell {} using config: {}'.format(cell_ind, config))
 
   num_output_connections = [0 for _ in feats]
   for i, fnode in enumerate(config.nodes):
     with tf.variable_scope('fnode{}'.format(i)):
-      tf.logging.info('fnode {} : {}'.format(i, fnode))
+      logging.info('fnode %d : %s', i, fnode)
       new_node_width = int(fnode['width_ratio'] * input_size)
       nodes = []
       for idx, input_offset in enumerate(fnode['inputs_offsets']):
@@ -531,7 +530,6 @@ def build_bifpn_layer(
     for i, fnode in enumerate(reversed(config.nodes)):
       if fnode['width_ratio'] == F(l):
         output_feats[l] = feats[-1 - i]
-  tf.logging.info('Output feature pyramid: {}'.format(output_feats))
   return output_feats
 
 
@@ -546,21 +544,21 @@ def efficientdet(features, model_name=None, config=None, **kwargs):
   if kwargs:
     config.override(kwargs)
 
-  tf.logging.info(config)
+  logging.info(config)
 
   # build backbone features.
   features = build_backbone(features, config)
-  tf.logging.info('backbone params/flops = {:.6f}M, {:.9f}B'.format(
+  logging.info('backbone params/flops = {:.6f}M, {:.9f}B'.format(
       *utils.num_params_flops()))
 
   # build feature network.
   fpn_feats = build_feature_network(features, config)
-  tf.logging.info('backbone+fpn params/flops = {:.6f}M, {:.9f}B'.format(
+  logging.info('backbone+fpn params/flops = {:.6f}M, {:.9f}B'.format(
       *utils.num_params_flops()))
 
   # build class and box predictions.
   class_outputs, box_outputs = build_class_and_box_outputs(fpn_feats, config)
-  tf.logging.info('backbone+fpn+box params/flops = {:.6f}M, {:.9f}B'.format(
+  logging.info('backbone+fpn+box params/flops = {:.6f}M, {:.9f}B'.format(
       *utils.num_params_flops()))
 
   return class_outputs, box_outputs

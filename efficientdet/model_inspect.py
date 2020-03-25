@@ -22,8 +22,9 @@ from __future__ import print_function
 import os
 import time
 
-from absl import logging
 from absl import flags
+from absl import logging
+
 import numpy as np
 import tensorflow.compat.v1 as tf
 from typing import Text, Tuple, List
@@ -105,7 +106,7 @@ class ModelInspector(object):
   def build_model(self, inputs: tf.Tensor,
                   is_training: bool = False) -> List[tf.Tensor]:
     """Build model with inputs and labels and print out model stats."""
-    tf.logging.info('start building model')
+    logging.info('start building model')
     model_arch = det_model_fn.get_model_arch(self.model_name)
     cls_outputs, box_outputs = model_arch(
         inputs,
@@ -187,7 +188,7 @@ class ModelInspector(object):
       outputs = self.build_model(inputs, is_training=False)
 
       checkpoint = tf.train.latest_checkpoint(self.logdir)
-      tf.logging.info('Loading checkpoint: {}'.format(checkpoint))
+      logging.info('Loading checkpoint: %s', checkpoint)
       saver = tf.train.Saver()
 
       # Restore the Variables from the checkpoint and freeze the Graph.
@@ -249,7 +250,7 @@ class ModelInspector(object):
           run_metadata = tf.RunMetadata()
           sess.run(output, feed_dict={inputs: img},
                    options=run_options, run_metadata=run_metadata)
-          tf.logging.info('Dumping trace to %s' % trace_filename)
+          logging.info('Dumping trace to %s', trace_filename)
           trace_dir = os.path.dirname(trace_filename)
           if not tf.io.gfile.exists(trace_dir):
             tf.io.gfile.makedirs(trace_dir)
@@ -307,7 +308,7 @@ class ModelInspector(object):
 
 def main(_):
   if tf.io.gfile.exists(FLAGS.logdir) and FLAGS.delete_logdir:
-    tf.logging.info('Deleting log dir ...')
+    logging.info('Deleting log dir ...')
     tf.io.gfile.rmtree(FLAGS.logdir)
 
   inspector = ModelInspector(
@@ -325,6 +326,5 @@ def main(_):
 
 if __name__ == '__main__':
   logging.set_verbosity(logging.WARNING)
-  tf.logging.set_verbosity(tf.logging.WARN)
   tf.disable_v2_behavior()
   tf.app.run(main)
