@@ -119,7 +119,7 @@ To train this model on Cloud TPU, you will need:
 Then train the model:
 
     $ export PYTHONPATH="$PYTHONPATH:/path/to/models"
-    $ python main.py --tpu=TPU_NAME --training_file_pattern=FILE_PATTERN --model_dir=MODEL_DIR
+    $ python main.py --tpu=TPU_NAME --training_file_pattern=DATA_DIR/*.tfrecord --model_dir=MODEL_DIR
 
     # TPU_NAME is the name of the TPU node, the same name that appears when you run gcloud compute tpus list, or ctpu ls.
     # MODEL_DIR is a GCS location (a URL starting with gs:// where both the GCE VM and the associated Cloud TPU have write access.
