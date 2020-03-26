@@ -124,8 +124,9 @@ class ModelInspector(object):
     return all_outputs
 
   def export_saved_model(self):
-    driver = inference.InferenceDriver(self.model_name, self.ckpt_path)
-    driver.export_saved_model(os.path.join(self.logdir, self.model_name))
+    driver = inference.ServingDriver(self.model_name, self.ckpt_path)
+    driver.build()
+    driver.export(os.path.join(self.logdir, self.model_name))
 
   def saved_model_inference(self, image_path_pattern, output_dir, model_dir):
     with tf.Session() as sess:
@@ -135,7 +136,7 @@ class ModelInspector(object):
       raw_images.append(image)
       with tf.io.gfile.GFile(image_path_pattern, 'rb') as file:
         image_bin = file.read()
-      outputs_np = sess.run(["cond_798/Merge:0"], {'input:0': [image_bin]})
+      outputs_np = sess.run(["detection:0"], {'image:0': [image_bin]})
       for i, output_np in enumerate(outputs_np):
         # output_np has format [image_id, y, x, height, width, score, class]
         boxes = output_np[:, 1:5]

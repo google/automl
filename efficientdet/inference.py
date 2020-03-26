@@ -273,17 +273,21 @@ class ServingDriver(object):
     self.signitures = None
     self.sess = None
 
-  def build(self, params_override=None):
+  def build(self, params_override=None, batch_size=1):
     """Build model and restore checkpoints."""
     params = copy.deepcopy(self.params)
     if params_override:
       params.update(params_override)
-    image_shape = [None, None, None]
-    input_image = tf.placeholder(tf.uint8, name='image', shape=image_shape)
-    image, scale = image_preprocess(input_image, params['image_size'])
+
+    inputs = tf.placeholder(tf.string, name='image', shape=(1))
+    image_size = params['image_size']
+    image = tf.io.decode_image(inputs[0], channels=3, dtype=tf.float32)
+    image.set_shape([None, None, None])
+    image, scale = image_preprocess(image, image_size)
     image = tf.expand_dims(image, 0)
+
     class_outputs, box_outputs = build_model(self.model_name, image, **params)
-    params.update(dict(batch_size=1))  # for postprocessing.
+    params.update(dict(batch_size=1))
     detections = det_post_process(params, class_outputs, box_outputs, [scale])
 
     if not self.sess:
@@ -291,7 +295,7 @@ class ServingDriver(object):
     restore_ckpt(self.sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
 
     self.signitures = {
-        'input': input_image,
+        'input': inputs,
         'prediction': detections,
     }
     return self.signitures
@@ -312,9 +316,6 @@ class ServingDriver(object):
     boxes = predictions[:, 1:5]
     classes = predictions[:, 6].astype(int)
     scores = predictions[:, 5]
-    # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]
-    # TODO(tanmingxing): make this convertion more efficient.
-    boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
     boxes[:, 2:4] += boxes[:, 0:2]
     return visualize_image(image, boxes, classes, scores, self.label_id_mapping,
                            **kwargs)
@@ -334,6 +335,11 @@ class ServingDriver(object):
         self.signitures['prediction'],
         feed_dict={self.signitures['input']: image})
     return predictions
+
+  def export(self, output_dir):
+      tf.saved_model.simple_save(self.sess, output_dir, inputs={self.signitures['input'].name: self.signitures['input']},
+                                 outputs={item.name: item for item in self.signitures['prediction']})
+      logging.INFO('Model saved at ' + output_dir)
 
 
 class InferenceDriver(object):
@@ -366,28 +372,6 @@ class InferenceDriver(object):
     self.params.update(dict(is_training_bn=False, use_bfloat16=False))
     if image_size:
       self.params.update(dict(image_size=image_size))
-
-  def export_saved_model(self, output_dir):
-      params = copy.deepcopy(self.params)
-      with tf.Session() as sess:
-          inputs = tf.placeholder(tf.string, name='input', shape=(1))
-          image_size = params['image_size']
-          image = tf.io.decode_image(inputs[0], channels=3, dtype=tf.float32)
-          image.set_shape([None, None, 3])
-          image, scale = image_preprocess(
-              image, image_size)
-          # Build model.
-          class_outputs, box_outputs = build_model(
-              self.model_name, tf.expand_dims(image,0), **self.params)
-
-          restore_ckpt(sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
-          params.update(dict(batch_size=1))  # required by postprocessing.
-
-          # Build postprocessing.
-          detections_batch = det_post_process(
-              params, class_outputs, box_outputs, [scale])
-          tf.saved_model.simple_save(sess, output_dir, inputs={inputs.name: inputs},
-                                 outputs={item.name:item for item in detections_batch})
 
   def inference(self,
                 image_path_pattern: Text,

@@ -278,7 +278,7 @@ def _generate_detections_tf(cls_outputs, box_outputs, anchor_boxes, indices,
     indices = tf.where(tf.equal(classes, c))
     detections = tf.cond(tf.equal(tf.shape(indices)[0], 0), lambda: detections, lambda: _else(detections))
 
-  return detections
+  return tf.identity(detections, name="detection")
 
 def _generate_detections(cls_outputs, box_outputs, anchor_boxes, indices,
                          classes, image_id, image_scale, num_classes):
