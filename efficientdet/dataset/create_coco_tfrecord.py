@@ -40,7 +40,7 @@ import PIL.Image
 
 from pycocotools import mask
 import tensorflow.compat.v1 as tf
-from dataset import label_map_util
+from dataset.label_map_util import create_category_index
 from dataset import tfrecord_util
 
 
@@ -209,7 +209,7 @@ def _load_object_annotations(object_annotations_file):
     obj_annotations = json.load(fid)
 
   images = obj_annotations['images']
-  category_index = label_map_util.create_category_index(
+  category_index = create_category_index(
       obj_annotations['categories'])
 
   img_to_obj_annotation = collections.defaultdict(list)
