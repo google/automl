@@ -530,6 +530,7 @@ def build_bifpn_layer(
     for i, fnode in enumerate(reversed(config.nodes)):
       if fnode['width_ratio'] == F(l):
         output_feats[l] = feats[-1 - i]
+        break
   return output_feats
 
 
