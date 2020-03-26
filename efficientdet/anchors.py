@@ -109,7 +109,7 @@ def decode_box_outputs_tf(rel_codes, anchors):
   xmax = xcenter + w / 2.
   return tf.stack([ymin, xmin, ymax, xmax], axis=1)
 
-
+@tf.autograph.to_graph
 def nms(dets, thresh):
   """Non-maximum suppression."""
   x1 = dets[:, 0]
@@ -119,25 +119,30 @@ def nms(dets, thresh):
   scores = dets[:, 4]
 
   areas = (x2 - x1 + 1) * (y2 - y1 + 1)
-  order = scores.argsort()[::-1]
+  order = tf.argsort(scores, direction='DESCENDING')
 
-  keep = []
-  while order.size > 0:
+  keep = tf.TensorArray(tf.int32, size=0, dynamic_size=True)
+  index = 0
+  while tf.size(order) > 0:
     i = order[0]
-    keep.append(i)
-    xx1 = np.maximum(x1[i], x1[order[1:]])
-    yy1 = np.maximum(y1[i], y1[order[1:]])
-    xx2 = np.minimum(x2[i], x2[order[1:]])
-    yy2 = np.minimum(y2[i], y2[order[1:]])
+    keep = keep.write(index, i)
+    xx1 = tf.maximum(x1[i], tf.gather(x1, order[1:]))
+    yy1 = tf.maximum(y1[i], tf.gather(y1, order[1:]))
+    xx2 = tf.minimum(x2[i], tf.gather(x2, order[1:]))
+    yy2 = tf.minimum(y2[i], tf.gather(y2, order[1:]))
 
-    w = np.maximum(0.0, xx2 - xx1 + 1)
-    h = np.maximum(0.0, yy2 - yy1 + 1)
+    w = tf.maximum(0.0, xx2 - xx1 + 1)
+    h = tf.maximum(0.0, yy2 - yy1 + 1)
     intersection = w * h
-    overlap = intersection / (areas[i] + areas[order[1:]] - intersection)
+    overlap = intersection / (areas[i] + tf.gather(areas, order[1:]) - intersection)
 
-    inds = np.where(overlap <= thresh)[0]
-    order = order[inds + 1]
-  return keep
+    inds = tf.where_v2(overlap <= thresh)
+    if tf.size(inds)>0:
+      order = tf.gather(order, inds[0] + 1)
+    else:
+      order = tf.constant([], dtype=order.dtype)
+    index += 1
+  return keep.stack()
 
 
 def _generate_anchor_configs(min_level, max_level, num_scales, aspect_ratios):
@@ -214,7 +219,7 @@ def _generate_anchor_boxes(image_size, anchor_scale, anchor_configs):
   return anchor_boxes
 
 def _generate_detections_tf(cls_outputs, box_outputs, anchor_boxes, indices,
-                         classes, image_id, image_scale, num_classes):
+                         classes, image_id, image_scale, num_classes, use_native_nms=False):
   """Generates detections with RetinaNet model outputs and anchors.
 
   Args:
@@ -254,10 +259,13 @@ def _generate_detections_tf(cls_outputs, box_outputs, anchor_boxes, indices,
     # (nms) for boxes in the same class. The selected boxes from each class are
     # then concatenated for the final detection outputs.
     all_detections_cls = tf.concat([tf.reshape(boxes_cls, [-1, 4]), scores_cls], axis=1)
-    top_detection_idx = tf.image.non_max_suppression(all_detections_cls[:, :4],
-                                                     all_detections_cls[:, 4],
-                                                     MAX_DETECTIONS_PER_IMAGE,
-                                                     iou_threshold=0.5)
+    if use_native_nms:
+      top_detection_idx = tf.image.non_max_suppression(all_detections_cls[:, :4],
+                                                       all_detections_cls[:, 4],
+                                                       MAX_DETECTIONS_PER_IMAGE,
+                                                       iou_threshold=0.5)
+    else:
+      top_detection_idx = nms(all_detections_cls, 0.5)
     top_detections_cls = tf.gather(all_detections_cls, top_detection_idx)
     height = top_detections_cls[:, 2] - top_detections_cls[:, 0]
     width = top_detections_cls[:, 3] - top_detections_cls[:, 1]
