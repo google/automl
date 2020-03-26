@@ -25,7 +25,6 @@ from six.moves import range
 import tensorflow.compat.v1 as tf
 from google.protobuf import text_format
 
-from dataset import string_int_label_map_pb2
 
 
 def _validate_label_map(label_map):
