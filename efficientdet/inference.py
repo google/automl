@@ -267,7 +267,6 @@ class ServingDriver(object):
 
     self.params = hparams_config.get_detection_config(self.model_name).as_dict()
     self.params.update(dict(is_training_bn=False, use_bfloat16=False))
-    self.params.update(dict(batch_size=1))
     if image_size:
       self.params.update(dict(image_size=image_size))
 
@@ -276,7 +275,7 @@ class ServingDriver(object):
 
   def build(self, params_override=None):
     """Build model and restore checkpoints."""
-    params = self.params
+    params = copy.deepcopy(self.params)
     if params_override:
       params.update(params_override)
     image_shape = [None, None, None]
@@ -284,6 +283,7 @@ class ServingDriver(object):
     image, scale = image_preprocess(input_image, params['image_size'])
     image = tf.expand_dims(image, 0)
     class_outputs, box_outputs = build_model(self.model_name, image, **params)
+    params.update(dict(batch_size=1))  # for postprocessing.
     detections = det_post_process(params, class_outputs, box_outputs, [scale])
 
     if not self.sess:
@@ -341,7 +341,7 @@ class InferenceDriver(object):
 
   Example usage:
 
-    driver = inference.ServingDriver('efficientdet-d0', '/tmp/efficientdet-d0')
+    driver = inference.InferenceDriver('efficientdet-d0', '/tmp/efficientdet-d0')
     driver.inference('/tmp/*.jpg', '/tmp/outputdir')
 
   """
