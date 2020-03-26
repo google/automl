@@ -232,8 +232,119 @@ def visualize_image(image,
   return img
 
 
+class ServingDriver(object):
+  """A driver for continuously serving single input image.
+
+  Example usage:
+
+    driver = inference.ServingDriver('efficientdet-d0', '/tmp/efficientdet-d0')
+    driver.build()
+    for f in tf.io.gfile.glob('/tmp/*.jpg'):
+      image = Image.open(f)
+      predictions = driver.serve(image)
+      out_image = driver.visualize(image, predictions[0])
+      ...
+  """
+
+  def __init__(self,
+               model_name: Text,
+               ckpt_path: Text,
+               image_size: int = None,
+               label_id_mapping: Dict[int, Text] = None):
+    """Initialize the inference driver.
+
+    Args:
+      model_name: target model name, such as efficientdet-d0.
+      ckpt_path: checkpoint path, such as /tmp/efficientdet-d0/.
+      image_size: user specified image size. If None, use the default image size
+        defined by model_name.
+      label_id_mapping: a dictionary from id to name. If None, use the default
+        coco_id_mapping (with 90 classes).
+    """
+    self.model_name = model_name
+    self.ckpt_path = ckpt_path
+    self.label_id_mapping = label_id_mapping or coco_id_mapping
+
+    self.params = hparams_config.get_detection_config(self.model_name).as_dict()
+    self.params.update(dict(is_training_bn=False, use_bfloat16=False))
+    if image_size:
+      self.params.update(dict(image_size=image_size))
+
+    self.signitures = None
+    self.sess = None
+
+  def build(self, params_override=None):
+    """Build model and restore checkpoints."""
+    params = copy.deepcopy(self.params)
+    if params_override:
+      params.update(params_override)
+    image_shape = [None, None, None]
+    input_image = tf.placeholder(tf.uint8, name='image', shape=image_shape)
+    image, scale = image_preprocess(input_image, params['image_size'])
+    image = tf.expand_dims(image, 0)
+    class_outputs, box_outputs = build_model(self.model_name, image, **params)
+    params.update(dict(batch_size=1))  # for postprocessing.
+    detections = det_post_process(params, class_outputs, box_outputs, [scale])
+
+    if not self.sess:
+      self.sess = tf.Session()
+    restore_ckpt(self.sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
+
+    self.signitures = {
+        'input': input_image,
+        'prediction': detections,
+    }
+    return self.signitures
+
+  def visualize(self, image, predictions, **kwargs):
+    """Visualize predictions on image.
+
+    Args:
+      image: Image content in shape of [height, width, 3].
+      predictions: a list of vector, with each vector has the format of
+        [image_id, x, y, width, height, score, class].
+      **kwargs: extra parameters for for vistualization, such as
+        min_score_thresh, max_boxes_to_draw, and line_thickness.
+
+    Returns:
+      annotated image.
+    """
+    boxes = predictions[:, 1:5]
+    classes = predictions[:, 6].astype(int)
+    scores = predictions[:, 5]
+    # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]
+    # TODO(tanmingxing): make this convertion more efficient.
+    boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
+    boxes[:, 2:4] += boxes[:, 0:2]
+    return visualize_image(image, boxes, classes, scores, self.label_id_mapping,
+                           **kwargs)
+
+  def serve(self, image):
+    """Read and preprocess input images.
+
+    Args:
+      image: Image content in shape of [height, width, 3].
+
+    Returns:
+      Annotated image.
+    """
+    if not self.sess:
+      self.build()
+    predictions = self.sess.run(
+        self.signitures['prediction'],
+        feed_dict={self.signitures['input']: image})
+    return predictions
+
+
 class InferenceDriver(object):
-  """A driver for doing inference."""
+  """A driver for doing batch inference.
+
+  Example usage:
+
+    driver = inference.InferenceDriver('efficientdet-d0', '/tmp/efficientdet-d0')
+    driver.inference('/tmp/*.jpg', '/tmp/outputdir')
+
+  """
 
   def __init__(self, model_name: Text, ckpt_path: Text, image_size: int = None,
                label_id_mapping: Dict[int, Text] = None):

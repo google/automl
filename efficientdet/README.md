@@ -5,7 +5,7 @@
 
 Updates:
 
-  - **Mar24: Add [tutorial](tutorial.ipynb) (with visualization and coco eval)**
+  - **Mar24: Add tutorial with visualization and coco eval: [tutorial.ipynb](tutorial.ipynb)**
   - Mar 13: Release the initial code and models.
 
 ## 1. About EfficientDet Models
@@ -16,7 +16,7 @@ EfficientDets are a family of object detection models, which achieve state-of-th
 EfficientDets are developed based on the advanced backbone, a new BiFPN, and a new scaling technique:
 
 <p align="center">
-<img src="./g3doc/network.png" width="80%" />
+<img src="./g3doc/network.png" width="800" />
 </p>
 
   * **Backbone**: we employ the more advanced [EfficientNets](https://arxiv.org/abs/1905.11946) as our backbone networks.
@@ -74,7 +74,7 @@ We have provided a list of EfficientNet checkpoints for EfficientNet checkpoints
 Here is an example of EfficientDet-D0 visualization: more on [tutorial](tutorial.ipynb)
 
 <p align="center">
-<img src="https://user-images.githubusercontent.com/6027221/77340634-d16dc300-6cea-11ea-822c-63853f457329.jpg" width="600" />
+<img src="https://user-images.githubusercontent.com/6027221/77340634-d16dc300-6cea-11ea-822c-63853f457329.jpg" width="800" />
 </p>
 
 ## 4. Eval on COCO 2017 val.

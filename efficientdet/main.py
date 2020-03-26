@@ -52,7 +52,7 @@ flags.DEFINE_string(
     'eval_master', default='',
     help='GRPC URL of the eval master. Set to an appropriate value when running'
     ' on CPU/GPU')
-flags.DEFINE_bool('use_tpu', True, 'Use TPUs rather than CPUs//GPUs')
+flags.DEFINE_bool('use_tpu', True, 'Use TPUs rather than CPUs/GPUs')
 flags.DEFINE_bool('use_fake_data', False, 'Use fake input.')
 flags.DEFINE_bool(
     'use_xla', False,
@@ -381,6 +381,5 @@ def main(argv):
 
 
 if __name__ == '__main__':
-  logging.set_verbosity(logging.WARNING)
   tf.disable_v2_behavior()
   tf.app.run(main)
