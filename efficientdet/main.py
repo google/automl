@@ -62,6 +62,9 @@ flags.DEFINE_string('model_dir', None, 'Location of model_dir')
 flags.DEFINE_string('backbone_ckpt', '',
                     'Location of the ResNet50 checkpoint to use for model '
                     'initialization.')
+flags.DEFINE_string('ckpt',  default='',
+    help='Start training from this EfficientDet checkpoint.')
+
 flags.DEFINE_string('hparams', '',
                     'Comma separated k=v pairs of hyperparameters.')
 flags.DEFINE_integer(
@@ -202,6 +205,7 @@ def main(argv):
       num_examples_per_epoch=FLAGS.num_examples_per_epoch,
       use_tpu=FLAGS.use_tpu,
       backbone_ckpt=FLAGS.backbone_ckpt,
+      ckpt=FLAGS.ckpt,
       val_json_file=FLAGS.val_json_file,
       mode=FLAGS.mode,
   )
@@ -252,7 +256,6 @@ def main(argv):
           params,
           use_tpu=False,
           input_rand_hflip=False,
-          backbone_ckpt=None,
           is_training_bn=False,
           use_bfloat16=False,
       )
@@ -280,7 +283,6 @@ def main(argv):
         params,
         use_tpu=False,
         input_rand_hflip=False,
-        backbone_ckpt=None,
         is_training_bn=False,
         use_bfloat16=False,
     )
@@ -356,7 +358,6 @@ def main(argv):
           params,
           use_tpu=False,
           input_rand_hflip=False,
-          backbone_ckpt=None,
           is_training_bn=False,
       )
 

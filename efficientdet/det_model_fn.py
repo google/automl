@@ -513,18 +513,35 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     add_metric_fn_inputs(params, cls_outputs, box_outputs, metric_fn_inputs)
     eval_metrics = (metric_fn, metric_fn_inputs)
 
-  if params['backbone_ckpt'] and mode == tf.estimator.ModeKeys.TRAIN:
+  checkpoint = params.get("ckpt") or params.get("backbone_ckpt")
+
+  if checkpoint and mode == tf.estimator.ModeKeys.TRAIN:
+    # Start training from an EfficientDet checkpoint or
+    # an backbone checkpoint if given
+    if params.get("ckpt") and params.get("backbone_ckpt"):
+      raise RuntimeError("--backbone_ckpt and --checkpoint are mutually exclusive")
+    elif params.get("backbone_ckpt"):
+      var_scope = params["backbone_name"] + "/"
+      if params["ckpt_var_scope"] is None:
+        # Use backbone name as default checkpoint scope.
+        ckpt_scope = params["backbone_name"] + "/"
+      else:
+        ckpt_scope = params["ckpt_var_scope"] + "/"
+    else:
+      # Load every var in the given checkpoint
+      var_scope = ckpt_scope = "/"
+
     def scaffold_fn():
       """Loads pretrained model through scaffold function."""
-      logging.info('restore variables from %s', params['backbone_ckpt'])
-      if params['ckpt_var_scope'] is None:
-        ckpt_scope = params['backbone_name']  # Use backbone name in default.
-      else:
-        ckpt_scope = params['ckpt_var_scope']
-      tf.train.init_from_checkpoint(
-          params['backbone_ckpt'],
-          utils.get_ckt_var_map(params['backbone_ckpt'], ckpt_scope + '/',
-                                params['backbone_name'] + '/'))
+      logging.info('restore variables from %s' % checkpoint)
+
+      var_map = utils.get_ckt_var_map(
+        ckpt_path=checkpoint,
+        ckpt_scope=ckpt_scope,
+        var_scope=var_scope
+      )
+      tf.train.init_from_checkpoint(checkpoint, var_map)
+
       return tf.train.Scaffold()
   elif mode == tf.estimator.ModeKeys.EVAL and moving_average_decay:
     def scaffold_fn():
