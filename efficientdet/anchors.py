@@ -137,10 +137,8 @@ def nms(dets, thresh):
     overlap = intersection / (areas[i] + tf.gather(areas, order[1:]) - intersection)
 
     inds = tf.where_v2(overlap <= thresh)
-    if tf.size(inds)>0:
-      order = tf.gather(order, inds[0] + 1)
-    else:
-      order = tf.constant([], dtype=order.dtype)
+    order = tf.concat(tf.gather(order, inds + 1), axis=1)
+    order = tf.squeeze(order, axis=-1)
     index += 1
   return keep.stack()
 
