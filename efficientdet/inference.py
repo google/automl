@@ -273,7 +273,7 @@ class ServingDriver(object):
     self.signitures = None
     self.sess = None
 
-  def build(self, params_override=None, batch_size=1):
+  def build(self, params_override=None):
     """Build model and restore checkpoints."""
     params = copy.deepcopy(self.params)
     if params_override:
@@ -339,7 +339,7 @@ class ServingDriver(object):
   def export(self, output_dir):
       tf.saved_model.simple_save(self.sess, output_dir, inputs={self.signitures['input'].name: self.signitures['input']},
                                  outputs={item.name: item for item in self.signitures['prediction']})
-      logging.INFO('Model saved at ' + output_dir)
+      logging.info('Model saved at ' + output_dir)
 
 
 class InferenceDriver(object):
