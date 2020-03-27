@@ -341,8 +341,8 @@ class InferenceDriver(object):
 
   Example usage:
 
-    driver = inference.InferenceDriver('efficientdet-d0', '/tmp/efficientdet-d0')
-    driver.inference('/tmp/*.jpg', '/tmp/outputdir')
+   driver = inference.InferenceDriver('efficientdet-d0', '/tmp/efficientdet-d0')
+   driver.inference('/tmp/*.jpg', '/tmp/outputdir')
 
   """
 

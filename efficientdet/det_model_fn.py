@@ -383,6 +383,9 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
   Returns:
     tpu_spec: the TPUEstimatorSpec to run training, evaluation, or prediction.
+
+  Raises:
+    RuntimeError: if both ckpt and backbone_ckpt are set.
   """
   # Convert params (dict) to Config for easier access.
   def _model_outputs():
@@ -513,33 +516,30 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     add_metric_fn_inputs(params, cls_outputs, box_outputs, metric_fn_inputs)
     eval_metrics = (metric_fn, metric_fn_inputs)
 
-  checkpoint = params.get("ckpt") or params.get("backbone_ckpt")
+  checkpoint = params.get('ckpt') or params.get('backbone_ckpt')
 
   if checkpoint and mode == tf.estimator.ModeKeys.TRAIN:
-    # Start training from an EfficientDet checkpoint or
-    # an backbone checkpoint if given
-    if params.get("ckpt") and params.get("backbone_ckpt"):
-      raise RuntimeError("--backbone_ckpt and --checkpoint are mutually exclusive")
-    elif params.get("backbone_ckpt"):
-      var_scope = params["backbone_name"] + "/"
-      if params["ckpt_var_scope"] is None:
+    # Initialize the model from an EfficientDet or backbone checkpoint.
+    if params.get('ckpt') and params.get('backbone_ckpt'):
+      raise RuntimeError(
+          '--backbone_ckpt and --checkpoint are mutually exclusive')
+    elif params.get('backbone_ckpt'):
+      var_scope = params['backbone_name'] + '/'
+      if params['ckpt_var_scope'] is None:
         # Use backbone name as default checkpoint scope.
-        ckpt_scope = params["backbone_name"] + "/"
+        ckpt_scope = params['backbone_name'] + '/'
       else:
-        ckpt_scope = params["ckpt_var_scope"] + "/"
+        ckpt_scope = params['ckpt_var_scope'] + '/'
     else:
       # Load every var in the given checkpoint
-      var_scope = ckpt_scope = "/"
+      var_scope = ckpt_scope = '/'
 
     def scaffold_fn():
       """Loads pretrained model through scaffold function."""
-      logging.info('restore variables from %s' % checkpoint)
+      logging.info('restore variables from %s', checkpoint)
 
       var_map = utils.get_ckt_var_map(
-        ckpt_path=checkpoint,
-        ckpt_scope=ckpt_scope,
-        var_scope=var_scope
-      )
+          ckpt_path=checkpoint, ckpt_scope=ckpt_scope, var_scope=var_scope)
       tf.train.init_from_checkpoint(checkpoint, var_map)
 
       return tf.train.Scaffold()

@@ -62,8 +62,8 @@ flags.DEFINE_string('model_dir', None, 'Location of model_dir')
 flags.DEFINE_string('backbone_ckpt', '',
                     'Location of the ResNet50 checkpoint to use for model '
                     'initialization.')
-flags.DEFINE_string('ckpt',  default='',
-    help='Start training from this EfficientDet checkpoint.')
+flags.DEFINE_string('ckpt', None,
+                    'Start training from this EfficientDet checkpoint.')
 
 flags.DEFINE_string('hparams', '',
                     'Comma separated k=v pairs of hyperparameters.')

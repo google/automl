@@ -5,8 +5,9 @@
 
 Updates:
 
-  - **Mar24: Add tutorial with visualization and coco eval: [tutorial.ipynb](tutorial.ipynb)**
-  - Mar 13: Release the initial code and models.
+  - **Mar26: Fixed a few bugs and updated all checkpoints/results.**
+  - **Mar24: Added tutorial with visualization and coco eval: [tutorial.ipynb](tutorial.ipynb)**
+  - Mar 13: Released the initial code and models.
 
 ## 1. About EfficientDet Models
 
@@ -50,15 +51,15 @@ We have provided a list of EfficientNet checkpoints for EfficientNet checkpoints
   * With the baseline RetinaNet preprocessing, we have achieved state-of-the-art results.
 
 
-|       Model    |  mAP    |  |mAP<sub>S</sub>   |  mAP<sub>M</sub>    |  mAP<sub>L</sub>   | | #params | #FLOPs |
-|----------     |------ |------ | -------- | ------| ------| ------ |------ |  :------: |
-|     EfficientDet-D0 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0-coco.txt))    | 32.9 |   |  12.9   |  38.2 |  51.2 | | 3.9M | 2.54B  |
-|     EfficientDet-D1 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d1.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d1-coco.txt))    | 38.9 |   |  19.5   |  41.1 |  56.5  | | 6.6M | 6.10B |
-|     EfficientDet-D2 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d2.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d2-coco.txt))    | 42.2 |   |  24.0   |  46.3 |  59.4 | | 8.1M | 11.0B |
-|     EfficientDet-D3 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d3.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d3-coco.txt))    | 45.5 |   |  29.1   |  49.2 |  61.3 | | 12.0M | 24.9B |
-|     EfficientDet-D4 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d4.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d4-coco.txt))    |  48.0 |   |  31.9   |  52.0 | 63.1 | | 20.7M | 55.2B |
-|     EfficientDet-D5 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d5.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d5-coco.txt))    |  49.8 |   |  33.6   |  53.7 | 64.2 | | 33.7M | 135.4B |
-|     EfficientDet-D6 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d6.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d6-coco.txt))    |  50.9 |   |  36.2   |  54.9 | 64.8 |  | 51.9M  |  225.6B  |
+|       Model    |  AP    |  AP<sub>50</sub> | AP<sub>75</sub> |AP<sub>S</sub>   |  AP<sub>M</sub>    |  AP<sub>L</sub>   | | #params | #FLOPs |
+|----------     |------ |------ | -------- | ------| ------| ------ |------ |------ |------ |  :------: |
+|     EfficientDet-D0 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0-coco.txt))    | 33.5 | 51.6 | 35.2 | 52.6 | 38.7 | 12.4 |  | 3.9M | 2.54B  |
+|     EfficientDet-D1 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d1.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d1-coco.txt))    | 39.1 | 58.1 | 41.8 | 56.9 | 44.7 | 18.6 | | 6.6M | 6.10B |
+|     EfficientDet-D2 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d2.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d2-coco.txt))    | 42.5 | 61.7 | 45.3 | 59.0 | 48.0 | 23.7 | | 8.1M | 11.0B |
+|     EfficientDet-D3 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d3.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d3-coco.txt))    | 45.9 | 65.0 | 49.0 | 61.7 | 50.2 | 28.0 | | 12.0M | 24.9B |
+|     EfficientDet-D4 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d4.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d4-coco.txt))    |  49.0 | 68.5 | 52.9 | 64.0 | 53.7 | 33.4 |  | 20.7M | 55.2B |
+|     EfficientDet-D5 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d5.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d5-coco.txt))    |  50.5 | 70.0 | 54.4 | 64.6 | 54.9 | 34.3 |  | 33.7M | 135.4B |
+|     EfficientDet-D6 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d6.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d6-coco.txt))    |  51.3 | 70.5 | 55.4 | 65.2 | 55.6 | 35.1 | | 51.9M  |  225.6B  |
 
   ** All checkpoints are trained without autoaugmentation.
 
