@@ -281,7 +281,7 @@ class ServingDriver(object):
 
     inputs = tf.placeholder(tf.string, name='image', shape=(1))
     image_size = params['image_size']
-    image = tf.io.decode_image(inputs[0], channels=3, dtype=tf.float32)
+    image = tf.io.decode_image(inputs[0])
     image.set_shape([None, None, None])
     image, scale = image_preprocess(image, image_size)
     image = tf.expand_dims(image, 0)
