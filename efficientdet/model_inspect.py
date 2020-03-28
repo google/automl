@@ -34,6 +34,7 @@ import hparams_config
 import inference
 import utils
 
+from PIL import Image
 
 flags.DEFINE_string('model_name', 'efficientdet-d1', 'Model.')
 flags.DEFINE_string('logdir', '/tmp/deff/', 'log directory.')
@@ -121,6 +122,32 @@ class ModelInspector(object):
     all_outputs = list(cls_outputs.values()) + list(box_outputs.values())
     return all_outputs
 
+  def export_saved_model(self):
+    driver = inference.ServingDriver(self.model_name, self.ckpt_path)
+    driver.build()
+    driver.export(os.path.join(self.logdir, self.model_name))
+
+  def saved_model_inference(self, image_path_pattern, output_dir):
+    with tf.Session() as sess:
+      tf.saved_model.load(sess, ["serve"], os.path.join(self.logdir, self.model_name))
+      raw_images = []
+      image = Image.open(image_path_pattern)
+      raw_images.append(image)
+      with tf.io.gfile.GFile(image_path_pattern, 'rb') as file:
+        image_bin = file.read()
+      outputs_np = sess.run(["detection:0"], {'image:0': [image_bin]})
+      for i, output_np in enumerate(outputs_np):
+        # output_np has format [image_id, y, x, height, width, score, class]
+        boxes = output_np[:, 1:5]
+        classes = output_np[:, 6].astype(int)
+        scores = output_np[:, 5]
+        boxes[:, 2:4] += boxes[:, 0:2]
+        img = inference.visualize_image(
+            raw_images[i], boxes, classes, scores, inference.coco_id_mapping)
+        output_image_path = os.path.join(output_dir, str(i) + '.jpg')
+        Image.fromarray(img).save(output_image_path)
+        tf.logging.info('writing file to {}'.format(output_image_path))
+
   def build_and_save_model(self):
     """build and save the model into self.logdir."""
     with tf.Graph().as_default(), tf.Session() as sess:
@@ -135,6 +162,7 @@ class ModelInspector(object):
       sess.run(tf.global_variables_initializer())
       # Run a single train step.
       sess.run(outputs, feed_dict={inputs: inputs_val})
+
       all_saver = tf.train.Saver(save_relative_paths=True)
       all_saver.save(sess, os.path.join(self.logdir, self.model_name))
 
@@ -300,6 +328,10 @@ class ModelInspector(object):
         config_dict['min_score_thresh'] = FLAGS.min_score_thresh
       self.inference_single_image(FLAGS.input_image, FLAGS.output_image_dir,
                                   **config_dict)
+    elif runmode == 'saved_model':
+      self.export_saved_model()
+    elif runmode == 'saved_model_infer':
+      self.saved_model_inference(FLAGS.input_image, FLAGS.output_image_dir)
     elif runmode == 'bm':
       self.benchmark_model(warmup_runs=5, bm_runs=FLAGS.bm_runs,
                            num_threads=threads,

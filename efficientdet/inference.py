@@ -278,12 +278,16 @@ class ServingDriver(object):
     params = copy.deepcopy(self.params)
     if params_override:
       params.update(params_override)
-    image_shape = [None, None, None]
-    input_image = tf.placeholder(tf.uint8, name='image', shape=image_shape)
-    image, scale = image_preprocess(input_image, params['image_size'])
+
+    inputs = tf.placeholder(tf.string, name='image', shape=(1))
+    image_size = params['image_size']
+    image = tf.io.decode_image(inputs[0])
+    image.set_shape([None, None, None])
+    image, scale = image_preprocess(image, image_size)
     image = tf.expand_dims(image, 0)
+
     class_outputs, box_outputs = build_model(self.model_name, image, **params)
-    params.update(dict(batch_size=1))  # for postprocessing.
+    params.update(dict(batch_size=1))
     detections = det_post_process(params, class_outputs, box_outputs, [scale])
 
     if not self.sess:
@@ -291,7 +295,7 @@ class ServingDriver(object):
     restore_ckpt(self.sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
 
     self.signitures = {
-        'input': input_image,
+        'input': inputs,
         'prediction': detections,
     }
     return self.signitures
@@ -312,9 +316,6 @@ class ServingDriver(object):
     boxes = predictions[:, 1:5]
     classes = predictions[:, 6].astype(int)
     scores = predictions[:, 5]
-    # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]
-    # TODO(tanmingxing): make this convertion more efficient.
-    boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
     boxes[:, 2:4] += boxes[:, 0:2]
     return visualize_image(image, boxes, classes, scores, self.label_id_mapping,
                            **kwargs)
@@ -334,6 +335,11 @@ class ServingDriver(object):
         self.signitures['prediction'],
         feed_dict={self.signitures['input']: image})
     return predictions
+
+  def export(self, output_dir):
+      tf.saved_model.simple_save(self.sess, output_dir, inputs={self.signitures['input'].name: self.signitures['input']},
+                                 outputs={item.name: item for item in self.signitures['prediction']})
+      logging.info('Model saved at ' + output_dir)
 
 
 class InferenceDriver(object):
@@ -402,13 +408,10 @@ class InferenceDriver(object):
 
       # Visualize results.
       for i, output_np in enumerate(outputs_np):
-        # output_np has format [image_id, x, y, width, height, score, class]
+        # output_np has format [image_id, y, x, height, width, score, class]
         boxes = output_np[:, 1:5]
         classes = output_np[:, 6].astype(int)
         scores = output_np[:, 5]
-        # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]
-        # TODO(tanmingxing): make this convertion more efficient.
-        boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
         boxes[:, 2:4] += boxes[:, 0:2]
         img = visualize_image(raw_images[i], boxes, classes, scores,
                               self.label_id_mapping, **kwargs)
