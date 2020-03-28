@@ -186,9 +186,10 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
     classes_per_sample = outputs['classes_all'][index]
     detections = anchor_labeler.generate_detections(
         cls_outputs_per_sample, box_outputs_per_sample, indices_per_sample,
-        classes_per_sample, image_id=[index], image_scale=[scales[index]])
+        classes_per_sample, image_id=[index], image_scale=[scales[index]],
+        disable_pyfun=True)
     detections_batch.append(detections)
-  return detections_batch
+  return tf.stack(detections_batch, name='detections')
 
 
 def visualize_image(image,
@@ -285,9 +286,8 @@ class ServingDriver(object):
     image.set_shape([None, None, None])
     image, scale = image_preprocess(image, image_size)
     image = tf.expand_dims(image, 0)
-
     class_outputs, box_outputs = build_model(self.model_name, image, **params)
-    params.update(dict(batch_size=1))
+    params.update(dict(batch_size=1, disable_pyfun=True))  # for postprocessing.
     detections = det_post_process(params, class_outputs, box_outputs, [scale])
 
     if not self.sess:
@@ -337,9 +337,14 @@ class ServingDriver(object):
     return predictions
 
   def export(self, output_dir):
-      tf.saved_model.simple_save(self.sess, output_dir, inputs={self.signitures['input'].name: self.signitures['input']},
-                                 outputs={item.name: item for item in self.signitures['prediction']})
-      logging.info('Model saved at ' + output_dir)
+    tf.saved_model.simple_save(
+        self.sess,
+        output_dir,
+        inputs={self.signitures['input'].name: self.signitures['input']},
+        outputs={
+            self.signitures['prediction'].name: self.signitures['prediction']
+        })
+    logging.info('Model saved at %s', output_dir)
 
 
 class InferenceDriver(object):
@@ -399,7 +404,8 @@ class InferenceDriver(object):
       class_outputs, box_outputs = build_model(
           self.model_name, images, **self.params)
       restore_ckpt(sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
-      params.update(dict(batch_size=len(raw_images)))  # for postprocessing.
+      # for postprocessing.
+      params.update(dict(batch_size=len(raw_images), disable_pyfun=True))
 
       # Build postprocessing.
       detections_batch = det_post_process(

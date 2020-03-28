@@ -352,7 +352,8 @@ def coco_metric_fn(batch_size,
     detections = anchor_labeler.generate_detections(
         cls_outputs_per_sample, box_outputs_per_sample, indices_per_sample,
         classes_per_sample, tf.slice(kwargs['source_ids'], [index], [1]),
-        tf.slice(kwargs['image_scales'], [index], [1])
+        tf.slice(kwargs['image_scales'], [index], [1]),
+        disable_pyfun=kwargs.get('disable_pyfun', None),
     )
     detections_bs.append(detections)
 
@@ -506,6 +507,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
             anchor_labeler,
             params['val_json_file'],
             testdev_dir=params['testdev_dir'],
+            disable_pyfun=params.get('disable_pyfun', None),
             **kwargs)
       else:
         logging.info('Eval val with groudtruths %s.', params['val_json_file'])
