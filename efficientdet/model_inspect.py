@@ -52,7 +52,6 @@ flags.DEFINE_bool('xla', False, 'Run with xla optimization.')
 flags.DEFINE_string('ckpt_path', None, 'checkpoint dir used for eval.')
 flags.DEFINE_string('export_ckpt', None, 'Path for exporting new models.')
 flags.DEFINE_bool('enable_ema', True, 'Use ema variables for eval.')
-flags.DEFINE_string('model_dir', None, 'Saved model directory.')
 
 flags.DEFINE_string('input_image', None, 'Input image path for inference.')
 flags.DEFINE_string('output_image_dir', None, 'Output dir for inference.')
@@ -128,9 +127,9 @@ class ModelInspector(object):
     driver.build()
     driver.export(os.path.join(self.logdir, self.model_name))
 
-  def saved_model_inference(self, image_path_pattern, output_dir, model_dir):
+  def saved_model_inference(self, image_path_pattern, output_dir):
     with tf.Session() as sess:
-      tf.saved_model.load(sess, ["serve"], model_dir)
+      tf.saved_model.load(sess, ["serve"], os.path.join(self.logdir, self.model_name))
       raw_images = []
       image = Image.open(image_path_pattern)
       raw_images.append(image)
@@ -332,7 +331,7 @@ class ModelInspector(object):
     elif runmode == 'saved_model':
       self.export_saved_model()
     elif runmode == 'saved_model_infer':
-      self.saved_model_inference(FLAGS.input_image, FLAGS.output_image_dir, FLAGS.model_dir)
+      self.saved_model_inference(FLAGS.input_image, FLAGS.output_image_dir)
     elif runmode == 'bm':
       self.benchmark_model(warmup_runs=5, bm_runs=FLAGS.bm_runs,
                            num_threads=threads,

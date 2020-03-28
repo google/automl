@@ -217,7 +217,8 @@ def _generate_anchor_boxes(image_size, anchor_scale, anchor_configs):
   return anchor_boxes
 
 def _generate_detections_tf(cls_outputs, box_outputs, anchor_boxes, indices,
-                         classes, image_id, image_scale, num_classes, use_native_nms=False):
+                         classes, image_id, image_scale, num_classes,
+                         use_native_nms=False):
   """Generates detections with RetinaNet model outputs and anchors.
 
   Args:
