@@ -23,7 +23,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+
+import json
+import os
 from absl import flags
+from absl import logging
 
 import numpy as np
 from pycocotools.coco import COCO
@@ -37,7 +41,7 @@ FLAGS = flags.FLAGS
 class EvaluationMetric(object):
   """COCO evaluation metric class."""
 
-  def __init__(self, filename):
+  def __init__(self, filename=None, testdev_dir=None):
     """Constructs COCO evaluation class.
 
     The class provides the interface to metrics_fn in TPUEstimator. The
@@ -47,11 +51,15 @@ class EvaluationMetric(object):
 
     Args:
       filename: Ground truth JSON file name. If filename is None, use
-        groundtruth data passed from the dataloader for evaluation.
+        groundtruth data passed from the dataloader for evaluation. filename is
+        ignored if testdev_dir is not None.
+      testdev_dir: folder name for testdev data. If None, run eval without
+        groundtruth, and filename will be ignored.
     """
     if filename:
       self.coco_gt = COCO(filename)
     self.filename = filename
+    self.testdev_dir = testdev_dir
     self.metric_names = ['AP', 'AP50', 'AP75', 'APs', 'APm', 'APl', 'ARmax1',
                          'ARmax10', 'ARmax100', 'ARs', 'ARm', 'ARl']
     self._reset()
@@ -100,20 +108,42 @@ class EvaluationMetric(object):
         self.coco_gt.dataset = self.dataset
         self.coco_gt.createIndex()
 
-      detections = np.array(self.detections)
-      image_ids = list(set(detections[:, 0]))
-      coco_dt = self.coco_gt.loadRes(detections)
-      coco_eval = COCOeval(self.coco_gt, coco_dt, iouType='bbox')
-      coco_eval.params.imgIds = image_ids
-      coco_eval.evaluate()
-      coco_eval.accumulate()
-      coco_eval.summarize()
-      coco_metrics = coco_eval.stats
-      # clean self.detections after evaluation is done.
-      # this makes sure the next evaluation will start with an empty list of
-      # self.detections.
-      self._reset()
-      return np.array(coco_metrics, dtype=np.float32)
+      if self.testdev_dir:
+        # Run on test-dev dataset.
+        box_result_list = []
+        for det in self.detections:
+          box_result_list.append({
+              'image_id': int(det[0]),
+              'category_id': int(det[6]),
+              'bbox': np.around(
+                  det[1:5].astype(np.float64), decimals=2).tolist(),
+              'score': float(np.around(det[5], sdecimals=3)),
+          })
+        json.encoder.FLOAT_REPR = lambda o: format(o, '.3f')
+        output_path = os.path.join(self.testdev_dir,
+                                   'detections_test-dev2017_test_results.json')
+        logging.info('Writing output json file to: %s', output_path)
+        with tf.io.gfile.GFile(output_path, 'w') as fid:
+          json.dump(box_result_list, fid)
+
+        self._reset()
+        return np.array([0.], dtype=np.float32)
+      else:
+        # Run on validation dataset.
+        detections = np.array(self.detections)
+        image_ids = list(set(detections[:, 0]))
+        coco_dt = self.coco_gt.loadRes(detections)
+        coco_eval = COCOeval(self.coco_gt, coco_dt, iouType='bbox')
+        coco_eval.params.imgIds = image_ids
+        coco_eval.evaluate()
+        coco_eval.accumulate()
+        coco_eval.summarize()
+        coco_metrics = coco_eval.stats
+        # clean self.detections after evaluation is done.
+        # this makes sure the next evaluation will start with an empty list of
+        # self.detections.
+        self._reset()
+        return np.array(coco_metrics, dtype=np.float32)
 
     def _update_op(detections, groundtruth_data):
       """Update detection results and groundtruth data.
@@ -135,16 +165,23 @@ class EvaluationMetric(object):
         detections[i] = detections[i, indices]
         if detections[i].shape[0] == 0:
           continue
-        self.detections.extend(detections[i])
         # Append groundtruth annotations to create COCO dataset object.
         # Add images.
         image_id = detections[i][0, 0]
         if image_id == -1:
           image_id = self.image_id
+        detections[i][:, 0] = image_id
+        self.detections.extend(detections[i])
+
+        if self.testdev_dir:
+          # Skip annotation for test-dev case.
+          self.image_id += 1
+          continue
+
         self.dataset['images'].append({
             'id': int(image_id),
         })
-        detections[i][:, 0] = image_id
+
         # Add annotations.
         indices = np.where(groundtruth_data[i, :, -1] > -1)[0]
         for data in groundtruth_data[i, indices]:
@@ -173,9 +210,15 @@ class EvaluationMetric(object):
       ]
 
     with tf.name_scope('coco_metric'):
-      update_op = tf.py_func(_update_op, [detections, groundtruth_data], [])
-      metrics = tf.py_func(_evaluate, [], tf.float32)
-      metrics_dict = {}
-      for i, name in enumerate(self.metric_names):
-        metrics_dict[name] = (metrics[i], update_op)
-      return metrics_dict
+      if self.testdev_dir:
+        update_op = tf.py_func(_update_op, [detections, groundtruth_data], [])
+        metrics = tf.py_func(_evaluate, [], tf.float32)
+        metrics_dict = {'AP': (metrics, update_op)}
+        return metrics_dict
+      else:
+        update_op = tf.py_func(_update_op, [detections, groundtruth_data], [])
+        metrics = tf.py_func(_evaluate, [], tf.float32)
+        metrics_dict = {}
+        for i, name in enumerate(self.metric_names):
+          metrics_dict[name] = (metrics[i], update_op)
+        return metrics_dict

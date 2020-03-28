@@ -336,7 +336,11 @@ def add_metric_fn_inputs(params, cls_outputs, box_outputs, metric_fn_inputs):
   metric_fn_inputs['classes_all'] = classes_all
 
 
-def coco_metric_fn(batch_size, anchor_labeler, filename=None, **kwargs):
+def coco_metric_fn(batch_size,
+                   anchor_labeler,
+                   filename=None,
+                   testdev_dir=None,
+                   **kwargs):
   """Evaluation metric fn. Performed on CPU, do not reference TPU ops."""
   # add metrics to output
   detections_bs = []
@@ -351,9 +355,14 @@ def coco_metric_fn(batch_size, anchor_labeler, filename=None, **kwargs):
         tf.slice(kwargs['image_scales'], [index], [1])
     )
     detections_bs.append(detections)
-  eval_metric = coco_metric.EvaluationMetric(filename=filename)
-  coco_metrics = eval_metric.estimator_metric_fn(detections_bs,
-                                                 kwargs['groundtruth_data'])
+
+  if testdev_dir:
+    eval_metric = coco_metric.EvaluationMetric(testdev_dir=testdev_dir)
+    coco_metrics = eval_metric.estimator_metric_fn(detections_bs, tf.zeros([1]))
+  else:
+    eval_metric = coco_metric.EvaluationMetric(filename=filename)
+    coco_metrics = eval_metric.estimator_metric_fn(detections_bs,
+                                                   kwargs['groundtruth_data'])
   return coco_metrics
 
 
@@ -489,8 +498,19 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
                                              params['num_classes'])
       cls_loss = tf.metrics.mean(kwargs['cls_loss_repeat'])
       box_loss = tf.metrics.mean(kwargs['box_loss_repeat'])
-      coco_metrics = coco_metric_fn(batch_size, anchor_labeler,
-                                    params['val_json_file'], **kwargs)
+
+      if params.get('testdev_dir', None):
+        logging.info('Eval testdev_dir %s', params['testdev_dir'])
+        coco_metrics = coco_metric_fn(
+            batch_size,
+            anchor_labeler,
+            params['val_json_file'],
+            testdev_dir=params['testdev_dir'],
+            **kwargs)
+      else:
+        logging.info('Eval val with groudtruths %s.', params['val_json_file'])
+        coco_metrics = coco_metric_fn(batch_size, anchor_labeler,
+                                      params['val_json_file'], **kwargs)
 
       # Add metrics to output.
       output_metrics = {
