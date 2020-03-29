@@ -139,10 +139,8 @@ class ModelInspector(object):
       tf.saved_model.load(sess, ['serve'], self.saved_model_dir)
       raw_images = []
       image = Image.open(image_path_pattern)
-      raw_images.append(image)
-      with tf.io.gfile.GFile(image_path_pattern, 'rb') as f:
-        image_array = f.read()
-      outputs_np = sess.run('detections:0', {'image:0': [image_array]})
+      raw_images.append(np.array(image))
+      outputs_np = sess.run('detections:0', {'image_arrays:0': raw_images})
       for i, output_np in enumerate(outputs_np):
         # output_np has format [image_id, y, x, height, width, score, class]
         boxes = output_np[:, 1:5]

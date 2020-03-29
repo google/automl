@@ -234,23 +234,59 @@ def visualize_image(image,
 
 
 class ServingDriver(object):
-  """A driver for continuously serving single input image.
+  """A driver for serving single or batch images.
 
-  Example usage:
+  This driver supports serving with image files or arrays, with configurable
+  batch size.
 
+  Example 1. Serving streaming image contents:
+
+    driver = inference.ServingDriver(
+      'efficientdet-d0', '/tmp/efficientdet-d0', batch_size=1)
+    driver.build()
+    for m in image_iterator():
+      predictions = driver.serve_files([m])
+      driver.visualize(m, predictions[0])
+      # m is the new image with annotated boxes.
+
+  Example 2. Serving batch image contents:
+
+    imgs = []
+    for f in ['/tmp/1.jpg', '/tmp/2.jpg']:
+      imgs.append(np.array(Image.open(f)))
+
+    driver = inference.ServingDriver(
+      'efficientdet-d0', '/tmp/efficientdet-d0', batch_size=len(imgs))
+    driver.build()
+    predictions = driver.serve_files(imgs)
+    for i in imgs:
+      driver.visualize(imgs[0], predictions[0])
+
+  Example 3: another way is to use SavedModel:
+
+    # step1: export a model.
     driver = inference.ServingDriver('efficientdet-d0', '/tmp/efficientdet-d0')
     driver.build()
-    for f in tf.io.gfile.glob('/tmp/*.jpg'):
-      image = Image.open(f)
-      predictions = driver.serve(image)
-      out_image = driver.visualize(image, predictions[0])
-      ...
+    driver.export('/tmp/saved_model_path')
+
+    # step2: Serve a model.
+    with tf.Session() as sess:
+      tf.saved_model.load(sess, ['serve'], self.saved_model_dir)
+      raw_images = []
+      for f in tf.io.gfile.glob('/tmp/images/*.jpg'):
+        raw_images.append(np.array(PIL.Image.open(f)))
+      detections = sess.run('detections:0', {'image_arrays:0': raw_images})
+      driver = inference.ServingDriver(
+        'efficientdet-d0', '/tmp/efficientdet-d0')
+      driver.visualize(raw_images[0], detections[0])
+      PIL.Image.fromarray(raw_images[0]).save(output_image_path)
   """
 
   def __init__(self,
                model_name: Text,
                ckpt_path: Text,
                image_size: int = None,
+               batch_size: int = 1,
                label_id_mapping: Dict[int, Text] = None):
     """Initialize the inference driver.
 
@@ -259,11 +295,13 @@ class ServingDriver(object):
       ckpt_path: checkpoint path, such as /tmp/efficientdet-d0/.
       image_size: user specified image size. If None, use the default image size
         defined by model_name.
+      batch_size: batch size for inference.
       label_id_mapping: a dictionary from id to name. If None, use the default
         coco_id_mapping (with 90 classes).
     """
     self.model_name = model_name
     self.ckpt_path = ckpt_path
+    self.batch_size = batch_size
     self.label_id_mapping = label_id_mapping or coco_id_mapping
 
     self.params = hparams_config.get_detection_config(self.model_name).as_dict()
@@ -280,22 +318,33 @@ class ServingDriver(object):
     if params_override:
       params.update(params_override)
 
-    inputs = tf.placeholder(tf.string, name='image', shape=(1))
+    image_files = tf.placeholder(tf.string, name='image_files', shape=(None))
     image_size = params['image_size']
-    image = tf.io.decode_image(inputs[0])
-    image.set_shape([None, None, None])
-    image, scale = image_preprocess(image, image_size)
-    image = tf.expand_dims(image, 0)
-    class_outputs, box_outputs = build_model(self.model_name, image, **params)
-    params.update(dict(batch_size=1, disable_pyfun=True))  # for postprocessing.
-    detections = det_post_process(params, class_outputs, box_outputs, [scale])
+    raw_images = []
+    for i in range(self.batch_size):
+      image = tf.io.decode_image(image_files[i])
+      image.set_shape([None, None, None])
+      raw_images.append(image)
+    raw_images = tf.stack(raw_images, name='image_arrays')
+
+    scales, images = [], []
+    for i in range(self.batch_size):
+      image, scale = image_preprocess(raw_images[i], image_size)
+      scales.append(scale)
+      images.append(image)
+    scales = tf.stack(scales)
+    images = tf.stack(images)
+    class_outputs, box_outputs = build_model(self.model_name, images, **params)
+    params.update(dict(batch_size=self.batch_size, disable_pyfun=True))
+    detections = det_post_process(params, class_outputs, box_outputs, scales)
 
     if not self.sess:
       self.sess = tf.Session()
     restore_ckpt(self.sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
 
     self.signitures = {
-        'input': inputs,
+        'image_files': image_files,
+        'image_arrays': raw_images,
         'prediction': detections,
     }
     return self.signitures
@@ -320,30 +369,47 @@ class ServingDriver(object):
     return visualize_image(image, boxes, classes, scores, self.label_id_mapping,
                            **kwargs)
 
-  def serve(self, image):
-    """Read and preprocess input images.
+  def serve_files(self, image_files: List[Text]):
+    """Serve a list of input image files.
 
     Args:
-      image: Image content in shape of [height, width, 3].
+      image_files: a list of image files with shape [1] and type string.
 
     Returns:
-      Annotated image.
+      A list of detections.
     """
     if not self.sess:
       self.build()
     predictions = self.sess.run(
         self.signitures['prediction'],
-        feed_dict={self.signitures['input']: image})
+        feed_dict={self.signitures['image_files']: image_files})
+    return predictions
+
+  def serve_images(self, image_arrays):
+    """Serve a list of image arrays.
+
+    Args:
+      image_arrays: A list of image content with each image has shape
+        [height, width, 3] and uint8 type.
+
+    Returns:
+      A list of detections.
+    """
+    if not self.sess:
+      self.build()
+    predictions = self.sess.run(
+        self.signitures['prediction'],
+        feed_dict={self.signitures['image_arrays']: image_arrays})
     return predictions
 
   def export(self, output_dir):
+    """Export a saved model."""
+    signitures = self.signitures
     tf.saved_model.simple_save(
         self.sess,
         output_dir,
-        inputs={self.signitures['input'].name: self.signitures['input']},
-        outputs={
-            self.signitures['prediction'].name: self.signitures['prediction']
-        })
+        inputs={signitures['image_arrays'].name: signitures['image_arrays']},
+        outputs={signitures['prediction'].name: signitures['prediction']})
     logging.info('Model saved at %s', output_dir)
 
 

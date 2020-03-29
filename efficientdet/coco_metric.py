@@ -117,7 +117,7 @@ class EvaluationMetric(object):
               'category_id': int(det[6]),
               'bbox': np.around(
                   det[1:5].astype(np.float64), decimals=2).tolist(),
-              'score': float(np.around(det[5], sdecimals=3)),
+              'score': float(np.around(det[5], decimals=3)),
           })
         json.encoder.FLOAT_REPR = lambda o: format(o, '.3f')
         output_path = os.path.join(self.testdev_dir,
