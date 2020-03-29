@@ -7,7 +7,7 @@ Updates:
 
   - **Mar26: Fixed a few bugs and updated all checkpoints/results.**
   - **Mar24: Added tutorial with visualization and coco eval: [tutorial.ipynb](tutorial.ipynb)**
-  - Mar 13: Released the initial code and models.
+  - **Mar13: Released the initial code and models.**
 
 ## 1. About EfficientDet Models
 
