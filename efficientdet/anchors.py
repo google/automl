@@ -289,8 +289,8 @@ def _generate_detections_tf(cls_outputs, box_outputs, anchor_boxes, indices,
   boxes = decode_box_outputs_tf(
       tf.transpose(box_outputs, [1, 0]), tf.transpose(anchor_boxes, [1, 0]))
 
-  def _else(detections, class_id):
-    """Else branch forr generating detections."""
+  def _else(detections, class_id, indices):
+    """Else branch for generating detections."""
     boxes_cls = tf.gather(boxes, indices)
     scores_cls = tf.gather(scores, indices)
     # Select top-scoring boxes in each class and apply non-maximum suppression
@@ -330,10 +330,10 @@ def _generate_detections_tf(cls_outputs, box_outputs, anchor_boxes, indices,
 
   detections = tf.constant([], tf.float32, [0, 7])
   for c in range(num_classes):
-    indices = tf.where(tf.equal(classes, c))
+    indices = tf.squeeze(tf.where_v2(tf.equal(classes, c)))
     detections = tf.cond(
-        tf.equal(tf.shape(indices)[0], 0), lambda: detections,
-        lambda class_id=c: _else(detections, class_id))
+        tf.equal(tf.size(indices), 0), lambda: detections,
+        lambda class_id=c: _else(detections, class_id, indices))
 
   return tf.identity(detections, name='detection')
 
