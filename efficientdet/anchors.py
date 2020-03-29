@@ -253,8 +253,8 @@ def _generate_anchor_boxes(image_size, anchor_scale, anchor_configs):
 
 
 def _generate_detections_tf(cls_outputs, box_outputs, anchor_boxes, indices,
-                            classes, image_id, image_scale, num_classes,
-                            use_native_nms=False):
+                            classes, image_id, image_scale, num_classes, min_score_thresh=0.2,
+                            soft_nms_sigma=0.0, use_native_nms=False):
   """Generates detections with model outputs and anchors.
 
   Args:
@@ -299,11 +299,13 @@ def _generate_detections_tf(cls_outputs, box_outputs, anchor_boxes, indices,
     all_detections_cls = tf.concat([tf.reshape(boxes_cls, [-1, 4]), scores_cls],
                                    axis=1)
     if use_native_nms:
-      top_detection_idx = tf.image.non_max_suppression(
+      top_detection_idx, _ = tf.image.non_max_suppression_with_scores(
           all_detections_cls[:, :4],
           all_detections_cls[:, 4],
           MAX_DETECTIONS_PER_IMAGE,
-          iou_threshold=0.5)
+          iou_threshold=0.5,
+          score_threshold=min_score_thresh,
+          soft_nms_sigma=soft_nms_sigma)
     else:
       top_detection_idx = nms_tf(all_detections_cls, 0.5)
     top_detections_cls = tf.gather(all_detections_cls, top_detection_idx)
@@ -544,11 +546,11 @@ class AnchorLabeler(object):
     return cls_targets_dict, box_targets_dict, num_positives
 
   def generate_detections(self, cls_outputs, box_outputs, indices, classes,
-                          image_id, image_scale, disable_pyfun=None):
+                          image_id, image_scale, min_score_thresh=0.2, disable_pyfun=None):
     if disable_pyfun:
       return _generate_detections_tf(cls_outputs, box_outputs,
                                      self._anchors.boxes, indices, classes,
-                                     image_id, image_scale, self._num_classes)
+                                     image_id, image_scale, self._num_classes, min_score_thresh=min_score_thresh)
     else:
       return tf.py_func(_generate_detections, [
           cls_outputs, box_outputs, self._anchors.boxes, indices, classes,
