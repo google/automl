@@ -560,8 +560,11 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
       """Loads pretrained model through scaffold function."""
       logging.info('restore variables from %s', checkpoint)
 
-      var_map = utils.get_ckt_var_map(
-          ckpt_path=checkpoint, ckpt_scope=ckpt_scope, var_scope=var_scope)
+      var_map = utils.get_ckpt_var_map(
+          ckpt_path=checkpoint,
+          ckpt_scope=ckpt_scope,
+          var_scope=var_scope,
+          var_exclude_expr=params.get('var_exclude_expr', None))
       tf.train.init_from_checkpoint(checkpoint, var_map)
 
       return tf.train.Scaffold()
