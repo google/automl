@@ -128,9 +128,10 @@ class ModelInspector(object):
     all_outputs = list(cls_outputs.values()) + list(box_outputs.values())
     return all_outputs
 
-  def export_saved_model(self):
+  def export_saved_model(self, **kwargs):
     driver = inference.ServingDriver(self.model_name, self.ckpt_path)
-    driver.build()
+    driver.build(min_score_thresh=kwargs.get('min_score_thresh', 0.2),
+                 max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 50))
     driver.export(self.saved_model_dir)
 
   def saved_model_inference(self, image_path_pattern, output_dir):
@@ -333,7 +334,14 @@ class ModelInspector(object):
       self.inference_single_image(FLAGS.input_image, FLAGS.output_image_dir,
                                   **config_dict)
     elif runmode == 'saved_model':
-      self.export_saved_model()
+      config_dict = {}
+      if FLAGS.line_thickness:
+        config_dict['line_thickness'] = FLAGS.line_thickness
+      if FLAGS.max_boxes_to_draw:
+        config_dict['max_boxes_to_draw'] = FLAGS.max_boxes_to_draw
+      if FLAGS.min_score_thresh:
+        config_dict['min_score_thresh'] = FLAGS.min_score_thresh
+      self.export_saved_model(**config_dict)
     elif runmode == 'saved_model_infer':
       self.saved_model_inference(FLAGS.input_image, FLAGS.output_image_dir)
     elif runmode == 'bm':

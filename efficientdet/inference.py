@@ -145,7 +145,8 @@ def restore_ckpt(sess, ckpt_path, enable_ema=True, export_ckpt=None):
 
 
 def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
-                     box_outputs: Dict[int, tf.Tensor], scales: List[float]):
+                     box_outputs: Dict[int, tf.Tensor], scales: List[float],
+                     min_score_thresh=0.2, max_boxes_to_draw=50):
   """Post preprocessing the box/class predictions.
 
   Args:
@@ -157,6 +158,9 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
       representing box regression targets in
       [batch_size, height, width, num_anchors * 4].
     scales: a list of float values indicating image scale.
+    min_score_thresh: A float representing the threshold for deciding when to
+      remove boxes based on score.
+    max_boxes_to_draw: Max number of boxes to draw.
 
   Returns:
     detections_batch: a batch of detection results. Each detection is a tensor
@@ -187,8 +191,8 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
     detections = anchor_labeler.generate_detections(
         cls_outputs_per_sample, box_outputs_per_sample, indices_per_sample,
         classes_per_sample, image_id=[index], image_scale=[scales[index]],
-        min_score_thresh=params['min_score_thresh'],
-        max_boxes_to_draw=params['max_boxes_to_draw'],
+        min_score_thresh=min_score_thresh,
+        max_boxes_to_draw=max_boxes_to_draw,
         disable_pyfun=True)
     detections_batch.append(detections)
   return tf.stack(detections_batch, name='detections')
@@ -314,7 +318,7 @@ class ServingDriver(object):
     self.signitures = None
     self.sess = None
 
-  def build(self, params_override=None):
+  def build(self, params_override=None, min_score_thresh=0.2, max_boxes_to_draw=50):
     """Build model and restore checkpoints."""
     params = copy.deepcopy(self.params)
     if params_override:
@@ -338,7 +342,9 @@ class ServingDriver(object):
     images = tf.stack(images)
     class_outputs, box_outputs = build_model(self.model_name, images, **params)
     params.update(dict(batch_size=self.batch_size, disable_pyfun=False))
-    detections = det_post_process(params, class_outputs, box_outputs, scales)
+    detections = det_post_process(params, class_outputs, box_outputs, scales,
+                                  min_score_thresh=min_score_thresh,
+                                  max_boxes_to_draw=max_boxes_to_draw)
 
     if not self.sess:
       self.sess = tf.Session()
@@ -420,7 +426,6 @@ class ServingDriver(object):
         outputs={signitures['prediction'].name: signitures['prediction']})
     logging.info('Model saved at %s', output_dir)
 
-
 class InferenceDriver(object):
   """A driver for doing batch inference.
 
@@ -479,13 +484,13 @@ class InferenceDriver(object):
           self.model_name, images, **self.params)
       restore_ckpt(sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
       # for postprocessing.
-      params.update(dict(batch_size=len(raw_images), disable_pyfun=True,
-                         min_score_thresh=kwargs.get('min_score_thresh', 0.2),
-                         max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 50)))
+      params.update(dict(batch_size=len(raw_images), disable_pyfun=True))
 
       # Build postprocessing.
       detections_batch = det_post_process(
-          params, class_outputs, box_outputs, scales)
+          params, class_outputs, box_outputs, scales,
+          min_score_thresh=kwargs.get('min_score_thresh', 0.2),
+          max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 50))
       outputs_np = sess.run(detections_batch)
 
       # Visualize results.
