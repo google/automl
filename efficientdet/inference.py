@@ -187,7 +187,9 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
     detections = anchor_labeler.generate_detections(
         cls_outputs_per_sample, box_outputs_per_sample, indices_per_sample,
         classes_per_sample, image_id=[index], image_scale=[scales[index]],
-        disable_pyfun=False)
+        min_score_thresh=params['min_score_thresh'],
+        max_boxes_to_draw=params['max_boxes_to_draw'],
+        disable_pyfun=True)
     detections_batch.append(detections)
   return tf.stack(detections_batch, name='detections')
 
@@ -477,7 +479,9 @@ class InferenceDriver(object):
           self.model_name, images, **self.params)
       restore_ckpt(sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
       # for postprocessing.
-      params.update(dict(batch_size=len(raw_images), disable_pyfun=False))
+      params.update(dict(batch_size=len(raw_images), disable_pyfun=True,
+                         min_score_thresh=kwargs.get('min_score_thresh', 0.2),
+                         max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 50)))
 
       # Build postprocessing.
       detections_batch = det_post_process(
@@ -490,11 +494,6 @@ class InferenceDriver(object):
         boxes = output_np[:, 1:5]
         classes = output_np[:, 6].astype(int)
         scores = output_np[:, 5]
-
-        # This is not needed if disable_pyfun=True
-        # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]
-        # TODO(tanmingxing): make this convertion more efficient.
-        boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
 
         boxes[:, 2:4] += boxes[:, 0:2]
         img = visualize_image(raw_images[i], boxes, classes, scores,
