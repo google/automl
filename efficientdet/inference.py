@@ -429,7 +429,7 @@ class InferenceDriver(object):
 
   """
 
-  def __init__(self, model_name: Text, ckpt_path: Text, image_size: int = None,
+  def __init__(self, model_name: Text, ckpt_path: Text, image_size: int = None, num_classes: int = None,
                label_id_mapping: Dict[int, Text] = None):
     """Initialize the inference driver.
 
@@ -449,7 +449,8 @@ class InferenceDriver(object):
     self.params.update(dict(is_training_bn=False, use_bfloat16=False))
     if image_size:
       self.params.update(dict(image_size=image_size))
-
+    if num_classes:
+      self.params.update(dict(num_classes=num_classes))
   def inference(self,
                 image_path_pattern: Text,
                 output_dir: Text,

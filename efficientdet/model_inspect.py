@@ -210,7 +210,7 @@ class ModelInspector(object):
 
   def inference_single_image(self, image_image_path, output_dir, **kwargs):
     driver = inference.InferenceDriver(self.model_name, self.ckpt_path,
-                                       self.image_size)
+                                       self.image_size, self.num_classes)
     driver.inference(image_image_path, output_dir, **kwargs)
 
   def freeze_model(self) -> Tuple[Text, Text]:
