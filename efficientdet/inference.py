@@ -419,11 +419,22 @@ class ServingDriver(object):
   def export(self, output_dir):
     """Export a saved model."""
     signitures = self.signitures
-    tf.saved_model.simple_save(
+    signature_def_map = {
+        "serving_default":
+            tf.saved_model.predict_signature_def({signitures['image_arrays'].name: signitures['image_arrays']},
+                                                 {signitures['prediction'].name: signitures['prediction']}),
+        "serving_base64":
+            tf.saved_model.predict_signature_def({signitures['image_files'].name: signitures['image_files']},
+                                                 {signitures['prediction'].name: signitures['prediction']}),
+    }
+    b = tf.saved_model.Builder(output_dir)
+    b.add_meta_graph_and_variables(
         self.sess,
-        output_dir,
-        inputs={signitures['image_arrays'].name: signitures['image_arrays']},
-        outputs={signitures['prediction'].name: signitures['prediction']})
+        tags=['serve'],
+        signature_def_map=signature_def_map,
+        assets_collection=tf.get_collection(tf.GraphKeys.ASSET_FILEPATHS),
+        clear_devices=True)
+    b.save()
     logging.info('Model saved at %s', output_dir)
 
 class InferenceDriver(object):
