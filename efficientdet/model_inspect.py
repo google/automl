@@ -125,6 +125,11 @@ class ModelInspector(object):
     print('backbone+fpn+box params/flops = {:.6f}M, {:.9f}B'.format(
         *utils.num_params_flops()))
 
+    # Write to tfevent for tensorboard.
+    train_writer = tf.summary.FileWriter(self.logdir)
+    train_writer.add_graph(tf.get_default_graph())
+    train_writer.flush()
+
     all_outputs = list(cls_outputs.values()) + list(box_outputs.values())
     return all_outputs
 
@@ -155,7 +160,7 @@ class ModelInspector(object):
 
   def build_and_save_model(self):
     """build and save the model into self.logdir."""
-    with tf.Graph().as_default() as graph, tf.Session() as sess:
+    with tf.Graph().as_default(), tf.Session() as sess:
       # Build model with inputs and labels.
       inputs = tf.placeholder(tf.float32, name='input', shape=self.inputs_shape)
       outputs = self.build_model(inputs, is_training=False)
@@ -173,11 +178,6 @@ class ModelInspector(object):
       tf_graph = os.path.join(self.logdir, self.model_name + '_train.pb')
       with tf.io.gfile.GFile(tf_graph, 'wb') as f:
         f.write(sess.graph_def.SerializeToString())
-
-      # Write graph to tfevent for tensorboard.
-      train_writer = tf.summary.FileWriter(self.logdir)
-      train_writer.add_graph(graph)
-      train_writer.flush()
 
   def restore_model(self, sess, ckpt_path, enable_ema=True, export_ckpt=None):
     """Restore variables from a given checkpoint."""
