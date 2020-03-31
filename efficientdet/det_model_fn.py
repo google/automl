@@ -565,6 +565,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
           ckpt_scope=ckpt_scope,
           var_scope=var_scope,
           var_exclude_expr=params.get('var_exclude_expr', None))
+
       tf.train.init_from_checkpoint(checkpoint, var_map)
 
       return tf.train.Scaffold()

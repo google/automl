@@ -19,8 +19,8 @@ from __future__ import division
 # gtype import
 from __future__ import print_function
 
-import re
 import os
+import re
 from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
@@ -304,6 +304,8 @@ def num_params_flops(readable_format=True):
   options['output'] = 'none'
   flops = tf.profiler.profile(
       tf.get_default_graph(), options=options).total_float_ops
+  # We use flops to denote multiply-adds, which is counted as 2 ops in tfprof.
+  flops = flops // 2
   if readable_format:
     nparams = float(nparams) * 1e-6
     flops = float(flops) * 1e-9
