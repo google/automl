@@ -130,7 +130,7 @@ class ModelInspector(object):
 
   def export_saved_model(self, **kwargs):
     tf.enable_resource_variables()
-    driver = inference.ServingDriver(self.model_name, self.ckpt_path)
+    driver = inference.ServingDriver(self.model_name, self.ckpt_path, self.image_size)
     driver.build(min_score_thresh=kwargs.get('min_score_thresh', 0.2),
                  max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 50))
     driver.export(self.saved_model_dir)
