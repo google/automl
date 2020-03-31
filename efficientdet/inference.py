@@ -193,7 +193,7 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
         classes_per_sample, image_id=[index], image_scale=[scales[index]],
         min_score_thresh=min_score_thresh,
         max_boxes_to_draw=max_boxes_to_draw,
-        disable_pyfun=True)
+        disable_pyfun=params.get('disable_pyfun'))
     detections_batch.append(detections)
   return tf.stack(detections_batch, name='detections')
 
@@ -317,6 +317,7 @@ class ServingDriver(object):
 
     self.signitures = None
     self.sess = None
+    self.disable_pyfun = True
 
   def build(self, params_override=None, min_score_thresh=0.2, max_boxes_to_draw=50):
     """Build model and restore checkpoints."""
@@ -341,7 +342,7 @@ class ServingDriver(object):
     scales = tf.stack(scales)
     images = tf.stack(images)
     class_outputs, box_outputs = build_model(self.model_name, images, **params)
-    params.update(dict(batch_size=self.batch_size, disable_pyfun=False))
+    params.update(dict(batch_size=self.batch_size, disable_pyfun=self.disable_pyfun))
     detections = det_post_process(params, class_outputs, box_outputs, scales,
                                   min_score_thresh=min_score_thresh,
                                   max_boxes_to_draw=max_boxes_to_draw)
@@ -377,7 +378,8 @@ class ServingDriver(object):
     # This is not needed if disable_pyfun=True
     # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]
     # TODO(tanmingxing): make this convertion more efficient.
-    boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
+    if not self.disable_pyfun:
+        boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
 
     boxes[:, 2:4] += boxes[:, 0:2]
     return visualize_image(image, boxes, classes, scores, self.label_id_mapping,
@@ -467,6 +469,7 @@ class InferenceDriver(object):
     self.params.update(dict(is_training_bn=False, use_bfloat16=False))
     if image_size:
       self.params.update(dict(image_size=image_size))
+    self.disable_pyfun = True
 
   def inference(self,
                 image_path_pattern: Text,
@@ -495,7 +498,7 @@ class InferenceDriver(object):
           self.model_name, images, **self.params)
       restore_ckpt(sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
       # for postprocessing.
-      params.update(dict(batch_size=len(raw_images), disable_pyfun=True))
+      params.update(dict(batch_size=len(raw_images), disable_pyfun=self.disable_pyfun))
 
       # Build postprocessing.
       detections_batch = det_post_process(
@@ -503,13 +506,18 @@ class InferenceDriver(object):
           min_score_thresh=kwargs.get('min_score_thresh', 0.2),
           max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 50))
       outputs_np = sess.run(detections_batch)
-
       # Visualize results.
       for i, output_np in enumerate(outputs_np):
         # output_np has format [image_id, y, x, height, width, score, class]
         boxes = output_np[:, 1:5]
         classes = output_np[:, 6].astype(int)
         scores = output_np[:, 5]
+
+        # This is not needed if disable_pyfun=True
+        # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]
+        # TODO(tanmingxing): make this convertion more efficient.
+        if not self.disable_pyfun:
+          boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
 
         boxes[:, 2:4] += boxes[:, 0:2]
         img = visualize_image(raw_images[i], boxes, classes, scores,
