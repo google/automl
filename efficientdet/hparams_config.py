@@ -264,6 +264,17 @@ efficientdet_model_param_dict = {
             box_class_repeats=5,
             fpn_name='bifpn_sum',  # Use unweighted sum for training stability.
         ),
+    'efficientdet-d7':
+        dict(
+            name='efficientdet-d7',
+            backbone_name='efficientnet-b6',
+            image_size=1536,
+            fpn_num_filters=384,
+            fpn_cell_repeats=8,
+            box_class_repeats=5,
+            anchor_scale=5.0,
+            fpn_name='bifpn_sum',  # Use unweighted sum for training stability.
+        ),
 }
 
 
@@ -272,6 +283,7 @@ def get_efficientdet_config(model_name='efficientdet-d1'):
   h = default_detection_configs()
   h.override(efficientdet_model_param_dict[model_name])
   return h
+
 
 retinanet_model_param_dict = {
     'retinanet-50':
