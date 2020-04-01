@@ -145,7 +145,8 @@ def restore_ckpt(sess, ckpt_path, enable_ema=True, export_ckpt=None):
 
 
 def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
-                     box_outputs: Dict[int, tf.Tensor], scales: List[float]):
+                     box_outputs: Dict[int, tf.Tensor], scales: List[float],
+                     min_score_thresh=0.2, max_boxes_to_draw=50):
   """Post preprocessing the box/class predictions.
 
   Args:
@@ -157,6 +158,9 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
       representing box regression targets in
       [batch_size, height, width, num_anchors * 4].
     scales: a list of float values indicating image scale.
+    min_score_thresh: A float representing the threshold for deciding when to
+      remove boxes based on score.
+    max_boxes_to_draw: Max number of boxes to draw.
 
   Returns:
     detections_batch: a batch of detection results. Each detection is a tensor
@@ -187,7 +191,9 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
     detections = anchor_labeler.generate_detections(
         cls_outputs_per_sample, box_outputs_per_sample, indices_per_sample,
         classes_per_sample, image_id=[index], image_scale=[scales[index]],
-        disable_pyfun=False)
+        min_score_thresh=min_score_thresh,
+        max_boxes_to_draw=max_boxes_to_draw,
+        disable_pyfun=params.get('disable_pyfun'))
     detections_batch.append(detections)
   return tf.stack(detections_batch, name='detections')
 
@@ -311,8 +317,9 @@ class ServingDriver(object):
 
     self.signitures = None
     self.sess = None
+    self.disable_pyfun = True
 
-  def build(self, params_override=None):
+  def build(self, params_override=None, min_score_thresh=0.2, max_boxes_to_draw=50):
     """Build model and restore checkpoints."""
     params = copy.deepcopy(self.params)
     if params_override:
@@ -335,8 +342,10 @@ class ServingDriver(object):
     scales = tf.stack(scales)
     images = tf.stack(images)
     class_outputs, box_outputs = build_model(self.model_name, images, **params)
-    params.update(dict(batch_size=self.batch_size, disable_pyfun=False))
-    detections = det_post_process(params, class_outputs, box_outputs, scales)
+    params.update(dict(batch_size=self.batch_size, disable_pyfun=self.disable_pyfun))
+    detections = det_post_process(params, class_outputs, box_outputs, scales,
+                                  min_score_thresh=min_score_thresh,
+                                  max_boxes_to_draw=max_boxes_to_draw)
 
     if not self.sess:
       self.sess = tf.Session()
@@ -369,7 +378,8 @@ class ServingDriver(object):
     # This is not needed if disable_pyfun=True
     # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]
     # TODO(tanmingxing): make this convertion more efficient.
-    boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
+    if not self.disable_pyfun:
+        boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
 
     boxes[:, 2:4] += boxes[:, 0:2]
     return visualize_image(image, boxes, classes, scores, self.label_id_mapping,
@@ -411,13 +421,23 @@ class ServingDriver(object):
   def export(self, output_dir):
     """Export a saved model."""
     signitures = self.signitures
-    tf.saved_model.simple_save(
+    signature_def_map = {
+        "serving_default":
+            tf.saved_model.predict_signature_def({signitures['image_arrays'].name: signitures['image_arrays']},
+                                                 {signitures['prediction'].name: signitures['prediction']}),
+        "serving_base64":
+            tf.saved_model.predict_signature_def({signitures['image_files'].name: signitures['image_files']},
+                                                 {signitures['prediction'].name: signitures['prediction']}),
+    }
+    b = tf.saved_model.Builder(output_dir)
+    b.add_meta_graph_and_variables(
         self.sess,
-        output_dir,
-        inputs={signitures['image_arrays'].name: signitures['image_arrays']},
-        outputs={signitures['prediction'].name: signitures['prediction']})
+        tags=['serve'],
+        signature_def_map=signature_def_map,
+        assets_collection=tf.get_collection(tf.GraphKeys.ASSET_FILEPATHS),
+        clear_devices=True)
+    b.save()
     logging.info('Model saved at %s', output_dir)
-
 
 class InferenceDriver(object):
   """A driver for doing batch inference.
@@ -449,6 +469,7 @@ class InferenceDriver(object):
     self.params.update(dict(is_training_bn=False, use_bfloat16=False))
     if image_size:
       self.params.update(dict(image_size=image_size))
+    self.disable_pyfun = True
 
   def inference(self,
                 image_path_pattern: Text,
@@ -477,13 +498,14 @@ class InferenceDriver(object):
           self.model_name, images, **self.params)
       restore_ckpt(sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
       # for postprocessing.
-      params.update(dict(batch_size=len(raw_images), disable_pyfun=False))
+      params.update(dict(batch_size=len(raw_images), disable_pyfun=self.disable_pyfun))
 
       # Build postprocessing.
       detections_batch = det_post_process(
-          params, class_outputs, box_outputs, scales)
+          params, class_outputs, box_outputs, scales,
+          min_score_thresh=kwargs.get('min_score_thresh', 0.2),
+          max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 50))
       outputs_np = sess.run(detections_batch)
-
       # Visualize results.
       for i, output_np in enumerate(outputs_np):
         # output_np has format [image_id, y, x, height, width, score, class]
@@ -494,7 +516,8 @@ class InferenceDriver(object):
         # This is not needed if disable_pyfun=True
         # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]
         # TODO(tanmingxing): make this convertion more efficient.
-        boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
+        if not self.disable_pyfun:
+          boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
 
         boxes[:, 2:4] += boxes[:, 0:2]
         img = visualize_image(raw_images[i], boxes, classes, scores,
