@@ -144,9 +144,12 @@ def restore_ckpt(sess, ckpt_path, enable_ema=True, export_ckpt=None):
     saver.save(sess, export_ckpt)
 
 
-def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
-                     box_outputs: Dict[int, tf.Tensor], scales: List[float],
-                     min_score_thresh=0.2, max_boxes_to_draw=50):
+def det_post_process(params: Dict[Any, Any],
+                     cls_outputs: Dict[int, tf.Tensor],
+                     box_outputs: Dict[int, tf.Tensor],
+                     scales: List[float],
+                     min_score_thresh=0.2,
+                     max_boxes_to_draw=50):
   """Post preprocessing the box/class predictions.
 
   Args:
@@ -155,8 +158,8 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
     cls_outputs: an OrderDict with keys representing levels and values
       representing logits in [batch_size, height, width, num_anchors].
     box_outputs: an OrderDict with keys representing levels and values
-      representing box regression targets in
-      [batch_size, height, width, num_anchors * 4].
+      representing box regression targets in [batch_size, height, width,
+      num_anchors * 4].
     scales: a list of float values indicating image scale.
     min_score_thresh: A float representing the threshold for deciding when to
       remove boxes based on score.
@@ -167,18 +170,18 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
       with each row representing [image_id, x, y, width, height, score, class].
   """
   # TODO(tanmingxing): refactor the code to make it more explicity.
-  outputs = {'cls_outputs_all': [None], 'box_outputs_all': [None],
-             'indices_all': [None], 'classes_all': [None]}
-  det_model_fn.add_metric_fn_inputs(
-      params, cls_outputs, box_outputs, outputs)
+  outputs = {
+      'cls_outputs_all': [None],
+      'box_outputs_all': [None],
+      'indices_all': [None],
+      'classes_all': [None]
+  }
+  det_model_fn.add_metric_fn_inputs(params, cls_outputs, box_outputs, outputs)
 
   # Create anchor_label for picking top-k predictions.
-  eval_anchors = anchors.Anchors(params['min_level'],
-                                 params['max_level'],
-                                 params['num_scales'],
-                                 params['aspect_ratios'],
-                                 params['anchor_scale'],
-                                 params['image_size'])
+  eval_anchors = anchors.Anchors(params['min_level'], params['max_level'],
+                                 params['num_scales'], params['aspect_ratios'],
+                                 params['anchor_scale'], params['image_size'])
   anchor_labeler = anchors.AnchorLabeler(eval_anchors, params['num_classes'])
 
   # Add all detections for each input image.
@@ -189,8 +192,12 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
     indices_per_sample = outputs['indices_all'][index]
     classes_per_sample = outputs['classes_all'][index]
     detections = anchor_labeler.generate_detections(
-        cls_outputs_per_sample, box_outputs_per_sample, indices_per_sample,
-        classes_per_sample, image_id=[index], image_scale=[scales[index]],
+        cls_outputs_per_sample,
+        box_outputs_per_sample,
+        indices_per_sample,
+        classes_per_sample,
+        image_id=[index],
+        image_scale=[scales[index]],
         min_score_thresh=min_score_thresh,
         max_boxes_to_draw=max_boxes_to_draw,
         disable_pyfun=params.get('disable_pyfun'))
@@ -319,7 +326,10 @@ class ServingDriver(object):
     self.sess = None
     self.disable_pyfun = True
 
-  def build(self, params_override=None, min_score_thresh=0.2, max_boxes_to_draw=50):
+  def build(self,
+            params_override=None,
+            min_score_thresh=0.2,
+            max_boxes_to_draw=50):
     """Build model and restore checkpoints."""
     params = copy.deepcopy(self.params)
     if params_override:
@@ -342,10 +352,15 @@ class ServingDriver(object):
     scales = tf.stack(scales)
     images = tf.stack(images)
     class_outputs, box_outputs = build_model(self.model_name, images, **params)
-    params.update(dict(batch_size=self.batch_size, disable_pyfun=self.disable_pyfun))
-    detections = det_post_process(params, class_outputs, box_outputs, scales,
-                                  min_score_thresh=min_score_thresh,
-                                  max_boxes_to_draw=max_boxes_to_draw)
+    params.update(
+        dict(batch_size=self.batch_size, disable_pyfun=self.disable_pyfun))
+    detections = det_post_process(
+        params,
+        class_outputs,
+        box_outputs,
+        scales,
+        min_score_thresh=min_score_thresh,
+        max_boxes_to_draw=max_boxes_to_draw)
 
     if not self.sess:
       self.sess = tf.Session()
@@ -379,7 +394,7 @@ class ServingDriver(object):
     # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]
     # TODO(tanmingxing): make this convertion more efficient.
     if not self.disable_pyfun:
-        boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
+      boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
 
     boxes[:, 2:4] += boxes[:, 0:2]
     return visualize_image(image, boxes, classes, scores, self.label_id_mapping,
@@ -405,8 +420,8 @@ class ServingDriver(object):
     """Serve a list of image arrays.
 
     Args:
-      image_arrays: A list of image content with each image has shape
-        [height, width, 3] and uint8 type.
+      image_arrays: A list of image content with each image has shape [height,
+        width, 3] and uint8 type.
 
     Returns:
       A list of detections.
@@ -422,12 +437,14 @@ class ServingDriver(object):
     """Export a saved model."""
     signitures = self.signitures
     signature_def_map = {
-        "serving_default":
-            tf.saved_model.predict_signature_def({signitures['image_arrays'].name: signitures['image_arrays']},
-                                                 {signitures['prediction'].name: signitures['prediction']}),
-        "serving_base64":
-            tf.saved_model.predict_signature_def({signitures['image_files'].name: signitures['image_files']},
-                                                 {signitures['prediction'].name: signitures['prediction']}),
+        'serving_default':
+            tf.saved_model.predict_signature_def(
+                {signitures['image_arrays'].name: signitures['image_arrays']},
+                {signitures['prediction'].name: signitures['prediction']}),
+        'serving_base64':
+            tf.saved_model.predict_signature_def(
+                {signitures['image_files'].name: signitures['image_files']},
+                {signitures['prediction'].name: signitures['prediction']}),
     }
     b = tf.saved_model.Builder(output_dir)
     b.add_meta_graph_and_variables(
@@ -439,6 +456,7 @@ class ServingDriver(object):
     b.save()
     logging.info('Model saved at %s', output_dir)
 
+
 class InferenceDriver(object):
   """A driver for doing batch inference.
 
@@ -449,7 +467,10 @@ class InferenceDriver(object):
 
   """
 
-  def __init__(self, model_name: Text, ckpt_path: Text, image_size: int = None,
+  def __init__(self,
+               model_name: Text,
+               ckpt_path: Text,
+               image_size: int = None,
                label_id_mapping: Dict[int, Text] = None):
     """Initialize the inference driver.
 
@@ -469,12 +490,9 @@ class InferenceDriver(object):
     self.params.update(dict(is_training_bn=False, use_bfloat16=False))
     if image_size:
       self.params.update(dict(image_size=image_size))
-    self.disable_pyfun = True
+    self.disable_pyfun = False
 
-  def inference(self,
-                image_path_pattern: Text,
-                output_dir: Text,
-                **kwargs):
+  def inference(self, image_path_pattern: Text, output_dir: Text, **kwargs):
     """Read and preprocess input images.
 
     Args:
@@ -490,19 +508,23 @@ class InferenceDriver(object):
     params = copy.deepcopy(self.params)
     with tf.Session() as sess:
       # Buid inputs and preprocessing.
-      raw_images, images, scales = build_inputs(
-          image_path_pattern, params['image_size'])
+      raw_images, images, scales = build_inputs(image_path_pattern,
+                                                params['image_size'])
 
       # Build model.
-      class_outputs, box_outputs = build_model(
-          self.model_name, images, **self.params)
+      class_outputs, box_outputs = build_model(self.model_name, images,
+                                               **self.params)
       restore_ckpt(sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
       # for postprocessing.
-      params.update(dict(batch_size=len(raw_images), disable_pyfun=self.disable_pyfun))
+      params.update(
+          dict(batch_size=len(raw_images), disable_pyfun=self.disable_pyfun))
 
       # Build postprocessing.
       detections_batch = det_post_process(
-          params, class_outputs, box_outputs, scales,
+          params,
+          class_outputs,
+          box_outputs,
+          scales,
           min_score_thresh=kwargs.get('min_score_thresh', 0.2),
           max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 50))
       outputs_np = sess.run(detections_batch)

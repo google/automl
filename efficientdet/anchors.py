@@ -349,9 +349,10 @@ def _generate_detections_tf(cls_outputs, box_outputs, anchor_boxes, indices,
     indices_cls = tf.squeeze(tf.where_v2(tf.equal(classes, c)), axis=-1)
     detections = tf.cond(
         tf.equal(tf.size(indices), 0), lambda: detections,
-        lambda class_id=c: _else(detections, class_id, indices_cls))
+        lambda id=c, id_cls=indices_cls: _else(detections, id, id_cls))
   indices_final = tf.argsort(detections[:, -2], direction='DESCENDING')
-  detections = tf.gather(detections, indices_final[:max_boxes_to_draw], name='detection')
+  detections = tf.gather(
+      detections, indices_final[:max_boxes_to_draw], name='detection')
   return detections
 
 
@@ -562,12 +563,29 @@ class AnchorLabeler(object):
 
     return cls_targets_dict, box_targets_dict, num_positives
 
-  def generate_detections(self, cls_outputs, box_outputs, indices, classes,
-                          image_id, image_scale, min_score_thresh=0.2, max_boxes_to_draw=50, disable_pyfun=None):
+  def generate_detections(self,
+                          cls_outputs,
+                          box_outputs,
+                          indices,
+                          classes,
+                          image_id,
+                          image_scale,
+                          min_score_thresh=0.2,
+                          max_boxes_to_draw=50,
+                          disable_pyfun=None):
+    """Generate detections based on class and box predictions."""
     if disable_pyfun:
-      return _generate_detections_tf(cls_outputs, box_outputs,
-                                     self._anchors.boxes, indices, classes,
-                                     image_id, image_scale, self._num_classes, min_score_thresh=min_score_thresh, max_boxes_to_draw=max_boxes_to_draw)
+      return _generate_detections_tf(
+          cls_outputs,
+          box_outputs,
+          self._anchors.boxes,
+          indices,
+          classes,
+          image_id,
+          image_scale,
+          self._num_classes,
+          min_score_thresh=min_score_thresh,
+          max_boxes_to_draw=max_boxes_to_draw)
     else:
       return tf.py_func(_generate_detections, [
           cls_outputs, box_outputs, self._anchors.boxes, indices, classes,
