@@ -5,8 +5,9 @@
 
 Updates:
 
-  - **Mar26: Fixed a few bugs and updated all checkpoints/results.**
-  - **Mar24: Added tutorial with visualization and coco eval: [tutorial.ipynb](tutorial.ipynb)**
+  - **Apr1: Updated results for test-dev and added EfficientDet-D7 (52.2 AP).**
+  - Mar26: Fixed a few bugs and updated all checkpoints/results.
+  - Mar24: Added tutorial with visualization and coco eval: [tutorial.ipynb](tutorial.ipynb)
   - Mar 13: Released the initial code and models.
 
 ## 1. About EfficientDet Models
@@ -21,12 +22,12 @@ EfficientDets are developed based on the advanced backbone, a new BiFPN, and a n
 </p>
 
   * **Backbone**: we employ the more advanced [EfficientNets](https://arxiv.org/abs/1905.11946) as our backbone networks.
-  * **BiFPN**: we propose a new bi-directional feature network, named BiFPN, to enable easy and fast feature fusion. In addition to the bi-directional topology, we also propose a new fast normalized fusion that enables better fusion with negligible latency cost.
+  * **BiFPN**: we propose BiFPN, a bi-directional feature network that enables easy and fast feature fusion. In addition to the topology, we also propose a new fast normalized fusion that enables better fusion with negligible latency cost.
   * **Scaling**: we propose to use a single compound scaling factor to govern the network depth, width, and resolution for all backbone, feature network, and prediction networks.
 
-Based on the BiFPN topology and the fast feature fusion technique, we first develop a baseline detection model EfficientDet-D0, which has comparable accuracy as [YOLOv3](https://arxiv.org/abs/1804.02767). Then we scale up this baseline model using our compound scaling method to obtain a list of detection models EfficientDet-D1 to D6, with different trade-offs between accuracy and model complexity.
+Our model family starts from EfficientDet-D0, which has comparable accuracy as [YOLOv3](https://arxiv.org/abs/1804.02767). Then we scale up this baseline model using our compound scaling method to obtain a list of detection models EfficientDet-D1 to D6, with different trade-offs between accuracy and model complexity.
 
-Our evaluation on COCO dataset show our EfficientDets outperform previous detectors by a large margin: In particular, our EfficientDet-D6 achieves state-of-the-art 50.9 mAP on COCO dataset, with 51.9M parameters and 229B FLOPs. Compared to previous best single-model AmoebaNet + NAS-FPN + AutoAugment ([ref](https://arxiv.org/abs/1906.11172)), our model achieves higher accuracy with 4x fewer parameters and 13x fewer FLOPs, and meanwhile runs 3x - 5x faster on GPU/CPU.
+In particular, our single-model single-scale EfficientDet-D7 achieves 52.2 mAP on COCO test-dev set. Compared to previous best single-model AmoebaNet + NAS-FPN + AutoAugment ([ref](https://arxiv.org/abs/1906.11172)), our model achieves higher accuracy with 4x fewer parameters and 13x fewer FLOPs, and meanwhile runs 3x - 5x faster on GPU/CPU.
 
 
 <table border="0">
@@ -46,22 +47,20 @@ Our evaluation on COCO dataset show our EfficientDets outperform previous detect
 
 ## 2. Pretrained EfficientDet Checkpoints
 
-We have provided a list of EfficientNet checkpoints for EfficientNet checkpoints:.
-
-  * With the baseline RetinaNet preprocessing, we have achieved state-of-the-art results.
-
+We have provided a list of EfficientDet checkpoints and results as follows:
 
 |       Model    |  AP    |  AP<sub>50</sub> | AP<sub>75</sub> |AP<sub>S</sub>   |  AP<sub>M</sub>    |  AP<sub>L</sub>   | | #params | #FLOPs |
 |----------     |------ |------ | -------- | ------| ------| ------ |------ |------ |  :------: |
-|     EfficientDet-D0 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0-coco.txt))    | 33.5 | 51.6 | 35.2 | 52.6 | 38.7 | 12.4 |  | 3.9M | 2.54B  |
-|     EfficientDet-D1 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d1.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d1-coco.txt))    | 39.1 | 58.1 | 41.8 | 56.9 | 44.7 | 18.6 | | 6.6M | 6.10B |
-|     EfficientDet-D2 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d2.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d2-coco.txt))    | 42.5 | 61.7 | 45.3 | 59.0 | 48.0 | 23.7 | | 8.1M | 11.0B |
-|     EfficientDet-D3 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d3.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d3-coco.txt))    | 45.9 | 65.0 | 49.0 | 61.7 | 50.2 | 28.0 | | 12.0M | 24.9B |
-|     EfficientDet-D4 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d4.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d4-coco.txt))    |  49.0 | 68.5 | 52.9 | 64.0 | 53.7 | 33.4 |  | 20.7M | 55.2B |
-|     EfficientDet-D5 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d5.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d5-coco.txt))    |  50.5 | 70.0 | 54.4 | 64.6 | 54.9 | 34.3 |  | 33.7M | 135.4B |
-|     EfficientDet-D6 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d6.tar.gz), [result](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d6-coco.txt))    |  51.3 | 70.5 | 55.4 | 65.2 | 55.6 | 35.1 | | 51.9M  |  225.6B  |
+|     EfficientDet-D0 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d0_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d0_coco_test-dev2017.txt))    | 33.8 | 52.2 | 35.8 | 12.0 | 38.3 | 51.2 |  | 3.9M | 2.54B  |
+|     EfficientDet-D1 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d1.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d1_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d1_coco_test-dev2017.txt))    | 39.6 | 58.6 | 42.3 | 17.9 | 44.3 | 56.0 | | 6.6M | 6.10B |
+|     EfficientDet-D2 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d2.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d2_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d2_coco_test-dev2017.txt))    | 43.0 | 62.3 | 46.2 | 22.5 | 47.0 | 58.4 | | 8.1M | 11.0B |
+|     EfficientDet-D3 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d3.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d3_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d3_coco_test-dev2017.txt))    | 45.8 | 65.0 | 49.3 | 26.6 | 49.4 | 59.8 | | 12.0M | 24.9B |
+|     EfficientDet-D4 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d4.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d4_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d4_coco_test-dev2017.txt))    | 49.4 | 69.0 | 53.4 | 30.3 | 53.2 | 63.2 |  | 20.7M | 55.2B |
+|     EfficientDet-D5 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d5.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d5_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d5_coco_test-dev2017.txt))    | 50.7 | 70.2 | 54.7 | 33.2 | 53.9 | 63.2 |  | 33.7M | 135.4B |
+|     EfficientDet-D6 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d6.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d6_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d6_coco_test-dev2017.txt))    | 51.7 | 71.2 | 56.0 | 34.1 | 55.2 | 64.1 | | 51.9M  |  225.6B  |
+|     EfficientDet-D7 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d7.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d7_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d7_coco_test-dev2017.txt))    | 52.2 | 71.4 | 56.3 | 34.8 | 55.5 | 64.6 | | 51.9M  |  324.8B  |
 
-  ** All checkpoints are trained without autoaugmentation.
+  ** <em>val</em> denotes validation results, <em>test-dev</em> denotes test-dev2017 results. AP results in the table are for COCO test-dev2017. All checkpoints are trained with baseline preprocessing (no autoaugmentation).
 
 ## 3. Run inference.
 
