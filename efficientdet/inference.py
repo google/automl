@@ -300,6 +300,7 @@ class ServingDriver(object):
                ckpt_path: Text,
                image_size: int = None,
                batch_size: int = 1,
+               num_classes: int = None,
                label_id_mapping: Dict[int, Text] = None):
     """Initialize the inference driver.
 
@@ -309,6 +310,7 @@ class ServingDriver(object):
       image_size: user specified image size. If None, use the default image size
         defined by model_name.
       batch_size: batch size for inference.
+      num_classes: number of classes. If None, use the default COCO classes.
       label_id_mapping: a dictionary from id to name. If None, use the default
         coco_id_mapping (with 90 classes).
     """
@@ -321,6 +323,8 @@ class ServingDriver(object):
     self.params.update(dict(is_training_bn=False, use_bfloat16=False))
     if image_size:
       self.params.update(dict(image_size=image_size))
+    if num_classes:
+      self.params.update(dict(num_classes=num_classes))
 
     self.signitures = None
     self.sess = None
@@ -471,6 +475,7 @@ class InferenceDriver(object):
                model_name: Text,
                ckpt_path: Text,
                image_size: int = None,
+               num_classes: int = None,
                label_id_mapping: Dict[int, Text] = None):
     """Initialize the inference driver.
 
@@ -479,6 +484,7 @@ class InferenceDriver(object):
       ckpt_path: checkpoint path, such as /tmp/efficientdet-d0/.
       image_size: user specified image size. If None, use the default image size
         defined by model_name.
+      num_classes: number of classes. If None, use the default COCO classes.
       label_id_mapping: a dictionary from id to name. If None, use the default
         coco_id_mapping (with 90 classes).
     """
@@ -490,6 +496,8 @@ class InferenceDriver(object):
     self.params.update(dict(is_training_bn=False, use_bfloat16=False))
     if image_size:
       self.params.update(dict(image_size=image_size))
+    if num_classes:
+      self.params.update(dict(num_classes=num_classes))
     self.disable_pyfun = False
 
   def inference(self, image_path_pattern: Text, output_dir: Text, **kwargs):

@@ -252,10 +252,18 @@ def _generate_anchor_boxes(image_size, anchor_scale, anchor_configs):
   return anchor_boxes
 
 
-def _generate_detections_tf(cls_outputs, box_outputs, anchor_boxes, indices,
-                            classes, image_id, image_scale, num_classes,
-                            min_score_thresh=0.2, max_boxes_to_draw=50,
-                            soft_nms_sigma=0.0, iou_threshold=0.5,
+def _generate_detections_tf(cls_outputs,
+                            box_outputs,
+                            anchor_boxes,
+                            indices,
+                            classes,
+                            image_id,
+                            image_scale,
+                            num_classes,
+                            min_score_thresh=0.2,
+                            max_boxes_to_draw=50,
+                            soft_nms_sigma=0.0,
+                            iou_threshold=0.5,
                             use_native_nms=False):
   """Generates detections with model outputs and anchors.
 
@@ -348,7 +356,8 @@ def _generate_detections_tf(cls_outputs, box_outputs, anchor_boxes, indices,
   for c in range(num_classes):
     indices_cls = tf.squeeze(tf.where_v2(tf.equal(classes, c)), axis=-1)
     detections = tf.cond(
-        tf.equal(tf.size(indices), 0), lambda: detections,
+        tf.equal(tf.size(indices), 0),
+        lambda: detections,
         lambda id=c, id_cls=indices_cls: _else(detections, id, id_cls))
   indices_final = tf.argsort(detections[:, -2], direction='DESCENDING')
   detections = tf.gather(

@@ -135,9 +135,11 @@ class ModelInspector(object):
 
   def export_saved_model(self, **kwargs):
     tf.enable_resource_variables()
-    driver = inference.ServingDriver(self.model_name, self.ckpt_path, self.image_size)
-    driver.build(min_score_thresh=kwargs.get('min_score_thresh', 0.2),
-                 max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 50))
+    driver = inference.ServingDriver(self.model_name, self.ckpt_path,
+                                     self.image_size)
+    driver.build(
+        min_score_thresh=kwargs.get('min_score_thresh', 0.2),
+        max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 50))
     driver.export(self.saved_model_dir)
 
   def saved_model_inference(self, image_path_pattern, output_dir):
@@ -217,7 +219,7 @@ class ModelInspector(object):
 
   def inference_single_image(self, image_image_path, output_dir, **kwargs):
     driver = inference.InferenceDriver(self.model_name, self.ckpt_path,
-                                       self.image_size)
+                                       self.image_size, self.num_classes)
     driver.inference(image_image_path, output_dir, **kwargs)
 
   def freeze_model(self) -> Tuple[Text, Text]:
