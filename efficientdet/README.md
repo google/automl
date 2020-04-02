@@ -86,7 +86,7 @@ Here is an example of EfficientDet-D0 visualization: more on [tutorial](tutorial
     $ unzip annotations_trainval2017.zip
 
     // convert coco data to tfrecord.
-    $ mkdir tfrecrod
+    $ mkdir tfrecord
     $ PYTHONPATH=".:$PYTHONPATH"  python dataset/create_coco_tfrecord.py \
         --image_dir=val2017 \
         --caption_annotations_file=annotations/captions_val2017.json \
