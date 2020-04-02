@@ -23,7 +23,8 @@ from __future__ import print_function
 from absl import app, logging, flags
 from tensorflow.python.tools.freeze_graph import freeze_graph
 from tensorflow.tools.graph_transforms import TransformGraph
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.enable_v2_behavior()
 
 FLAGS=flags.FLAGS
 flags.DEFINE_string('saved_model_dir', '/tmp/saved_model',
@@ -31,6 +32,7 @@ flags.DEFINE_string('saved_model_dir', '/tmp/saved_model',
 flags.DEFINE_string('output_dir', '/tmp/optimized_saved_model',
                     "String where to saved optimized saved model")
 flags.DEFINE_boolean('quantize', False, "Whether quantize graph")
+flags.DEFINE_boolean('as_text', False, "Export graph as text")
 
 
 def convert_graph_def_to_saved_model(export_dir, graph_filepath):
@@ -56,7 +58,7 @@ def convert_graph_def_to_saved_model(export_dir, graph_filepath):
         signature_def_map=signature_def_map,
         assets_collection=tf.get_collection(tf.GraphKeys.ASSET_FILEPATHS),
         clear_devices=True)
-    b.save()
+    b.save(FLAGS.as_text)
     logging.info('Optimized graph converted to SavedModel!')
 
 
@@ -96,6 +98,7 @@ def get_graph_def_from_file(graph_filepath):
       graph_def.ParseFromString(f.read())
       return graph_def
 
+
 def main(_):
     freeze_graph(input_saved_model_dir=FLAGS.saved_model_dir,
                  output_graph='/tmp/frozen_graph.pb',
@@ -114,7 +117,7 @@ def main(_):
     describe_graph(graph_def)
 
     transforms = [
-        'strip_unused_nodes',
+        'remove_nodes(op=Identity, op=CheckNumerics)',
         'fold_constants(ignore_errors=true)',
         'fold_batch_norms',
         'fold_old_batch_norms',
@@ -143,5 +146,5 @@ def main(_):
     logging.info("Finished")
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     app.run(main)

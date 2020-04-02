@@ -34,7 +34,6 @@ import hparams_config
 import utils
 from visualize import vis_utils
 
-
 coco_id_mapping = {
     1: 'person', 2: 'bicycle', 3: 'car', 4: 'motorcycle', 5: 'airplane',
     6: 'bus', 7: 'train', 8: 'truck', 9: 'boat', 10: 'traffic light',
@@ -329,6 +328,7 @@ class ServingDriver(object):
     self.signitures = None
     self.sess = None
     self.disable_pyfun = True
+    self.optimize = True
 
   def build(self,
             params_override=None,
@@ -367,7 +367,17 @@ class ServingDriver(object):
         max_boxes_to_draw=max_boxes_to_draw)
 
     if not self.sess:
-      self.sess = tf.Session()
+      if self.optimize:
+          config_proto = tf.ConfigProto(
+            allow_soft_placement=True, log_device_placement=False)
+          from tensorflow.core.protobuf import rewriter_config_pb2
+          config_proto.graph_options.rewrite_options.auto_mixed_precision = rewriter_config_pb2.RewriterConfig.ON
+          config_proto.graph_options.rewrite_options.scoped_allocator_optimization = rewriter_config_pb2.RewriterConfig.ON
+          config_proto.graph_options.rewrite_options.debug_stripper = rewriter_config_pb2.RewriterConfig.ON
+          config_proto.graph_options.infer_shapes = True
+          self.sess = tf.Session(config=config_proto)
+      else:
+          self.sess = tf.Session()
     restore_ckpt(self.sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
 
     self.signitures = {
