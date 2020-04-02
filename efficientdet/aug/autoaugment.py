@@ -28,7 +28,10 @@ from absl import logging
 import tensorflow.compat.v1 as tf
 
 import hparams_config
-import tensorflow_addons as tfa
+try:
+    import tensorflow_addons.image as contrib_image
+except:
+    import tensorflow.contrib.image as contrib_image
 
 
 # This signifies the max integer that the controller RNN could predict for the
