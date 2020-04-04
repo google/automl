@@ -250,7 +250,9 @@ def main(_):
   for writer in writers:
     writer.close()
 
-  with tf.io.gfile.GFile(FLAGS.output_path + '.json', 'w') as f:
+  json_file_path = os.path.join(os.path.dirname(x),
+                               'json_' + os.path.basename(x) + '.json')
+  with tf.io.gfile.GFile(json_file_path, 'w') as f:
     json.dump(ann_json_dict, f)
 
 
