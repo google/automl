@@ -149,7 +149,7 @@ def det_post_process(params: Dict[Any, Any],
                      box_outputs: Dict[int, tf.Tensor],
                      scales: List[float],
                      min_score_thresh=0.2,
-                     max_boxes_to_draw=50):
+                     max_boxes_to_draw=100):
   """Post preprocessing the box/class predictions.
 
   Args:
@@ -211,7 +211,7 @@ def visualize_image(image,
                     scores,
                     id_mapping,
                     min_score_thresh=0.2,
-                    max_boxes_to_draw=50,
+                    max_boxes_to_draw=100,
                     line_thickness=4,
                     **kwargs):
   """Visualizes a given image.
@@ -333,7 +333,7 @@ class ServingDriver(object):
   def build(self,
             params_override=None,
             min_score_thresh=0.2,
-            max_boxes_to_draw=50):
+            max_boxes_to_draw=100):
     """Build model and restore checkpoints."""
     params = copy.deepcopy(self.params)
     if params_override:
@@ -437,8 +437,15 @@ class ServingDriver(object):
         feed_dict={self.signitures['image_arrays']: image_arrays})
     return predictions
 
+  def load(self, saved_model_dir):
+    if not self.sess:
+      self.build()
+    tf.saved_model.load(self.sess, ['serve'], saved_model_dir)
+
   def export(self, output_dir):
     """Export a saved model."""
+    if not self.sess:
+      self.build()
     signitures = self.signitures
     signature_def_map = {
         'serving_default':
@@ -534,7 +541,7 @@ class InferenceDriver(object):
           box_outputs,
           scales,
           min_score_thresh=kwargs.get('min_score_thresh', 0.2),
-          max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 50))
+          max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 100))
       outputs_np = sess.run(detections_batch)
       # Visualize results.
       for i, output_np in enumerate(outputs_np):
