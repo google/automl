@@ -142,22 +142,19 @@ class ModelInspector(object):
         max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 50))
     driver.export(self.saved_model_dir)
 
-  def saved_model_inference(self, image_path_pattern, output_dir):
+  def saved_model_inference(self, image_path_pattern, output_dir, **kwargs):
     """Perform inference for the given saved model."""
     with tf.Session() as sess:
       tf.saved_model.load(sess, ['serve'], self.saved_model_dir)
       raw_images = []
       image = Image.open(image_path_pattern)
       raw_images.append(np.array(image))
-      outputs_np = sess.run('detections:0', {'image_arrays:0': raw_images})
-      for i, output_np in enumerate(outputs_np):
-        # output_np has format [image_id, y, x, height, width, score, class]
-        boxes = output_np[:, 1:5]
-        classes = output_np[:, 6].astype(int)
-        scores = output_np[:, 5]
-        boxes[:, 2:4] += boxes[:, 0:2]
-        img = inference.visualize_image(
-            raw_images[i], boxes, classes, scores, inference.coco_id_mapping)
+      detections_bs = sess.run('detections:0', {'image_arrays:0': raw_images})
+      driver = inference.ServingDriver(self.model_name, self.ckpt_path,
+                                       self.image_size)
+      for i, detections in enumerate(detections_bs):
+        print('detections[:10]=', detections[:10])
+        img = driver.visualize(raw_images[i], detections, **kwargs)
         output_image_path = os.path.join(output_dir, str(i) + '.jpg')
         Image.fromarray(img).save(output_image_path)
         logging.info('writing file to %s', output_image_path)
@@ -341,7 +338,7 @@ class ModelInspector(object):
         config_dict['min_score_thresh'] = FLAGS.min_score_thresh
       self.inference_single_image(FLAGS.input_image, FLAGS.output_image_dir,
                                   **config_dict)
-    elif runmode == 'saved_model':
+    elif runmode in ('saved_model', 'saved_model_infer'):
       config_dict = {}
       if FLAGS.line_thickness:
         config_dict['line_thickness'] = FLAGS.line_thickness
@@ -349,9 +346,12 @@ class ModelInspector(object):
         config_dict['max_boxes_to_draw'] = FLAGS.max_boxes_to_draw
       if FLAGS.min_score_thresh:
         config_dict['min_score_thresh'] = FLAGS.min_score_thresh
-      self.export_saved_model(**config_dict)
-    elif runmode == 'saved_model_infer':
-      self.saved_model_inference(FLAGS.input_image, FLAGS.output_image_dir)
+
+      if runmode == 'saved_model':
+        self.export_saved_model(**config_dict)
+      elif runmode == 'saved_model_infer': 
+        self.saved_model_inference(
+          FLAGS.input_image, FLAGS.output_image_dir, **config_dict)
     elif runmode == 'bm':
       self.benchmark_model(warmup_runs=5, bm_runs=FLAGS.bm_runs,
                            num_threads=threads,

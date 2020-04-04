@@ -331,7 +331,8 @@ class ServingDriver(object):
     self.disable_pyfun = True
 
   def __del__(self):
-    self.sess.close()
+    if self.sess:
+        self.sess.close()
 
   def build(self,
             params_override=None,
