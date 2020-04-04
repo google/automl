@@ -147,7 +147,7 @@ You can also run eval on test-dev set with the following command:
     # Now you can submit testdev_output/detections_test-dev2017_test_results.json to
     # coco server: https://competitions.codalab.org/competitions/20794#participate
 
-## 5. Training EfficientDet with ImageNet ckpt for backbone.
+## 6. Training EfficientDet with ImageNet ckpt for backbone.
 
     # Download backbone checkopints.
     $ wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/ckptsaug/efficientnet-b0.tar.gz
@@ -166,7 +166,7 @@ You can also run eval on test-dev set with the following command:
       --num_examples_per_epoch=5717 --num_epochs=1  \
       --hparams="use_bfloat16=false" --use_tpu=False 
 
-## 6. Finetuning EfficientDet with COCO checkpoint.
+## 7. Finetuning EfficientDet with COCO checkpoint.
 
     # Download efficientdet coco checkpoint.
     $ wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz
@@ -186,7 +186,7 @@ You can also run eval on test-dev set with the following command:
       --num_examples_per_epoch=5717 --num_epochs=1  \
       --hparams="use_bfloat16=false" --use_tpu=False
 
-## 7. Training EfficientDets on TPUs.
+## 8. Training EfficientDets on TPUs.
 
 To train this model on Cloud TPU, you will need:
 
