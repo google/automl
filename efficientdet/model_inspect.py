@@ -340,7 +340,7 @@ class ModelInspector(object):
         config_dict['max_boxes_to_draw'] = FLAGS.max_boxes_to_draw
       if FLAGS.min_score_thresh:
         config_dict['min_score_thresh'] = FLAGS.min_score_thresh
-      self.export_saved_model(FLAGS.input_image, FLAGS.output_image_dir, **config_dict)
+      self.export_saved_model(**config_dict)
     elif runmode == 'saved_model_infer':	
       self.saved_model_inference(FLAGS.input_image, FLAGS.output_image_dir)
     elif runmode == 'bm':
