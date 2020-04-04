@@ -83,6 +83,9 @@ def build_inputs(image_path_pattern: Text, image_size: int):
 
   Returns:
     (raw_images, images, scales): raw images, processed images, and scales.
+
+  Raises:
+    ValueError if image_path_pattern doesn't match any file.
   """
   raw_images, images, scales = [], [], []
   for f in tf.io.gfile.glob(image_path_pattern):
@@ -91,6 +94,9 @@ def build_inputs(image_path_pattern: Text, image_size: int):
     image, scale = image_preprocess(image, image_size)
     images.append(image)
     scales.append(scale)
+  if len(images) == 0:
+    raise ValueError(
+        'Cannot find any images for pattern {}'.format(image_path_pattern))
   return raw_images, tf.stack(images), tf.stack(scales)
 
 

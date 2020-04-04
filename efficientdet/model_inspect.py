@@ -328,17 +328,7 @@ class ModelInspector(object):
       self.freeze_model()
     elif runmode == 'ckpt':
       self.eval_ckpt()
-    elif runmode == 'infer':
-      config_dict = {}
-      if FLAGS.line_thickness:
-        config_dict['line_thickness'] = FLAGS.line_thickness
-      if FLAGS.max_boxes_to_draw:
-        config_dict['max_boxes_to_draw'] = FLAGS.max_boxes_to_draw
-      if FLAGS.min_score_thresh:
-        config_dict['min_score_thresh'] = FLAGS.min_score_thresh
-      self.inference_single_image(FLAGS.input_image, FLAGS.output_image_dir,
-                                  **config_dict)
-    elif runmode in ('saved_model', 'saved_model_infer'):
+    elif runmode in ('infer', 'saved_model', 'saved_model_infer'):
       config_dict = {}
       if FLAGS.line_thickness:
         config_dict['line_thickness'] = FLAGS.line_thickness
@@ -347,11 +337,14 @@ class ModelInspector(object):
       if FLAGS.min_score_thresh:
         config_dict['min_score_thresh'] = FLAGS.min_score_thresh
 
-      if runmode == 'saved_model':
+      if runmode == 'infer':
+        self.inference_single_image(
+            FLAGS.input_image, FLAGS.output_image_dir, **config_dict)
+      elif runmode == 'saved_model':
         self.export_saved_model(**config_dict)
       elif runmode == 'saved_model_infer': 
         self.saved_model_inference(
-          FLAGS.input_image, FLAGS.output_image_dir, **config_dict)
+            FLAGS.input_image, FLAGS.output_image_dir, **config_dict)
     elif runmode == 'bm':
       self.benchmark_model(warmup_runs=5, bm_runs=FLAGS.bm_runs,
                            num_threads=threads,
