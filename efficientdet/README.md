@@ -12,7 +12,7 @@ Updates:
 
 ## 1. About EfficientDet Models
 
-EfficientDets are a family of object detection models, which achieve state-of-the-art accuracy, yet being an order-of-magnitude smaller and more efficient than previous models.
+EfficientDets are a family of object detection models, which achieve state-of-the-art 52.2mAP on COCO test-dev, yet being 4x - 9x smaller and using 13x - 42x fewer FLOPs than previous detectors. Our models also run 2x - 4x faster on GPU, and 5x - 11x faster on CPU than other detectors.
 
 
 EfficientDets are developed based on the advanced backbone, a new BiFPN, and a new scaling technique:
@@ -21,13 +21,11 @@ EfficientDets are developed based on the advanced backbone, a new BiFPN, and a n
 <img src="./g3doc/network.png" width="800" />
 </p>
 
-  * **Backbone**: we employ the more advanced [EfficientNets](https://arxiv.org/abs/1905.11946) as our backbone networks.
-  * **BiFPN**: we propose BiFPN, a bi-directional feature network that enables easy and fast feature fusion. In addition to the topology, we also propose a new fast normalized fusion that enables better fusion with negligible latency cost.
-  * **Scaling**: we propose to use a single compound scaling factor to govern the network depth, width, and resolution for all backbone, feature network, and prediction networks.
+  * **Backbone**: we employ [EfficientNets](https://arxiv.org/abs/1905.11946) as our backbone networks.
+  * **BiFPN**: we propose BiFPN, a bi-directional feature network enhenced with fast normalization, which enables easy and fast feature fusion.
+  * **Scaling**: we use a single compound scaling factor to govern the depth, width, and resolution for all backbone, feature & prediction networks.
 
 Our model family starts from EfficientDet-D0, which has comparable accuracy as [YOLOv3](https://arxiv.org/abs/1804.02767). Then we scale up this baseline model using our compound scaling method to obtain a list of detection models EfficientDet-D1 to D6, with different trade-offs between accuracy and model complexity.
-
-In particular, our single-model single-scale EfficientDet-D7 achieves 52.2 mAP on COCO test-dev set. Compared to previous best single-model AmoebaNet + NAS-FPN + AutoAugment ([ref](https://arxiv.org/abs/1906.11172)), our model achieves higher accuracy with 4x fewer parameters and 13x fewer FLOPs, and meanwhile runs 3x - 5x faster on GPU/CPU.
 
 
 <table border="0">
@@ -64,11 +62,17 @@ We have provided a list of EfficientDet checkpoints and results as follows:
 
 ## 3. Run inference.
 
+    # Download model and testing image.
     $ export MODEL=efficientdet-d0
     $ export CKPT_PATH=efficientdet-d0
     $ wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/${MODEL}.tar.gz
+    $ wget https://user-images.githubusercontent.com/11736571/77320690-099af300-6d37-11ea-9d86-24f14dc2d540.png -o img.png
     $ tar xf ${MODEL}.tar.gz
-    $ python model_inspect.py --runmode=infer --model_name=$MODEL --ckpt_path=$CKPT_PATH --input_image=testdata/img1.jpg --output_image_dir=/tmp
+
+    # Run inference.
+    $ python model_inspect.py --runmode=infer --model_name=$MODEL \
+      --input_image_size=1920 --max_boxes_to_draw=100   --min_score_thresh=0.2 \
+      --ckpt_path=$CKPT_PATH --input_image=img.jpg --output_image_dir=/tmp
     # you can visualize the output /tmp/0.jpg
 
 Here is an example of EfficientDet-D0 visualization: more on [tutorial](tutorial.ipynb)
@@ -77,7 +81,26 @@ Here is an example of EfficientDet-D0 visualization: more on [tutorial](tutorial
 <img src="https://user-images.githubusercontent.com/6027221/77340634-d16dc300-6cea-11ea-822c-63853f457329.jpg" width="800" />
 </p>
 
-## 4. Eval on COCO 2017 val.
+## 4. Using saved model for inference.
+
+You can also export a saved model, and use it to serve image inference.
+
+    # Step 1: export model
+    $ python model_inspect.py --runmode=saved_model \
+      --model_name=efficientdet-d0 --ckpt_path=efficientdet-d0 \
+      --input_image_size=1920 --max_boxes_to_draw=100   --min_score_thresh=0.2 \
+      --saved_model_dir=/tmp/saved_model 
+
+    # Step 2: do inference with saved model.
+    $ python model_inspect.py --runmode=saved_model_infer \
+      --model_name=efficientdet-d0   --ckpt_path=efficientdet-d0 \
+      --input_image_size=1920 \
+      --max_boxes_to_draw=100   --min_score_thresh=0.2 \
+      --line_thickness=4 --saved_model_dir=/tmp/saved_model  \
+      --input_image=img.png --output_image_dir=/tmp/
+    # you can visualize the output /tmp/0.jpg
+
+## 5. Eval on COCO 2017 val or test-dev.
 
     // Download coco data.
     $ wget http://images.cocodataset.org/zips/val2017.zip
@@ -100,15 +123,70 @@ Here is an example of EfficientDet-D0 visualization: more on [tutorial](tutorial
         --val_json_file=annotations/instances_val2017.json  \
         --hparams="use_bfloat16=false" --use_tpu=False
 
-## 5. Training EfficientDets on single GPU.
+You can also run eval on test-dev set with the following command:
 
-    $ python main.py --training_file_pattern=/coco_tfrecord/train* \
-        --model_name=$MODEL \
-        --model_dir=/tmp/$MODEL \
+    $ wget http://images.cocodataset.org/zips/test2017.zip
+    # unzip -q test2017.zip
+    $ wget http://images.cocodataset.org/annotations/image_info_test2017.zip
+    $ unzip image_info_test2017.zip
+
+    $ mkdir tfrecrod
+    $ PYTHONPATH=".:$PYTHONPATH"  python dataset/create_coco_tfrecord.py \
+          --image_dir=test2017 \
+          --image_info_file=annotations/image_info_test-dev2017.json \
+          --output_file_prefix=tfrecord/testdev \
+          --num_shards=32
+
+    # Eval on test-dev: testdev_dir must be set.
+    # Also, test-dev has 20288 images rather than val 5000 images.
+    $ python main.py --mode=eval  \
+        --model_name=${MODEL}  --model_dir=${CKPT_PATH}  \
+        --validation_file_pattern=tfrecord/testdev*  \
+        --testdev_dir='testdev_output' --eval_samples=20288 \
         --hparams="use_bfloat16=false" --use_tpu=False
+    # Now you can submit testdev_output/detections_test-dev2017_test_results.json to
+    # coco server: https://competitions.codalab.org/competitions/20794#participate
 
+## 5. Training EfficientDet with ImageNet ckpt for backbone.
 
-## 6. Training EfficientDets on TPUs.
+    # Download backbone checkopints.
+    $ wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/ckptsaug/efficientnet-b0.tar.gz
+    $ tar xf efficientnet-b0.tar.gz 
+
+    $ !python main.py --mode=train_and_eval \
+      --num_classes=20 \
+      --training_file_pattern=tfrecord/pascal*.tfrecord \
+      --validation_file_pattern=tfrecord/pascal*.tfrecord \
+      --val_json_file=tfrecord/json_pascal.json \
+      --model_name=efficientdet-d0 \
+      --model_dir=/tmp/efficientdet-d0-scratch  \
+      --backbone_ckpt=efficientnet-b0  \
+      --train_batch_size=8 \
+      --eval_batch_size=8 --eval_samples=1024 \
+      --num_examples_per_epoch=5717 --num_epochs=1  \
+      --hparams="use_bfloat16=false" --use_tpu=False 
+
+## 6. Finetuning EfficientDet with COCO checkpoint.
+
+    # Download efficientdet coco checkpoint.
+    $ wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz
+    $ tar xf efficientdet-d0.tar.gz
+
+    # Finetune needs to use --ckpt rather than --backbone_ckpt.
+    $ !python main.py --mode=train_and_eval \
+      --num_classes=20 \
+      --training_file_pattern=tfrecord/pascal*.tfrecord \
+      --validation_file_pattern=tfrecord/pascal*.tfrecord \
+      --val_json_file=tfrecord/json_pascal.json \
+      --model_name=efficientdet-d0 \
+      --model_dir=/tmp/efficientdet-d0-scratch  \
+      --ckpt=efficientdet-d0  \
+      --train_batch_size=8 \
+      --eval_batch_size=8 --eval_samples=1024 \
+      --num_examples_per_epoch=5717 --num_epochs=1  \
+      --hparams="use_bfloat16=false" --use_tpu=False
+
+## 7. Training EfficientDets on TPUs.
 
 To train this model on Cloud TPU, you will need:
 
