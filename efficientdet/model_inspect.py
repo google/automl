@@ -133,6 +133,19 @@ class ModelInspector(object):
     all_outputs = list(cls_outputs.values()) + list(box_outputs.values())
     return all_outputs
 
+  def saved_model_inference(self, image_path_pattern, output_image_dir, **kwargs):
+    driver = inference.ServingDriver(self.model_name, self.ckpt_path,
+                                     self.image_size)
+    driver.build(**kwargs)
+    driver.load(self.saved_model_dir)
+    for f in tf.io.gfile.glob(image_path_pattern):
+      image = Image.open(f)
+      predictions = driver.serve_images([np.array(image)])
+      final_image = driver.visualize(image, predictions[0])
+      output_image_path = os.path.join(output_image_dir, '0.jpg')
+      Image.fromarray(final_image).save(output_image_path)
+      logging.info('writing file to %s', output_image_path)
+
   def export_saved_model(self, **kwargs):
     tf.enable_resource_variables()
     driver = inference.ServingDriver(self.model_name, self.ckpt_path,
