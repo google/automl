@@ -330,6 +330,9 @@ class ServingDriver(object):
     self.sess = None
     self.disable_pyfun = True
 
+  def __del__(self):
+    self.sess.close()
+
   def build(self,
             params_override=None,
             min_score_thresh=0.2,
@@ -339,36 +342,32 @@ class ServingDriver(object):
     if params_override:
       params.update(params_override)
 
-    image_files = tf.placeholder(tf.string, name='image_files', shape=(None))
-    image_size = params['image_size']
-    raw_images = []
-    for i in range(self.batch_size):
-      image = tf.io.decode_image(image_files[i])
-      image.set_shape([None, None, None])
-      raw_images.append(image)
-    raw_images = tf.stack(raw_images, name='image_arrays')
-
-    scales, images = [], []
-    for i in range(self.batch_size):
-      image, scale = image_preprocess(raw_images[i], image_size)
-      scales.append(scale)
-      images.append(image)
-    scales = tf.stack(scales)
-    images = tf.stack(images)
-    class_outputs, box_outputs = build_model(self.model_name, images, **params)
-    params.update(
-        dict(batch_size=self.batch_size, disable_pyfun=self.disable_pyfun))
-    detections = det_post_process(
-        params,
-        class_outputs,
-        box_outputs,
-        scales,
-        min_score_thresh=min_score_thresh,
-        max_boxes_to_draw=max_boxes_to_draw)
-
     if not self.sess:
       self.sess = tf.Session()
-    restore_ckpt(self.sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
+    with self.sess.graph.as_default():
+      image_files = tf.placeholder(tf.string, name='image_files', shape=[None])
+      image_size = params['image_size']
+      raw_images = []
+      for i in range(self.batch_size):
+        image = tf.io.decode_image(image_files[i])
+        image.set_shape([None, None, None])
+        raw_images.append(image)
+      raw_images = tf.stack(raw_images, name='image_arrays')
+
+      scales, images = [], []
+      for i in range(self.batch_size):
+        image, scale = image_preprocess(raw_images[i], image_size)
+        scales.append(scale)
+        images.append(image)
+      scales = tf.stack(scales)
+      images = tf.stack(images)
+      class_outputs, box_outputs = build_model(self.model_name, images, **params)
+      params.update(dict(batch_size=self.batch_size, disable_pyfun=self.disable_pyfun))
+      detections = det_post_process(params, class_outputs, box_outputs, scales,
+                                    min_score_thresh=min_score_thresh,
+                                    max_boxes_to_draw=max_boxes_to_draw)
+
+      restore_ckpt(self.sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
 
     self.signitures = {
         'image_files': image_files,
