@@ -341,7 +341,8 @@ class ModelInspector(object):
       if FLAGS.min_score_thresh:
         config_dict['min_score_thresh'] = FLAGS.min_score_thresh
       self.export_saved_model(FLAGS.input_image, FLAGS.output_image_dir, **config_dict)
-
+    elif runmode == 'saved_model_infer':	
+      self.saved_model_inference(FLAGS.input_image, FLAGS.output_image_dir)
     elif runmode == 'bm':
       self.benchmark_model(warmup_runs=5, bm_runs=FLAGS.bm_runs,
                            num_threads=threads,
