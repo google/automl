@@ -314,18 +314,19 @@ def num_params_flops(readable_format=True):
 
 conv_kernel_initializer = tf.initializers.variance_scaling()
 dense_kernel_initializer = tf.initializers.variance_scaling()
-
+summaries = []
 
 def scalar(name, tensor):
   """Stores a (name, Tensor) tuple in a custom collection."""
   logging.info('Adding summary {}'.format((name, tensor)))
-  tf.add_to_collection('edsummaries', (name, tf.reduce_mean(tensor)))
+  global summaries
+  summaries.append((name, tf.reduce_mean(tensor)))
 
 
 def get_scalar_summaries():
   """Returns the list of (name, Tensor) summaries recorded by scalar()."""
-  logging.info('get summaries {}'.format(tf.get_collection('edsummaries')))
-  return tf.get_collection('edsummaries')
+  global summaries
+  return summaries
 
 
 def get_tpu_host_call(global_step, params):
