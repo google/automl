@@ -63,14 +63,14 @@ We have provided a list of EfficientDet checkpoints and results as follows:
 ## 3. Run inference.
 
     # Download model and testing image.
-    $ export MODEL=efficientdet-d0
-    $ export CKPT_PATH=efficientdet-d0
-    $ wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/${MODEL}.tar.gz
-    $ wget https://user-images.githubusercontent.com/11736571/77320690-099af300-6d37-11ea-9d86-24f14dc2d540.png -o img.png
-    $ tar xf ${MODEL}.tar.gz
+    !export MODEL=efficientdet-d0
+    !export CKPT_PATH=efficientdet-d0
+    !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/${MODEL}.tar.gz
+    !wget https://user-images.githubusercontent.com/11736571/77320690-099af300-6d37-11ea-9d86-24f14dc2d540.png -o img.png
+    !tar xf ${MODEL}.tar.gz
 
     # Run inference.
-    $ python model_inspect.py --runmode=infer --model_name=$MODEL \
+    !python model_inspect.py --runmode=infer --model_name=$MODEL \
       --input_image_size=1920 --max_boxes_to_draw=100   --min_score_thresh=0.2 \
       --ckpt_path=$CKPT_PATH --input_image=img.jpg --output_image_dir=/tmp
     # you can visualize the output /tmp/0.jpg
@@ -86,13 +86,13 @@ Here is an example of EfficientDet-D0 visualization: more on [tutorial](tutorial
 You can also export a saved model, and use it to serve image inference.
 
     # Step 1: export model
-    $ python model_inspect.py --runmode=saved_model \
+    !python model_inspect.py --runmode=saved_model \
       --model_name=efficientdet-d0 --ckpt_path=efficientdet-d0 \
       --input_image_size=1920 --max_boxes_to_draw=100   --min_score_thresh=0.2 \
       --saved_model_dir=/tmp/saved_model 
 
     # Step 2: do inference with saved model.
-    $ python model_inspect.py --runmode=saved_model_infer \
+    !python model_inspect.py --runmode=saved_model_infer \
       --model_name=efficientdet-d0   --ckpt_path=efficientdet-d0 \
       --input_image_size=1920 \
       --max_boxes_to_draw=100   --min_score_thresh=0.2 \
@@ -103,21 +103,21 @@ You can also export a saved model, and use it to serve image inference.
 ## 5. Eval on COCO 2017 val or test-dev.
 
     // Download coco data.
-    $ wget http://images.cocodataset.org/zips/val2017.zip
-    $ wget http://images.cocodataset.org/annotations/annotations_trainval2017.zip
-    $ unzip val2017.zip
-    $ unzip annotations_trainval2017.zip
+    !wget http://images.cocodataset.org/zips/val2017.zip
+    !wget http://images.cocodataset.org/annotations/annotations_trainval2017.zip
+    !unzip val2017.zip
+    !unzip annotations_trainval2017.zip
 
     // convert coco data to tfrecord.
-    $ mkdir tfrecord
-    $ PYTHONPATH=".:$PYTHONPATH"  python dataset/create_coco_tfrecord.py \
+    !mkdir tfrecord
+    !PYTHONPATH=".:$PYTHONPATH"  python dataset/create_coco_tfrecord.py \
         --image_dir=val2017 \
         --caption_annotations_file=annotations/captions_val2017.json \
         --output_file_prefix=tfrecord/val \
         --num_shards=32
 
     // Run eval.
-    $ python main.py --mode=eval  \
+    !python main.py --mode=eval  \
         --model_name=${MODEL}  --model_dir=${CKPT_PATH}  \
         --validation_file_pattern=tfrecord/val*  \
         --val_json_file=annotations/instances_val2017.json  \
@@ -125,13 +125,13 @@ You can also export a saved model, and use it to serve image inference.
 
 You can also run eval on test-dev set with the following command:
 
-    $ wget http://images.cocodataset.org/zips/test2017.zip
-    # unzip -q test2017.zip
-    $ wget http://images.cocodataset.org/annotations/image_info_test2017.zip
-    $ unzip image_info_test2017.zip
+    !wget http://images.cocodataset.org/zips/test2017.zip
+    !unzip -q test2017.zip
+    !wget http://images.cocodataset.org/annotations/image_info_test2017.zip
+    !unzip image_info_test2017.zip
 
-    $ mkdir tfrecrod
-    $ PYTHONPATH=".:$PYTHONPATH"  python dataset/create_coco_tfrecord.py \
+    !mkdir tfrecrod
+    !PYTHONPATH=".:$PYTHONPATH"  python dataset/create_coco_tfrecord.py \
           --image_dir=test2017 \
           --image_info_file=annotations/image_info_test-dev2017.json \
           --output_file_prefix=tfrecord/testdev \
@@ -139,7 +139,7 @@ You can also run eval on test-dev set with the following command:
 
     # Eval on test-dev: testdev_dir must be set.
     # Also, test-dev has 20288 images rather than val 5000 images.
-    $ python main.py --mode=eval  \
+    !python main.py --mode=eval  \
         --model_name=${MODEL}  --model_dir=${CKPT_PATH}  \
         --validation_file_pattern=tfrecord/testdev*  \
         --testdev_dir='testdev_output' --eval_samples=20288 \
@@ -147,44 +147,51 @@ You can also run eval on test-dev set with the following command:
     # Now you can submit testdev_output/detections_test-dev2017_test_results.json to
     # coco server: https://competitions.codalab.org/competitions/20794#participate
 
-## 6. Training EfficientDet with ImageNet ckpt for backbone.
+## 6. Train on PASCAL VOC 2012 with backbone ImageNet ckpt.
+
+    # Download and convert pascal data.
+    !wget http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar
+    !tar xf VOCtrainval_11-May-2012.tar
+    !mkdir tfrecord
+    !PYTHONPATH=".:$PYTHONPATH"  python dataset/create_pascal_tfrecord.py  \
+        --data_dir=VOCdevkit --year=VOC2012  --output_path=tfrecord/pascal
 
     # Download backbone checkopints.
-    $ wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/ckptsaug/efficientnet-b0.tar.gz
-    $ tar xf efficientnet-b0.tar.gz 
+    !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/ckptsaug/efficientnet-b0.tar.gz
+    !tar xf efficientnet-b0.tar.gz 
 
-    $ !python main.py --mode=train_and_eval \
-      --num_classes=20 \
-      --training_file_pattern=tfrecord/pascal*.tfrecord \
-      --validation_file_pattern=tfrecord/pascal*.tfrecord \
-      --val_json_file=tfrecord/json_pascal.json \
-      --model_name=efficientdet-d0 \
-      --model_dir=/tmp/efficientdet-d0-scratch  \
-      --backbone_ckpt=efficientnet-b0  \
-      --train_batch_size=8 \
-      --eval_batch_size=8 --eval_samples=1024 \
-      --num_examples_per_epoch=5717 --num_epochs=1  \
-      --hparams="use_bfloat16=false" --use_tpu=False 
+    !python main.py --mode=train_and_eval \
+        --training_file_pattern=tfrecord/pascal*.tfrecord \
+        --validation_file_pattern=tfrecord/pascal*.tfrecord \
+        --val_json_file=tfrecord/json_pascal.json \
+        --model_name=efficientdet-d0 \
+        --model_dir=/tmp/efficientdet-d0-scratch  \
+        --backbone_ckpt=efficientnet-b0  \
+        --train_batch_size=8 \
+        --eval_batch_size=8 --eval_samples=512 \
+        --num_examples_per_epoch=5717 --num_epochs=1  \
+        --hparams="use_bfloat16=false,num_classes=20,moving_average_decay=0" \
+        --use_tpu=False 
 
-## 7. Finetuning EfficientDet with COCO checkpoint.
-
+## 7. Finetune on PASCAL VOC 2012 with detector COCO ckpt.
     # Download efficientdet coco checkpoint.
-    $ wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz
-    $ tar xf efficientdet-d0.tar.gz
+    !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz
+    !tar xf efficientdet-d0.tar.gz
 
     # Finetune needs to use --ckpt rather than --backbone_ckpt.
-    $ !python main.py --mode=train_and_eval \
-      --num_classes=20 \
-      --training_file_pattern=tfrecord/pascal*.tfrecord \
-      --validation_file_pattern=tfrecord/pascal*.tfrecord \
-      --val_json_file=tfrecord/json_pascal.json \
-      --model_name=efficientdet-d0 \
-      --model_dir=/tmp/efficientdet-d0-scratch  \
-      --ckpt=efficientdet-d0  \
-      --train_batch_size=8 \
-      --eval_batch_size=8 --eval_samples=1024 \
-      --num_examples_per_epoch=5717 --num_epochs=1  \
-      --hparams="use_bfloat16=false" --use_tpu=False
+    !python main.py --mode=train_and_eval \
+        --num_classes=20 \
+        --training_file_pattern=tfrecord/pascal*.tfrecord \
+        --validation_file_pattern=tfrecord/pascal*.tfrecord \
+        --val_json_file=tfrecord/json_pascal.json \
+        --model_name=efficientdet-d0 \
+        --model_dir=/tmp/efficientdet-d0-scratch  \
+        --ckpt=efficientdet-d0  \
+        --train_batch_size=8 \
+        --eval_batch_size=8 --eval_samples=1024 \
+        --num_examples_per_epoch=5717 --num_epochs=1  \
+        --hparams="use_bfloat16=false,num_classes=20,moving_average_decay=0" \
+        --use_tpu=False
 
 ## 8. Training EfficientDets on TPUs.
 
@@ -192,12 +199,12 @@ To train this model on Cloud TPU, you will need:
 
    * A GCE VM instance with an associated Cloud TPU resource.
    * A GCS bucket to store your training checkpoints (the "model directory").
-   * Install TensorFlow version >= 1.13 for both GCE VM and Cloud.
+   * Install latest TensorFlow for both GCE VM and Cloud.
 
 Then train the model:
 
-    $ export PYTHONPATH="$PYTHONPATH:/path/to/models"
-    $ python main.py --tpu=TPU_NAME --training_file_pattern=DATA_DIR/*.tfrecord --model_dir=MODEL_DIR
+    !export PYTHONPATH="$PYTHONPATH:/path/to/models"
+    !python main.py --tpu=TPU_NAME --training_file_pattern=DATA_DIR/*.tfrecord --model_dir=MODEL_DIR
 
     # TPU_NAME is the name of the TPU node, the same name that appears when you run gcloud compute tpus list, or ctpu ls.
     # MODEL_DIR is a GCS location (a URL starting with gs:// where both the GCE VM and the associated Cloud TPU have write access.
