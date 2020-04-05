@@ -62,11 +62,19 @@ pascal_label_map_dict = {
 }
 
 
+GLOBAL_ID = 0
+
 def filename_to_int(filename):
   """Convert a string to a integer."""
-  filename = filename.replace('_', '')
-  filename = os.path.splitext(os.path.basename(filename))[0]
-  return int(filename)
+  # Warning: this function is highly specific to pascal filename!!
+  # Given filename like '2008_000002', we cannot use id 2008000002 because our
+  # code internally will convert the int value to float32 and back to int, which
+  # would cause value mismatch int(float32(2008000002)) != int(2008000002).
+  # COCO needs int values, here we just use a incremental global_id, but
+  # users should customize their own ways to generate filename.
+  global GLOBAL_ID
+  GLOBAL_ID += 1
+  return GLOBAL_ID
 
 
 def dict_to_tf_example(data,
@@ -250,8 +258,9 @@ def main(_):
   for writer in writers:
     writer.close()
 
-  json_file_path = os.path.join(os.path.dirname(x),
-                               'json_' + os.path.basename(x) + '.json')
+  json_file_path = os.path.join(
+      os.path.dirname(FLAGS.output_path),
+      'json_' + os.path.basename(FLAGS.output_path) + '.json')
   with tf.io.gfile.GFile(json_file_path, 'w') as f:
     json.dump(ann_json_dict, f)
 
