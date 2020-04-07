@@ -64,7 +64,8 @@ pascal_label_map_dict = {
 
 GLOBAL_ID = 0
 
-def filename_to_int(filename):
+
+def get_image_id(filename):
   """Convert a string to a integer."""
   # Warning: this function is highly specific to pascal filename!!
   # Given filename like '2008_000002', we cannot use id 2008000002 because our
@@ -72,6 +73,7 @@ def filename_to_int(filename):
   # would cause value mismatch int(float32(2008000002)) != int(2008000002).
   # COCO needs int values, here we just use a incremental global_id, but
   # users should customize their own ways to generate filename.
+  del filename
   global GLOBAL_ID
   GLOBAL_ID += 1
   return GLOBAL_ID
@@ -117,7 +119,7 @@ def dict_to_tf_example(data,
 
   width = int(data['size']['width'])
   height = int(data['size']['height'])
-  image_id = filename_to_int(data['filename'])
+  image_id = get_image_id(data['filename'])
   if ann_json_dict:
     image = {
         'file_name': data['filename'],

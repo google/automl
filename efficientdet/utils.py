@@ -316,6 +316,7 @@ conv_kernel_initializer = tf.initializers.variance_scaling()
 dense_kernel_initializer = tf.initializers.variance_scaling()
 summaries = []
 
+
 def scalar(name, tensor):
   """Stores a (name, Tensor) tuple in a custom collection."""
   logging.info('Adding summary {}'.format((name, tensor)))
@@ -323,15 +324,9 @@ def scalar(name, tensor):
   summaries.append((name, tf.reduce_mean(tensor)))
 
 
-def get_scalar_summaries():
-  """Returns the list of (name, Tensor) summaries recorded by scalar()."""
-  global summaries
-  return summaries
-
-
 def get_tpu_host_call(global_step, params):
   """Get TPU host call for summaries."""
-  summaries = get_scalar_summaries()
+  global summaries
   if not summaries:
     # No summaries to write.
     return None

@@ -11,10 +11,10 @@ This folder provides tools for converting raw coco/pascal data to tfrecord.
     # convert coco data to tfrecord.
     !mkdir tfrecord
     !PYTHONPATH=".:$PYTHONPATH"  python dataset/create_coco_tfrecord.py \
-        --image_dir=val2017 \
-        --caption_annotations_file=annotations/captions_val2017.json \
-        --output_file_prefix=tfrecord/val \
-        --num_shards=32
+      --image_dir=val2017 \
+      --caption_annotations_file=annotations/captions_val2017.json \
+      --output_file_prefix=tfrecord/val \
+      --num_shards=32
 
 ### 2. Convert Pascal VOC 2012 to tfrecord:
 

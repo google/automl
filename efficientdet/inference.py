@@ -94,7 +94,7 @@ def build_inputs(image_path_pattern: Text, image_size: int):
     image, scale = image_preprocess(image, image_size)
     images.append(image)
     scales.append(scale)
-  if len(images) == 0:
+  if not images:
     raise ValueError(
         'Cannot find any images for pattern {}'.format(image_path_pattern))
   return raw_images, tf.stack(images), tf.stack(scales)
@@ -338,7 +338,7 @@ class ServingDriver(object):
 
   def __del__(self):
     if self.sess:
-        self.sess.close()
+      self.sess.close()
 
   def build(self,
             params_override=None,
@@ -368,11 +368,17 @@ class ServingDriver(object):
         images.append(image)
       scales = tf.stack(scales)
       images = tf.stack(images)
-      class_outputs, box_outputs = build_model(self.model_name, images, **params)
-      params.update(dict(batch_size=self.batch_size, disable_pyfun=self.disable_pyfun))
-      detections = det_post_process(params, class_outputs, box_outputs, scales,
-                                    min_score_thresh=min_score_thresh,
-                                    max_boxes_to_draw=max_boxes_to_draw)
+      class_outputs, box_outputs = build_model(self.model_name, images,
+                                               **params)
+      params.update(
+          dict(batch_size=self.batch_size, disable_pyfun=self.disable_pyfun))
+      detections = det_post_process(
+          params,
+          class_outputs,
+          box_outputs,
+          scales,
+          min_score_thresh=min_score_thresh,
+          max_boxes_to_draw=max_boxes_to_draw)
 
       restore_ckpt(self.sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
 

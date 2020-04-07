@@ -342,7 +342,7 @@ class ModelInspector(object):
             FLAGS.input_image, FLAGS.output_image_dir, **config_dict)
       elif runmode == 'saved_model':
         self.export_saved_model(**config_dict)
-      elif runmode == 'saved_model_infer': 
+      elif runmode == 'saved_model_infer':
         self.saved_model_inference(
             FLAGS.input_image, FLAGS.output_image_dir, **config_dict)
     elif runmode == 'bm':

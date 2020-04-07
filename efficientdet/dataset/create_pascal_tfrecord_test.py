@@ -83,7 +83,7 @@ class CreatePascalTFRecordTest(tf.test.TestCase):
         [six.b(image_file_name)])
     self._assertProtoEqual(
         example.features.feature['image/source_id'].bytes_list.value,
-        [six.b(str(create_pascal_tfrecord.filename_to_int(image_file_name)))])
+        [six.b(str(1))])
     self._assertProtoEqual(
         example.features.feature['image/format'].bytes_list.value,
         [six.b('jpeg')])
