@@ -22,7 +22,7 @@ EfficientDets are developed based on the advanced backbone, a new BiFPN, and a n
 </p>
 
   * **Backbone**: we employ [EfficientNets](https://arxiv.org/abs/1905.11946) as our backbone networks.
-  * **BiFPN**: we propose BiFPN, a bi-directional feature network enhenced with fast normalization, which enables easy and fast feature fusion.
+  * **BiFPN**: we propose BiFPN, a bi-directional feature network enhanced with fast normalization, which enables easy and fast feature fusion.
   * **Scaling**: we use a single compound scaling factor to govern the depth, width, and resolution for all backbone, feature & prediction networks.
 
 Our model family starts from EfficientDet-D0, which has comparable accuracy as [YOLOv3](https://arxiv.org/abs/1804.02767). Then we scale up this baseline model using our compound scaling method to obtain a list of detection models EfficientDet-D1 to D6, with different trade-offs between accuracy and model complexity.
@@ -171,7 +171,7 @@ You can also run eval on test-dev set with the following command:
         --eval_batch_size=8 --eval_samples=512 \
         --num_examples_per_epoch=5717 --num_epochs=1  \
         --hparams="use_bfloat16=false,num_classes=20,moving_average_decay=0" \
-        --use_tpu=False 
+        --use_tpu=False
 
 ## 7. Finetune on PASCAL VOC 2012 with detector COCO ckpt.
     # Download efficientdet coco checkpoint.

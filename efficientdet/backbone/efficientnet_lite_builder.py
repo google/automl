@@ -12,161 +12,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Model Builder for EfficientNet.
+"""Model Builder for EfficientNet Edge Models.
 
-efficientnet-bx (x=0,1,2,3,4,5,6,7) checkpoints are located in:
-  https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/ckptsaug/efficientnet-bx.tar.gz
+efficientnet-litex (x=0,1,2,3,4) checkpoints are located in:
+  https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/lite/efficientnet-litex.tar.gz
 """
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
 import os
-import re
 from absl import logging
-import numpy as np
-import six
 import tensorflow.compat.v1 as tf
 
 import utils
+from backbone import efficientnet_builder
 from backbone import efficientnet_model
 
+# Edge models use inception-style MEAN and STDDEV for better post-quantization.
+MEAN_RGB = [127.0, 127.0, 127.0]
+STDDEV_RGB = [128.0, 128.0, 128.0]
 
-def efficientnet_params(model_name):
+
+def efficientnet_lite_params(model_name):
   """Get efficientnet params based on model name."""
   params_dict = {
       # (width_coefficient, depth_coefficient, resolution, dropout_rate)
-      'efficientnet-b0': (1.0, 1.0, 224, 0.2),
-      'efficientnet-b1': (1.0, 1.1, 240, 0.2),
-      'efficientnet-b2': (1.1, 1.2, 260, 0.3),
-      'efficientnet-b3': (1.2, 1.4, 300, 0.3),
-      'efficientnet-b4': (1.4, 1.8, 380, 0.4),
-      'efficientnet-b5': (1.6, 2.2, 456, 0.4),
-      'efficientnet-b6': (1.8, 2.6, 528, 0.5),
-      'efficientnet-b7': (2.0, 3.1, 600, 0.5),
-      'efficientnet-b8': (2.2, 3.6, 672, 0.5),
-      'efficientnet-l2': (4.3, 5.3, 800, 0.5),
+      'efficientnet-lite0': (1.0, 1.0, 224, 0.2),
+      'efficientnet-lite1': (1.0, 1.1, 240, 0.2),
+      'efficientnet-lite2': (1.1, 1.2, 260, 0.3),
+      'efficientnet-lite3': (1.2, 1.4, 280, 0.3),
+      'efficientnet-lite4': (1.4, 1.8, 300, 0.3),
   }
   return params_dict[model_name]
-
-
-class BlockDecoder(object):
-  """Block Decoder for readability."""
-
-  def _decode_block_string(self, block_string):
-    """Gets a block through a string notation of arguments."""
-    if six.PY2:
-      assert isinstance(block_string, (str, unicode))
-    else:
-      assert isinstance(block_string, str)
-    ops = block_string.split('_')
-    options = {}
-    for op in ops:
-      splits = re.split(r'(\d.*)', op)
-      if len(splits) >= 2:
-        key, value = splits[:2]
-        options[key] = value
-
-    if 's' not in options or len(options['s']) != 2:
-      raise ValueError('Strides options should be a pair of integers.')
-
-    return efficientnet_model.BlockArgs(
-        kernel_size=int(options['k']),
-        num_repeat=int(options['r']),
-        input_filters=int(options['i']),
-        output_filters=int(options['o']),
-        expand_ratio=int(options['e']),
-        id_skip=('noskip' not in block_string),
-        se_ratio=float(options['se']) if 'se' in options else None,
-        strides=[int(options['s'][0]),
-                 int(options['s'][1])],
-        conv_type=int(options['c']) if 'c' in options else 0,
-        fused_conv=int(options['f']) if 'f' in options else 0,
-        super_pixel=int(options['p']) if 'p' in options else 0,
-        condconv=('cc' in block_string))
-
-  def _encode_block_string(self, block):
-    """Encodes a block to a string."""
-    args = [
-        'r%d' % block.num_repeat,
-        'k%d' % block.kernel_size,
-        's%d%d' % (block.strides[0], block.strides[1]),
-        'e%s' % block.expand_ratio,
-        'i%d' % block.input_filters,
-        'o%d' % block.output_filters,
-        'c%d' % block.conv_type,
-        'f%d' % block.fused_conv,
-        'p%d' % block.super_pixel,
-    ]
-    if block.se_ratio > 0 and block.se_ratio <= 1:
-      args.append('se%s' % block.se_ratio)
-    if block.id_skip is False:  # pylint: disable=g-bool-id-comparison
-      args.append('noskip')
-    if block.condconv:
-      args.append('cc')
-    return '_'.join(args)
-
-  def decode(self, string_list):
-    """Decodes a list of string notations to specify blocks inside the network.
-
-    Args:
-      string_list: a list of strings, each string is a notation of block.
-
-    Returns:
-      A list of namedtuples to represent blocks arguments.
-    """
-    assert isinstance(string_list, list)
-    blocks_args = []
-    for block_string in string_list:
-      blocks_args.append(self._decode_block_string(block_string))
-    return blocks_args
-
-  def encode(self, blocks_args):
-    """Encodes a list of Blocks to a list of strings.
-
-    Args:
-      blocks_args: A list of namedtuples to represent blocks arguments.
-    Returns:
-      a list of strings, each string is a notation of block.
-    """
-    block_strings = []
-    for block in blocks_args:
-      block_strings.append(self._encode_block_string(block))
-    return block_strings
-
-
-def swish(features, use_native=True, use_hard=False):
-  """Computes the Swish activation function.
-
-  We provide three alternatives:
-    - Native tf.nn.swish, use less memory during training than composable swish.
-    - Quantization friendly hard swish.
-    - A composable swish, equivalent to tf.nn.swish, but more general for
-      finetuning and TF-Hub.
-
-  Args:
-    features: A `Tensor` representing preactivation values.
-    use_native: Whether to use the native swish from tf.nn that uses a custom
-      gradient to reduce memory usage, or to use customized swish that uses
-      default TensorFlow gradient computation.
-    use_hard: Whether to use quantization-friendly hard swish.
-
-  Returns:
-    The activation value.
-  """
-  if use_native and use_hard:
-    raise ValueError('Cannot specify both use_native and use_hard.')
-
-  if use_native:
-    return tf.nn.swish(features)
-
-  if use_hard:
-    return features * tf.nn.relu6(features + np.float32(3)) * (1. / 6.)
-
-  features = tf.convert_to_tensor(features, name='features')
-  return features * tf.nn.sigmoid(features)
 
 
 _DEFAULT_BLOCKS_ARGS = [
@@ -177,10 +56,10 @@ _DEFAULT_BLOCKS_ARGS = [
 ]
 
 
-def efficientnet(width_coefficient=None,
-                 depth_coefficient=None,
-                 dropout_rate=0.2,
-                 survival_prob=0.8):
+def efficientnet_lite(width_coefficient=None,
+                      depth_coefficient=None,
+                      dropout_rate=0.2,
+                      survival_prob=0.8):
   """Creates a efficientnet model."""
   global_params = efficientnet_model.GlobalParams(
       blocks_args=_DEFAULT_BLOCKS_ARGS,
@@ -194,21 +73,23 @@ def efficientnet(width_coefficient=None,
       depth_coefficient=depth_coefficient,
       depth_divisor=8,
       min_depth=None,
-      relu_fn=tf.nn.swish,
+      relu_fn=tf.nn.relu6,  # Relu6 is for easier quantization.
       # The default is TPU-specific batch norm.
       # The alternative is tf.layers.BatchNormalization.
       batch_norm=utils.TpuBatchNormalization,  # TPU-specific requirement.
-      use_se=True,
-      clip_projection_output=False)
+      clip_projection_output=False,
+      fix_head_stem=True,  # Don't scale stem and head.
+      local_pooling=True,  # special cases for tflite issues.
+      use_se=False)  # SE is not well supported on many lite devices.
   return global_params
 
 
 def get_model_params(model_name, override_params):
   """Get the block args and global params for a given model."""
-  if model_name.startswith('efficientnet'):
+  if model_name.startswith('efficientnet-lite'):
     width_coefficient, depth_coefficient, _, dropout_rate = (
-        efficientnet_params(model_name))
-    global_params = efficientnet(
+        efficientnet_lite_params(model_name))
+    global_params = efficientnet_lite(
         width_coefficient, depth_coefficient, dropout_rate)
   else:
     raise NotImplementedError('model name is not pre-defined: %s' % model_name)
@@ -218,7 +99,7 @@ def get_model_params(model_name, override_params):
     # in global_params.
     global_params = global_params._replace(**override_params)
 
-  decoder = BlockDecoder()
+  decoder = efficientnet_builder.BlockDecoder()
   blocks_args = decoder.decode(global_params.blocks_args)
 
   logging.info('global_params= %s', global_params)
@@ -267,8 +148,6 @@ def build_model(images,
     if not override_params:
       override_params = {}
     override_params['batch_norm'] = utils.BatchNormalization
-    if fine_tuning:
-      override_params['relu_fn'] = functools.partial(swish, use_native=False)
   blocks_args, global_params = get_model_params(model_name, override_params)
 
   if model_dir:

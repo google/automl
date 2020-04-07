@@ -30,6 +30,7 @@ import tensorflow.compat.v1 as tf
 
 import hparams_config
 import utils
+from backbone import backbone_factory
 from backbone import efficientnet_builder
 
 
@@ -322,7 +323,8 @@ def build_backbone(features, config):
       override_params['blocks_args'] = (
           efficientnet_builder.BlockDecoder().encode(
               config.backbone_config.blocks))
-    _, endpoints = efficientnet_builder.build_model_base(
+    model_builder = backbone_factory.get_model_builder(backbone_name)
+    _, endpoints = model_builder.build_model_base(
         features,
         backbone_name,
         training=is_training_bn,
