@@ -16,6 +16,9 @@
 
 [1] Barret, et al. Learning Data Augmentation Strategies for Object Detection.
     Arxiv: https://arxiv.org/abs/1906.11172
+
+To use autoaugmentation, please install tensorflow_addons by running
+  - pip install tensorflow_addons
 """
 
 from __future__ import absolute_import
@@ -26,12 +29,8 @@ import inspect
 import math
 from absl import logging
 import tensorflow.compat.v1 as tf
-
+from tensorflow_addons import image as tfa_image
 import hparams_config
-try:
-    import tensorflow_addons.image as contrib_image
-except:
-    import tensorflow.contrib.image as contrib_image
 
 
 # This signifies the max integer that the controller RNN could predict for the
@@ -324,7 +323,7 @@ def rotate(image, degrees, replace):
   # In practice, we should randomize the rotation degrees by flipping
   # it negatively half the time, but that's done on 'degrees' outside
   # of the function.
-  image = contrib_image.rotate(wrap(image), radians)
+  image = tfa_image.rotate(wrap(image), radians)
   return unwrap(image, replace)
 
 
@@ -879,13 +878,13 @@ def rotate_with_bboxes(image, bboxes, degrees, replace):
 
 def translate_x(image, pixels, replace):
   """Equivalent of PIL Translate in X dimension."""
-  image = contrib_image.translate(wrap(image), [-pixels, 0])
+  image = tfa_image.translate(wrap(image), [-pixels, 0])
   return unwrap(image, replace)
 
 
 def translate_y(image, pixels, replace):
   """Equivalent of PIL Translate in Y dimension."""
-  image = contrib_image.translate(wrap(image), [0, -pixels])
+  image = tfa_image.translate(wrap(image), [0, -pixels])
   return unwrap(image, replace)
 
 
@@ -970,7 +969,7 @@ def shear_x(image, level, replace):
   # with a matrix form of:
   # [1  level
   #  0  1].
-  image = contrib_image.transform(
+  image = tfa_image.transform(
       wrap(image), [1., level, 0., 0., 1., 0., 0., 0.])
   return unwrap(image, replace)
 
@@ -981,7 +980,7 @@ def shear_y(image, level, replace):
   # with a matrix form of:
   # [1  0
   #  level  1].
-  image = contrib_image.transform(
+  image = tfa_image.transform(
       wrap(image), [1., 0., 0., level, 1., 0., 0., 0.])
   return unwrap(image, replace)
 
