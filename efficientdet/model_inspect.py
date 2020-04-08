@@ -134,9 +134,13 @@ class ModelInspector(object):
     return all_outputs
 
   def export_saved_model(self, **kwargs):
+    """Export a saved model for inference."""
     tf.enable_resource_variables()
-    driver = inference.ServingDriver(self.model_name, self.ckpt_path,
-                                     self.image_size)
+    driver = inference.ServingDriver(
+        self.model_name,
+        self.ckpt_path,
+        self.image_size,
+        enable_ema=self.enable_ema)
     driver.build(
         min_score_thresh=kwargs.get('min_score_thresh', 0.2),
         max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 50))
@@ -150,8 +154,11 @@ class ModelInspector(object):
       image = Image.open(image_path_pattern)
       raw_images.append(np.array(image))
       detections_bs = sess.run('detections:0', {'image_arrays:0': raw_images})
-      driver = inference.ServingDriver(self.model_name, self.ckpt_path,
-                                       self.image_size)
+      driver = inference.ServingDriver(
+          self.model_name,
+          self.ckpt_path,
+          self.image_size,
+          enable_ema=self.enable_ema)
       for i, detections in enumerate(detections_bs):
         print('detections[:10]=', detections[:10])
         img = driver.visualize(raw_images[i], detections, **kwargs)
@@ -216,7 +223,8 @@ class ModelInspector(object):
 
   def inference_single_image(self, image_image_path, output_dir, **kwargs):
     driver = inference.InferenceDriver(self.model_name, self.ckpt_path,
-                                       self.image_size, self.num_classes)
+                                       self.image_size, self.num_classes,
+                                       self.enable_ema)
     driver.inference(image_image_path, output_dir, **kwargs)
 
   def freeze_model(self) -> Tuple[Text, Text]:

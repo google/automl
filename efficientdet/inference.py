@@ -307,6 +307,7 @@ class ServingDriver(object):
                image_size: int = None,
                batch_size: int = 1,
                num_classes: int = None,
+               enable_ema: bool = True,
                label_id_mapping: Dict[int, Text] = None):
     """Initialize the inference driver.
 
@@ -317,6 +318,7 @@ class ServingDriver(object):
         defined by model_name.
       batch_size: batch size for inference.
       num_classes: number of classes. If None, use the default COCO classes.
+      enable_ema: whether to enable moving average.
       label_id_mapping: a dictionary from id to name. If None, use the default
         coco_id_mapping (with 90 classes).
     """
@@ -335,6 +337,7 @@ class ServingDriver(object):
     self.signitures = None
     self.sess = None
     self.disable_pyfun = True
+    self.enable_ema = enable_ema
 
   def __del__(self):
     if self.sess:
@@ -380,7 +383,11 @@ class ServingDriver(object):
           min_score_thresh=min_score_thresh,
           max_boxes_to_draw=max_boxes_to_draw)
 
-      restore_ckpt(self.sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
+      restore_ckpt(
+          self.sess,
+          self.ckpt_path,
+          enable_ema=self.enable_ema,
+          export_ckpt=None)
 
     self.signitures = {
         'image_files': image_files,
@@ -488,6 +495,7 @@ class InferenceDriver(object):
                ckpt_path: Text,
                image_size: int = None,
                num_classes: int = None,
+               enable_ema: bool = True,
                label_id_mapping: Dict[int, Text] = None):
     """Initialize the inference driver.
 
@@ -497,6 +505,7 @@ class InferenceDriver(object):
       image_size: user specified image size. If None, use the default image size
         defined by model_name.
       num_classes: number of classes. If None, use the default COCO classes.
+      enable_ema: whether to enable moving average.
       label_id_mapping: a dictionary from id to name. If None, use the default
         coco_id_mapping (with 90 classes).
     """
@@ -511,6 +520,7 @@ class InferenceDriver(object):
     if num_classes:
       self.params.update(dict(num_classes=num_classes))
     self.disable_pyfun = False
+    self.enable_ema = enable_ema
 
   def inference(self, image_path_pattern: Text, output_dir: Text, **kwargs):
     """Read and preprocess input images.
@@ -534,7 +544,8 @@ class InferenceDriver(object):
       # Build model.
       class_outputs, box_outputs = build_model(self.model_name, images,
                                                **self.params)
-      restore_ckpt(sess, self.ckpt_path, enable_ema=True, export_ckpt=None)
+      restore_ckpt(
+          sess, self.ckpt_path, enable_ema=self.enable_ema, export_ckpt=None)
       # for postprocessing.
       params.update(
           dict(batch_size=len(raw_images), disable_pyfun=self.disable_pyfun))
