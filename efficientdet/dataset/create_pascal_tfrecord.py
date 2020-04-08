@@ -62,7 +62,8 @@ pascal_label_map_dict = {
 }
 
 
-GLOBAL_ID = 0
+GLOBAL_IMG_ID = 0  # global image id.
+GLOBAL_ANN_ID = 0  # global annotation id.
 
 
 def get_image_id(filename):
@@ -74,9 +75,16 @@ def get_image_id(filename):
   # COCO needs int values, here we just use a incremental global_id, but
   # users should customize their own ways to generate filename.
   del filename
-  global GLOBAL_ID
-  GLOBAL_ID += 1
-  return GLOBAL_ID
+  global GLOBAL_IMG_ID
+  GLOBAL_IMG_ID += 1
+  return GLOBAL_IMG_ID
+
+
+def get_ann_id():
+  """Return unique annotation id across images."""
+  global GLOBAL_ANN_ID
+  GLOBAL_ANN_ID += 1
+  return GLOBAL_ANN_ID
 
 
 def dict_to_tf_example(data,
@@ -128,7 +136,6 @@ def dict_to_tf_example(data,
         'id': image_id,
     }
     ann_json_dict['images'].append(image)
-    ann_box_id = 1
 
   xmin = []
   ymin = []
@@ -169,12 +176,11 @@ def dict_to_tf_example(data,
             'image_id': image_id,
             'bbox': [abs_xmin, abs_ymin, abs_width, abs_height],
             'category_id': label_map_dict[obj['name']],
-            'id': ann_box_id,
+            'id': get_ann_id(),
             'ignore': 0,
             'segmentation': [],
         }
         ann_json_dict['annotations'].append(ann)
-        ann_box_id += 1
 
   example = tf.train.Example(features=tf.train.Features(feature={
       'image/height': tfrecord_util.int64_feature(height),
