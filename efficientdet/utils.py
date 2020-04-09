@@ -214,16 +214,16 @@ class BatchNormalization(tf.layers.BatchNormalization):
     super(BatchNormalization, self).__init__(**kwargs)
 
 
-def batch_norm_class(is_training):
-  if is_training:
+def batch_norm_class(is_training, use_tpu=False,):
+  if is_training and use_tpu:
     return TpuBatchNormalization
   else:
     return BatchNormalization
 
 
-def tpu_batch_normalization(inputs, training=False, **kwargs):
+def tpu_batch_normalization(inputs, training=False, use_tpu=False, **kwargs):
   """A wrapper for TpuBatchNormalization."""
-  layer = batch_norm_class(training)(**kwargs)
+  layer = batch_norm_class(training, use_tpu)(**kwargs)
   return layer.apply(inputs, training=training)
 
 
@@ -234,6 +234,7 @@ def batch_norm_relu(inputs,
                     data_format='channels_last',
                     momentum=0.99,
                     epsilon=1e-3,
+                    use_tpu=False,
                     name=None):
   """Performs a batch normalization followed by a ReLU.
 
@@ -247,6 +248,7 @@ def batch_norm_relu(inputs,
       width]` or "channels_last for `[batch, height, width, channels]`.
     momentum: `float`, momentume of batch norm.
     epsilon: `float`, small value for numerical stability.
+    use_tpu: `bool`, whether to use tpu version of batch norm.
     name: the name of the batch normalization layer
 
   Returns:
@@ -270,6 +272,7 @@ def batch_norm_relu(inputs,
       center=True,
       scale=True,
       training=is_training_bn,
+      use_tpu=use_tpu,
       gamma_initializer=gamma_initializer,
       name=name)
 

@@ -166,6 +166,7 @@ def default_detection_configs():
   h.weight_decay = 4e-5
   # enable bfloat
   h.use_bfloat16 = True
+  h.use_tpu = True
 
   # For detection.
   h.box_class_repeats = 3
