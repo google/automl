@@ -72,7 +72,7 @@ We have provided a list of EfficientDet checkpoints and results as follows:
     # Run inference.
     !python model_inspect.py --runmode=infer --model_name=$MODEL \
       --input_image_size=1920 --max_boxes_to_draw=100   --min_score_thresh=0.2 \
-      --ckpt_path=$CKPT_PATH --input_image=img.jpg --output_image_dir=/tmp
+      --ckpt_path=$CKPT_PATH --input_image=img.png --output_image_dir=/tmp
     # you can visualize the output /tmp/0.jpg
 
 Here is an example of EfficientDet-D0 visualization: more on [tutorial](tutorial.ipynb)
@@ -130,7 +130,7 @@ You can also run eval on test-dev set with the following command:
     !wget http://images.cocodataset.org/annotations/image_info_test2017.zip
     !unzip image_info_test2017.zip
 
-    !mkdir tfrecrod
+    !mkdir tfrecord
     !PYTHONPATH=".:$PYTHONPATH"  python dataset/create_coco_tfrecord.py \
           --image_dir=test2017 \
           --image_info_file=annotations/image_info_test-dev2017.json \
