@@ -91,9 +91,10 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     'val_json_file',
     None,
-    'COCO validation JSON containing golden bounding boxes.')
+    'COCO validation JSON containing golden bounding boxes. If None, use the '
+    'ground truth from the dataloader. Ignored if testdev_dir is not None.')
 flags.DEFINE_string('testdev_dir', None,
-                    'COCO testdev dir. If true, ignorer val_json_file.')
+                    'COCO testdev dir. If not None, ignorer val_json_file.')
 flags.DEFINE_integer('num_examples_per_epoch', 120000,
                      'Number of examples in one epoch')
 flags.DEFINE_integer('num_epochs', 15, 'Number of epochs for training')
@@ -135,9 +136,6 @@ def main(argv):
     if FLAGS.validation_file_pattern is None:
       raise RuntimeError('You must specify --validation_file_pattern '
                          'for evaluation.')
-    if not FLAGS.val_json_file and not FLAGS.testdev_dir:
-      raise RuntimeError(
-          'You must specify --val_json_file or --testdev for evaluation.')
 
   # Parse and override hparams
   config = hparams_config.get_detection_config(FLAGS.model_name)
