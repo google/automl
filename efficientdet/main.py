@@ -102,8 +102,6 @@ flags.DEFINE_string('mode', 'train',
                     'Mode to run: train or eval (default: train)')
 flags.DEFINE_string('model_name', 'efficientdet-d1',
                     'Model name: retinanet or efficientdet')
-flags.DEFINE_bool('eval_after_training', False, 'Run one eval after the '
-                  'training finishes.')
 
 # For Eval mode
 flags.DEFINE_integer('min_eval_interval', 180,
@@ -252,30 +250,6 @@ def main(argv):
         max_steps=int((FLAGS.num_epochs * FLAGS.num_examples_per_epoch) /
                       FLAGS.train_batch_size))
 
-    if FLAGS.eval_after_training:
-      # Run evaluation after training finishes.
-      eval_params = dict(
-          params,
-          use_tpu=False,
-          input_rand_hflip=False,
-          is_training_bn=False,
-          use_bfloat16=False,
-      )
-      eval_estimator = tf.estimator.tpu.TPUEstimator(
-          model_fn=model_fn_instance,
-          use_tpu=False,
-          train_batch_size=FLAGS.train_batch_size,
-          eval_batch_size=FLAGS.eval_batch_size,
-          config=run_config,
-          params=eval_params)
-      eval_results = eval_estimator.evaluate(
-          input_fn=dataloader.InputReader(FLAGS.validation_file_pattern,
-                                          is_training=False),
-          steps=FLAGS.eval_samples//FLAGS.eval_batch_size)
-      logging.info('Eval results: %s', eval_results)
-      ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
-      utils.archive_ckpt(eval_results, eval_results['AP'], ckpt)
-
   elif FLAGS.mode == 'eval':
     # Eval only runs on CPU or GPU host with batch_size = 1.
     # Override the default options: disable randomization in the input pipeline
@@ -362,6 +336,7 @@ def main(argv):
           use_tpu=False,
           input_rand_hflip=False,
           is_training_bn=False,
+          use_bfloat16=False,
       )
 
       eval_estimator = tf.estimator.tpu.TPUEstimator(
