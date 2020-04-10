@@ -66,7 +66,7 @@ We have provided a list of EfficientDet checkpoints and results as follows:
     !export MODEL=efficientdet-d0
     !export CKPT_PATH=efficientdet-d0
     !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/${MODEL}.tar.gz
-    !wget https://user-images.githubusercontent.com/11736571/77320690-099af300-6d37-11ea-9d86-24f14dc2d540.png -o img.png
+    !wget https://user-images.githubusercontent.com/11736571/77320690-099af300-6d37-11ea-9d86-24f14dc2d540.png -O img.png
     !tar xf ${MODEL}.tar.gz
 
     # Run inference.
