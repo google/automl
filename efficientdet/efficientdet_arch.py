@@ -108,12 +108,9 @@ def resample_feature_map(feat, name, target_width, target_num_channels,
     # If conv_after_downsample is True, when downsampling, apply 1x1 after
     # downsampling for efficiency.
     if width > target_width:
-      if width % target_width != 0:
-        raise ValueError('width ({}) is not divisible by '
-                         'target_width ({}).'.format(width, target_width))
       if not conv_after_downsample:
         feat = _maybe_apply_1x1(feat)
-      stride_size = int(width // target_width)
+      stride_size = int((width - 1) // target_width + 1)
       if pooling_type == 'max' or pooling_type is None:
         # Use max pooling in default.
         feat = tf.layers.max_pooling2d(
@@ -134,25 +131,23 @@ def resample_feature_map(feat, name, target_width, target_num_channels,
       if conv_after_downsample:
         feat = _maybe_apply_1x1(feat)
     else:
-      if target_width % width != 0:
-        raise ValueError('target_width ({}) is not divisible by '
-                         'width ({}).'.format(target_width, width))
       feat = _maybe_apply_1x1(feat)
       if width < target_width:
-        _, h, w, _ = feat.get_shape().as_list()
         scale = target_width // width
-        if use_native_resize_op:
-          feat = tf.image.resize_nearest_neighbor(feat, [h * scale, w * scale])
+        if use_native_resize_op or target_width % width != 0:
+          feat = tf.cast(
+              tf.image.resize_nearest_neighbor(
+                  tf.cast(feat, tf.float32), [target_width, target_width]),
+              dtype=feat.dtype)
         else:
           feat = nearest_upsampling(feat, scale=scale)
 
   return feat
 
 
-def _verify_feats_size(feats, input_size, min_level, max_level):
-  expected_output_width = [
-      int(input_size / 2**l) for l in range(min_level, max_level + 1)
-  ]
+def _verify_feats_size(feats, input_size, feat_sizes, min_level, max_level):
+  """Verify the feature map sizes."""
+  expected_output_width = feat_sizes[min_level:max_level + 1]
   for cnt, width in enumerate(expected_output_width):
     if feats[cnt].shape[1] != width:
       raise ValueError('feats[{}] has shape {} but its width should be {}.'
@@ -363,6 +358,7 @@ def build_feature_network(features, config):
   Returns:
     A dict from levels to the feature maps processed after feature network.
   """
+  feat_sizes = utils.get_feat_sizes(config.image_size, config.max_level)
   feats = []
   if config.min_level not in features.keys():
     raise ValueError('features.keys ({}) should include min_level ({})'.format(
@@ -378,7 +374,7 @@ def build_feature_network(features, config):
           resample_feature_map(
               feats[-1],
               name='p%d' % level,
-              target_width=feats[-1].shape[1] // 2,
+              target_width=(feats[-1].shape[1] - 1) // 2 + 1,
               target_num_channels=config.fpn_num_filters,
               apply_bn=config.apply_bn_for_resampling,
               is_training=config.is_training_bn,
@@ -391,6 +387,7 @@ def build_feature_network(features, config):
   _verify_feats_size(
       feats,
       input_size=config.image_size,
+      feat_sizes=feat_sizes,
       min_level=config.min_level,
       max_level=config.max_level)
 
@@ -400,9 +397,9 @@ def build_feature_network(features, config):
         logging.info('building cell %d', rep)
         new_feats = build_bifpn_layer(
             feats=feats,
+            feat_sizes=feat_sizes,
             fpn_name=config.fpn_name,
             fpn_config=config.fpn_config,
-            input_size=config.image_size,
             fpn_num_filters=config.fpn_num_filters,
             min_level=config.min_level,
             max_level=config.max_level,
@@ -424,27 +421,25 @@ def build_feature_network(features, config):
         _verify_feats_size(
             feats,
             input_size=config.image_size,
+            feat_sizes=feat_sizes,
             min_level=config.min_level,
             max_level=config.max_level)
 
   return new_feats
 
 
-F = lambda x: 1.0 / (2 ** x)  # Resolution size for a given feature level.
-
-
 def bifpn_sum_config():
   """BiFPN config with sum."""
   p = hparams_config.Config()
   p.nodes = [
-      {'width_ratio': F(6), 'inputs_offsets': [3, 4]},
-      {'width_ratio': F(5), 'inputs_offsets': [2, 5]},
-      {'width_ratio': F(4), 'inputs_offsets': [1, 6]},
-      {'width_ratio': F(3), 'inputs_offsets': [0, 7]},
-      {'width_ratio': F(4), 'inputs_offsets': [1, 7, 8]},
-      {'width_ratio': F(5), 'inputs_offsets': [2, 6, 9]},
-      {'width_ratio': F(6), 'inputs_offsets': [3, 5, 10]},
-      {'width_ratio': F(7), 'inputs_offsets': [4, 11]},
+      {'width_index': 6, 'inputs_offsets': [3, 4]},
+      {'width_index': 5, 'inputs_offsets': [2, 5]},
+      {'width_index': 4, 'inputs_offsets': [1, 6]},
+      {'width_index': 3, 'inputs_offsets': [0, 7]},
+      {'width_index': 4, 'inputs_offsets': [1, 7, 8]},
+      {'width_index': 5, 'inputs_offsets': [2, 6, 9]},
+      {'width_index': 6, 'inputs_offsets': [3, 5, 10]},
+      {'width_index': 7, 'inputs_offsets': [4, 11]},
   ]
   p.weight_method = 'sum'
   return p
@@ -468,7 +463,7 @@ def get_fpn_config(fpn_name):
 
 
 def build_bifpn_layer(
-    feats, fpn_name, fpn_config, is_training, input_size,
+    feats, feat_sizes, fpn_name, fpn_config, is_training,
     fpn_num_filters, min_level, max_level, separable_conv,
     apply_bn_for_resampling, conv_after_downsample,
     use_native_resize_op, conv_bn_relu_pattern, pooling_type, use_tpu=False):
@@ -479,7 +474,7 @@ def build_bifpn_layer(
   for i, fnode in enumerate(config.nodes):
     with tf.variable_scope('fnode{}'.format(i)):
       logging.info('fnode %d : %s', i, fnode)
-      new_node_width = int(fnode['width_ratio'] * input_size)
+      new_node_width = feat_sizes[fnode['width_index']]
       nodes = []
       for idx, input_offset in enumerate(fnode['inputs_offsets']):
         input_node = feats[input_offset]
@@ -548,7 +543,7 @@ def build_bifpn_layer(
   output_feats = {}
   for l in range(min_level, max_level + 1):
     for i, fnode in enumerate(reversed(config.nodes)):
-      if fnode['width_ratio'] == F(l):
+      if fnode['width_index'] == l:
         output_feats[l] = feats[-1 - i]
         break
   return output_feats

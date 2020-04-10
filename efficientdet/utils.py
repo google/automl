@@ -407,3 +407,12 @@ def archive_ckpt(ckpt_eval, ckpt_objective, ckpt_path):
 
   logging.info('Copying checkpoint {} to {}'.format(ckpt_path, dst_dir))
   return True
+
+
+def get_feat_sizes(image_size, max_level):
+  feat_sizes = [image_size]
+  feat_size = image_size
+  for _ in range(1, max_level + 1):
+    feat_size = (feat_size - 1) // 2 + 1
+    feat_sizes.append(feat_size)
+  return feat_sizes

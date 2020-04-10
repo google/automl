@@ -26,6 +26,7 @@ from __future__ import print_function
 import collections
 import numpy as np
 import tensorflow.compat.v1 as tf
+import utils
 from object_detection import argmax_matcher
 from object_detection import box_list
 from object_detection import faster_rcnn_box_coder
@@ -176,12 +177,14 @@ def nms(dets, thresh):
   return keep
 
 
-def _generate_anchor_configs(min_level, max_level, num_scales, aspect_ratios):
+def _generate_anchor_configs(feat_sizes, min_level, max_level, num_scales,
+                             aspect_ratios):
   """Generates mapping from output level to a list of anchor configurations.
 
   A configuration is a tuple of (num_anchors, scale, aspect_ratio).
 
   Args:
+      feat_sizes: list of integer numbers of feature map sizes.
       min_level: integer number of minimum level of the output feature pyramid.
       max_level: integer number of maximum level of the output feature pyramid.
       num_scales: integer number representing intermediate scales added
@@ -200,8 +203,8 @@ def _generate_anchor_configs(min_level, max_level, num_scales, aspect_ratios):
     anchor_configs[level] = []
     for scale_octave in range(num_scales):
       for aspect in aspect_ratios:
-        anchor_configs[level].append(
-            (2**level, scale_octave / float(num_scales), aspect))
+        anchor_configs[level].append((feat_sizes[0] / float(feat_sizes[level]),
+                                      scale_octave / float(num_scales), aspect))
   return anchor_configs
 
 
@@ -210,8 +213,7 @@ def _generate_anchor_boxes(image_size, anchor_scale, anchor_configs):
 
   Args:
     image_size: integer number of input image size. The input image has the
-      same dimension for width and height. The image_size should be divided by
-      the largest feature stride 2^max_level.
+      same dimension for width and height.
     anchor_scale: float number representing the scale of size of the base
       anchor to the feature stride 2^level.
     anchor_configs: a dictionary with keys as the levels of anchors and
@@ -228,8 +230,6 @@ def _generate_anchor_boxes(image_size, anchor_scale, anchor_configs):
     boxes_level = []
     for config in configs:
       stride, octave_scale, aspect = config
-      if image_size % stride != 0:
-        raise ValueError('input size must be divided by the stride.')
       base_anchor_size = anchor_scale * stride * 2**octave_scale
       anchor_size_x_2 = base_anchor_size * aspect[0] / 2.0
       anchor_size_y_2 = base_anchor_size * aspect[1] / 2.0
@@ -465,8 +465,7 @@ class Anchors(object):
       anchor_scale: float number representing the scale of size of the base
         anchor to the feature stride 2^level.
       image_size: integer number of input image size. The input image has the
-        same dimension for width and height. The image_size should be divided by
-        the largest feature stride 2^max_level.
+        same dimension for width and height.
     """
     self.min_level = min_level
     self.max_level = max_level
@@ -474,13 +473,15 @@ class Anchors(object):
     self.aspect_ratios = aspect_ratios
     self.anchor_scale = anchor_scale
     self.image_size = image_size
+    self.feat_sizes = utils.get_feat_sizes(image_size, max_level)
     self.config = self._generate_configs()
     self.boxes = self._generate_boxes()
 
   def _generate_configs(self):
     """Generate configurations of anchor boxes."""
-    return _generate_anchor_configs(self.min_level, self.max_level,
-                                    self.num_scales, self.aspect_ratios)
+    return _generate_anchor_configs(self.feat_sizes, self.min_level,
+                                    self.max_level, self.num_scales,
+                                    self.aspect_ratios)
 
   def _generate_boxes(self):
     """Generates multiscale anchor boxes."""
@@ -525,7 +526,7 @@ class AnchorLabeler(object):
     anchors = self._anchors
     count = 0
     for level in range(anchors.min_level, anchors.max_level + 1):
-      feat_size = int(anchors.image_size / 2**level)
+      feat_size = anchors.feat_sizes[level]
       steps = feat_size**2 * anchors.get_anchors_per_location()
       indices = tf.range(count, count + steps)
       count += steps
