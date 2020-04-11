@@ -16,9 +16,6 @@
 
 [1] Barret, et al. Learning Data Augmentation Strategies for Object Detection.
     Arxiv: https://arxiv.org/abs/1906.11172
-
-To use autoaugmentation, please install tensorflow_addons by running
-  - pip install tensorflow_addons
 """
 
 from __future__ import absolute_import
@@ -29,8 +26,13 @@ import inspect
 import math
 from absl import logging
 import tensorflow.compat.v1 as tf
-from tensorflow_addons import image as tfa_image
 import hparams_config
+
+try:
+  # addon image_ops are simpler, but they have some issues on GPU and TPU.
+  from tensorflow_addons import image as image_ops  # pylint: disable=g-import-not-at-top
+except ImportError:
+  from tensorflow.contrib import image as image_ops  # pylint: disable=g-import-not-at-top
 
 
 # This signifies the max integer that the controller RNN could predict for the
@@ -323,7 +325,7 @@ def rotate(image, degrees, replace):
   # In practice, we should randomize the rotation degrees by flipping
   # it negatively half the time, but that's done on 'degrees' outside
   # of the function.
-  image = tfa_image.rotate(wrap(image), radians)
+  image = image_ops.rotate(wrap(image), radians)
   return unwrap(image, replace)
 
 
@@ -878,13 +880,13 @@ def rotate_with_bboxes(image, bboxes, degrees, replace):
 
 def translate_x(image, pixels, replace):
   """Equivalent of PIL Translate in X dimension."""
-  image = tfa_image.translate(wrap(image), [-pixels, 0])
+  image = image_ops.translate(wrap(image), [-pixels, 0])
   return unwrap(image, replace)
 
 
 def translate_y(image, pixels, replace):
   """Equivalent of PIL Translate in Y dimension."""
-  image = tfa_image.translate(wrap(image), [0, -pixels])
+  image = image_ops.translate(wrap(image), [0, -pixels])
   return unwrap(image, replace)
 
 
@@ -969,7 +971,7 @@ def shear_x(image, level, replace):
   # with a matrix form of:
   # [1  level
   #  0  1].
-  image = tfa_image.transform(
+  image = image_ops.transform(
       wrap(image), [1., level, 0., 0., 1., 0., 0., 0.])
   return unwrap(image, replace)
 
@@ -980,7 +982,7 @@ def shear_y(image, level, replace):
   # with a matrix form of:
   # [1  0
   #  level  1].
-  image = tfa_image.transform(
+  image = image_ops.transform(
       wrap(image), [1., 0., 0., level, 1., 0., 0., 0.])
   return unwrap(image, replace)
 
