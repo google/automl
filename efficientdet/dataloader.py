@@ -173,35 +173,6 @@ class DetectionInputProcessor(InputProcessor):
     return self._crop_offset_y
 
 
-class SegmentationInputProcessor(InputProcessor):
-  """Input processor for semantic segmentation."""
-
-  def __init__(self, image, output_size, label):
-    InputProcessor.__init__(self, image, output_size)
-    self._label = label
-
-  def random_horizontal_flip(self):
-    """Randomly flip input image and segmentation label."""
-    self._label = tf.expand_dims(self._label, 0)
-    self._image, self._label = preprocessor.random_horizontal_flip(
-        self._image, masks=self._label)
-    self._label = self._label[0, :, :]
-
-  def resize_and_crop_label(self, padding_label,
-                            method=tf.image.ResizeMethod.NEAREST_NEIGHBOR):
-    """Resize label and crop it to the self._output dimension."""
-    scaled_label = tf.image.resize_images(
-        self._label, [self._scaled_height, self._scaled_width], method=method)
-    scaled_label = scaled_label[
-        self._crop_offset_y:self._crop_offset_y + self._output_size,
-        self._crop_offset_x:self._crop_offset_x + self._output_size]
-    scaled_label -= padding_label
-    scaled_label = tf.image.pad_to_bounding_box(
-        scaled_label, 0, 0, self._output_size, self._output_size)
-    scaled_label += padding_label
-    return scaled_label
-
-
 def pad_to_fixed_size(data, pad_value, output_shape):
   """Pad data to a fixed length at the first dimension.
 
@@ -388,75 +359,4 @@ class InputReader(object):
       # first batch. This reduces variance in performance and is useful in
       # testing.
       dataset = dataset.take(1).cache().repeat()
-    return dataset
-
-
-class SegmentationInputReader(object):
-  """Input reader for dataset."""
-
-  def __init__(self, file_pattern, is_training):
-    self._file_pattern = file_pattern
-    self._is_training = is_training
-
-  def __call__(self, params):
-    example_decoder = tf_example_decoder.TfExampleSegmentationDecoder()
-    def _dataset_parser(value):
-      """Parse data to a fixed dimension input image and learning targets.
-
-      Args:
-        value: A dictionary contains an image and groundtruth annotations.
-
-      Returns:
-        A list of the following elements in order:
-        image: Image tensor that is preprocessed to have normalized value and
-          fixed dimension [image_size, image_size, 3]
-        label: label tensor of the same spatial dimension as the image.
-      """
-      with tf.name_scope('parser'):
-        data = example_decoder.decode(value)
-        image = data['image']
-        label = data['labels_class']
-        label = tf.to_int32(label)
-        input_processor = SegmentationInputProcessor(image,
-                                                     params['image_size'],
-                                                     label)
-        # The image normalization is identical to Cloud TPU ResNet.
-        input_processor.normalize_image()
-        if self._is_training and params['input_rand_hflip']:
-          input_processor.random_horizontal_flip()
-        if self._is_training:
-          input_processor.set_training_random_scale_factors(
-              params['train_scale_min'], params['train_scale_max'])
-        image = input_processor.resize_and_crop_image()
-
-        # Set padding to background (class=0) during training.
-        if self._is_training:
-          label = input_processor.resize_and_crop_label(0)
-        else:
-          label = input_processor.resize_and_crop_label(params['ignore_label'])
-        if params['use_bfloat16']:
-          image = tf.cast(image, dtype=tf.bfloat16)
-        return image, label
-
-    batch_size = params['batch_size']
-
-    dataset = tf.data.Dataset.list_files(
-        self._file_pattern, shuffle=self._is_training)
-    if self._is_training:
-      dataset = dataset.repeat()
-
-    def _prefetch_dataset(filename):
-      dataset = tf.data.TFRecordDataset(filename).prefetch(1)
-      return dataset
-
-    dataset = dataset.apply(
-        tf.data.experimental.parallel_interleave(
-            _prefetch_dataset, cycle_length=32, sloppy=self._is_training))
-    if self._is_training:
-      dataset = dataset.shuffle(64)
-
-    dataset = dataset.map(_dataset_parser, num_parallel_calls=64)
-    dataset = dataset.prefetch(batch_size)
-    dataset = dataset.batch(batch_size, drop_remainder=True)
-    dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
     return dataset

@@ -169,7 +169,8 @@ def main(argv):
     # [batch_size, 6, 6, 9], which cannot be partitioned (6 % 4 != 0). In this
     # case, the level-8 and level-9 target tensors are not partition-able, and
     # the highest partition-able level is 7.
-    image_size = config.get('image_size')
+    feat_sizes = utils.get_feat_sizes(
+        config.get('image_size'), config.get('max_level'))
     for level in range(config.get('min_level'), config.get('max_level') + 1):
 
       def _can_partition(spatial_dim):
@@ -177,7 +178,7 @@ def main(argv):
             spatial_dim % np.array(FLAGS.input_partition_dims) == 0)
         return len(partitionable_index[0]) == len(FLAGS.input_partition_dims)
 
-      spatial_dim = image_size // (2 ** level)
+      spatial_dim = feat_sizes[level]
       if _can_partition(spatial_dim):
         labels_partition_dims[
             'box_targets_%d' % level] = FLAGS.input_partition_dims
