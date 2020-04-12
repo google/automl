@@ -339,6 +339,7 @@ def build_backbone(features, config):
         backbone_name,
         training=is_training_bn,
         override_params=override_params)
+    u1 = endpoints['reduction_1']
     u2 = endpoints['reduction_2']
     u3 = endpoints['reduction_3']
     u4 = endpoints['reduction_4']
@@ -346,7 +347,7 @@ def build_backbone(features, config):
   else:
     raise ValueError(
         'backbone model {} is not supported.'.format(backbone_name))
-  return {2: u2, 3: u3, 4: u4, 5: u5}
+  return {0: features, 1: u1, 2: u2, 3: u3, 4: u4, 5: u5}
 
 
 def build_feature_network(features, config):
