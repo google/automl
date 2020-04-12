@@ -24,6 +24,7 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
+import itertools
 from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
@@ -452,12 +453,63 @@ def bifpn_fa_config():
   return p
 
 
-def get_fpn_config(fpn_name):
+def bifpn_dynamic_config(min_level, max_level, weight_method='fastattn'):
+  """A dynamic bifpn config that can adapt to different min/max levels."""
+  p = hparams_config.Config()
+  p.weight_method = weight_method
+
+  # Node id starts from the input features and monotonically increase whenever
+  # a new node is added. Here is an example for level P3 - P7:
+  #     P7 (4)              P7" (12)
+  #     P6 (3)    P6' (5)   P6" (11)
+  #     P5 (2)    P5' (6)   P5" (10)
+  #     P4 (1)    P4' (7)   P4" (9)
+  #     P3 (0)              P3" (8)
+  # So output would be like:
+  # [
+  #   {'width_index': 6, 'inputs_offsets': [3, 4]},  # for P6'
+  #   {'width_index': 5, 'inputs_offsets': [2, 5]},  # for P5'
+  #   {'width_index': 4, 'inputs_offsets': [1, 6]},  # for P4'
+  #   {'width_index': 3, 'inputs_offsets': [0, 7]},  # for P3"
+  #   {'width_index': 4, 'inputs_offsets': [1, 7, 8]},  # for P4"
+  #   {'width_index': 5, 'inputs_offsets': [2, 6, 9]},  # for P5"
+  #   {'width_index': 6, 'inputs_offsets': [3, 5, 10]},  # for P6"
+  #   {'width_index': 7, 'inputs_offsets': [4, 11]},  # for P7"
+  # ]
+  num_levels = max_level - min_level + 1
+  node_ids = {min_level + i: [i] for i in range(num_levels)}
+
+  level_last_id = lambda level: node_ids[level][-1]
+  level_all_ids = lambda level: node_ids[level]
+  id_cnt = itertools.count(num_levels)
+
+  p.nodes = []
+  for i in range(max_level - 1, min_level - 1, -1):
+    # top-down path.
+    p.nodes.append({
+        'width_index': i,
+        'inputs_offsets': [level_last_id(i), level_last_id(i + 1)]
+    })
+    node_ids[i].append(next(id_cnt))
+
+  for i in range(min_level + 1, max_level + 1):
+    # bottom-up path.
+    p.nodes.append({
+        'width_index': i,
+        'inputs_offsets': level_all_ids(i) + [level_last_id(i - 1)]
+    })
+    node_ids[i].append(next(id_cnt))
+
+  return p
+
+
+def get_fpn_config(fpn_name, min_level, max_level):
   if not fpn_name:
     fpn_name = 'bifpn_fa'
   name_to_config = {
       'bifpn_sum': bifpn_sum_config(),
       'bifpn_fa': bifpn_fa_config(),
+      'bifpn_dyn': bifpn_dynamic_config(min_level, max_level)
   }
   return name_to_config[fpn_name]
 
@@ -468,7 +520,7 @@ def build_bifpn_layer(
     apply_bn_for_resampling, conv_after_downsample,
     use_native_resize_op, conv_bn_relu_pattern, pooling_type, use_tpu=False):
   """Builds a feature pyramid given previous feature pyramid and config."""
-  config = fpn_config or get_fpn_config(fpn_name)
+  config = fpn_config or get_fpn_config(fpn_name, min_level, max_level)
 
   num_output_connections = [0 for _ in feats]
   for i, fnode in enumerate(config.nodes):
