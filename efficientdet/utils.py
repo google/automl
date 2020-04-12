@@ -394,8 +394,7 @@ def archive_ckpt(ckpt_eval, ckpt_objective, ckpt_path):
     tf.io.gfile.copy(f, dest, overwrite=True)
   ckpt_state = tf.train.generate_checkpoint_state_proto(
       dst_dir,
-      model_checkpoint_path=ckpt_name,
-      all_model_checkpoint_paths=[ckpt_name])
+      model_checkpoint_path=os.path.join(dst_dir, ckpt_name))
   with tf.io.gfile.GFile(os.path.join(dst_dir, 'checkpoint'), 'w') as f:
     f.write(str(ckpt_state))
   with tf.io.gfile.GFile(os.path.join(dst_dir, 'best_eval.txt'), 'w') as f:
