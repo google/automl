@@ -44,7 +44,7 @@ flags.DEFINE_integer('num_classes', 90, 'Number of classes.')
 flags.DEFINE_string('input_image_size', None, 'Size of input image. Enter a'
                     'single integer if the image height is equal to the width;'
                     'Otherwise, enter two integers seprated by a "x".'
-                    'e.g. "640x1280" if height=640 and width=1280.')
+                    'e.g. "1280x640" if width=1280 and height=640.')
 flags.DEFINE_integer('threads', 0, 'Number of threads.')
 flags.DEFINE_integer('bm_runs', 20, 'Number of benchmark runs.')
 flags.DEFINE_string('tensorrt', None, 'TensorRT mode: {None, FP32, FP16, INT8}')
@@ -98,7 +98,7 @@ class ModelInspector(object):
     if image_size is None:
       image_size = hparams_config.get_detection_config(model_name).image_size
     elif 'x' in image_size:
-      height, width = image_size.split('x')
+      width, height = image_size.split('x')
       image_size = (int(height), int(width))
     else:
       image_size = int(image_size)
