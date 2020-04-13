@@ -184,7 +184,7 @@ def _generate_anchor_configs(feat_sizes, min_level, max_level, num_scales,
   A configuration is a tuple of (num_anchors, scale, aspect_ratio).
 
   Args:
-      feat_sizes: list of integer numbers of feature map sizes.
+      feat_sizes: list of dict of integer numbers of feature map sizes.
       min_level: integer number of minimum level of the output feature pyramid.
       max_level: integer number of maximum level of the output feature pyramid.
       num_scales: integer number representing intermediate scales added
@@ -203,8 +203,10 @@ def _generate_anchor_configs(feat_sizes, min_level, max_level, num_scales,
     anchor_configs[level] = []
     for scale_octave in range(num_scales):
       for aspect in aspect_ratios:
-        anchor_configs[level].append((feat_sizes[0] / float(feat_sizes[level]),
-                                      scale_octave / float(num_scales), aspect))
+        anchor_configs[level].append(
+            ((feat_sizes[0]['height'] / float(feat_sizes[level]['height']),
+              feat_sizes[0]['width'] / float(feat_sizes[level]['width'])),
+             scale_octave / float(num_scales), aspect))
   return anchor_configs
 
 
@@ -212,8 +214,7 @@ def _generate_anchor_boxes(image_size, anchor_scale, anchor_configs):
   """Generates multiscale anchor boxes.
 
   Args:
-    image_size: integer number of input image size. The input image has the
-      same dimension for width and height.
+    image_size: tuple of integer numbers of input image size.
     anchor_scale: float number representing the scale of size of the base
       anchor to the feature stride 2^level.
     anchor_configs: a dictionary with keys as the levels of anchors and
@@ -230,12 +231,13 @@ def _generate_anchor_boxes(image_size, anchor_scale, anchor_configs):
     boxes_level = []
     for config in configs:
       stride, octave_scale, aspect = config
-      base_anchor_size = anchor_scale * stride * 2**octave_scale
-      anchor_size_x_2 = base_anchor_size * aspect[0] / 2.0
-      anchor_size_y_2 = base_anchor_size * aspect[1] / 2.0
+      base_anchor_size_x = anchor_scale * stride[1] * 2**octave_scale
+      base_anchor_size_y = anchor_scale * stride[0] * 2**octave_scale
+      anchor_size_x_2 = base_anchor_size_x * aspect[0] / 2.0
+      anchor_size_y_2 = base_anchor_size_y * aspect[1] / 2.0
 
-      x = np.arange(stride / 2, image_size, stride)
-      y = np.arange(stride / 2, image_size, stride)
+      x = np.arange(stride[1] / 2, image_size[1], stride[1])
+      y = np.arange(stride[0] / 2, image_size[0], stride[0])
       xv, yv = np.meshgrid(x, y)
       xv = xv.reshape(-1)
       yv = yv.reshape(-1)
@@ -438,10 +440,10 @@ def _generate_detections(cls_outputs, box_outputs, anchor_boxes, indices,
     n = max(MAX_DETECTIONS_PER_IMAGE - len(detections), 0)
     detections_dummy = _generate_dummy_detections(n)
     detections = np.vstack([detections, detections_dummy])
-    detections[:, 1:5] *= image_scale
   else:
     detections = _generate_dummy_detections(MAX_DETECTIONS_PER_IMAGE)
-    detections[:, 1:5] *= image_scale
+
+  detections[:, 1:5] *= image_scale
 
   return detections
 
@@ -464,15 +466,17 @@ class Anchors(object):
         [(1, 1), (1.4, 0.7), (0.7, 1.4)] adds three anchors on each level.
       anchor_scale: float number representing the scale of size of the base
         anchor to the feature stride 2^level.
-      image_size: integer number of input image size. The input image has the
-        same dimension for width and height.
+      image_size: integer number or tuple of integer number of input image size.
     """
     self.min_level = min_level
     self.max_level = max_level
     self.num_scales = num_scales
     self.aspect_ratios = aspect_ratios
     self.anchor_scale = anchor_scale
-    self.image_size = image_size
+    if isinstance(image_size, int):
+      self.image_size = (image_size, image_size)
+    else:
+      self.image_size = image_size
     self.feat_sizes = utils.get_feat_sizes(image_size, max_level)
     self.config = self._generate_configs()
     self.boxes = self._generate_boxes()
@@ -527,11 +531,13 @@ class AnchorLabeler(object):
     count = 0
     for level in range(anchors.min_level, anchors.max_level + 1):
       feat_size = anchors.feat_sizes[level]
-      steps = feat_size**2 * anchors.get_anchors_per_location()
+      steps = feat_size['height'] * feat_size[
+          'width'] * anchors.get_anchors_per_location()
       indices = tf.range(count, count + steps)
       count += steps
       labels_unpacked[level] = tf.reshape(
-          tf.gather(labels, indices), [feat_size, feat_size, -1])
+          tf.gather(labels, indices),
+          [feat_size['height'], feat_size['width'], -1])
     return labels_unpacked
 
   def label_anchors(self, gt_boxes, gt_labels):

@@ -179,11 +179,12 @@ def main(argv):
         return len(partitionable_index[0]) == len(FLAGS.input_partition_dims)
 
       spatial_dim = feat_sizes[level]
-      if _can_partition(spatial_dim):
-        labels_partition_dims[
-            'box_targets_%d' % level] = FLAGS.input_partition_dims
-        labels_partition_dims[
-            'cls_targets_%d' % level] = FLAGS.input_partition_dims
+      if _can_partition(spatial_dim['height']) and _can_partition(
+          spatial_dim['width']):
+        labels_partition_dims['box_targets_%d' %
+                              level] = FLAGS.input_partition_dims
+        labels_partition_dims['cls_targets_%d' %
+                              level] = FLAGS.input_partition_dims
       else:
         labels_partition_dims['box_targets_%d' % level] = None
         labels_partition_dims['cls_targets_%d' % level] = None

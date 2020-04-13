@@ -36,7 +36,7 @@ from backbone import efficientnet_builder
 
 
 ################################################################################
-def nearest_upsampling(data, scale):
+def nearest_upsampling(data, height_scale, width_scale):
   """Nearest neighbor upsampling implementation."""
   with tf.name_scope('nearest_upsampling'):
     bs, h, w, c = data.get_shape().as_list()
@@ -44,8 +44,8 @@ def nearest_upsampling(data, scale):
     # Use reshape to quickly upsample the input.  The nearest pixel is selected
     # implicitly via broadcasting.
     data = tf.reshape(data, [bs, h, 1, w, 1, c]) * tf.ones(
-        [1, 1, scale, 1, scale, 1], dtype=data.dtype)
-    return tf.reshape(data, [bs, h * scale, w * scale, c])
+        [1, 1, height_scale, 1, width_scale, 1], dtype=data.dtype)
+    return tf.reshape(data, [bs, h * height_scale, w * width_scale, c])
 
 
 def resize_bilinear(images, size, output_type):
@@ -76,17 +76,23 @@ def remove_variables(variables, resnet_depth=50):
   return var_list
 
 
-def resample_feature_map(feat, name, target_width, target_num_channels,
-                         apply_bn=False, is_training=None,
+def resample_feature_map(feat,
+                         name,
+                         target_height,
+                         target_width,
+                         target_num_channels,
+                         apply_bn=False,
+                         is_training=None,
                          conv_after_downsample=False,
                          use_native_resize_op=False, pooling_type=None,
                          use_tpu=False):
-  """Resample input feature map to have target number of channels and width."""
+  """Resample input feature map to have target number of channels and size."""
 
-  _, width, _, num_channels = feat.get_shape().as_list()
-  if width is None or num_channels is None:
-    raise ValueError('shape[1] or shape[3] of feat is None (shape:{}).'.format(
-        feat.shape))
+  _, height, width, num_channels = feat.get_shape().as_list()
+  if height is None or width is None or num_channels is None:
+    raise ValueError(
+        'shape[1] or shape[2] or shape[3] of feat is None (shape:{}).'.format(
+            feat.shape))
   if apply_bn and is_training is None:
     raise ValueError('If BN is applied, need to provide is_training')
 
@@ -108,53 +114,67 @@ def resample_feature_map(feat, name, target_width, target_num_channels,
   with tf.variable_scope('resample_{}'.format(name)):
     # If conv_after_downsample is True, when downsampling, apply 1x1 after
     # downsampling for efficiency.
-    if width > target_width:
+    if height > target_height and width > target_width:
       if not conv_after_downsample:
         feat = _maybe_apply_1x1(feat)
-      stride_size = int((width - 1) // target_width + 1)
+      height_stride_size = int((height - 1) // target_height + 1)
+      width_stride_size = int((width - 1) // target_width + 1)
       if pooling_type == 'max' or pooling_type is None:
         # Use max pooling in default.
         feat = tf.layers.max_pooling2d(
             inputs=feat,
-            pool_size=stride_size + 1,
-            strides=[stride_size, stride_size],
+            pool_size=[height_stride_size + 1, width_stride_size + 1],
+            strides=[height_stride_size, width_stride_size],
             padding='SAME',
             data_format='channels_last')
       elif pooling_type == 'avg':
         feat = tf.layers.average_pooling2d(
             inputs=feat,
-            pool_size=stride_size + 1,
-            strides=[stride_size, stride_size],
+            pool_size=[height_stride_size + 1, width_stride_size + 1],
+            strides=[height_stride_size, width_stride_size],
             padding='SAME',
             data_format='channels_last')
       else:
         raise ValueError('Unknown pooling type: {}'.format(pooling_type))
       if conv_after_downsample:
         feat = _maybe_apply_1x1(feat)
-    else:
+    elif height <= target_height and width <= target_width:
       feat = _maybe_apply_1x1(feat)
-      if width < target_width:
-        scale = target_width // width
-        if use_native_resize_op or target_width % width != 0:
+      if height < target_height or width < target_width:
+        height_scale = target_height // height
+        width_scale = target_width // width
+        if use_native_resize_op or target_height % height != 0 or target_width % width != 0:
           feat = tf.cast(
               tf.image.resize_nearest_neighbor(
-                  tf.cast(feat, tf.float32), [target_width, target_width]),
+                  tf.cast(feat, tf.float32), [target_height, target_width]),
               dtype=feat.dtype)
         else:
-          feat = nearest_upsampling(feat, scale=scale)
+          feat = nearest_upsampling(
+              feat, height_scale=height_scale, width_scale=width_scale)
+    else:
+      raise ValueError(
+          'Incompatible target feature map size: target_height: {},'
+          'target_width: {}'.format(target_height, target_width))
 
   return feat
 
 
-def _verify_feats_size(feats, input_size, feat_sizes, min_level, max_level):
+def _verify_feats_size(feats, feat_sizes, min_level, max_level):
   """Verify the feature map sizes."""
-  expected_output_width = feat_sizes[min_level:max_level + 1]
-  for cnt, width in enumerate(expected_output_width):
-    if feats[cnt].shape[1] != width:
-      raise ValueError('feats[{}] has shape {} but its width should be {}.'
-                       '(input_size: {}, min_level: {}, max_level: {}.)'.format(
-                           cnt, feats[cnt].shape, width, input_size, min_level,
-                           max_level))
+  expected_output_size = feat_sizes[min_level:max_level + 1]
+  for cnt, size in enumerate(expected_output_size):
+    if feats[cnt].shape[1] != size['height']:
+      raise ValueError(
+          'feats[{}] has shape {} but its height should be {}.'
+          '(input_height: {}, min_level: {}, max_level: {}.)'.format(
+              cnt, feats[cnt].shape, size['height'], feat_sizes[0]['height'],
+              min_level, max_level))
+    if feats[cnt].shape[2] != size['width']:
+      raise ValueError(
+          'feats[{}] has shape {} but its width should be {}.'
+          '(input_width: {}, min_level: {}, max_level: {}.)'.format(
+              cnt, feats[cnt].shape, size['width'], feat_sizes[0]['width'],
+              min_level, max_level))
 
 
 ###############################################################################
@@ -376,7 +396,8 @@ def build_feature_network(features, config):
           resample_feature_map(
               feats[-1],
               name='p%d' % level,
-              target_width=(feats[-1].shape[1] - 1) // 2 + 1,
+              target_height=(feats[-1].shape[1] - 1) // 2 + 1,
+              target_width=(feats[-1].shape[2] - 1) // 2 + 1,
               target_num_channels=config.fpn_num_filters,
               apply_bn=config.apply_bn_for_resampling,
               is_training=config.is_training_bn,
@@ -388,7 +409,6 @@ def build_feature_network(features, config):
 
   _verify_feats_size(
       feats,
-      input_size=config.image_size,
       feat_sizes=feat_sizes,
       min_level=config.min_level,
       max_level=config.max_level)
@@ -422,7 +442,6 @@ def build_feature_network(features, config):
 
         _verify_feats_size(
             feats,
-            input_size=config.image_size,
             feat_sizes=feat_sizes,
             min_level=config.min_level,
             max_level=config.max_level)
@@ -434,14 +453,14 @@ def bifpn_sum_config():
   """BiFPN config with sum."""
   p = hparams_config.Config()
   p.nodes = [
-      {'width_index': 6, 'inputs_offsets': [3, 4]},
-      {'width_index': 5, 'inputs_offsets': [2, 5]},
-      {'width_index': 4, 'inputs_offsets': [1, 6]},
-      {'width_index': 3, 'inputs_offsets': [0, 7]},
-      {'width_index': 4, 'inputs_offsets': [1, 7, 8]},
-      {'width_index': 5, 'inputs_offsets': [2, 6, 9]},
-      {'width_index': 6, 'inputs_offsets': [3, 5, 10]},
-      {'width_index': 7, 'inputs_offsets': [4, 11]},
+      {'feat_level': 6, 'inputs_offsets': [3, 4]},
+      {'feat_level': 5, 'inputs_offsets': [2, 5]},
+      {'feat_level': 4, 'inputs_offsets': [1, 6]},
+      {'feat_level': 3, 'inputs_offsets': [0, 7]},
+      {'feat_level': 4, 'inputs_offsets': [1, 7, 8]},
+      {'feat_level': 5, 'inputs_offsets': [2, 6, 9]},
+      {'feat_level': 6, 'inputs_offsets': [3, 5, 10]},
+      {'feat_level': 7, 'inputs_offsets': [4, 11]},
   ]
   p.weight_method = 'sum'
   return p
@@ -468,14 +487,14 @@ def bifpn_dynamic_config(min_level, max_level, weight_method='fastattn'):
   #     P3 (0)              P3" (8)
   # So output would be like:
   # [
-  #   {'width_index': 6, 'inputs_offsets': [3, 4]},  # for P6'
-  #   {'width_index': 5, 'inputs_offsets': [2, 5]},  # for P5'
-  #   {'width_index': 4, 'inputs_offsets': [1, 6]},  # for P4'
-  #   {'width_index': 3, 'inputs_offsets': [0, 7]},  # for P3"
-  #   {'width_index': 4, 'inputs_offsets': [1, 7, 8]},  # for P4"
-  #   {'width_index': 5, 'inputs_offsets': [2, 6, 9]},  # for P5"
-  #   {'width_index': 6, 'inputs_offsets': [3, 5, 10]},  # for P6"
-  #   {'width_index': 7, 'inputs_offsets': [4, 11]},  # for P7"
+  #   {'feat_level': 6, 'inputs_offsets': [3, 4]},  # for P6'
+  #   {'feat_level': 5, 'inputs_offsets': [2, 5]},  # for P5'
+  #   {'feat_level': 4, 'inputs_offsets': [1, 6]},  # for P4'
+  #   {'feat_level': 3, 'inputs_offsets': [0, 7]},  # for P3"
+  #   {'feat_level': 4, 'inputs_offsets': [1, 7, 8]},  # for P4"
+  #   {'feat_level': 5, 'inputs_offsets': [2, 6, 9]},  # for P5"
+  #   {'feat_level': 6, 'inputs_offsets': [3, 5, 10]},  # for P6"
+  #   {'feat_level': 7, 'inputs_offsets': [4, 11]},  # for P7"
   # ]
   num_levels = max_level - min_level + 1
   node_ids = {min_level + i: [i] for i in range(num_levels)}
@@ -488,7 +507,7 @@ def bifpn_dynamic_config(min_level, max_level, weight_method='fastattn'):
   for i in range(max_level - 1, min_level - 1, -1):
     # top-down path.
     p.nodes.append({
-        'width_index': i,
+        'feat_level': i,
         'inputs_offsets': [level_last_id(i), level_last_id(i + 1)]
     })
     node_ids[i].append(next(id_cnt))
@@ -496,7 +515,7 @@ def bifpn_dynamic_config(min_level, max_level, weight_method='fastattn'):
   for i in range(min_level + 1, max_level + 1):
     # bottom-up path.
     p.nodes.append({
-        'width_index': i,
+        'feat_level': i,
         'inputs_offsets': level_all_ids(i) + [level_last_id(i - 1)]
     })
     node_ids[i].append(next(id_cnt))
@@ -527,14 +546,15 @@ def build_bifpn_layer(
   for i, fnode in enumerate(config.nodes):
     with tf.variable_scope('fnode{}'.format(i)):
       logging.info('fnode %d : %s', i, fnode)
-      new_node_width = feat_sizes[fnode['width_index']]
+      new_node_height = feat_sizes[fnode['feat_level']]['height']
+      new_node_width = feat_sizes[fnode['feat_level']]['width']
       nodes = []
       for idx, input_offset in enumerate(fnode['inputs_offsets']):
         input_node = feats[input_offset]
         num_output_connections[input_offset] += 1
         input_node = resample_feature_map(
             input_node, '{}_{}_{}'.format(idx, input_offset, len(feats)),
-            new_node_width, fpn_num_filters,
+            new_node_height, new_node_width, fpn_num_filters,
             apply_bn_for_resampling, is_training,
             conv_after_downsample,
             use_native_resize_op,
@@ -596,7 +616,7 @@ def build_bifpn_layer(
   output_feats = {}
   for l in range(min_level, max_level + 1):
     for i, fnode in enumerate(reversed(config.nodes)):
-      if fnode['width_index'] == l:
+      if fnode['feat_level'] == l:
         output_feats[l] = feats[-1 - i]
         break
   return output_feats
