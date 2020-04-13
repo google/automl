@@ -25,6 +25,7 @@ from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
 import tensorflow.compat.v2 as tf2
+from typing import Union, Tuple
 
 from tensorflow.python.tpu import tpu_function  # pylint:disable=g-direct-tensorflow-import
 
@@ -408,10 +409,13 @@ def archive_ckpt(ckpt_eval, ckpt_objective, ckpt_path):
   return True
 
 
-def get_feat_sizes(image_size, max_level):
-  feat_sizes = [image_size]
+def get_feat_sizes(image_size: Union[int, Tuple[int, int]], max_level: int):
+  """Get feat widths and heights for all levels."""
+  if isinstance(image_size, int):
+    image_size = (image_size, image_size)
+  feat_sizes = [{'height': image_size[0], 'width': image_size[1]}]
   feat_size = image_size
   for _ in range(1, max_level + 1):
-    feat_size = (feat_size - 1) // 2 + 1
-    feat_sizes.append(feat_size)
+    feat_size = ((feat_size[0] - 1) // 2 + 1, (feat_size[1] - 1) // 2 + 1)
+    feat_sizes.append({'height': feat_size[0], 'width': feat_size[1]})
   return feat_sizes

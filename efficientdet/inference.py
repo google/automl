@@ -25,7 +25,7 @@ from absl import logging
 import numpy as np
 from PIL import Image
 import tensorflow.compat.v1 as tf
-from typing import Text, Dict, Any, List
+from typing import Text, Dict, Any, List, Tuple, Union
 
 import anchors
 import dataloader
@@ -56,12 +56,12 @@ coco_id_mapping = {
 }  # pyformat: disable
 
 
-def image_preprocess(image, image_size: int):
+def image_preprocess(image, image_size: Union[int, Tuple[int, int]]):
   """Preprocess image for inference.
 
   Args:
     image: input image, can be a tensor or a numpy arary.
-    image_size: integer of image size.
+    image_size: integer or tuple of two integers of image size.
 
   Returns:
     (image, scale): a tuple of processed image and its scale.
@@ -74,12 +74,13 @@ def image_preprocess(image, image_size: int):
   return image, image_scale
 
 
-def build_inputs(image_path_pattern: Text, image_size: int):
+def build_inputs(image_path_pattern: Text,
+                 image_size: Union[int, Tuple[int, int]]):
   """Read and preprocess input images.
 
   Args:
     image_path_pattern: a path to indicate a single or multiple files.
-    image_size: a single integer for image width and height.
+    image_size: integer or tuple of two integers for image width and height.
 
   Returns:
     (raw_images, images, scales): raw images, processed images, and scales.
@@ -304,7 +305,7 @@ class ServingDriver(object):
   def __init__(self,
                model_name: Text,
                ckpt_path: Text,
-               image_size: int = None,
+               image_size: Union[int, Tuple[int, int]] = None,
                batch_size: int = 1,
                num_classes: int = None,
                enable_ema: bool = True,
@@ -493,7 +494,7 @@ class InferenceDriver(object):
   def __init__(self,
                model_name: Text,
                ckpt_path: Text,
-               image_size: int = None,
+               image_size: Union[int, Tuple[int, int]] = None,
                num_classes: int = None,
                enable_ema: bool = True,
                label_id_mapping: Dict[int, Text] = None):

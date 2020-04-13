@@ -39,7 +39,10 @@ class InputProcessor(object):
         function.
     """
     self._image = image
-    self._output_size = output_size
+    if isinstance(output_size, int):
+      self._output_size = (output_size, output_size)
+    else:
+      self._output_size = output_size
     # Parameters to control rescaling and shifting during preprocessing.
     # Image scale defines scale from original image to scaled image.
     self._image_scale = tf.constant(1.0)
@@ -68,20 +71,22 @@ class InputProcessor(object):
     """Set the parameters for multiscale training."""
     # Select a random scale factor.
     random_scale_factor = tf.random_uniform([], scale_min, scale_max)
-    scaled_size = tf.to_int32(random_scale_factor * self._output_size)
+    scaled_size_y = tf.to_int32(random_scale_factor * self._output_size[0])
+    scaled_size_x = tf.to_int32(random_scale_factor * self._output_size[1])
 
     # Recompute the accurate scale_factor using rounded scaled image size.
     height = tf.shape(self._image)[0]
     width = tf.shape(self._image)[1]
-    max_image_size = tf.to_float(tf.maximum(height, width))
-    image_scale = tf.to_float(scaled_size) / max_image_size
+    image_scale_y = tf.to_float(scaled_size_y) / tf.to_float(height)
+    image_scale_x = tf.to_float(scaled_size_x) / tf.to_float(width)
+    image_scale = tf.minimum(image_scale_x, image_scale_y)
 
     # Select non-zero random offset (x, y) if scaled image is larger than
     # self._output_size.
     scaled_height = tf.to_int32(tf.to_float(height) * image_scale)
     scaled_width = tf.to_int32(tf.to_float(width) * image_scale)
-    offset_y = tf.to_float(scaled_height - self._output_size)
-    offset_x = tf.to_float(scaled_width - self._output_size)
+    offset_y = tf.to_float(scaled_height - self._output_size[0])
+    offset_x = tf.to_float(scaled_width - self._output_size[1])
     offset_y = tf.maximum(0.0, offset_y) * tf.random_uniform([], 0, 1)
     offset_x = tf.maximum(0.0, offset_x) * tf.random_uniform([], 0, 1)
     offset_y = tf.to_int32(offset_y)
@@ -97,8 +102,9 @@ class InputProcessor(object):
     # Compute the scale_factor using rounded scaled image size.
     height = tf.shape(self._image)[0]
     width = tf.shape(self._image)[1]
-    max_image_size = tf.to_float(tf.maximum(height, width))
-    image_scale = tf.to_float(self._output_size) / max_image_size
+    image_scale_y = tf.to_float(self._output_size[0]) / tf.to_float(height)
+    image_scale_x = tf.to_float(self._output_size[1]) / tf.to_float(width)
+    image_scale = tf.minimum(image_scale_x, image_scale_y)
     scaled_height = tf.to_int32(tf.to_float(height) * image_scale)
     scaled_width = tf.to_int32(tf.to_float(width) * image_scale)
     self._image_scale = image_scale
@@ -110,10 +116,10 @@ class InputProcessor(object):
     scaled_image = tf.image.resize_images(
         self._image, [self._scaled_height, self._scaled_width], method=method)
     scaled_image = scaled_image[
-        self._crop_offset_y:self._crop_offset_y + self._output_size,
-        self._crop_offset_x:self._crop_offset_x + self._output_size, :]
+        self._crop_offset_y:self._crop_offset_y + self._output_size[0],
+        self._crop_offset_x:self._crop_offset_x + self._output_size[1], :]
     output_image = tf.image.pad_to_bounding_box(
-        scaled_image, 0, 0, self._output_size, self._output_size)
+        scaled_image, 0, 0, self._output_size[0], self._output_size[1])
     return output_image
 
 
@@ -133,8 +139,8 @@ class DetectionInputProcessor(InputProcessor):
   def clip_boxes(self, boxes):
     """Clip boxes to fit in an image."""
     boxes = tf.where(tf.less(boxes, 0), tf.zeros_like(boxes), boxes)
-    boxes = tf.where(tf.greater(boxes, self._output_size - 1),
-                     (self._output_size - 1) * tf.ones_like(boxes), boxes)
+    boxes = tf.where(tf.greater(boxes, self._output_size[0] - 1),
+                     (self._output_size[1] - 1) * tf.ones_like(boxes), boxes)
     return boxes
 
   def resize_and_crop_boxes(self):
@@ -224,7 +230,7 @@ class InputReader(object):
 
       Returns:
         image: Image tensor that is preprocessed to have normalized value and
-          fixed dimension [image_size, image_size, 3]
+          fixed dimension [image_height, image_width, 3]
         cls_targets_dict: ordered dictionary with keys
           [min_level, min_level+1, ..., max_level]. The values are tensor with
           shape [height_l, width_l, num_anchors]. The height_l and width_l

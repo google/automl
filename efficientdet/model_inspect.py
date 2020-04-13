@@ -41,7 +41,10 @@ flags.DEFINE_string('logdir', '/tmp/deff/', 'log directory.')
 flags.DEFINE_string('runmode', 'dry', 'Run mode: {freeze, bm, dry}')
 flags.DEFINE_string('trace_filename', None, 'Trace file name.')
 flags.DEFINE_integer('num_classes', 90, 'Number of classes.')
-flags.DEFINE_integer('input_image_size', None, 'Size of input image.')
+flags.DEFINE_string('input_image_size', None, 'Size of input image. Enter a'
+                    'single integer if the image height is equal to the width;'
+                    'Otherwise, enter two integers seprated by a "x".'
+                    'e.g. "1280x640" if width=1280 and height=640.')
 flags.DEFINE_integer('threads', 0, 'Number of threads.')
 flags.DEFINE_integer('bm_runs', 20, 'Number of benchmark runs.')
 flags.DEFINE_string('tensorrt', None, 'TensorRT mode: {None, FP32, FP16, INT8}')
@@ -73,7 +76,7 @@ class ModelInspector(object):
 
   def __init__(self,
                model_name: Text,
-               image_size: int,
+               image_size: Text,
                num_classes: int,
                logdir: Text,
                tensorrt: Text = False,
@@ -92,21 +95,26 @@ class ModelInspector(object):
     self.export_ckpt = export_ckpt
     self.saved_model_dir = saved_model_dir
 
-    if image_size:
-      # Use user specified image size.
-      self.model_overrides = {
-          'image_size': image_size,
-          'num_classes': num_classes
-      }
-    else:
-      # Use default size.
+    if image_size is None:
       image_size = hparams_config.get_detection_config(model_name).image_size
-      self.model_overrides = {'num_classes': num_classes}
+    elif 'x' in image_size:
+      width, height = image_size.split('x')
+      image_size = (int(height), int(width))
+    else:
+      image_size = int(image_size)
+
+    if isinstance(image_size, int):
+      image_size = (image_size, image_size)
+
+    self.model_overrides = {
+        'image_size': image_size,
+        'num_classes': num_classes
+    }
 
     # A few fixed parameters.
     batch_size = 1
     self.num_classes = num_classes
-    self.inputs_shape = [batch_size, image_size, image_size, 3]
+    self.inputs_shape = [batch_size, image_size[0], image_size[1], 3]
     self.labels_shape = [batch_size, self.num_classes]
     self.image_size = image_size
 
