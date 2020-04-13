@@ -147,9 +147,9 @@ class ModelInspector(object):
     driver = inference.ServingDriver(
         self.model_name,
         self.ckpt_path,
-        self.image_size,
         enable_ema=self.enable_ema)
     driver.build(
+        params_override=self.model_overrides,
         min_score_thresh=kwargs.get('min_score_thresh', 0.2),
         max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 50))
     driver.export(self.saved_model_dir)
@@ -165,7 +165,6 @@ class ModelInspector(object):
       driver = inference.ServingDriver(
           self.model_name,
           self.ckpt_path,
-          self.image_size,
           enable_ema=self.enable_ema)
       for i, detections in enumerate(detections_bs):
         print('detections[:10]=', detections[:10])
