@@ -98,13 +98,12 @@ class ModelInspector(object):
     if image_size is None:
       image_size = hparams_config.get_detection_config(model_name).image_size
     elif 'x' in image_size:
+      # image_size is in format of WIDTHxHEIGHT
       width, height = image_size.split('x')
-      image_size = (int(height), int(width))
+      image_size = (int(width), int(height))
     else:
-      image_size = int(image_size)
-
-    if isinstance(image_size, int):
-      image_size = (image_size, image_size)
+      # image_size is integer, witht the same width and height.
+      image_size = (int(image_size), int(image_size))
 
     self.model_overrides = {
         'image_size': image_size,
@@ -147,9 +146,9 @@ class ModelInspector(object):
     driver = inference.ServingDriver(
         self.model_name,
         self.ckpt_path,
-        self.image_size,
         enable_ema=self.enable_ema)
     driver.build(
+        params_override=self.model_overrides,
         min_score_thresh=kwargs.get('min_score_thresh', 0.2),
         max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 50))
     driver.export(self.saved_model_dir)
@@ -165,7 +164,6 @@ class ModelInspector(object):
       driver = inference.ServingDriver(
           self.model_name,
           self.ckpt_path,
-          self.image_size,
           enable_ema=self.enable_ema)
       for i, detections in enumerate(detections_bs):
         print('detections[:10]=', detections[:10])

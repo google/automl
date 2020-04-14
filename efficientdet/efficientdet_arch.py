@@ -102,10 +102,10 @@ def resample_feature_map(feat,
       feat = tf.layers.conv2d(
           feat, filters=target_num_channels, kernel_size=(1, 1), padding='same')
       if apply_bn:
-        feat = utils.batch_norm_relu(
+        feat = utils.batch_norm_act(
             feat,
             is_training_bn=is_training,
-            relu=False,
+            act_type=None,
             data_format='channels_last',
             use_tpu=use_tpu,
             name='bn')
@@ -184,6 +184,7 @@ def class_net(images,
               num_anchors,
               num_filters,
               is_training,
+              act_type,
               separable_conv=True,
               repeats=4,
               survival_prob=None,
@@ -209,10 +210,10 @@ def class_net(images,
         activation=None,
         padding='same',
         name='class-%d' % i)
-    images = utils.batch_norm_relu(
+    images = utils.batch_norm_act(
         images,
         is_training,
-        relu=True,
+        act_type=act_type,
         init_zero=False,
         use_tpu=use_tpu,
         name='class-%d-bn-%d' % (i, level))
@@ -231,8 +232,16 @@ def class_net(images,
   return classes
 
 
-def box_net(images, level, num_anchors, num_filters, is_training,
-            repeats=4, separable_conv=True, survival_prob=None, use_tpu=False):
+def box_net(images,
+            level,
+            num_anchors,
+            num_filters,
+            is_training,
+            act_type,
+            repeats=4,
+            separable_conv=True,
+            survival_prob=None,
+            use_tpu=False):
   """Box regression network."""
   if separable_conv:
     conv_op = functools.partial(
@@ -254,10 +263,10 @@ def box_net(images, level, num_anchors, num_filters, is_training,
         bias_initializer=tf.zeros_initializer(),
         padding='same',
         name='box-%d' % i)
-    images = utils.batch_norm_relu(
+    images = utils.batch_norm_act(
         images,
         is_training,
-        relu=True,
+        act_type=act_type,
         init_zero=False,
         use_tpu=use_tpu,
         name='box-%d-bn-%d' % (i, level))
@@ -302,6 +311,7 @@ def build_class_and_box_outputs(feats, config):
           num_anchors=num_anchors,
           num_filters=cls_fsize,
           is_training=config.is_training_bn,
+          act_type=config.act_type,
           repeats=config.box_class_repeats,
           separable_conv=config.separable_conv,
           survival_prob=config.survival_prob,
@@ -318,6 +328,7 @@ def build_class_and_box_outputs(feats, config):
           num_anchors=num_anchors,
           num_filters=box_fsize,
           is_training=config.is_training_bn,
+          act_type=config.act_type,
           repeats=config.box_class_repeats,
           separable_conv=config.separable_conv,
           survival_prob=config.survival_prob,
@@ -344,7 +355,6 @@ def build_backbone(features, config):
   is_training_bn = config.is_training_bn
   if 'efficientnet' in backbone_name:
     override_params = {
-        'relu_fn': utils.backbone_relu_fn,
         'batch_norm': utils.batch_norm_class(is_training_bn, config.use_tpu),
     }
     if 'b0' in backbone_name:
@@ -417,22 +427,7 @@ def build_feature_network(features, config):
     for rep in range(config.fpn_cell_repeats):
       with tf.variable_scope('cell_{}'.format(rep)):
         logging.info('building cell %d', rep)
-        new_feats = build_bifpn_layer(
-            feats=feats,
-            feat_sizes=feat_sizes,
-            fpn_name=config.fpn_name,
-            fpn_config=config.fpn_config,
-            fpn_num_filters=config.fpn_num_filters,
-            min_level=config.min_level,
-            max_level=config.max_level,
-            separable_conv=config.separable_conv,
-            is_training=config.is_training_bn,
-            apply_bn_for_resampling=config.apply_bn_for_resampling,
-            conv_after_downsample=config.conv_after_downsample,
-            use_native_resize_op=config.use_native_resize_op,
-            conv_bn_relu_pattern=config.conv_bn_relu_pattern,
-            pooling_type=config.pooling_type,
-            use_tpu=config.use_tpu)
+        new_feats = build_bifpn_layer(feats, feat_sizes, config)
 
         feats = [
             new_feats[level]
@@ -534,16 +529,16 @@ def get_fpn_config(fpn_name, min_level, max_level):
   return name_to_config[fpn_name]
 
 
-def build_bifpn_layer(
-    feats, feat_sizes, fpn_name, fpn_config, is_training,
-    fpn_num_filters, min_level, max_level, separable_conv,
-    apply_bn_for_resampling, conv_after_downsample,
-    use_native_resize_op, conv_bn_relu_pattern, pooling_type, use_tpu=False):
+def build_bifpn_layer(feats, feat_sizes, config):
   """Builds a feature pyramid given previous feature pyramid and config."""
-  config = fpn_config or get_fpn_config(fpn_name, min_level, max_level)
+  p = config  # use p to denote the network config.
+  if p.fpn_config:
+    fpn_config = p.fpn_config
+  else:
+    fpn_config = get_fpn_config(p.fpn_name, p.min_level, p.max_level)
 
   num_output_connections = [0 for _ in feats]
-  for i, fnode in enumerate(config.nodes):
+  for i, fnode in enumerate(fpn_config.nodes):
     with tf.variable_scope('fnode{}'.format(i)):
       logging.info('fnode %d : %s', i, fnode)
       new_node_height = feat_sizes[fnode['feat_level']]['height']
@@ -554,22 +549,22 @@ def build_bifpn_layer(
         num_output_connections[input_offset] += 1
         input_node = resample_feature_map(
             input_node, '{}_{}_{}'.format(idx, input_offset, len(feats)),
-            new_node_height, new_node_width, fpn_num_filters,
-            apply_bn_for_resampling, is_training,
-            conv_after_downsample,
-            use_native_resize_op,
-            pooling_type)
+            new_node_height, new_node_width, p.fpn_num_filters,
+            p.apply_bn_for_resampling, p.is_training_bn,
+            p.conv_after_downsample,
+            p.use_native_resize_op,
+            p.pooling_type)
         nodes.append(input_node)
 
       # Combine all nodes.
       dtype = nodes[0].dtype
-      if config.weight_method == 'attn':
+      if fpn_config.weight_method == 'attn':
         edge_weights = [tf.cast(tf.Variable(1.0, name='WSM'), dtype=dtype)
                         for _ in range(len(fnode['inputs_offsets']))]
         normalized_weights = tf.nn.softmax(tf.stack(edge_weights))
         nodes = tf.stack(nodes, axis=-1)
         new_node = tf.reduce_sum(tf.multiply(nodes, normalized_weights), -1)
-      elif config.weight_method == 'fastattn':
+      elif fpn_config.weight_method == 'fastattn':
         edge_weights = [
             tf.nn.relu(tf.cast(tf.Variable(1.0, name='WSM'), dtype=dtype))
             for _ in range(len(fnode['inputs_offsets']))
@@ -578,17 +573,17 @@ def build_bifpn_layer(
         nodes = [nodes[i] * edge_weights[i] / (weights_sum + 0.0001)
                  for i in range(len(nodes))]
         new_node = tf.add_n(nodes)
-      elif config.weight_method == 'sum':
+      elif fpn_config.weight_method == 'sum':
         new_node = tf.add_n(nodes)
       else:
         raise ValueError(
-            'unknown weight_method {}'.format(config.weight_method))
+            'unknown weight_method {}'.format(fpn_config.weight_method))
 
       with tf.variable_scope('op_after_combine{}'.format(len(feats))):
-        if not conv_bn_relu_pattern:
-          new_node = utils.relu_fn(new_node)
+        if not p.conv_bn_act_pattern:
+          new_node = utils.activation_fn(new_node, p.act_type)
 
-        if separable_conv:
+        if p.separable_conv:
           conv_op = functools.partial(
               tf.layers.separable_conv2d, depth_multiplier=1)
         else:
@@ -596,26 +591,26 @@ def build_bifpn_layer(
 
         new_node = conv_op(
             new_node,
-            filters=fpn_num_filters,
+            filters=p.fpn_num_filters,
             kernel_size=(3, 3),
             padding='same',
-            use_bias=True if not conv_bn_relu_pattern else False,
+            use_bias=True if not p.conv_bn_act_pattern else False,
             name='conv')
 
-        new_node = utils.batch_norm_relu(
+        new_node = utils.batch_norm_act(
             new_node,
-            is_training_bn=is_training,
-            relu=False if not conv_bn_relu_pattern else True,
+            is_training_bn=p.is_training_bn,
+            act_type=None if not p.conv_bn_act_pattern else p.act_type,
             data_format='channels_last',
-            use_tpu=use_tpu,
+            use_tpu=p.use_tpu,
             name='bn')
 
       feats.append(new_node)
       num_output_connections.append(0)
 
   output_feats = {}
-  for l in range(min_level, max_level + 1):
-    for i, fnode in enumerate(reversed(config.nodes)):
+  for l in range(p.min_level, p.max_level + 1):
+    for i, fnode in enumerate(reversed(fpn_config.nodes)):
       if fnode['feat_level'] == l:
         output_feats[l] = feats[-1 - i]
         break

@@ -127,6 +127,9 @@ def default_detection_configs():
   # model name.
   h.name = 'efficientdet-d1'
 
+  # activation type: see activation_fn in utils.py.
+  h.act_type = 'swish'
+
   # input preprocessing parameters
   h.image_size = 640
   h.input_rand_hflip = True
@@ -175,7 +178,7 @@ def default_detection_configs():
   h.separable_conv = True
   h.apply_bn_for_resampling = True
   h.conv_after_downsample = False
-  h.conv_bn_relu_pattern = False
+  h.conv_bn_act_pattern = False
   h.use_native_resize_op = False
   h.pooling_type = None
 
