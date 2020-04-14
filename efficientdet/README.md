@@ -47,18 +47,18 @@ Our model family starts from EfficientDet-D0, which has comparable accuracy as [
 
 We have provided a list of EfficientDet checkpoints and results as follows:
 
-|       Model    |  AP    |  AP<sub>50</sub> | AP<sub>75</sub> |AP<sub>S</sub>   |  AP<sub>M</sub>    |  AP<sub>L</sub>   | | #params | #FLOPs |
-|----------     |------ |------ | -------- | ------| ------| ------ |------ |------ |  :------: |
-|     EfficientDet-D0 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d0_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d0_coco_test-dev2017.txt))    | 33.8 | 52.2 | 35.8 | 12.0 | 38.3 | 51.2 |  | 3.9M | 2.54B  |
-|     EfficientDet-D1 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d1.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d1_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d1_coco_test-dev2017.txt))    | 39.6 | 58.6 | 42.3 | 17.9 | 44.3 | 56.0 | | 6.6M | 6.10B |
-|     EfficientDet-D2 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d2.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d2_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d2_coco_test-dev2017.txt))    | 43.0 | 62.3 | 46.2 | 22.5 | 47.0 | 58.4 | | 8.1M | 11.0B |
-|     EfficientDet-D3 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d3.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d3_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d3_coco_test-dev2017.txt))    | 45.8 | 65.0 | 49.3 | 26.6 | 49.4 | 59.8 | | 12.0M | 24.9B |
-|     EfficientDet-D4 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d4.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d4_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d4_coco_test-dev2017.txt))    | 49.4 | 69.0 | 53.4 | 30.3 | 53.2 | 63.2 |  | 20.7M | 55.2B |
-|     EfficientDet-D5 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d5.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d5_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d5_coco_test-dev2017.txt))    | 50.7 | 70.2 | 54.7 | 33.2 | 53.9 | 63.2 |  | 33.7M | 135.4B |
-|     EfficientDet-D6 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d6.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d6_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d6_coco_test-dev2017.txt))    | 51.7 | 71.2 | 56.0 | 34.1 | 55.2 | 64.1 | | 51.9M  |  225.6B  |
-|     EfficientDet-D7 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d7.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d7_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d7_coco_test-dev2017.txt))    | 52.2 | 71.4 | 56.3 | 34.8 | 55.5 | 64.6 | | 51.9M  |  324.8B  |
+|       Model    |  AP<sup>val</sup> | AP<sup>test</sup>    |  AP<sub>50</sub> | AP<sub>75</sub> |AP<sub>S</sub>   |  AP<sub>M</sub>    |  AP<sub>L</sub>   | | #params | #FLOPs |
+|----------     |------ |------ |------ | -------- | ------| ------| ------ |------ |------ |  :------: |
+|     EfficientDet-D0 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d0_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d0_coco_test-dev2017.txt))    | 33.5 | 33.8 | 52.2 | 35.8 | 12.0 | 38.3 | 51.2 |  | 3.9M | 2.54B  |
+|     EfficientDet-D1 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d1.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d1_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d1_coco_test-dev2017.txt))    | 39.1  | 39.6 | 58.6 | 42.3 | 17.9 | 44.3 | 56.0 | | 6.6M | 6.10B |
+|     EfficientDet-D2 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d2.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d2_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d2_coco_test-dev2017.txt))    | 42.5 | 43.0 | 62.3 | 46.2 | 22.5 | 47.0 | 58.4 | | 8.1M | 11.0B |
+|     EfficientDet-D3 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d3.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d3_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d3_coco_test-dev2017.txt))    | 45.9 | 45.8 | 65.0 | 49.3 | 26.6 | 49.4 | 59.8 | | 12.0M | 24.9B |
+|     EfficientDet-D4 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d4.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d4_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d4_coco_test-dev2017.txt))    | 49.0 | 49.4 | 69.0 | 53.4 | 30.3 | 53.2 | 63.2 |  | 20.7M | 55.2B |
+|     EfficientDet-D5 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d5.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d5_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d5_coco_test-dev2017.txt))    | 50.5 | 50.7 | 70.2 | 54.7 | 33.2 | 53.9 | 63.2 |  | 33.7M | 135.4B |
+|     EfficientDet-D6 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d6.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d6_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d6_coco_test-dev2017.txt))    | 51.3 | 51.7 | 71.2 | 56.0 | 34.1 | 55.2 | 64.1 | | 51.9M  |  225.6B  |
+|     EfficientDet-D7 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d7.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d7_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d7_coco_test-dev2017.txt))    | 51.8 | 52.2 | 71.4 | 56.3 | 34.8 | 55.5 | 64.6 | | 51.9M  |  324.8B  |
 
-  ** <em>val</em> denotes validation results, <em>test-dev</em> denotes test-dev2017 results. AP results in the table are for COCO test-dev2017. All checkpoints are trained with baseline preprocessing (no autoaugmentation).
+  ** <em>val</em> denotes validation results, <em>test-dev</em> denotes test-dev2017 results. AP<sup>val</sup> is for validation accuracy, all other AP results in the table are for COCO test-dev2017. All accuracy numbers are for single-model single-scale without ensemble or test-time augmentation. All checkpoints are trained with baseline preprocessing (no autoaugmentation).
 
 ## 3. Run inference.
 
@@ -71,7 +71,7 @@ We have provided a list of EfficientDet checkpoints and results as follows:
 
     # Run inference.
     !python model_inspect.py --runmode=infer --model_name=$MODEL \
-      --input_image_size=1920 --max_boxes_to_draw=100   --min_score_thresh=0.2 \
+      --input_image_size=1920x1280 --max_boxes_to_draw=100   --min_score_thresh=0.2 \
       --ckpt_path=$CKPT_PATH --input_image=img.png --output_image_dir=/tmp
     # you can visualize the output /tmp/0.jpg
 
@@ -88,13 +88,13 @@ You can also export a saved model, and use it to serve image inference.
     # Step 1: export model
     !python model_inspect.py --runmode=saved_model \
       --model_name=efficientdet-d0 --ckpt_path=efficientdet-d0 \
-      --input_image_size=1920 --max_boxes_to_draw=100   --min_score_thresh=0.2 \
+      --input_image_size=1920x1280 --max_boxes_to_draw=100   --min_score_thresh=0.2 \
       --saved_model_dir=/tmp/saved_model 
 
     # Step 2: do inference with saved model.
     !python model_inspect.py --runmode=saved_model_infer \
       --model_name=efficientdet-d0   --ckpt_path=efficientdet-d0 \
-      --input_image_size=1920 \
+      --input_image_size=1920x1280 \
       --max_boxes_to_draw=100   --min_score_thresh=0.2 \
       --line_thickness=4 --saved_model_dir=/tmp/saved_model  \
       --input_image=img.png --output_image_dir=/tmp/

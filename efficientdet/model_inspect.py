@@ -100,7 +100,7 @@ class ModelInspector(object):
     elif 'x' in image_size:
       # image_size is in format of WIDTHxHEIGHT
       width, height = image_size.split('x')
-      image_size = (int(width), int(height))
+      image_size = (int(height), int(width))
     else:
       # image_size is integer, witht the same width and height.
       image_size = (int(image_size), int(image_size))
