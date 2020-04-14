@@ -301,8 +301,8 @@ def add_metric_fn_inputs(params, cls_outputs, box_outputs, metric_fn_inputs):
   _, cls_topk_indices = tf.math.top_k(cls_outputs_all_reshape,
                                       k=anchors.MAX_DETECTION_POINTS,
                                       sorted=False)
-  indices = tf.div(cls_topk_indices, num_classes)
-  classes = tf.mod(cls_topk_indices, num_classes)
+  indices = cls_topk_indices // num_classes
+  classes = cls_topk_indices % num_classes
   cls_indices = tf.stack([indices, classes], axis=2)
   cls_outputs_all_after_topk = tf.gather_nd(
       cls_outputs_all, cls_indices, batch_dims=1)
