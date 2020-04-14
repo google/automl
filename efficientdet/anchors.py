@@ -266,7 +266,7 @@ def _generate_detections_tf(cls_outputs,
                             max_boxes_to_draw=50,
                             soft_nms_sigma=0.0,
                             iou_threshold=0.5,
-                            use_native_nms=False):
+                            use_native_nms=True):
   """Generates detections with model outputs and anchors.
 
   Args:
