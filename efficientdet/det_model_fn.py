@@ -284,56 +284,35 @@ def add_metric_fn_inputs(params, cls_outputs, box_outputs, metric_fn_inputs):
       [batch_size, height, width, num_anchors * 4].
     metric_fn_inputs: a dictionary that will hold the top-k selections.
   """
+  num_classes = params['num_classes']
   cls_outputs_all = []
   box_outputs_all = []
   # Concatenates class and box of all levels into one tensor.
   for level in range(params['min_level'], params['max_level'] + 1):
     cls_outputs_all.append(tf.reshape(
         cls_outputs[level],
-        [params['batch_size'], -1, params['num_classes']]))
+        [params['batch_size'], -1, num_classes]))
     box_outputs_all.append(tf.reshape(
         box_outputs[level], [params['batch_size'], -1, 4]))
   cls_outputs_all = tf.concat(cls_outputs_all, 1)
   box_outputs_all = tf.concat(box_outputs_all, 1)
 
-  # cls_outputs_all has a shape of [batch_size, N, num_classes] and
-  # box_outputs_all has a shape of [batch_size, N, 4]. The batch_size here
-  # is per-shard batch size. Recently, top-k on TPU supports batch
-  # dimension (b/67110441), but the following function performs top-k on
-  # each sample.
-  cls_outputs_all_after_topk = []
-  box_outputs_all_after_topk = []
-  indices_all = []
-  classes_all = []
-  for index in range(params['batch_size']):
-    cls_outputs_per_sample = cls_outputs_all[index]
-    box_outputs_per_sample = box_outputs_all[index]
-    cls_outputs_per_sample_reshape = tf.reshape(cls_outputs_per_sample,
-                                                [-1])
-    _, cls_topk_indices = tf.nn.top_k(
-        cls_outputs_per_sample_reshape, k=anchors.MAX_DETECTION_POINTS)
-    # Gets top-k class and box scores.
-    indices = tf.div(cls_topk_indices, params['num_classes'])
-    classes = tf.mod(cls_topk_indices, params['num_classes'])
-    cls_indices = tf.stack([indices, classes], axis=1)
-    cls_outputs_after_topk = tf.gather_nd(cls_outputs_per_sample,
-                                          cls_indices)
-    cls_outputs_all_after_topk.append(cls_outputs_after_topk)
-    box_outputs_after_topk = tf.gather_nd(
-        box_outputs_per_sample, tf.expand_dims(indices, 1))
-    box_outputs_all_after_topk.append(box_outputs_after_topk)
+  cls_outputs_all_reshape = tf.reshape(cls_outputs_all, [params['batch_size'], -1])
+  _, cls_topk_indices = tf.math.top_k(cls_outputs_all_reshape,
+                                      k=anchors.MAX_DETECTION_POINTS,
+                                      sorted=False)
+  indices = tf.div(cls_topk_indices, num_classes)
+  classes = tf.mod(cls_topk_indices, num_classes)
+  cls_indices = tf.stack([indices, classes], axis=2)
+  cls_outputs_all_after_topk = tf.gather_nd(
+      cls_outputs_all, cls_indices, batch_dims=1)
+  box_outputs_all_after_topk = tf.gather_nd(
+      box_outputs_all, tf.expand_dims(indices, 2), batch_dims=1)
 
-    indices_all.append(indices)
-    classes_all.append(classes)
-  # Concatenates via the batch dimension.
-  cls_outputs_all_after_topk = tf.stack(cls_outputs_all_after_topk, axis=0)
-  box_outputs_all_after_topk = tf.stack(box_outputs_all_after_topk, axis=0)
-  indices_all = tf.stack(indices_all, axis=0)
-  classes_all = tf.stack(classes_all, axis=0)
   metric_fn_inputs['cls_outputs_all'] = cls_outputs_all_after_topk
   metric_fn_inputs['box_outputs_all'] = box_outputs_all_after_topk
-  metric_fn_inputs['indices_all'] = indices_all
-  metric_fn_inputs['classes_all'] = classes_all
+  metric_fn_inputs['indices_all'] = indices
+  metric_fn_inputs['classes_all'] = classes
 
 
 def coco_metric_fn(batch_size,
