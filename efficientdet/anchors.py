@@ -24,6 +24,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
 import utils
@@ -303,6 +304,7 @@ def _generate_detections_tf(cls_outputs,
     detections: detection results in a tensor with each row representing
       [image_id, y, x, height, width, score, class]
   """
+  logging.info('Using tf version of post-processing.')
   anchor_boxes = tf.gather(anchor_boxes, indices)
 
   scores = tf.math.sigmoid(cls_outputs)
@@ -319,6 +321,7 @@ def _generate_detections_tf(cls_outputs,
     # then concatenated for the final detection outputs.
 
     if use_native_nms:
+      logging.info('Using native nms.')
       top_detection_idx, scores_cls = tf.image.non_max_suppression_with_scores(
           boxes_cls,
           scores_cls,
@@ -330,6 +333,7 @@ def _generate_detections_tf(cls_outputs,
       boxes_cls = tf.gather(boxes_cls, top_detection_idx)
       top_detections_cls = tf.concat([boxes_cls, scores_cls], axis=1)
     else:
+      logging.info('Using customized nms.')
       scores_cls = tf.expand_dims(scores_cls, axis=1)
       all_detections_cls = tf.concat([boxes_cls, scores_cls], axis=1)
       top_detection_idx = nms_tf(all_detections_cls, iou_threshold)
@@ -368,7 +372,8 @@ def _generate_detections_tf(cls_outputs,
 
 
 def _generate_detections(cls_outputs, box_outputs, anchor_boxes, indices,
-                         classes, image_id, image_scale, num_classes):
+                         classes, image_id, image_scale, num_classes,
+                         max_boxes_to_draw):
   """Generates detections with model outputs and anchors.
 
   Args:
@@ -395,6 +400,7 @@ def _generate_detections(cls_outputs, box_outputs, anchor_boxes, indices,
     detections: detection results in a tensor with each row representing
       [image_id, x, y, width, height, score, class]
   """
+  logging.info('Using numpy version of post-processing.')
   anchor_boxes = anchor_boxes[indices, :]
   scores = sigmoid(cls_outputs)
   # apply bounding box regression to anchors
@@ -435,13 +441,13 @@ def _generate_detections(cls_outputs, box_outputs, anchor_boxes, indices,
     # take final 100 detections
     indices = np.argsort(-detections[:, -2])
     detections = np.array(
-        detections[indices[0:MAX_DETECTIONS_PER_IMAGE]], dtype=np.float32)
+        detections[indices[0:max_boxes_to_draw]], dtype=np.float32)
     # Add dummy detections to fill up to 100 detections
-    n = max(MAX_DETECTIONS_PER_IMAGE - len(detections), 0)
+    n = max(max_boxes_to_draw - len(detections), 0)
     detections_dummy = _generate_dummy_detections(n)
     detections = np.vstack([detections, detections_dummy])
   else:
-    detections = _generate_dummy_detections(MAX_DETECTIONS_PER_IMAGE)
+    detections = _generate_dummy_detections(max_boxes_to_draw)
 
   detections[:, 1:5] *= image_scale
 
@@ -586,8 +592,8 @@ class AnchorLabeler(object):
                           classes,
                           image_id,
                           image_scale,
-                          min_score_thresh=0.2,
-                          max_boxes_to_draw=50,
+                          min_score_thresh=0.5,
+                          max_boxes_to_draw=MAX_DETECTIONS_PER_IMAGE,
                           disable_pyfun=None):
     """Generate detections based on class and box predictions."""
     if disable_pyfun:
@@ -605,5 +611,5 @@ class AnchorLabeler(object):
     else:
       return tf.py_func(_generate_detections, [
           cls_outputs, box_outputs, self._anchors.boxes, indices, classes,
-          image_id, image_scale, self._num_classes
+          image_id, image_scale, self._num_classes, max_boxes_to_draw,
       ], tf.float32)
