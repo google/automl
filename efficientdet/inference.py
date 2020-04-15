@@ -26,6 +26,7 @@ import numpy as np
 from PIL import Image
 import tensorflow.compat.v1 as tf
 from typing import Text, Dict, Any, List, Tuple, Union
+from time import perf_counter
 
 import anchors
 import dataloader
@@ -440,6 +441,27 @@ class ServingDriver(object):
         feed_dict={self.signitures['image_files']: image_files})
     return predictions
 
+  def benchmark(self, image_arrays):
+    if not self.sess:
+      self.build()
+
+    # init session
+    self.sess.run(
+      self.signitures['prediction'],
+      feed_dict={self.signitures['image_arrays']: image_arrays})
+
+    start = perf_counter()
+    for i in range(10):
+      self.sess.run(
+        self.signitures['prediction'],
+        feed_dict={self.signitures['image_arrays']: image_arrays})
+    end = perf_counter()
+    inference_time = (end-start) / 10
+
+    print('Inference time: ', inference_time)
+    print('FPS: ', 1 / inference_time)
+
+
   def serve_images(self, image_arrays):
     """Serve a list of image arrays.
 
@@ -456,6 +478,16 @@ class ServingDriver(object):
         self.signitures['prediction'],
         feed_dict={self.signitures['image_arrays']: image_arrays})
     return predictions
+
+  def load(self, saved_model_dir):
+      if not self.sess:
+          self.sess = tf.Session()
+      self.signitures = {
+        'image_files': 'image_files:0',
+        'image_arrays': 'image_arrays:0',
+        'prediction': 'detections:0',
+      }
+      return tf.saved_model.load(self.sess, ['serve'], saved_model_dir)
 
   def export(self, output_dir):
     """Export a saved model."""

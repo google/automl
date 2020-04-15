@@ -155,22 +155,32 @@ class ModelInspector(object):
 
   def saved_model_inference(self, image_path_pattern, output_dir, **kwargs):
     """Perform inference for the given saved model."""
-    with tf.Session() as sess:
-      tf.saved_model.load(sess, ['serve'], self.saved_model_dir)
-      raw_images = []
-      image = Image.open(image_path_pattern)
-      raw_images.append(np.array(image))
-      detections_bs = sess.run('detections:0', {'image_arrays:0': raw_images})
-      driver = inference.ServingDriver(
-          self.model_name,
-          self.ckpt_path,
-          enable_ema=self.enable_ema)
-      for i, detections in enumerate(detections_bs):
-        print('detections[:10]=', detections[:10])
-        img = driver.visualize(raw_images[i], detections, **kwargs)
-        output_image_path = os.path.join(output_dir, str(i) + '.jpg')
-        Image.fromarray(img).save(output_image_path)
-        logging.info('writing file to %s', output_image_path)
+    driver = inference.ServingDriver(
+      self.model_name,
+      self.ckpt_path,
+      enable_ema=self.enable_ema)
+    driver.load(self.saved_model_dir)
+    raw_images = []
+    image = Image.open(image_path_pattern)
+    raw_images.append(np.array(image))
+    detections_bs = driver.serve_images(raw_images)
+    for i, detections in enumerate(detections_bs):
+      img = driver.visualize(raw_images[i], detections, **kwargs)
+      output_image_path = os.path.join(output_dir, str(i) + '.jpg')
+      Image.fromarray(img).save(output_image_path)
+      logging.info('writing file to %s', output_image_path)
+
+  def saved_model_benchmark(self, image_path_pattern):
+    """Perform inference for the given saved model."""
+    driver = inference.ServingDriver(
+      self.model_name,
+      self.ckpt_path,
+      enable_ema=self.enable_ema)
+    driver.load(self.saved_model_dir)
+    raw_images = []
+    image = Image.open(image_path_pattern)
+    raw_images.append(np.array(image))
+    driver.benchmark(raw_images)
 
   def build_and_save_model(self):
     """build and save the model into self.logdir."""
@@ -342,6 +352,8 @@ class ModelInspector(object):
       self.freeze_model()
     elif runmode == 'ckpt':
       self.eval_ckpt()
+    elif runmode == 'saved_model_benchmark':
+      self.saved_model_benchmark(FLAGS.input_image)
     elif runmode in ('infer', 'saved_model', 'saved_model_infer'):
       config_dict = {}
       if FLAGS.line_thickness:
