@@ -457,6 +457,16 @@ class ServingDriver(object):
         feed_dict={self.signitures['image_arrays']: image_arrays})
     return predictions
 
+  def load(self, saved_model_dir):
+      if not self.sess:
+          self.sess = tf.Session()
+      self.signitures = {
+        'image_files': 'image_files:0',
+        'image_arrays': 'image_arrays:0',
+        'prediction': 'detections:0',
+      }
+      return tf.saved_model.load(self.sess, ['serve'], saved_model_dir)
+
   def export(self, output_dir):
     """Export a saved model."""
     signitures = self.signitures
