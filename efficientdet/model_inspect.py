@@ -97,8 +97,8 @@ class ModelInspector(object):
 
     if image_size is None:
       image_size = hparams_config.get_detection_config(model_name).image_size
-
-    if 'x' in image_size:
+      image_size = (image_size, image_size)
+    elif 'x' in image_size:
       # image_size is in format of WIDTHxHEIGHT
       width, height = image_size.split('x')
       image_size = (int(height), int(width))
@@ -332,6 +332,7 @@ class ModelInspector(object):
       print('{} {}runs {}threads: mean {:.4f} std {:.4f} min {:.4f} max {:.4f}'
             .format(self.model_name, len(timev), num_threads, np.mean(timev),
                     np.std(timev), np.min(timev), np.max(timev)))
+      print('Images per second FPS = {:.1f}'.format(1 / float(np.mean(timev))))
 
   def convert_tr(self, graph_def, fetches):
     """Convert to TensorRT."""
