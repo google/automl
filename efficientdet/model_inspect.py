@@ -97,7 +97,8 @@ class ModelInspector(object):
 
     if image_size is None:
       image_size = hparams_config.get_detection_config(model_name).image_size
-    elif 'x' in image_size:
+
+    if 'x' in image_size:
       # image_size is in format of WIDTHxHEIGHT
       width, height = image_size.split('x')
       image_size = (int(height), int(width))
