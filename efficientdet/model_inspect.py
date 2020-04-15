@@ -170,6 +170,18 @@ class ModelInspector(object):
       Image.fromarray(img).save(output_image_path)
       logging.info('writing file to %s', output_image_path)
 
+  def saved_model_benchmark(self, image_path_pattern):
+    """Perform inference for the given saved model."""
+    driver = inference.ServingDriver(
+      self.model_name,
+      self.ckpt_path,
+      enable_ema=self.enable_ema)
+    driver.load(self.saved_model_dir)
+    raw_images = []
+    image = Image.open(image_path_pattern)
+    raw_images.append(np.array(image))
+    driver.benchmark(raw_images)
+
   def build_and_save_model(self):
     """build and save the model into self.logdir."""
     with tf.Graph().as_default(), tf.Session() as sess:
@@ -340,6 +352,8 @@ class ModelInspector(object):
       self.freeze_model()
     elif runmode == 'ckpt':
       self.eval_ckpt()
+    elif runmode == 'saved_model_benchmark':
+      self.saved_model_benchmark(FLAGS.input_image)
     elif runmode in ('infer', 'saved_model', 'saved_model_infer'):
       config_dict = {}
       if FLAGS.line_thickness:
