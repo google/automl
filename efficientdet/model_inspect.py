@@ -112,10 +112,10 @@ class ModelInspector(object):
     }
 
     # A few fixed parameters.
-    batch_size = 1
+    self.batch_size = 1
     self.num_classes = num_classes
-    self.inputs_shape = [batch_size, image_size[0], image_size[1], 3]
-    self.labels_shape = [batch_size, self.num_classes]
+    self.inputs_shape = [self.batch_size, image_size[0], image_size[1], 3]
+    self.labels_shape = [self.batch_size, self.num_classes]
     self.image_size = image_size
 
   def build_model(self, inputs: tf.Tensor,
@@ -332,7 +332,8 @@ class ModelInspector(object):
       print('{} {}runs {}threads: mean {:.4f} std {:.4f} min {:.4f} max {:.4f}'
             .format(self.model_name, len(timev), num_threads, np.mean(timev),
                     np.std(timev), np.min(timev), np.max(timev)))
-      print('Images per second FPS = {:.1f}'.format(1 / float(np.mean(timev))))
+      print('Images per second FPS = {:.1f}'.format(
+          self.batch_size / float(np.mean(timev))))
 
   def convert_tr(self, graph_def, fetches):
     """Convert to TensorRT."""

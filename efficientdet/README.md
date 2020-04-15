@@ -78,7 +78,7 @@ We have provided a list of EfficientDet checkpoints and results as follows:
 Here is an example of EfficientDet-D0 visualization: more on [tutorial](tutorial.ipynb)
 
 <p align="center">
-<img src="https://user-images.githubusercontent.com/6027221/77340634-d16dc300-6cea-11ea-822c-63853f457329.jpg" width="800" />
+<img src="./g3doc/street.jpg" width="800" />
 </p>
 
 ## 4. Using saved model for inference.
@@ -89,7 +89,7 @@ You can also export a saved model, and use it to serve image inference.
     !python model_inspect.py --runmode=saved_model \
       --model_name=efficientdet-d0 --ckpt_path=efficientdet-d0 \
       --input_image_size=1920x1280 --max_boxes_to_draw=100   --min_score_thresh=0.2 \
-      --saved_model_dir=/tmp/saved_model 
+      --saved_model_dir=/tmp/saved_model
 
     # Step 2: do inference with saved model.
     !python model_inspect.py --runmode=saved_model_infer \
