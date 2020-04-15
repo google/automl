@@ -26,7 +26,7 @@ import numpy as np
 from PIL import Image
 import tensorflow.compat.v1 as tf
 from typing import Text, Dict, Any, List, Tuple, Union
-from time import time
+from time import perf_counter
 
 import anchors
 import dataloader
@@ -450,12 +450,12 @@ class ServingDriver(object):
       self.signitures['prediction'],
       feed_dict={self.signitures['image_arrays']: image_arrays})
 
-    start = time()
+    start = perf_counter()
     for i in range(10):
       self.sess.run(
         self.signitures['prediction'],
         feed_dict={self.signitures['image_arrays']: image_arrays})
-    end = time()
+    end = perf_counter()
     inference_time = (end-start) / 10
 
     print('Inference time: ', inference_time)
