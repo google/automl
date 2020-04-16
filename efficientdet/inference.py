@@ -279,9 +279,9 @@ class ServingDriver(object):
     driver = inference.ServingDriver(
       'efficientdet-d0', '/tmp/efficientdet-d0', batch_size=len(imgs))
     driver.build()
-    predictions = driver.serve_files(imgs)
-    for i in imgs:
-      driver.visualize(imgs[0], predictions[0])
+    predictions = driver.serve_images(imgs)
+    for i in range(len(imgs)):
+      driver.visualize(imgs[i], predictions[i])
 
   Example 3: another way is to use SavedModel:
 
@@ -405,7 +405,7 @@ class ServingDriver(object):
       image: Image content in shape of [height, width, 3].
       predictions: a list of vector, with each vector has the format of
         [image_id, x, y, width, height, score, class].
-      **kwargs: extra parameters for for vistualization, such as
+      **kwargs: extra parameters for vistualization, such as
         min_score_thresh, max_boxes_to_draw, and line_thickness.
 
     Returns:
