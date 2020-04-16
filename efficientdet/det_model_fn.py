@@ -380,6 +380,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   def _model_outputs():
     return model(features, config=hparams_config.Config(params))
 
+
+
   if params['use_bfloat16']:
     with tf.tpu.bfloat16_scope():
       cls_outputs, box_outputs = _model_outputs()
@@ -406,16 +408,27 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   global_step = tf.train.get_or_create_global_step()
   learning_rate = learning_rate_schedule(params, global_step)
 
-  # cls_loss and box_loss are for logging. only total_loss is optimized.
+  #cls_loss and box_loss are for logging. only total_loss is optimized.
   det_loss, cls_loss, box_loss = detection_loss(cls_outputs, box_outputs,
                                                 labels, params)
   l2loss = reg_l2_loss(params['weight_decay'])
   total_loss = det_loss + l2loss
 
+  if params['fcos']:
+    from fcos import fcos_block, fcos_loss
+    def _model_outputs():
+      cls_outputs, box_outputs = model(features, config=hparams_config.Config(params))
+      return fcos_block(cls_outputs, box_outputs, params)
+    logits_list, bbox_reg_list, centerness_list = _model_outputs()
+    cls_loss, centerness_loss, reg_loss = fcos_loss(logits_list, bbox_reg_list, centerness_list, labels, params)
+    det_loss = cls_loss + centerness_loss + reg_loss
+
   if mode == tf.estimator.ModeKeys.TRAIN:
     utils.scalar('lrn_rate', learning_rate)
     utils.scalar('trainloss/cls_loss', cls_loss)
     utils.scalar('trainloss/box_loss', box_loss)
+    if params['fcos']:
+      utils.scalar('trainloss/box_loss', reg_loss)
     utils.scalar('trainloss/det_loss', det_loss)
     utils.scalar('trainloss/l2_loss', l2loss)
     utils.scalar('trainloss/loss', total_loss)
