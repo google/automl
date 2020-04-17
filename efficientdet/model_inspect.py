@@ -184,7 +184,7 @@ class ModelInspector(object):
     raw_images = []
     image = Image.open(image_path_pattern)
     raw_images.append(np.array(image))
-    driver.benchmark(raw_images)
+    driver.benchmark(raw_images, FLAGS.trace_filename)
 
   def build_and_save_model(self):
     """build and save the model into self.logdir."""
