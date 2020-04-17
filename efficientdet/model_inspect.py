@@ -147,7 +147,8 @@ class ModelInspector(object):
     driver = inference.ServingDriver(
         self.model_name,
         self.ckpt_path,
-        enable_ema=self.enable_ema)
+        enable_ema=self.enable_ema,
+        use_xla=self.use_xla)
     driver.build(
         params_override=self.model_overrides,
         min_score_thresh=kwargs.get('min_score_thresh', 0.2),
@@ -159,7 +160,8 @@ class ModelInspector(object):
     driver = inference.ServingDriver(
       self.model_name,
       self.ckpt_path,
-      enable_ema=self.enable_ema)
+      enable_ema=self.enable_ema,
+      use_xla=self.use_xla)
     driver.load(self.saved_model_dir)
     raw_images = []
     image = Image.open(image_path_pattern)
@@ -176,7 +178,8 @@ class ModelInspector(object):
     driver = inference.ServingDriver(
       self.model_name,
       self.ckpt_path,
-      enable_ema=self.enable_ema)
+      enable_ema=self.enable_ema,
+      use_xla=self.use_xla)
     driver.load(self.saved_model_dir)
     raw_images = []
     image = Image.open(image_path_pattern)

@@ -310,7 +310,8 @@ class ServingDriver(object):
                batch_size: int = 1,
                num_classes: int = None,
                enable_ema: bool = True,
-               label_id_mapping: Dict[int, Text] = None):
+               label_id_mapping: Dict[int, Text] = None,
+               use_xla: bool = False):
     """Initialize the inference driver.
 
     Args:
@@ -323,6 +324,7 @@ class ServingDriver(object):
       enable_ema: whether to enable moving average.
       label_id_mapping: a dictionary from id to name. If None, use the default
         coco_id_mapping (with 90 classes).
+      use_xla: Whether run with xla optimization.
     """
     self.model_name = model_name
     self.ckpt_path = ckpt_path
@@ -340,10 +342,18 @@ class ServingDriver(object):
     self.sess = None
     self.disable_pyfun = True
     self.enable_ema = enable_ema
+    self.use_xla = use_xla
 
   def __del__(self):
     if self.sess:
       self.sess.close()
+
+  def _build_session(self):
+    sess_config = tf.ConfigProto()
+    if self.use_xla:
+      sess_config.graph_options.optimizer_options.global_jit_level = (
+        tf.OptimizerOptions.ON_2)
+    return tf.Session(config=sess_config)
 
   def build(self,
             params_override=None,
@@ -355,7 +365,7 @@ class ServingDriver(object):
       params.update(params_override)
 
     if not self.sess:
-      self.sess = tf.Session()
+      self.sess = self._build_session()
     with self.sess.graph.as_default():
       image_files = tf.placeholder(tf.string, name='image_files', shape=[None])
       image_size = params['image_size']
@@ -483,7 +493,7 @@ class ServingDriver(object):
 
   def load(self, saved_model_dir):
       if not self.sess:
-          self.sess = tf.Session()
+        self.sess = self._build_session()
       self.signitures = {
         'image_files': 'image_files:0',
         'image_arrays': 'image_arrays:0',
@@ -554,7 +564,7 @@ class InferenceDriver(object):
       self.params.update(dict(image_size=image_size))
     if num_classes:
       self.params.update(dict(num_classes=num_classes))
-    self.disable_pyfun = False
+    self.disable_pyfun = True
     self.enable_ema = enable_ema
 
   def inference(self, image_path_pattern: Text, output_dir: Text, **kwargs):
