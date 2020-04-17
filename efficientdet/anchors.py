@@ -262,7 +262,6 @@ def _generate_detections_tf(cls_outputs,
                             classes,
                             image_id,
                             image_scale,
-                            num_classes,
                             min_score_thresh=0.2,
                             max_boxes_to_draw=50,
                             soft_nms_sigma=0.0,
@@ -579,7 +578,6 @@ class AnchorLabeler(object):
           classes,
           image_id,
           image_scale,
-          self._num_classes,
           min_score_thresh=min_score_thresh,
           max_boxes_to_draw=max_boxes_to_draw)
     else:
