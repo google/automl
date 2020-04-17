@@ -312,14 +312,20 @@ def _generate_detections_tf(cls_outputs,
       tf.transpose(box_outputs, [1, 0]), tf.transpose(anchor_boxes, [1, 0]))
 
   if use_native_nms:
-    logging.info('Using native nms.')
-    top_detection_idx, scores = tf.image.non_max_suppression_with_scores(
-      boxes,
-      scores,
-      max_boxes_to_draw,
-      iou_threshold=iou_threshold,
-      score_threshold=min_score_thresh,
-      soft_nms_sigma=soft_nms_sigma)
+    if soft_nms_sigma is None:
+      logging.info('Using native gpu-nms.')
+      from tensorflow.python.ops import gen_image_ops
+      top_detection_idx = gen_image_ops.non_max_suppression_v2(boxes, scores, max_boxes_to_draw, iou_threshold=iou_threshold)
+      scores = tf.gather(scores, top_detection_idx)
+    else:
+      logging.info('Using native nms.')
+      top_detection_idx, scores = tf.image.non_max_suppression_with_scores(
+        boxes,
+        scores,
+        max_boxes_to_draw,
+        iou_threshold=iou_threshold,
+        score_threshold=min_score_thresh,
+        soft_nms_sigma=soft_nms_sigma)
     boxes = tf.gather(boxes, top_detection_idx)
   else:
     logging.info('Using customized nms.')
