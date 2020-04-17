@@ -320,25 +320,25 @@ def _generate_detections_tf(cls_outputs,
       iou_threshold=iou_threshold,
       score_threshold=min_score_thresh,
       soft_nms_sigma=soft_nms_sigma)
-    scores = tf.expand_dims(scores, axis=1)
     boxes = tf.gather(boxes, top_detection_idx)
-    detections = tf.concat([boxes, scores], axis=1)
   else:
     logging.info('Using customized nms.')
     scores = tf.expand_dims(scores, axis=1)
     all_detections = tf.concat([boxes, scores], axis=1)
     top_detection_idx = nms_tf(all_detections, iou_threshold)
     detections = tf.gather(all_detections, top_detection_idx)
-  height = detections[:, 2] - detections[:, 0]
-  width = detections[:, 3] - detections[:, 1]
+    scores = detections[:, 4]
+    boxes = detections[:, :4]
+  height = boxes[:, 2] - boxes[:, 0]
+  width = boxes[:, 3] - boxes[:, 1]
 
   detections = tf.stack([
       tf.cast(tf.repeat(image_id, tf.size(top_detection_idx)), tf.float32),
-      detections[:, 0] * image_scale,
-      detections[:, 1] * image_scale,
+      boxes[:, 0] * image_scale,
+      boxes[:, 1] * image_scale,
       height * image_scale,
       width * image_scale,
-      detections[:, 4],
+      scores,
       tf.cast(tf.gather(classes, top_detection_idx) + 1, tf.float32)
   ], axis=1)
   return detections
