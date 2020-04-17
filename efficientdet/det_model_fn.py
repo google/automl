@@ -238,13 +238,21 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
   cls_losses = []
   box_losses = []
   for level in levels:
+    if params['data_format'] == 'channels_first':
+      labels['cls_targets_%d' % level] = tf.transpose(labels['cls_targets_%d' % level], [0, 3, 1, 2])
+      labels['box_targets_%d' % level] = tf.transpose(labels['box_targets_%d' % level], [0, 3, 1, 2])
     # Onehot encoding for classification labels.
     cls_targets_at_level = tf.one_hot(
         labels['cls_targets_%d' % level],
         params['num_classes'])
-    bs, width, height, _, _ = cls_targets_at_level.get_shape().as_list()
-    cls_targets_at_level = tf.reshape(cls_targets_at_level,
-                                      [bs, width, height, -1])
+    if params['data_format'] == 'channels_first':
+      bs, _, width, height, _ = cls_targets_at_level.get_shape().as_list()
+      cls_targets_at_level = tf.reshape(cls_targets_at_level,
+                                        [bs, -1, width, height])
+    else:
+      bs, width, height, _, _ = cls_targets_at_level.get_shape().as_list()
+      cls_targets_at_level = tf.reshape(cls_targets_at_level,
+                                        [bs, width, height, -1])
     box_targets_at_level = labels['box_targets_%d' % level]
     cls_loss = _classification_loss(
         cls_outputs[level],
@@ -252,7 +260,11 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
         num_positives_sum,
         alpha=params['alpha'],
         gamma=params['gamma'])
-    cls_loss = tf.reshape(cls_loss,
+    if params['data_format'] == 'channels_first':
+      cls_loss = tf.reshape(cls_loss,
+                          [bs, -1, width, height, params['num_classes']])
+    else:
+      cls_loss = tf.reshape(cls_loss,
                           [bs, width, height, -1, params['num_classes']])
     cls_loss *= tf.cast(tf.expand_dims(
         tf.not_equal(labels['cls_targets_%d' % level], -2), -1), tf.float32)
@@ -377,6 +389,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     RuntimeError: if both ckpt and backbone_ckpt are set.
   """
   # Convert params (dict) to Config for easier access.
+  if params['data_format'] == 'channels_first':
+    features = tf.transpose(features, [0, 3, 1, 2])
   def _model_outputs():
     return model(features, config=hparams_config.Config(params))
 
