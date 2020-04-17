@@ -554,7 +554,7 @@ class InferenceDriver(object):
       self.params.update(dict(image_size=image_size))
     if num_classes:
       self.params.update(dict(num_classes=num_classes))
-    self.disable_pyfun = False
+    self.disable_pyfun = True
     self.enable_ema = enable_ema
 
   def inference(self, image_path_pattern: Text, output_dir: Text, **kwargs):

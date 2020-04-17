@@ -312,62 +312,36 @@ def _generate_detections_tf(cls_outputs,
   boxes = decode_box_outputs_tf(
       tf.transpose(box_outputs, [1, 0]), tf.transpose(anchor_boxes, [1, 0]))
 
-  def _else(class_id, indices):
-    """Else branch for generating detections."""
-    boxes_cls = tf.gather(boxes, indices)
-    scores_cls = tf.gather(scores, indices)
-    # Select top-scoring boxes in each class and apply non-maximum suppression
-    # (nms) for boxes in the same class. The selected boxes from each class are
-    # then concatenated for the final detection outputs.
+  if use_native_nms:
+    logging.info('Using native nms.')
+    top_detection_idx, scores = tf.image.non_max_suppression_with_scores(
+      boxes,
+      scores,
+      max_boxes_to_draw,
+      iou_threshold=iou_threshold,
+      score_threshold=min_score_thresh,
+      soft_nms_sigma=soft_nms_sigma)
+    scores = tf.expand_dims(scores, axis=1)
+    boxes = tf.gather(boxes, top_detection_idx)
+    detections = tf.concat([boxes, scores], axis=1)
+  else:
+    logging.info('Using customized nms.')
+    scores = tf.expand_dims(scores, axis=1)
+    all_detections = tf.concat([boxes, scores], axis=1)
+    top_detection_idx = nms_tf(all_detections, iou_threshold)
+    detections = tf.gather(all_detections, top_detection_idx)
+  height = detections[:, 2] - detections[:, 0]
+  width = detections[:, 3] - detections[:, 1]
+  detections = tf.stack([detections[:, 0] * image_scale,
+                        detections[:, 1] * image_scale,
+                        height * image_scale, width * image_scale,
+                        detections[:, 4]], axis=-1)
 
-    if use_native_nms:
-      logging.info('Using native nms.')
-      top_detection_idx, scores_cls = tf.image.non_max_suppression_with_scores(
-          boxes_cls,
-          scores_cls,
-          max_boxes_to_draw,
-          iou_threshold=iou_threshold,
-          score_threshold=min_score_thresh,
-          soft_nms_sigma=soft_nms_sigma)
-      scores_cls = tf.expand_dims(scores_cls, axis=1)
-      boxes_cls = tf.gather(boxes_cls, top_detection_idx)
-      top_detections_cls = tf.concat([boxes_cls, scores_cls], axis=1)
-    else:
-      logging.info('Using customized nms.')
-      scores_cls = tf.expand_dims(scores_cls, axis=1)
-      all_detections_cls = tf.concat([boxes_cls, scores_cls], axis=1)
-      top_detection_idx = nms_tf(all_detections_cls, iou_threshold)
-      top_detections_cls = tf.gather(all_detections_cls, top_detection_idx)
-    height = top_detections_cls[:, 2] - top_detections_cls[:, 0]
-    width = top_detections_cls[:, 3] - top_detections_cls[:, 1]
-    top_detections_cls = tf.stack([top_detections_cls[:, 0] * image_scale,
-                                   top_detections_cls[:, 1] * image_scale,
-                                   height * image_scale, width * image_scale,
-                                   top_detections_cls[:, 4]], axis=-1)
-
-    top_detections_cls = tf.stack(
-        [
-            tf.cast(
-                tf.repeat(image_id, tf.size(top_detection_idx)), tf.float32),
-            *tf.unstack(top_detections_cls, 5, axis=1),
-            tf.repeat(class_id + 1.0, tf.size(top_detection_idx))
-        ],
-        axis=1)
-
-    return top_detections_cls
-
-  detections = []
-  for c in range(num_classes):
-    indices_cls = tf.squeeze(tf.where_v2(tf.equal(classes, c)), axis=-1)
-    detections_cls = tf.cond(
-        tf.equal(tf.size(indices), 0),
-        lambda: tf.constant([], tf.float32, [0, 7]),
-        lambda id=c, id_cls=indices_cls: _else(id, id_cls))
-    detections.append(detections_cls)
-  detections = tf.concat(detections, axis=0)
-  indices_final = tf.argsort(detections[:, -2], direction='DESCENDING')
-  detections = tf.gather(
-      detections, indices_final[:max_boxes_to_draw], name='detection')
+  detections = tf.stack([
+      tf.cast(tf.repeat(image_id, tf.size(top_detection_idx)), tf.float32),
+      *tf.unstack(detections, 5, axis=1),
+      tf.cast(tf.gather(classes, top_detection_idx) + 1, tf.float32)
+  ], axis=1)
   return detections
 
 
