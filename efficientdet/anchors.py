@@ -312,7 +312,7 @@ def _generate_detections_tf(cls_outputs,
   boxes = decode_box_outputs_tf(
       tf.transpose(box_outputs, [1, 0]), tf.transpose(anchor_boxes, [1, 0]))
 
-  def _else(detections, class_id, indices):
+  def _else(class_id, indices):
     """Else branch for generating detections."""
     boxes_cls = tf.gather(boxes, indices)
     scores_cls = tf.gather(scores, indices)
@@ -354,17 +354,17 @@ def _generate_detections_tf(cls_outputs,
         ],
         axis=1)
 
-    detections = tf.concat([detections, top_detections_cls], axis=0)
+    return top_detections_cls
 
-    return detections
-
-  detections = tf.constant([], tf.float32, [0, 7])
+  detections = []
   for c in range(num_classes):
     indices_cls = tf.squeeze(tf.where_v2(tf.equal(classes, c)), axis=-1)
-    detections = tf.cond(
+    detections_cls = tf.cond(
         tf.equal(tf.size(indices), 0),
-        lambda: detections,
-        lambda id=c, id_cls=indices_cls: _else(detections, id, id_cls))
+        lambda: tf.constant([], tf.float32, [0, 7]),
+        lambda id=c, id_cls=indices_cls: _else(id, id_cls))
+    detections.append(detections_cls)
+  detections = tf.concat(detections, axis=0)
   indices_final = tf.argsort(detections[:, -2], direction='DESCENDING')
   detections = tf.gather(
       detections, indices_final[:max_boxes_to_draw], name='detection')

@@ -373,6 +373,8 @@ class ServingDriver(object):
         images.append(image)
       scales = tf.stack(scales)
       images = tf.stack(images)
+      if params['data_format'] == 'channels_first':
+        images = tf.transpose(images, [0, 3, 1, 2])
       class_outputs, box_outputs = build_model(self.model_name, images,
                                                **params)
       params.update(
@@ -573,7 +575,8 @@ class InferenceDriver(object):
       # Buid inputs and preprocessing.
       raw_images, images, scales = build_inputs(image_path_pattern,
                                                 params['image_size'])
-
+      if params['data_format'] == 'channels_first':
+        images = tf.transpose(images, [0, 3, 1, 2])
       # Build model.
       class_outputs, box_outputs = build_model(self.model_name, images,
                                                **self.params)
