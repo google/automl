@@ -453,7 +453,7 @@ class ServingDriver(object):
         feed_dict={self.signitures['image_files']: image_files})
     return predictions
 
-  def benchmark(self, image_arrays):
+  def benchmark(self, image_arrays, trace_filename=None):
     if not self.sess:
       self.build()
 
@@ -472,6 +472,19 @@ class ServingDriver(object):
 
     print('Inference time: ', inference_time)
     print('FPS: ', 1 / inference_time)
+    if trace_filename:
+      run_options = tf.RunOptions()
+      run_options.trace_level = tf.RunOptions.FULL_TRACE
+      run_metadata = tf.RunMetadata()
+      self.sess.run(
+          self.signitures['prediction'],
+          feed_dict={self.signitures['image_arrays']: image_arrays},
+          options=run_options, run_metadata=run_metadata)
+      with tf.io.gfile.GFile(trace_filename, 'w') as trace_file:
+        from tensorflow.python.client import timeline  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+        trace = timeline.Timeline(step_stats=run_metadata.step_stats)
+        trace_file.write(
+            trace.generate_chrome_trace_format(show_memory=True))
 
 
   def serve_images(self, image_arrays):
