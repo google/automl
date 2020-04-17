@@ -231,13 +231,13 @@ def main(_):
   else:
     label_map_dict = pascal_label_map_dict
 
+  ann_json_dict = {
+      'images': [],
+      'type': 'instances',
+      'annotations': [],
+      'categories': []
+  }
   for year in years:
-    ann_json_dict = {
-        'images': [],
-        'type': 'instances',
-        'annotations': [],
-        'categories': []
-    }
     for class_name, class_id in label_map_dict.items():
       cls = {'supercategory': 'none', 'id': class_id, 'name': class_name}
       ann_json_dict['categories'].append(cls)
