@@ -332,14 +332,14 @@ def _generate_detections_tf(cls_outputs,
     detections = tf.gather(all_detections, top_detection_idx)
   height = detections[:, 2] - detections[:, 0]
   width = detections[:, 3] - detections[:, 1]
-  detections = tf.stack([detections[:, 0] * image_scale,
-                        detections[:, 1] * image_scale,
-                        height * image_scale, width * image_scale,
-                        detections[:, 4]], axis=-1)
 
   detections = tf.stack([
       tf.cast(tf.repeat(image_id, tf.size(top_detection_idx)), tf.float32),
-      *tf.unstack(detections, 5, axis=1),
+      detections[:, 0] * image_scale,
+      detections[:, 1] * image_scale,
+      height * image_scale,
+      width * image_scale,
+      detections[:, 4],
       tf.cast(tf.gather(classes, top_detection_idx) + 1, tf.float32)
   ], axis=1)
   return detections
