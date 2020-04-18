@@ -36,26 +36,23 @@ from backbone import efficientnet_builder
 
 
 ################################################################################
-def nearest_upsampling(data, height_scale, width_scale, data_format='channels_last'):
+def nearest_upsampling(data, height_scale, width_scale, data_format):
   """Nearest neighbor upsampling implementation."""
   with tf.name_scope('nearest_upsampling'):
-    if data_format=='channels_last':
+    # Use reshape to quickly upsample the input. The nearest pixel is selected
+    # implicitly via broadcasting.
+    if data_format == 'channels_last':
       bs, h, w, c = data.get_shape().as_list()
       bs = -1 if bs is None else bs
-      # Use reshape to quickly upsample the input.  The nearest pixel is selected
-      # implicitly via broadcasting.
       data = tf.reshape(data, [bs, h, 1, w, 1, c]) * tf.ones(
-        [1, 1, height_scale, 1, width_scale, 1], dtype=data.dtype)
+          [1, 1, height_scale, 1, width_scale, 1], dtype=data.dtype)
       return tf.reshape(data, [bs, h * height_scale, w * width_scale, c])
     else:
       bs, c, h, w = data.get_shape().as_list()
       bs = -1 if bs is None else bs
-      # Use reshape to quickly upsample the input.  The nearest pixel is selected
-      # implicitly via broadcasting.
       data = tf.reshape(data, [bs, c, 1, h, 1, w]) * tf.ones(
-        [1, 1, height_scale, 1, width_scale, 1], dtype=data.dtype)
+          [1, 1, height_scale, 1, width_scale, 1], dtype=data.dtype)
       return tf.reshape(data, [bs, c, h * height_scale, w * width_scale])
-
 
 
 def resize_bilinear(images, size, output_type):
@@ -115,7 +112,11 @@ def resample_feature_map(feat,
     """Apply 1x1 conv to change layer width if necessary."""
     if num_channels != target_num_channels:
       feat = tf.layers.conv2d(
-          feat, filters=target_num_channels, kernel_size=(1, 1), padding='same', data_format=data_format)
+          feat,
+          filters=target_num_channels,
+          kernel_size=(1, 1),
+          padding='same',
+          data_format=data_format)
       if apply_bn:
         feat = utils.batch_norm_act(
             feat,
@@ -158,15 +159,20 @@ def resample_feature_map(feat,
       if height < target_height or width < target_width:
         height_scale = target_height // height
         width_scale = target_width // width
-        if use_native_resize_op or target_height % height != 0 or target_width % width != 0:
+        if (use_native_resize_op or target_height % height != 0 or
+            target_width % width != 0):
           if data_format == 'channels_first':
             feat = tf.transpose(feat, [0, 2, 3, 1])
-          feat = tf.image.resize_nearest_neighbor(feat, [target_height, target_width])
+          feat = tf.image.resize_nearest_neighbor(feat,
+                                                  [target_height, target_width])
           if data_format == 'channels_first':
             feat = tf.transpose(feat, [0, 3, 1, 2])
         else:
           feat = nearest_upsampling(
-              feat, height_scale=height_scale, width_scale=width_scale, data_format=data_format)
+              feat,
+              height_scale=height_scale,
+              width_scale=width_scale,
+              data_format=data_format)
     else:
       raise ValueError(
           'Incompatible target feature map size: target_height: {},'
@@ -175,36 +181,27 @@ def resample_feature_map(feat,
   return feat
 
 
-def _verify_feats_size(feats, feat_sizes, min_level, max_level, data_format='channels_last'):
+def _verify_feats_size(feats,
+                       feat_sizes,
+                       min_level,
+                       max_level,
+                       data_format='channels_last'):
   """Verify the feature map sizes."""
   expected_output_size = feat_sizes[min_level:max_level + 1]
   for cnt, size in enumerate(expected_output_size):
-    if data_format == 'channels_last':
-      if feats[cnt].shape[1] != size['height']:
-        raise ValueError(
-            'feats[{}] has shape {} but its height should be {}.'
-            '(input_height: {}, min_level: {}, max_level: {}.)'.format(
-                cnt, feats[cnt].shape, size['height'], feat_sizes[0]['height'],
-                min_level, max_level))
-      if feats[cnt].shape[2] != size['width']:
-        raise ValueError(
-            'feats[{}] has shape {} but its width should be {}.'
-            '(input_width: {}, min_level: {}, max_level: {}.)'.format(
-                cnt, feats[cnt].shape, size['width'], feat_sizes[0]['width'],
-                min_level, max_level))
-    else:
-      if feats[cnt].shape[2] != size['height']:
-        raise ValueError(
-            'feats[{}] has shape {} but its height should be {}.'
-            '(input_height: {}, min_level: {}, max_level: {}.)'.format(
-                cnt, feats[cnt].shape, size['height'], feat_sizes[0]['height'],
-                min_level, max_level))
-      if feats[cnt].shape[3] != size['width']:
-        raise ValueError(
-            'feats[{}] has shape {} but its width should be {}.'
-            '(input_width: {}, min_level: {}, max_level: {}.)'.format(
-                cnt, feats[cnt].shape, size['width'], feat_sizes[0]['width'],
-                min_level, max_level))
+    h_id, w_id = (1, 2) if data_format == 'channels_last' else (2, 3)
+    if feats[cnt].shape[h_id] != size['height']:
+      raise ValueError(
+          'feats[{}] has shape {} but its height should be {}.'
+          '(input_height: {}, min_level: {}, max_level: {}.)'.format(
+              cnt, feats[cnt].shape, size['height'], feat_sizes[0]['height'],
+              min_level, max_level))
+    if feats[cnt].shape[w_id] != size['width']:
+      raise ValueError(
+          'feats[{}] has shape {} but its width should be {}.'
+          '(input_width: {}, min_level: {}, max_level: {}.)'.format(
+              cnt, feats[cnt].shape, size['width'], feat_sizes[0]['width'],
+              min_level, max_level))
 
 
 ###############################################################################
@@ -224,7 +221,7 @@ def class_net(images,
   if separable_conv:
     conv_op = functools.partial(
         tf.layers.separable_conv2d, depth_multiplier=1,
-        data_format = data_format,
+        data_format=data_format,
         pointwise_initializer=tf.initializers.variance_scaling(),
         depthwise_initializer=tf.initializers.variance_scaling())
   else:
@@ -442,15 +439,14 @@ def build_feature_network(features, config):
     if level in features.keys():
       feats.append(features[level])
     else:
-      target_height = (feats[-1].shape[1 if config.data_format == 'channels_last' else 2] - 1) // 2 + 1
-      target_width = (feats[-1].shape[2 if config.data_format == 'channels_last' else 3] - 1) // 2 + 1
+      h_id, w_id = (1, 2) if config.data_format == 'channels_last' else (2, 3)
       # Adds a coarser level by downsampling the last feature map.
       feats.append(
           resample_feature_map(
               feats[-1],
               name='p%d' % level,
-              target_height=target_height,
-              target_width=target_width,
+              target_height=(feats[-1].shape[h_id] - 1) // 2 + 1,
+              target_width=(feats[-1].shape[w_id] - 1) // 2 + 1,
               target_num_channels=config.fpn_num_filters,
               apply_bn=config.apply_bn_for_resampling,
               is_training=config.is_training_bn,
@@ -514,10 +510,10 @@ def bifpn_fa_config():
   return p
 
 
-def bifpn_dynamic_config(min_level, max_level, weight_method='fastattn'):
+def bifpn_dynamic_config(min_level, max_level, weight_method):
   """A dynamic bifpn config that can adapt to different min/max levels."""
   p = hparams_config.Config()
-  p.weight_method = weight_method
+  p.weight_method = weight_method or 'fastattn'
 
   # Node id starts from the input features and monotonically increase whenever
   # a new node is added. Here is an example for level P3 - P7:
@@ -564,13 +560,14 @@ def bifpn_dynamic_config(min_level, max_level, weight_method='fastattn'):
   return p
 
 
-def get_fpn_config(fpn_name, min_level, max_level):
+def get_fpn_config(fpn_name, min_level, max_level, weight_method):
+  """Get fpn related configuration."""
   if not fpn_name:
     fpn_name = 'bifpn_fa'
   name_to_config = {
       'bifpn_sum': bifpn_sum_config(),
       'bifpn_fa': bifpn_fa_config(),
-      'bifpn_dyn': bifpn_dynamic_config(min_level, max_level)
+      'bifpn_dyn': bifpn_dynamic_config(min_level, max_level, weight_method)
   }
   return name_to_config[fpn_name]
 
@@ -581,7 +578,8 @@ def build_bifpn_layer(feats, feat_sizes, config):
   if p.fpn_config:
     fpn_config = p.fpn_config
   else:
-    fpn_config = get_fpn_config(p.fpn_name, p.min_level, p.max_level)
+    fpn_config = get_fpn_config(p.fpn_name, p.min_level, p.max_level,
+                                p.fpn_weight_method)
 
   num_output_connections = [0 for _ in feats]
   for i, fnode in enumerate(fpn_config.nodes):
