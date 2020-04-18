@@ -184,7 +184,7 @@ def det_post_process(params: Dict[Any, Any],
       'indices_all': [None],
       'classes_all': [None]
   }
-  det_model_fn.add_metric_fn_inputs(params, cls_outputs, box_outputs, outputs)
+  det_model_fn.add_metric_fn_inputs(params, cls_outputs, box_outputs, outputs, min_score_thresh)
 
   # Create anchor_label for picking top-k predictions.
   eval_anchors = anchors.Anchors(params['min_level'], params['max_level'],

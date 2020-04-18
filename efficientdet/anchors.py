@@ -255,7 +255,7 @@ def _generate_anchor_boxes(image_size, anchor_scale, anchor_configs):
   return anchor_boxes
 
 
-def _generate_detections_tf(cls_outputs,
+def _generate_detections_tf(scores,
                             box_outputs,
                             anchor_boxes,
                             indices,
@@ -270,7 +270,7 @@ def _generate_detections_tf(cls_outputs,
   """Generates detections with model outputs and anchors.
 
   Args:
-    cls_outputs: a numpy array with shape [N, 1], which has the highest class
+    scores: a numpy array with shape [N, 1], which has the highest class
       scores on all feature levels. The N is the number of selected
       top-K total anchors on all levels.  (k being MAX_DETECTION_POINTS)
     box_outputs: a numpy array with shape [N, 4], which stacks box regression
@@ -306,7 +306,6 @@ def _generate_detections_tf(cls_outputs,
   logging.info('Using tf version of post-processing.')
   anchor_boxes = tf.gather(anchor_boxes, indices)
 
-  scores = tf.math.sigmoid(cls_outputs)
   # apply bounding box regression to anchors
   boxes = decode_box_outputs_tf(
       tf.transpose(box_outputs, [1, 0]), tf.transpose(anchor_boxes, [1, 0]))

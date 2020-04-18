@@ -283,7 +283,7 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
   return total_loss, cls_loss, box_loss
 
 
-def add_metric_fn_inputs(params, cls_outputs, box_outputs, metric_fn_inputs):
+def add_metric_fn_inputs(params, cls_outputs, box_outputs, metric_fn_inputs, min_score_thresh = 0.):
   """Selects top-k predictions and adds the selected to metric_fn_inputs.
 
   Args:
@@ -308,20 +308,19 @@ def add_metric_fn_inputs(params, cls_outputs, box_outputs, metric_fn_inputs):
         box_outputs[level], [params['batch_size'], -1, 4]))
   cls_outputs_all = tf.concat(cls_outputs_all, 1)
   box_outputs_all = tf.concat(box_outputs_all, 1)
+  scores_all = tf.math.sigmoid(cls_outputs_all)
 
-  cls_outputs_all_reshape = tf.reshape(cls_outputs_all, [params['batch_size'], -1])
-  _, cls_topk_indices = tf.math.top_k(cls_outputs_all_reshape,
-                                      k=anchors.MAX_DETECTION_POINTS,
-                                      sorted=False)
+  cls_topk_indices = tf.where(scores_all>min_score_thresh)
+  cls_topk_indices = tf.reshape(cls_topk_indices, [params['batch_size'], -1])
   indices = cls_topk_indices // num_classes
   classes = cls_topk_indices % num_classes
   cls_indices = tf.stack([indices, classes], axis=2)
-  cls_outputs_all_after_topk = tf.gather_nd(
-      cls_outputs_all, cls_indices, batch_dims=1)
+  scores_all_after_topk = tf.gather_nd(
+      scores_all, cls_indices, batch_dims=1)
   box_outputs_all_after_topk = tf.gather_nd(
       box_outputs_all, tf.expand_dims(indices, 2), batch_dims=1)
 
-  metric_fn_inputs['cls_outputs_all'] = cls_outputs_all_after_topk
+  metric_fn_inputs['cls_outputs_all'] = scores_all_after_topk
   metric_fn_inputs['box_outputs_all'] = box_outputs_all_after_topk
   metric_fn_inputs['indices_all'] = indices
   metric_fn_inputs['classes_all'] = classes
