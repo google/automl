@@ -302,7 +302,11 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
   return total_loss, cls_loss, box_loss
 
 
-def add_metric_fn_inputs(params, cls_outputs, box_outputs, metric_fn_inputs):
+def add_metric_fn_inputs(params,
+                         cls_outputs,
+                         box_outputs,
+                         metric_fn_inputs,
+                         max_detection_points=anchors.MAX_DETECTION_POINTS):
   """Selects top-k predictions and adds the selected to metric_fn_inputs.
 
   Args:
@@ -314,6 +318,8 @@ def add_metric_fn_inputs(params, cls_outputs, box_outputs, metric_fn_inputs):
       representing box regression targets in
       [batch_size, height, width, num_anchors * 4].
     metric_fn_inputs: a dictionary that will hold the top-k selections.
+    max_detection_points: an integer specifing the maximum detection points to
+      keep before NMS. Keep all anchors if max_detection_points <= 0.
   """
   num_classes = params['num_classes']
   cls_outputs_all = []
@@ -328,18 +334,33 @@ def add_metric_fn_inputs(params, cls_outputs, box_outputs, metric_fn_inputs):
   cls_outputs_all = tf.concat(cls_outputs_all, 1)
   box_outputs_all = tf.concat(box_outputs_all, 1)
 
-  cls_outputs_all_reshape = tf.reshape(cls_outputs_all,
-                                       [params['batch_size'], -1])
-  _, cls_topk_indices = tf.math.top_k(cls_outputs_all_reshape,
-                                      k=anchors.MAX_DETECTION_POINTS,
-                                      sorted=False)
-  indices = cls_topk_indices // num_classes
-  classes = cls_topk_indices % num_classes
-  cls_indices = tf.stack([indices, classes], axis=2)
-  cls_outputs_all_after_topk = tf.gather_nd(
-      cls_outputs_all, cls_indices, batch_dims=1)
-  box_outputs_all_after_topk = tf.gather_nd(
-      box_outputs_all, tf.expand_dims(indices, 2), batch_dims=1)
+  if max_detection_points > 0:
+    # Prune anchors and detections to only keep max_detection_points.
+    # Due to some issues, top_k is currently slow in graph model.
+    cls_outputs_all_reshape = tf.reshape(cls_outputs_all,
+                                         [params['batch_size'], -1])
+    _, cls_topk_indices = tf.math.top_k(cls_outputs_all_reshape,
+                                        k=anchors.MAX_DETECTION_POINTS,
+                                        sorted=False)
+    indices = cls_topk_indices // num_classes
+    classes = cls_topk_indices % num_classes
+    cls_indices = tf.stack([indices, classes], axis=2)
+    cls_outputs_all_after_topk = tf.gather_nd(
+        cls_outputs_all, cls_indices, batch_dims=1)
+    box_outputs_all_after_topk = tf.gather_nd(
+        box_outputs_all, tf.expand_dims(indices, 2), batch_dims=1)
+  else:
+    # Keep all anchors, but for each anchor, just keep the max probablity for
+    # each class.
+    cls_outputs_idx = tf.math.argmax(cls_outputs_all, axis=-1)
+    num_anchors = cls_outputs_all.shape[1]
+
+    classes = cls_outputs_idx
+    indices = tf.reshape(
+        tf.tile(tf.range(num_anchors), [params['batch_size']]),
+        [-1, num_anchors])
+    cls_outputs_all_after_topk = tf.reduce_max(cls_outputs_all, -1)
+    box_outputs_all_after_topk = box_outputs_all
 
   metric_fn_inputs['cls_outputs_all'] = cls_outputs_all_after_topk
   metric_fn_inputs['box_outputs_all'] = box_outputs_all_after_topk
