@@ -21,12 +21,12 @@ from __future__ import print_function
 
 import copy
 import os
+import time
 from absl import logging
 import numpy as np
 from PIL import Image
 import tensorflow.compat.v1 as tf
 from typing import Text, Dict, Any, List, Tuple, Union
-from time import perf_counter
 
 import anchors
 import dataloader
@@ -62,7 +62,8 @@ def image_preprocess(image, image_size: Union[int, Tuple[int, int]]):
 
   Args:
     image: input image, can be a tensor or a numpy arary.
-    image_size: integer or tuple of two integers of image size.
+    image_size: single integer of image size for square image or tuple of two
+      integers, in the format of (image_height, image_width).
 
   Returns:
     (image, scale): a tuple of processed image and its scale.
@@ -81,7 +82,8 @@ def build_inputs(image_path_pattern: Text,
 
   Args:
     image_path_pattern: a path to indicate a single or multiple files.
-    image_size: integer or tuple of two integers for image width and height.
+    image_size: single integer of image size for square image or tuple of two
+      integers, in the format of (image_height, image_width).
 
   Returns:
     (raw_images, images, scales): raw images, processed images, and scales.
@@ -317,8 +319,9 @@ class ServingDriver(object):
     Args:
       model_name: target model name, such as efficientdet-d0.
       ckpt_path: checkpoint path, such as /tmp/efficientdet-d0/.
-      image_size: user specified image size. If None, use the default image size
-        defined by model_name.
+      image_size: single integer of image size for square image or tuple of two
+        integers, in the format of (image_height, image_width). If None, use the
+        default image size defined by model_name.
       batch_size: batch size for inference.
       num_classes: number of classes. If None, use the default COCO classes.
       enable_ema: whether to enable moving average.
@@ -352,7 +355,7 @@ class ServingDriver(object):
     sess_config = tf.ConfigProto()
     if self.use_xla:
       sess_config.graph_options.optimizer_options.global_jit_level = (
-        tf.OptimizerOptions.ON_2)
+          tf.OptimizerOptions.ON_2)
     return tf.Session(config=sess_config)
 
   def build(self,
@@ -454,24 +457,26 @@ class ServingDriver(object):
     return predictions
 
   def benchmark(self, image_arrays, trace_filename=None):
+    """Benchmark inference latency/throughput."""
     if not self.sess:
       self.build()
 
     # init session
     self.sess.run(
-      self.signitures['prediction'],
-      feed_dict={self.signitures['image_arrays']: image_arrays})
-
-    start = perf_counter()
-    for i in range(10):
-      self.sess.run(
         self.signitures['prediction'],
         feed_dict={self.signitures['image_arrays']: image_arrays})
-    end = perf_counter()
+
+    start = time.perf_counter()
+    for _ in range(10):
+      self.sess.run(
+          self.signitures['prediction'],
+          feed_dict={self.signitures['image_arrays']: image_arrays})
+    end = time.perf_counter()
     inference_time = (end-start) / 10
 
     print('Inference time: ', inference_time)
     print('FPS: ', 1 / inference_time)
+
     if trace_filename:
       run_options = tf.RunOptions()
       run_options.trace_level = tf.RunOptions.FULL_TRACE
@@ -485,7 +490,6 @@ class ServingDriver(object):
         trace = timeline.Timeline(step_stats=run_metadata.step_stats)
         trace_file.write(
             trace.generate_chrome_trace_format(show_memory=True))
-
 
   def serve_images(self, image_arrays):
     """Serve a list of image arrays.
@@ -505,14 +509,14 @@ class ServingDriver(object):
     return predictions
 
   def load(self, saved_model_dir):
-      if not self.sess:
-        self.sess = self._build_session()
-      self.signitures = {
+    if not self.sess:
+      self.sess = self._build_session()
+    self.signitures = {
         'image_files': 'image_files:0',
         'image_arrays': 'image_arrays:0',
         'prediction': 'detections:0',
-      }
-      return tf.saved_model.load(self.sess, ['serve'], saved_model_dir)
+    }
+    return tf.saved_model.load(self.sess, ['serve'], saved_model_dir)
 
   def export(self, output_dir):
     """Export a saved model."""

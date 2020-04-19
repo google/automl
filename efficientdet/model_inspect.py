@@ -158,10 +158,10 @@ class ModelInspector(object):
   def saved_model_inference(self, image_path_pattern, output_dir, **kwargs):
     """Perform inference for the given saved model."""
     driver = inference.ServingDriver(
-      self.model_name,
-      self.ckpt_path,
-      enable_ema=self.enable_ema,
-      use_xla=self.use_xla)
+        self.model_name,
+        self.ckpt_path,
+        enable_ema=self.enable_ema,
+        use_xla=self.use_xla)
     driver.load(self.saved_model_dir)
     raw_images = []
     image = Image.open(image_path_pattern)
@@ -176,10 +176,10 @@ class ModelInspector(object):
   def saved_model_benchmark(self, image_path_pattern):
     """Perform inference for the given saved model."""
     driver = inference.ServingDriver(
-      self.model_name,
-      self.ckpt_path,
-      enable_ema=self.enable_ema,
-      use_xla=self.use_xla)
+        self.model_name,
+        self.ckpt_path,
+        enable_ema=self.enable_ema,
+        use_xla=self.use_xla)
     driver.load(self.saved_model_dir)
     raw_images = []
     image = Image.open(image_path_pattern)

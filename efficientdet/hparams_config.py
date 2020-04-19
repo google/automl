@@ -156,6 +156,7 @@ def default_detection_configs():
   h.lr_warmup_epoch = 1.0
   h.first_lr_drop_epoch = 200.0
   h.second_lr_drop_epoch = 250.0
+  h.poly_lr_power = 0.9
   h.clip_gradients_norm = 10.0
   h.num_epochs = 300
   h.data_format = 'channels_last'
@@ -185,6 +186,7 @@ def default_detection_configs():
 
   # version.
   h.fpn_name = None
+  h.fpn_weight_method = None
   h.fpn_config = None
 
   # No stochastic depth in default.

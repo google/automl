@@ -102,6 +102,17 @@ def cosine_lr_schedule(adjusted_lr, lr_warmup_init, lr_warmup_step,
   return tf.where(step < lr_warmup_step, linear_warmup, cosine_lr)
 
 
+def polynomial_lr_schedule(adjusted_lr, lr_warmup_init, lr_warmup_step, power,
+                           total_steps, step):
+  logging.info('LR schedule method: polynomial')
+  linear_warmup = (
+      lr_warmup_init + (tf.cast(step, dtype=tf.float32) / lr_warmup_step *
+                        (adjusted_lr - lr_warmup_init)))
+  polynomial_lr = adjusted_lr * tf.pow(
+      1 - (tf.cast(step, tf.float32) / total_steps), power)
+  return tf.where(step < lr_warmup_step, linear_warmup, polynomial_lr)
+
+
 def learning_rate_schedule(params, global_step):
   """Learning rate schedule based on global step."""
   lr_decay_method = params['lr_decay_method']
@@ -116,6 +127,12 @@ def learning_rate_schedule(params, global_step):
                               params['lr_warmup_init'],
                               params['lr_warmup_step'],
                               params['total_steps'], global_step)
+  elif lr_decay_method == 'polynomial':
+    return polynomial_lr_schedule(params['adjusted_learning_rate'],
+                                  params['lr_warmup_init'],
+                                  params['lr_warmup_step'],
+                                  params['poly_lr_power'],
+                                  params['total_steps'], global_step)
   else:
     raise ValueError('unknown lr_decay_method: {}'.format(lr_decay_method))
 
@@ -239,8 +256,10 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
   box_losses = []
   for level in levels:
     if params['data_format'] == 'channels_first':
-      labels['cls_targets_%d' % level] = tf.transpose(labels['cls_targets_%d' % level], [0, 3, 1, 2])
-      labels['box_targets_%d' % level] = tf.transpose(labels['box_targets_%d' % level], [0, 3, 1, 2])
+      labels['cls_targets_%d' % level] = tf.transpose(
+          labels['cls_targets_%d' % level], [0, 3, 1, 2])
+      labels['box_targets_%d' % level] = tf.transpose(
+          labels['box_targets_%d' % level], [0, 3, 1, 2])
     # Onehot encoding for classification labels.
     cls_targets_at_level = tf.one_hot(
         labels['cls_targets_%d' % level],
@@ -262,10 +281,10 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
         gamma=params['gamma'])
     if params['data_format'] == 'channels_first':
       cls_loss = tf.reshape(cls_loss,
-                          [bs, -1, width, height, params['num_classes']])
+                            [bs, -1, width, height, params['num_classes']])
     else:
       cls_loss = tf.reshape(cls_loss,
-                          [bs, width, height, -1, params['num_classes']])
+                            [bs, width, height, -1, params['num_classes']])
     cls_loss *= tf.cast(tf.expand_dims(
         tf.not_equal(labels['cls_targets_%d' % level], -2), -1), tf.float32)
     cls_losses.append(tf.reduce_sum(cls_loss))
@@ -309,7 +328,8 @@ def add_metric_fn_inputs(params, cls_outputs, box_outputs, metric_fn_inputs):
   cls_outputs_all = tf.concat(cls_outputs_all, 1)
   box_outputs_all = tf.concat(box_outputs_all, 1)
 
-  cls_outputs_all_reshape = tf.reshape(cls_outputs_all, [params['batch_size'], -1])
+  cls_outputs_all_reshape = tf.reshape(cls_outputs_all,
+                                       [params['batch_size'], -1])
   _, cls_topk_indices = tf.math.top_k(cls_outputs_all_reshape,
                                       k=anchors.MAX_DETECTION_POINTS,
                                       sorted=False)

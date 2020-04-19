@@ -287,7 +287,6 @@ def _generate_detections_tf(cls_outputs,
     image_scale: a float tensor representing the scale between original image
       and input image for the detector. It is used to rescale detections for
       evaluating with the original groundtruth annotations.
-    num_classes: a integer that indicates the number of classes.
     min_score_thresh: A float representing the threshold for deciding when to
       remove boxes based on score.
     max_boxes_to_draw: Max number of boxes to draw.
@@ -314,12 +313,12 @@ def _generate_detections_tf(cls_outputs,
   if use_native_nms:
     logging.info('Using native nms.')
     top_detection_idx, scores = tf.image.non_max_suppression_with_scores(
-      boxes,
-      scores,
-      max_boxes_to_draw,
-      iou_threshold=iou_threshold,
-      score_threshold=min_score_thresh,
-      soft_nms_sigma=soft_nms_sigma)
+        boxes,
+        scores,
+        max_boxes_to_draw,
+        iou_threshold=iou_threshold,
+        score_threshold=min_score_thresh,
+        soft_nms_sigma=soft_nms_sigma)
     boxes = tf.gather(boxes, top_detection_idx)
   else:
     logging.info('Using customized nms.')
@@ -368,6 +367,7 @@ def _generate_detections(cls_outputs, box_outputs, anchor_boxes, indices,
       and input image for the detector. It is used to rescale detections for
       evaluating with the original groundtruth annotations.
     num_classes: a integer that indicates the number of classes.
+    max_boxes_to_draw: max number of boxes to draw per image.
 
   Returns:
     detections: detection results in a tensor with each row representing
