@@ -50,8 +50,8 @@ def nearest_upsampling(data, height_scale, width_scale, data_format):
     else:
       bs, c, h, w = data.get_shape().as_list()
       bs = -1 if bs is None else bs
-      data = tf.reshape(data, [bs, c, 1, h, 1, w]) * tf.ones(
-          [1, 1, height_scale, 1, width_scale, 1], dtype=data.dtype)
+      data = tf.reshape(data, [bs, c, h, 1, w, 1]) * tf.ones(
+          [1, 1, 1, height_scale, 1, width_scale], dtype=data.dtype)
       return tf.reshape(data, [bs, c, h * height_scale, w * width_scale])
 
 
