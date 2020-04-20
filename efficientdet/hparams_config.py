@@ -159,7 +159,7 @@ def default_detection_configs():
   h.poly_lr_power = 0.9
   h.clip_gradients_norm = 10.0
   h.num_epochs = 300
-  h.data_format = 'channels_last'
+  h.data_format = 'channels_first'
 
   # classification loss
   h.alpha = 0.25
@@ -181,7 +181,7 @@ def default_detection_configs():
   h.apply_bn_for_resampling = True
   h.conv_after_downsample = False
   h.conv_bn_act_pattern = False
-  h.use_native_resize_op = False
+  h.use_native_resize_op = True
   h.pooling_type = None
 
   # version.

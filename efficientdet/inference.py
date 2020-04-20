@@ -22,11 +22,11 @@ from __future__ import print_function
 import copy
 import os
 import time
+from typing import Text, Dict, Any, List, Tuple, Union
 from absl import logging
 import numpy as np
 from PIL import Image
 import tensorflow.compat.v1 as tf
-from typing import Text, Dict, Any, List, Tuple, Union
 
 import anchors
 import dataloader
@@ -207,13 +207,13 @@ def det_post_process(params: Dict[Any, Any],
         box_outputs_per_sample,
         indices_per_sample,
         classes_per_sample,
-        image_id=[index],
+        image_id=index,
         image_scale=[scales[index]],
         min_score_thresh=min_score_thresh,
         max_boxes_to_draw=max_boxes_to_draw,
         disable_pyfun=params.get('disable_pyfun'))
     detections_batch.append(detections)
-  return tf.stack(detections_batch, name='detections')
+  return detections_batch
 
 
 def visualize_image(image,
@@ -378,7 +378,6 @@ class ServingDriver(object):
         image = tf.io.decode_image(image_files[i])
         image.set_shape([None, None, None])
         raw_images.append(image)
-      raw_images = tf.stack(raw_images, name='image_arrays')
 
       scales, images = [], []
       for i in range(self.batch_size):
@@ -386,9 +385,10 @@ class ServingDriver(object):
         scales.append(scale)
         images.append(image)
       scales = tf.stack(scales)
-      images = tf.stack(images)
+      images = tf.stack(images, name='image_arrays')
+      scales = tf.placeholder_with_default(scales, scales.shape, name='scales')
       if params['data_format'] == 'channels_first':
-        images = tf.transpose(images, [0, 3, 1, 2])
+        images = tf.transpose(images, [0, 3, 1, 2], name='image_arrays_t')
       class_outputs, box_outputs = build_model(self.model_name, images,
                                                **params)
       params.update(
@@ -409,7 +409,8 @@ class ServingDriver(object):
 
     self.signitures = {
         'image_files': image_files,
-        'image_arrays': raw_images,
+        'image_arrays': images,
+        'scales': scales,
         'prediction': detections,
     }
     return self.signitures
@@ -492,7 +493,7 @@ class ServingDriver(object):
         trace_file.write(
             trace.generate_chrome_trace_format(show_memory=True))
 
-  def serve_images(self, image_arrays):
+  def serve_images(self, image_arrays, scales):
     """Serve a list of image arrays.
 
     Args:
@@ -506,16 +507,29 @@ class ServingDriver(object):
       self.build()
     predictions = self.sess.run(
         self.signitures['prediction'],
-        feed_dict={self.signitures['image_arrays']: image_arrays})
+        feed_dict={self.signitures['image_arrays']: image_arrays,
+                   self.signitures['scales']: scales})
     return predictions
 
   def load(self, saved_model_dir):
+    """Load saved model to session.
+
+    Args:
+      saved_model_dir: saved model directory.
+    Returns:
+      The `MetaGraphDef` protocol buffer loaded in the provided session. This
+      can be used to further extract signature-defs, collection-defs, etc.
+    Raises:
+      RuntimeError: MetaGraphDef associated with the tags cannot be found.
+    """
     if not self.sess:
       self.sess = self._build_session()
+
     self.signitures = {
         'image_files': 'image_files:0',
-        'image_arrays': 'image_arrays:0',
-        'prediction': 'detections:0',
+        'scales': 'scales:0',
+        'image_arrays': 'image_arrays_t:0' if self.params['data_format'] == 'channels_first' else 'image_arrays:0',
+        'prediction': ['detections_%d:0' % i for i in range(self.batch_size)],
     }
     return tf.saved_model.load(self.sess, ['serve'], saved_model_dir)
 
@@ -526,11 +540,11 @@ class ServingDriver(object):
         'serving_default':
             tf.saved_model.predict_signature_def(
                 {signitures['image_arrays'].name: signitures['image_arrays']},
-                {signitures['prediction'].name: signitures['prediction']}),
+                {detection.name: detection for detection in signitures['prediction']}),
         'serving_base64':
             tf.saved_model.predict_signature_def(
                 {signitures['image_files'].name: signitures['image_files']},
-                {signitures['prediction'].name: signitures['prediction']}),
+                {detection.name: detection for detection in signitures['prediction']}),
     }
     b = tf.saved_model.Builder(output_dir)
     b.add_meta_graph_and_variables(
@@ -620,8 +634,7 @@ class InferenceDriver(object):
           class_outputs,
           box_outputs,
           scales,
-          min_score_thresh=kwargs.get('min_score_thresh', 0.2),
-          max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 50))
+          **kwargs)
       outputs_np = sess.run(detections_batch)
       # Visualize results.
       for i, output_np in enumerate(outputs_np):

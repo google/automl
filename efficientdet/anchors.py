@@ -339,7 +339,7 @@ def _generate_detections_tf(cls_outputs,
       width * image_scale,
       scores,
       tf.cast(tf.gather(classes, top_detection_idx) + 1, tf.float32)
-  ], axis=1)
+  ], axis=1, name='detections_%s' % image_id)
   return detections
 
 

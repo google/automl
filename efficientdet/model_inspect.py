@@ -163,10 +163,9 @@ class ModelInspector(object):
         enable_ema=self.enable_ema,
         use_xla=self.use_xla)
     driver.load(self.saved_model_dir)
-    raw_images = []
-    image = Image.open(image_path_pattern)
-    raw_images.append(np.array(image))
-    detections_bs = driver.serve_images(raw_images)
+    image_binaries = [open(image_path_pattern, 'rb').read()]
+    raw_images = [np.array(Image.open(image_path_pattern))]
+    detections_bs = driver.serve_files(image_binaries)
     for i, detections in enumerate(detections_bs):
       img = driver.visualize(raw_images[i], detections, **kwargs)
       output_image_path = os.path.join(output_dir, str(i) + '.jpg')
