@@ -55,6 +55,7 @@ flags.DEFINE_bool('xla', False, 'Run with xla optimization.')
 flags.DEFINE_string('ckpt_path', None, 'checkpoint dir used for eval.')
 flags.DEFINE_string('export_ckpt', None, 'Path for exporting new models.')
 flags.DEFINE_bool('enable_ema', True, 'Use ema variables for eval.')
+flags.DEFINE_string('data_format', None, 'data format, e.g., channel_last.')
 
 flags.DEFINE_string('input_image', None, 'Input image path for inference.')
 flags.DEFINE_string('output_image_dir', None, 'Output dir for inference.')
@@ -84,7 +85,8 @@ class ModelInspector(object):
                ckpt_path: Text = None,
                enable_ema: bool = True,
                export_ckpt: Text = None,
-               saved_model_dir: Text = None):
+               saved_model_dir: Text = None,
+               data_format: Text = None):
     self.model_name = model_name
     self.model_params = hparams_config.get_detection_config(model_name)
     self.logdir = logdir
@@ -111,9 +113,13 @@ class ModelInspector(object):
         'num_classes': num_classes
     }
 
+    if data_format:
+      self.model_overrides.update(dict(data_format=data_format))
+
     # A few fixed parameters.
     self.batch_size = 1
     self.num_classes = num_classes
+    self.data_format = data_format
     self.inputs_shape = [self.batch_size, image_size[0], image_size[1], 3]
     self.labels_shape = [self.batch_size, self.num_classes]
     self.image_size = image_size
@@ -148,11 +154,10 @@ class ModelInspector(object):
         self.model_name,
         self.ckpt_path,
         enable_ema=self.enable_ema,
-        use_xla=self.use_xla)
-    driver.build(
-        params_override=self.model_overrides,
-        min_score_thresh=kwargs.get('min_score_thresh', 0.2),
-        max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 50))
+        use_xla=self.use_xla,
+        data_format=self.data_format,
+        **kwargs)
+    driver.build(params_override=self.model_overrides)
     driver.export(self.saved_model_dir)
 
   def saved_model_inference(self, image_path_pattern, output_dir, **kwargs):
@@ -161,7 +166,9 @@ class ModelInspector(object):
         self.model_name,
         self.ckpt_path,
         enable_ema=self.enable_ema,
-        use_xla=self.use_xla)
+        use_xla=self.use_xla,
+        data_format=self.data_format,
+        **kwargs)
     driver.load(self.saved_model_dir)
     raw_images = []
     image = Image.open(image_path_pattern)
@@ -173,18 +180,26 @@ class ModelInspector(object):
       Image.fromarray(img).save(output_image_path)
       logging.info('writing file to %s', output_image_path)
 
-  def saved_model_benchmark(self, image_path_pattern):
+  def saved_model_benchmark(self, image_path_pattern, **kwargs):
     """Perform inference for the given saved model."""
     driver = inference.ServingDriver(
         self.model_name,
         self.ckpt_path,
         enable_ema=self.enable_ema,
-        use_xla=self.use_xla)
+        use_xla=self.use_xla,
+        data_format=self.data_format,
+        **kwargs)
     driver.load(self.saved_model_dir)
     raw_images = []
     image = Image.open(image_path_pattern)
     raw_images.append(np.array(image))
     driver.benchmark(raw_images, FLAGS.trace_filename)
+
+  def inference_single_image(self, image_image_path, output_dir, **kwargs):
+    driver = inference.InferenceDriver(self.model_name, self.ckpt_path,
+                                       self.image_size, self.num_classes,
+                                       self.enable_ema, self.data_format)
+    driver.inference(image_image_path, output_dir, **kwargs)
 
   def build_and_save_model(self):
     """build and save the model into self.logdir."""
@@ -240,12 +255,6 @@ class ModelInspector(object):
       self.build_model(inputs, is_training=False)
       self.restore_model(
           sess, self.ckpt_path, self.enable_ema, self.export_ckpt)
-
-  def inference_single_image(self, image_image_path, output_dir, **kwargs):
-    driver = inference.InferenceDriver(self.model_name, self.ckpt_path,
-                                       self.image_size, self.num_classes,
-                                       self.enable_ema)
-    driver.inference(image_image_path, output_dir, **kwargs)
 
   def freeze_model(self) -> Tuple[Text, Text]:
     """Freeze model and convert them into tflite and tf graph."""
@@ -398,7 +407,8 @@ def main(_):
       ckpt_path=FLAGS.ckpt_path,
       enable_ema=FLAGS.enable_ema,
       export_ckpt=FLAGS.export_ckpt,
-      saved_model_dir=FLAGS.saved_model_dir)
+      saved_model_dir=FLAGS.saved_model_dir,
+      data_format=FLAGS.data_format)
   inspector.run_model(FLAGS.runmode, FLAGS.threads)
 
 

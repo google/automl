@@ -122,17 +122,20 @@ def learning_rate_schedule(params, global_step):
                                 params['lr_warmup_step'],
                                 params['first_lr_drop_step'],
                                 params['second_lr_drop_step'], global_step)
+
   if lr_decay_method == 'cosine':
     return cosine_lr_schedule(params['adjusted_learning_rate'],
                               params['lr_warmup_init'],
                               params['lr_warmup_step'],
                               params['total_steps'], global_step)
+
   if lr_decay_method == 'polynomial':
     return polynomial_lr_schedule(params['adjusted_learning_rate'],
                                   params['lr_warmup_init'],
                                   params['lr_warmup_step'],
                                   params['poly_lr_power'],
                                   params['total_steps'], global_step)
+
   raise ValueError('unknown lr_decay_method: {}'.format(lr_decay_method))
 
 
@@ -328,6 +331,7 @@ def add_metric_fn_inputs(params,
     if params['data_format'] == 'channels_first':
       cls_outputs[level] = tf.transpose(cls_outputs[level], [0, 2, 3, 1])
       box_outputs[level] = tf.transpose(box_outputs[level], [0, 2, 3, 1])
+
     cls_outputs_all.append(tf.reshape(
         cls_outputs[level],
         [params['batch_size'], -1, num_classes]))
@@ -581,6 +585,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     if params.get('ckpt') and params.get('backbone_ckpt'):
       raise RuntimeError(
           '--backbone_ckpt and --checkpoint are mutually exclusive')
+
     if params.get('backbone_ckpt'):
       var_scope = params['backbone_name'] + '/'
       if params['ckpt_var_scope'] is None:
@@ -649,8 +654,10 @@ def get_model_arch(model_name='efficientdet-d0'):
   """Get model architecture for a given model name."""
   if 'retinanet' in model_name:
     return retinanet_arch.retinanet
+
   if 'efficientdet' in model_name:
     return efficientdet_arch.efficientdet
+
   raise ValueError('Invalide model name {}'.format(model_name))
 
 
@@ -658,6 +665,8 @@ def get_model_fn(model_name='efficientdet-d0'):
   """Get model fn for a given model name."""
   if 'retinanet' in model_name:
     return retinanet_model_fn
+
   if 'efficientdet' in model_name:
     return efficientdet_model_fn
+
   raise ValueError('Invalide model name {}'.format(model_name))
