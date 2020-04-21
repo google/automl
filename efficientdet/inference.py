@@ -158,8 +158,8 @@ def det_post_process(params: Dict[Any, Any],
                      cls_outputs: Dict[int, tf.Tensor],
                      box_outputs: Dict[int, tf.Tensor],
                      scales: List[float],
-                     min_score_thresh=0.2,
-                     max_boxes_to_draw=50):
+                     min_score_thresh,
+                     max_boxes_to_draw):
   """Post preprocessing the box/class predictions.
 
   Args:
@@ -221,9 +221,9 @@ def visualize_image(image,
                     classes,
                     scores,
                     id_mapping,
-                    min_score_thresh=0.2,
-                    max_boxes_to_draw=50,
-                    line_thickness=4,
+                    min_score_thresh=anchors.MIN_SCORE_THRESH,
+                    max_boxes_to_draw=anchors.MAX_DETECTIONS_PER_IMAGE,
+                    line_thickness=2,
                     **kwargs):
   """Visualizes a given image.
 
@@ -314,7 +314,11 @@ class ServingDriver(object):
                num_classes: int = None,
                enable_ema: bool = True,
                label_id_mapping: Dict[int, Text] = None,
-               use_xla: bool = False):
+               use_xla: bool = False,
+               data_format: Text = None,
+               min_score_thresh: float = None,
+               max_boxes_to_draw: float = None,
+               line_thickness: int = None):
     """Initialize the inference driver.
 
     Args:
@@ -329,6 +333,10 @@ class ServingDriver(object):
       label_id_mapping: a dictionary from id to name. If None, use the default
         coco_id_mapping (with 90 classes).
       use_xla: Whether run with xla optimization.
+      data_format: data format such as 'channel_last'.
+      min_score_thresh: minimal score threshold for filtering predictions.
+      max_boxes_to_draw: the maximum number of boxes per image.
+      line_thickness: the line thickness for drawing boxes.
     """
     self.model_name = model_name
     self.ckpt_path = ckpt_path
@@ -341,12 +349,19 @@ class ServingDriver(object):
       self.params.update(dict(image_size=image_size))
     if num_classes:
       self.params.update(dict(num_classes=num_classes))
+    if data_format:
+      self.params.update(dict(data_format=data_format))
 
     self.signitures = None
     self.sess = None
     self.disable_pyfun = True
     self.enable_ema = enable_ema
     self.use_xla = use_xla
+
+    self.min_score_thresh = min_score_thresh or anchors.MIN_SCORE_THRESH
+    self.max_boxes_to_draw = (
+        max_boxes_to_draw or anchors.MAX_DETECTIONS_PER_IMAGE)
+    self.line_thickness = line_thickness
 
   def __del__(self):
     if self.sess:
@@ -359,10 +374,7 @@ class ServingDriver(object):
           tf.OptimizerOptions.ON_2)
     return tf.Session(config=sess_config)
 
-  def build(self,
-            params_override=None,
-            min_score_thresh=0.2,
-            max_boxes_to_draw=50):
+  def build(self, params_override=None):
     """Build model and restore checkpoints."""
     params = copy.deepcopy(self.params)
     if params_override:
@@ -398,8 +410,8 @@ class ServingDriver(object):
           class_outputs,
           box_outputs,
           scales,
-          min_score_thresh=min_score_thresh,
-          max_boxes_to_draw=max_boxes_to_draw)
+          self.min_score_thresh,
+          self.max_boxes_to_draw)
 
       restore_ckpt(
           self.sess,
@@ -458,7 +470,12 @@ class ServingDriver(object):
     return predictions
 
   def benchmark(self, image_arrays, trace_filename=None):
-    """Benchmark inference latency/throughput."""
+    """Benchmark inference latency/throughput.
+
+    Args:
+      image_arrays: a numpy array of image content.
+      trace_filename: If None, specify the filename for saving trace.
+    """
     if not self.sess:
       self.build()
 
@@ -559,6 +576,7 @@ class InferenceDriver(object):
                image_size: Union[int, Tuple[int, int]] = None,
                num_classes: int = None,
                enable_ema: bool = True,
+               data_format: Text = None,
                label_id_mapping: Dict[int, Text] = None):
     """Initialize the inference driver.
 
@@ -569,6 +587,7 @@ class InferenceDriver(object):
         defined by model_name.
       num_classes: number of classes. If None, use the default COCO classes.
       enable_ema: whether to enable moving average.
+      data_format: data format such as 'channel_last'.
       label_id_mapping: a dictionary from id to name. If None, use the default
         coco_id_mapping (with 90 classes).
     """
@@ -582,6 +601,9 @@ class InferenceDriver(object):
       self.params.update(dict(image_size=image_size))
     if num_classes:
       self.params.update(dict(num_classes=num_classes))
+    if data_format:
+      self.params.update(dict(data_format=data_format))
+
     self.disable_pyfun = True
     self.enable_ema = enable_ema
 
@@ -620,8 +642,10 @@ class InferenceDriver(object):
           class_outputs,
           box_outputs,
           scales,
-          min_score_thresh=kwargs.get('min_score_thresh', 0.2),
-          max_boxes_to_draw=kwargs.get('max_boxes_to_draw', 50))
+          min_score_thresh=kwargs.get('min_score_thresh',
+                                      anchors.MIN_SCORE_THRESH),
+          max_boxes_to_draw=kwargs.get('max_boxes_to_draw',
+                                       anchors.MAX_DETECTIONS_PER_IMAGE))
       outputs_np = sess.run(detections_batch)
       # Visualize results.
       for i, output_np in enumerate(outputs_np):

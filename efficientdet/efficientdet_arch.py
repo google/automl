@@ -41,18 +41,20 @@ def nearest_upsampling(data, height_scale, width_scale, data_format):
   with tf.name_scope('nearest_upsampling'):
     # Use reshape to quickly upsample the input. The nearest pixel is selected
     # implicitly via broadcasting.
-    if data_format == 'channels_last':
-      bs, h, w, c = data.get_shape().as_list()
-      bs = -1 if bs is None else bs
-      data = tf.reshape(data, [bs, h, 1, w, 1, c]) * tf.ones(
-          [1, 1, height_scale, 1, width_scale, 1], dtype=data.dtype)
-      return tf.reshape(data, [bs, h * height_scale, w * width_scale, c])
-    else:
+    if data_format == 'channels_first':
+      # Possibly faster for certain GPUs only.
       bs, c, h, w = data.get_shape().as_list()
       bs = -1 if bs is None else bs
-      data = tf.reshape(data, [bs, c, 1, h, 1, w]) * tf.ones(
-          [1, 1, height_scale, 1, width_scale, 1], dtype=data.dtype)
+      data = tf.reshape(data, [bs, c, h, 1, w, 1]) * tf.ones(
+          [1, 1, 1, height_scale, 1, width_scale], dtype=data.dtype)
       return tf.reshape(data, [bs, c, h * height_scale, w * width_scale])
+
+    # Normal format for CPU/TPU/GPU.
+    bs, h, w, c = data.get_shape().as_list()
+    bs = -1 if bs is None else bs
+    data = tf.reshape(data, [bs, h, 1, w, 1, c]) * tf.ones(
+        [1, 1, height_scale, 1, width_scale, 1], dtype=data.dtype)
+    return tf.reshape(data, [bs, h * height_scale, w * width_scale, c])
 
 
 def resize_bilinear(images, size, output_type):
@@ -96,10 +98,10 @@ def resample_feature_map(feat,
                          use_tpu=False,
                          data_format='channels_last'):
   """Resample input feature map to have target number of channels and size."""
-  if data_format == 'channels_last':
-    _, height, width, num_channels = feat.get_shape().as_list()
-  else:
+  if data_format == 'channels_first':
     _, num_channels, height, width = feat.get_shape().as_list()
+  else:
+    _, height, width, num_channels = feat.get_shape().as_list()
 
   if height is None or width is None or num_channels is None:
     raise ValueError(
@@ -189,7 +191,7 @@ def _verify_feats_size(feats,
   """Verify the feature map sizes."""
   expected_output_size = feat_sizes[min_level:max_level + 1]
   for cnt, size in enumerate(expected_output_size):
-    h_id, w_id = (1, 2) if data_format == 'channels_last' else (2, 3)
+    h_id, w_id = (2, 3) if data_format == 'channels_first' else (1, 2)
     if feats[cnt].shape[h_id] != size['height']:
       raise ValueError(
           'feats[{}] has shape {} but its height should be {}.'
@@ -439,7 +441,7 @@ def build_feature_network(features, config):
     if level in features.keys():
       feats.append(features[level])
     else:
-      h_id, w_id = (1, 2) if config.data_format == 'channels_last' else (2, 3)
+      h_id, w_id = (2, 3) if config.data_format == 'channels_first' else (1, 2)
       # Adds a coarser level by downsampling the last feature map.
       feats.append(
           resample_feature_map(

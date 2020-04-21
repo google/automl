@@ -46,6 +46,9 @@ MAX_DETECTION_POINTS = 5000
 # The maximum number of detections per image.
 MAX_DETECTIONS_PER_IMAGE = 100
 
+# The minimal score threshold.
+MIN_SCORE_THRESH = 0.4
+
 
 def sigmoid(x):
   """Sigmoid function for use with Numpy for CPU evaluation."""
@@ -262,8 +265,8 @@ def _generate_detections_tf(cls_outputs,
                             classes,
                             image_id,
                             image_scale,
-                            min_score_thresh=0.2,
-                            max_boxes_to_draw=50,
+                            min_score_thresh=MIN_SCORE_THRESH,
+                            max_boxes_to_draw=MAX_DETECTIONS_PER_IMAGE,
                             soft_nms_sigma=0.0,
                             iou_threshold=0.5,
                             use_native_nms=True):
@@ -565,7 +568,7 @@ class AnchorLabeler(object):
                           classes,
                           image_id,
                           image_scale,
-                          min_score_thresh=0.5,
+                          min_score_thresh=MIN_SCORE_THRESH,
                           max_boxes_to_draw=MAX_DETECTIONS_PER_IMAGE,
                           disable_pyfun=None):
     """Generate detections based on class and box predictions."""
