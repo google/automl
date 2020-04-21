@@ -60,6 +60,11 @@ flags.DEFINE_string('data_format', None, 'data format, e.g., channel_last.')
 flags.DEFINE_string('input_image', None, 'Input image path for inference.')
 flags.DEFINE_string('output_image_dir', None, 'Output dir for inference.')
 
+# For video.
+flags.DEFINE_string('input_video', None, 'Input video path for inference.')
+flags.DEFINE_string('output_video', None,
+                    'Output video path. If None, play it online instead.')
+
 # For visualization.
 flags.DEFINE_integer('line_thickness', None, 'Line thickness for box.')
 flags.DEFINE_integer('max_boxes_to_draw', None, 'Max number of boxes to draw.')
@@ -194,6 +199,48 @@ class ModelInspector(object):
     image = Image.open(image_path_pattern)
     raw_images.append(np.array(image))
     driver.benchmark(raw_images, FLAGS.trace_filename)
+
+  def saved_model_video(self, video_path: Text, output_video: Text, **kwargs):
+    """Perform video inference for the given saved model."""
+    import cv2  # pylint: disable=g-import-not-at-top
+
+    driver = inference.ServingDriver(
+        self.model_name,
+        self.ckpt_path,
+        enable_ema=self.enable_ema,
+        use_xla=self.use_xla)
+    driver.load(self.saved_model_dir)
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+      print('Error opening input video: {}'.format(video_path))
+
+    out_ptr = None
+    if output_video:
+      frame_width, frame_height = int(cap.get(3)), int(cap.get(4))
+      out_ptr = cv2.VideoWriter(output_video, cv2.VideoWriter_fourcc(
+          'm', 'p', '4', 'v'), 25, (frame_width, frame_height))
+
+    while cap.isOpened():
+      # Capture frame-by-frame
+      ret, frame = cap.read()
+      if not ret:
+        break
+
+      raw_frames = [np.array(frame)]
+      detections_bs = driver.serve_images(raw_frames)
+      new_frame = driver.visualize(raw_frames[0], detections_bs[0], **kwargs)
+
+      if out_ptr:
+        # write frame into output file.
+        out_ptr.write(new_frame)
+      else:
+        # show the frame online, mainly used for real-time speed test.
+        cv2.imshow('Frame', new_frame)
+
+      # Press Q on keyboard to  exit
+      if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
 
   def inference_single_image(self, image_image_path, output_dir, **kwargs):
     driver = inference.InferenceDriver(self.model_name, self.ckpt_path,
@@ -369,7 +416,8 @@ class ModelInspector(object):
       self.eval_ckpt()
     elif runmode == 'saved_model_benchmark':
       self.saved_model_benchmark(FLAGS.input_image)
-    elif runmode in ('infer', 'saved_model', 'saved_model_infer'):
+    elif runmode in ('infer', 'saved_model', 'saved_model_infer',
+                     'saved_model_video'):
       config_dict = {}
       if FLAGS.line_thickness:
         config_dict['line_thickness'] = FLAGS.line_thickness
@@ -386,6 +434,9 @@ class ModelInspector(object):
       elif runmode == 'saved_model_infer':
         self.saved_model_inference(
             FLAGS.input_image, FLAGS.output_image_dir, **config_dict)
+      elif runmode == 'saved_model_video':
+        self.saved_model_video(
+            FLAGS.input_video, FLAGS.output_video, **config_dict)
     elif runmode == 'bm':
       self.benchmark_model(warmup_runs=5, bm_runs=FLAGS.bm_runs,
                            num_threads=threads,
