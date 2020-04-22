@@ -335,7 +335,7 @@ def _generate_detections_tf(cls_outputs,
   width = boxes[:, 3] - boxes[:, 1]
 
   detections = tf.stack([
-      tf.cast(tf.repeat(image_id, tf.size(top_detection_idx)), tf.float32),
+      tf.cast(tf.tile(image_id, [tf.size(top_detection_idx)]), tf.float32),
       boxes[:, 0] * image_scale,
       boxes[:, 1] * image_scale,
       height * image_scale,
