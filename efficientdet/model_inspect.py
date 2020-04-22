@@ -36,7 +36,7 @@ import inference
 import utils
 
 
-flags.DEFINE_string('model_name', 'efficientdet-d1', 'Model.')
+flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model.')
 flags.DEFINE_string('logdir', '/tmp/deff/', 'log directory.')
 flags.DEFINE_string('runmode', 'dry', 'Run mode: {freeze, bm, dry}')
 flags.DEFINE_string('trace_filename', None, 'Trace file name.')
@@ -46,11 +46,12 @@ flags.DEFINE_string('input_image_size', None, 'Size of input image. Enter a'
                     'Otherwise, enter two integers seprated by a "x".'
                     'e.g. "1280x640" if width=1280 and height=640.')
 flags.DEFINE_integer('threads', 0, 'Number of threads.')
-flags.DEFINE_integer('bm_runs', 20, 'Number of benchmark runs.')
+flags.DEFINE_integer('bm_runs', 10, 'Number of benchmark runs.')
 flags.DEFINE_string('tensorrt', None, 'TensorRT mode: {None, FP32, FP16, INT8}')
 flags.DEFINE_bool('delete_logdir', True, 'Whether to delete logdir.')
 flags.DEFINE_bool('freeze', False, 'Freeze graph.')
 flags.DEFINE_bool('xla', False, 'Run with xla optimization.')
+flags.DEFINE_integer('batch_size', 1, 'Batch size for inference.')
 
 flags.DEFINE_string('ckpt_path', None, 'checkpoint dir used for eval.')
 flags.DEFINE_string('export_ckpt', None, 'Path for exporting new models.')
@@ -59,6 +60,11 @@ flags.DEFINE_string('data_format', None, 'data format, e.g., channel_last.')
 
 flags.DEFINE_string('input_image', None, 'Input image path for inference.')
 flags.DEFINE_string('output_image_dir', None, 'Output dir for inference.')
+
+# For video.
+flags.DEFINE_string('input_video', None, 'Input video path for inference.')
+flags.DEFINE_string('output_video', None,
+                    'Output video path. If None, play it online instead.')
 
 # For visualization.
 flags.DEFINE_integer('line_thickness', None, 'Line thickness for box.')
@@ -86,7 +92,8 @@ class ModelInspector(object):
                enable_ema: bool = True,
                export_ckpt: Text = None,
                saved_model_dir: Text = None,
-               data_format: Text = None):
+               data_format: Text = None,
+               batch_size: int = 1):
     self.model_name = model_name
     self.model_params = hparams_config.get_detection_config(model_name)
     self.logdir = logdir
@@ -117,7 +124,7 @@ class ModelInspector(object):
       self.model_overrides.update(dict(data_format=data_format))
 
     # A few fixed parameters.
-    self.batch_size = 1
+    self.batch_size = batch_size
     self.num_classes = num_classes
     self.data_format = data_format
     self.inputs_shape = [self.batch_size, image_size[0], image_size[1], 3]
@@ -153,6 +160,7 @@ class ModelInspector(object):
     driver = inference.ServingDriver(
         self.model_name,
         self.ckpt_path,
+        batch_size=self.batch_size,
         enable_ema=self.enable_ema,
         use_xla=self.use_xla,
         data_format=self.data_format,
@@ -165,35 +173,88 @@ class ModelInspector(object):
     driver = inference.ServingDriver(
         self.model_name,
         self.ckpt_path,
+        batch_size=self.batch_size,
         enable_ema=self.enable_ema,
         use_xla=self.use_xla,
         data_format=self.data_format,
         **kwargs)
     driver.load(self.saved_model_dir)
-    raw_images = []
-    image = Image.open(image_path_pattern)
-    raw_images.append(np.array(image))
-    detections_bs = driver.serve_images(raw_images)
-    for i, detections in enumerate(detections_bs):
-      img = driver.visualize(raw_images[i], detections, **kwargs)
-      output_image_path = os.path.join(output_dir, str(i) + '.jpg')
-      Image.fromarray(img).save(output_image_path)
-      logging.info('writing file to %s', output_image_path)
+
+    batch_size = self.batch_size
+    all_files = list(tf.io.gfile.glob(image_path_pattern))
+    num_batches = len(all_files) // batch_size
+
+    for i in range(num_batches):
+      batch_files = all_files[i * batch_size: (i + 1) * batch_size]
+      raw_images = [np.array(Image.open(f)) for f in batch_files]
+      detections_bs = driver.serve_images(raw_images)
+      print(len(raw_images), len(detections_bs))
+      for j in range(len(raw_images)):
+        img = driver.visualize(raw_images[j], detections_bs[j], **kwargs)
+        img_id = str(i * batch_size + j)
+        output_image_path = os.path.join(output_dir, img_id + '.jpg')
+        Image.fromarray(img).save(output_image_path)
+        logging.info('writing file to %s', output_image_path)
 
   def saved_model_benchmark(self, image_path_pattern, **kwargs):
     """Perform inference for the given saved model."""
     driver = inference.ServingDriver(
         self.model_name,
         self.ckpt_path,
+        batch_size=self.batch_size,
         enable_ema=self.enable_ema,
         use_xla=self.use_xla,
         data_format=self.data_format,
         **kwargs)
     driver.load(self.saved_model_dir)
     raw_images = []
-    image = Image.open(image_path_pattern)
-    raw_images.append(np.array(image))
+    all_files = list(tf.io.gfile.glob(image_path_pattern))
+    if len(all_files) < self.batch_size:
+      all_files = all_files * (self.batch_size // len(all_files) + 1)
+    raw_images = [np.array(Image.open(f)) for f in all_files[:self.batch_size]]
     driver.benchmark(raw_images, FLAGS.trace_filename)
+
+  def saved_model_video(self, video_path: Text, output_video: Text, **kwargs):
+    """Perform video inference for the given saved model."""
+    import cv2  # pylint: disable=g-import-not-at-top
+
+    driver = inference.ServingDriver(
+        self.model_name,
+        self.ckpt_path,
+        enable_ema=self.enable_ema,
+        use_xla=self.use_xla)
+    driver.load(self.saved_model_dir)
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+      print('Error opening input video: {}'.format(video_path))
+
+    out_ptr = None
+    if output_video:
+      frame_width, frame_height = int(cap.get(3)), int(cap.get(4))
+      out_ptr = cv2.VideoWriter(output_video, cv2.VideoWriter_fourcc(
+          'm', 'p', '4', 'v'), 25, (frame_width, frame_height))
+
+    while cap.isOpened():
+      # Capture frame-by-frame
+      ret, frame = cap.read()
+      if not ret:
+        break
+
+      raw_frames = [np.array(frame)]
+      detections_bs = driver.serve_images(raw_frames)
+      new_frame = driver.visualize(raw_frames[0], detections_bs[0], **kwargs)
+
+      if out_ptr:
+        # write frame into output file.
+        out_ptr.write(new_frame)
+      else:
+        # show the frame online, mainly used for real-time speed test.
+        cv2.imshow('Frame', new_frame)
+
+      # Press Q on keyboard to  exit
+      if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
 
   def inference_single_image(self, image_image_path, output_dir, **kwargs):
     driver = inference.InferenceDriver(self.model_name, self.ckpt_path,
@@ -312,40 +373,36 @@ class ModelInspector(object):
       if not self.use_xla:
         # Don't use tf.group because XLA removes the whole graph for tf.group.
         output = tf.group(*output)
+
       for i in range(warmup_runs):
         start_time = time.time()
         sess.run(output, feed_dict={inputs: img})
         print('Warm up: {} {:.4f}s'.format(i, time.time() - start_time))
+
       print('Start benchmark runs total={}'.format(bm_runs))
-      timev = []
+      start = time.perf_counter()
       for i in range(bm_runs):
-        if trace_filename and i == (bm_runs // 2):
-          run_options = tf.RunOptions()
-          run_options.trace_level = tf.RunOptions.FULL_TRACE
-          run_metadata = tf.RunMetadata()
-          sess.run(output, feed_dict={inputs: img},
-                   options=run_options, run_metadata=run_metadata)
-          logging.info('Dumping trace to %s', trace_filename)
-          trace_dir = os.path.dirname(trace_filename)
-          if not tf.io.gfile.exists(trace_dir):
-            tf.io.gfile.makedirs(trace_dir)
-          with tf.io.gfile.GFile(trace_filename, 'w') as trace_file:
-            from tensorflow.python.client import timeline  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-            trace = timeline.Timeline(step_stats=run_metadata.step_stats)
-            trace_file.write(
-                trace.generate_chrome_trace_format(show_memory=True))
-
-        start_time = time.time()
         sess.run(output, feed_dict={inputs: img})
-        timev.append(time.time() - start_time)
+      end = time.perf_counter()
+      inference_time = (end - start) / 10
+      print('Per batch inference time: ', inference_time)
+      print('FPS: ', self.batch_size / inference_time)
 
-      timev.sort()
-      timev = timev[2:bm_runs-2]
-      print('{} {}runs {}threads: mean {:.4f} std {:.4f} min {:.4f} max {:.4f}'
-            .format(self.model_name, len(timev), num_threads, np.mean(timev),
-                    np.std(timev), np.min(timev), np.max(timev)))
-      print('Images per second FPS = {:.1f}'.format(
-          self.batch_size / float(np.mean(timev))))
+      if trace_filename:
+        run_options = tf.RunOptions()
+        run_options.trace_level = tf.RunOptions.FULL_TRACE
+        run_metadata = tf.RunMetadata()
+        sess.run(output, feed_dict={inputs: img},
+                 options=run_options, run_metadata=run_metadata)
+        logging.info('Dumping trace to %s', trace_filename)
+        trace_dir = os.path.dirname(trace_filename)
+        if not tf.io.gfile.exists(trace_dir):
+          tf.io.gfile.makedirs(trace_dir)
+        with tf.io.gfile.GFile(trace_filename, 'w') as trace_file:
+          from tensorflow.python.client import timeline  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+          trace = timeline.Timeline(step_stats=run_metadata.step_stats)
+          trace_file.write(
+              trace.generate_chrome_trace_format(show_memory=True))
 
   def convert_tr(self, graph_def, fetches):
     """Convert to TensorRT."""
@@ -369,7 +426,8 @@ class ModelInspector(object):
       self.eval_ckpt()
     elif runmode == 'saved_model_benchmark':
       self.saved_model_benchmark(FLAGS.input_image)
-    elif runmode in ('infer', 'saved_model', 'saved_model_infer'):
+    elif runmode in ('infer', 'saved_model', 'saved_model_infer',
+                     'saved_model_video'):
       config_dict = {}
       if FLAGS.line_thickness:
         config_dict['line_thickness'] = FLAGS.line_thickness
@@ -386,6 +444,9 @@ class ModelInspector(object):
       elif runmode == 'saved_model_infer':
         self.saved_model_inference(
             FLAGS.input_image, FLAGS.output_image_dir, **config_dict)
+      elif runmode == 'saved_model_video':
+        self.saved_model_video(
+            FLAGS.input_video, FLAGS.output_video, **config_dict)
     elif runmode == 'bm':
       self.benchmark_model(warmup_runs=5, bm_runs=FLAGS.bm_runs,
                            num_threads=threads,
@@ -408,7 +469,8 @@ def main(_):
       enable_ema=FLAGS.enable_ema,
       export_ckpt=FLAGS.export_ckpt,
       saved_model_dir=FLAGS.saved_model_dir,
-      data_format=FLAGS.data_format)
+      data_format=FLAGS.data_format,
+      batch_size=FLAGS.batch_size)
   inspector.run_model(FLAGS.runmode, FLAGS.threads)
 
 

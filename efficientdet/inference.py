@@ -473,7 +473,7 @@ class ServingDriver(object):
     """Benchmark inference latency/throughput.
 
     Args:
-      image_arrays: a numpy array of image content.
+      image_arrays: a list of images in numpy array format.
       trace_filename: If None, specify the filename for saving trace.
     """
     if not self.sess:
@@ -490,10 +490,10 @@ class ServingDriver(object):
           self.signitures['prediction'],
           feed_dict={self.signitures['image_arrays']: image_arrays})
     end = time.perf_counter()
-    inference_time = (end-start) / 10
+    inference_time = (end - start) / 10
 
-    print('Inference time: ', inference_time)
-    print('FPS: ', 1 / inference_time)
+    print('Per batch inference time: ', inference_time)
+    print('FPS: ', self.batch_size / inference_time)
 
     if trace_filename:
       run_options = tf.RunOptions()
