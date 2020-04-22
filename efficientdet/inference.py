@@ -536,6 +536,13 @@ class ServingDriver(object):
     }
     return tf.saved_model.load(self.sess, ['serve'], saved_model_dir)
 
+  def freeze(self):
+    """Freeze the graph."""
+    output_names = [self.signitures['prediction'].op.name]
+    graphdef = tf.graph_util.convert_variables_to_constants(
+        self.sess, self.sess.graph_def, output_names)
+    return graphdef
+
   def export(self, output_dir):
     """Export a saved model."""
     signitures = self.signitures
@@ -558,6 +565,12 @@ class ServingDriver(object):
         clear_devices=True)
     b.save()
     logging.info('Model saved at %s', output_dir)
+
+    # also save freeze pb file.
+    graphdef = self.freeze()
+    pb_path = os.path.join(output_dir, self.model_name + '_frozen.pb')
+    tf.io.gfile.GFile(pb_path, 'wb').write(graphdef.SerializeToString())
+    logging.info('Free graph saved at %s', pb_path)
 
 
 class InferenceDriver(object):

@@ -326,12 +326,15 @@ class ModelInspector(object):
       logging.info('Loading checkpoint: %s', checkpoint)
       saver = tf.train.Saver()
 
-      # Restore the Variables from the checkpoint and freeze the Graph.
+      # Restore the Variables from the checkpoint and frozen the Graph.
       saver.restore(sess, checkpoint)
 
-      output_node_names = [node.name.split(':')[0] for node in outputs]
+      output_node_names = [node.op.name for node in outputs]
       graphdef = tf.graph_util.convert_variables_to_constants(
           sess, sess.graph_def, output_node_names)
+
+      tf_graph = os.path.join(self.logdir, self.model_name + '_frozen.pb')
+      tf.io.gfile.GFile(tf_graph, 'wb').write(graphdef.SerializeToString())
 
     return graphdef
 
