@@ -188,7 +188,6 @@ class ModelInspector(object):
       batch_files = all_files[i * batch_size: (i + 1) * batch_size]
       raw_images = [np.array(Image.open(f)) for f in batch_files]
       detections_bs = driver.serve_images(raw_images)
-      print(len(raw_images), len(detections_bs))
       for j in range(len(raw_images)):
         img = driver.visualize(raw_images[j], detections_bs[j], **kwargs)
         img_id = str(i * batch_size + j)
