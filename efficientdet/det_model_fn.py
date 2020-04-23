@@ -307,7 +307,6 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
 def add_metric_fn_inputs(params,
                          cls_outputs,
                          box_outputs,
-                         metric_fn_inputs,
                          max_detection_points=anchors.MAX_DETECTION_POINTS):
   """Selects top-k predictions and adds the selected to metric_fn_inputs.
 
@@ -346,7 +345,7 @@ def add_metric_fn_inputs(params,
     cls_outputs_all_reshape = tf.reshape(cls_outputs_all,
                                          [params['batch_size'], -1])
     _, cls_topk_indices = tf.math.top_k(cls_outputs_all_reshape,
-                                        k=anchors.MAX_DETECTION_POINTS,
+                                        k=max_detection_points,
                                         sorted=False)
     indices = cls_topk_indices // num_classes
     classes = cls_topk_indices % num_classes
@@ -368,10 +367,7 @@ def add_metric_fn_inputs(params,
     cls_outputs_all_after_topk = tf.reduce_max(cls_outputs_all, -1)
     box_outputs_all_after_topk = box_outputs_all
 
-  metric_fn_inputs['cls_outputs_all'] = cls_outputs_all_after_topk
-  metric_fn_inputs['box_outputs_all'] = box_outputs_all_after_topk
-  metric_fn_inputs['indices_all'] = indices
-  metric_fn_inputs['classes_all'] = classes
+  return cls_outputs_all_after_topk, box_outputs_all_after_topk, indices, classes
 
 
 def coco_metric_fn(batch_size,
@@ -381,18 +377,27 @@ def coco_metric_fn(batch_size,
                    **kwargs):
   """Evaluation metric fn. Performed on CPU, do not reference TPU ops."""
   # add metrics to output
+
+  anchor_boxes = tf.gather(anchor_labeler._anchors.box.boxes, kwargs['indices_all'])
   detections_bs = []
   for index in range(batch_size):
     cls_outputs_per_sample = kwargs['cls_outputs_all'][index]
     box_outputs_per_sample = kwargs['box_outputs_all'][index]
     indices_per_sample = kwargs['indices_all'][index]
     classes_per_sample = kwargs['classes_all'][index]
-    detections = anchor_labeler.generate_detections(
+    anchor_boxes_per_sample = anchor_boxes[index]
+    if kwargs.get('disable_pyfun', None):
+      detections = anchors.generate_detections_tf(
+          cls_outputs_per_sample, box_outputs_per_sample, anchor_boxes_per_sample,
+          classes_per_sample, tf.slice(kwargs['source_ids'], [index], [1]),
+          tf.slice(kwargs['image_scales'], [index], [1])
+      )
+    else:
+      detections = anchor_labeler.generate_detections(
         cls_outputs_per_sample, box_outputs_per_sample, indices_per_sample,
         classes_per_sample, tf.slice(kwargs['source_ids'], [index], [1]),
-        tf.slice(kwargs['image_scales'], [index], [1]),
-        disable_pyfun=kwargs.get('disable_pyfun', None),
-    )
+        tf.slice(kwargs['image_scales'], [index], [1])
+      )
     detections_bs.append(detections)
 
   if testdev_dir:

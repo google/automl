@@ -22,11 +22,11 @@ from __future__ import print_function
 import copy
 import os
 import time
+from typing import Text, Dict, Any, List, Tuple, Union
 from absl import logging
 import numpy as np
 from PIL import Image
 import tensorflow.compat.v1 as tf
-from typing import Text, Dict, Any, List, Tuple, Union
 
 import anchors
 import dataloader
@@ -179,41 +179,52 @@ def det_post_process(params: Dict[Any, Any],
     detections_batch: a batch of detection results. Each detection is a tensor
       with each row representing [image_id, x, y, width, height, score, class].
   """
-  # TODO(tanmingxing): refactor the code to make it more explicity.
-  outputs = {
-      'cls_outputs_all': [None],
-      'box_outputs_all': [None],
-      'indices_all': [None],
-      'classes_all': [None]
-  }
-  det_model_fn.add_metric_fn_inputs(
-      params, cls_outputs, box_outputs, outputs, -1)
+
+  cls_outputs_all, box_outputs_all, indices_all, classes_all = det_model_fn.add_metric_fn_inputs(
+      params, cls_outputs, box_outputs, -1)
 
   # Create anchor_label for picking top-k predictions.
   eval_anchors = anchors.Anchors(params['min_level'], params['max_level'],
                                  params['num_scales'], params['aspect_ratios'],
                                  params['anchor_scale'], params['image_size'])
-  anchor_labeler = anchors.AnchorLabeler(eval_anchors, params['num_classes'])
+  anchor_boxes = tf.gather(eval_anchors.boxes, indices_all)
 
+  scores_all = tf.math.sigmoid(cls_outputs_all)
   # Add all detections for each input image.
+  classes_all = tf.cast(classes_all, tf.float32)
+  # apply bounding box regression to anchors
+
   detections_batch = []
   for index in range(params['batch_size']):
-    cls_outputs_per_sample = outputs['cls_outputs_all'][index]
-    box_outputs_per_sample = outputs['box_outputs_all'][index]
-    indices_per_sample = outputs['indices_all'][index]
-    classes_per_sample = outputs['classes_all'][index]
-    detections = anchor_labeler.generate_detections(
-        cls_outputs_per_sample,
-        box_outputs_per_sample,
-        indices_per_sample,
-        classes_per_sample,
-        image_id=[index],
-        image_scale=[scales[index]],
-        min_score_thresh=min_score_thresh,
-        max_boxes_to_draw=max_boxes_to_draw,
-        disable_pyfun=params.get('disable_pyfun'))
+    scores_per_sample = scores_all[index]
+    cls_outputs_per_sample = cls_outputs_all[index]
+    box_outputs_per_sample = box_outputs_all[index]
+    indices_per_sample = indices_all[index]
+    anchor_boxes_per_sample = anchor_boxes[index]
+    classes_per_sample = classes_all[index]
+    if params.get('disable_pyfun', None):
+      detections = anchors.generate_detections_tf(
+          scores_per_sample,
+          box_outputs_per_sample,
+          anchor_boxes_per_sample,
+          classes_per_sample,
+          image_id=index,
+          image_scale=[scales[index]],
+          min_score_thresh=min_score_thresh,
+          max_boxes_to_draw=max_boxes_to_draw,
+      )
+    else:
+      anchor_labeler = anchors.AnchorLabeler(eval_anchors, params['num_classes'])
+      detections = anchor_labeler.generate_detections(
+          cls_outputs_per_sample,
+          box_outputs_per_sample,
+          indices_per_sample,
+          classes_per_sample,
+          image_id=index,
+          image_scale=[scales[index]],
+          max_boxes_to_draw=max_boxes_to_draw)
     detections_batch.append(detections)
-  return tf.stack(detections_batch, name='detections')
+  return detections_batch
 
 
 def visualize_image(image,
@@ -439,9 +450,9 @@ class ServingDriver(object):
     Returns:
       annotated image.
     """
-    boxes = predictions[:, 1:5]
-    classes = predictions[:, 6].astype(int)
-    scores = predictions[:, 5]
+    boxes = predictions[:, 0:4]
+    classes = predictions[:, 5].astype(int)
+    scores = predictions[:, 4]
 
     # This is not needed if disable_pyfun=True
     # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]
@@ -527,12 +538,23 @@ class ServingDriver(object):
     return predictions
 
   def load(self, saved_model_dir):
+    """Load saved model to session.
+
+    Args:
+      saved_model_dir: saved model directory.
+    Returns:
+      The `MetaGraphDef` protocol buffer loaded in the provided session. This
+      can be used to further extract signature-defs, collection-defs, etc.
+    Raises:
+      RuntimeError: MetaGraphDef associated with the tags cannot be found.
+    """
     if not self.sess:
       self.sess = self._build_session()
+
     self.signitures = {
         'image_files': 'image_files:0',
         'image_arrays': 'image_arrays:0',
-        'prediction': 'detections:0',
+        'prediction': ['detections_%d:0' % i for i in range(self.batch_size)],
     }
     return tf.saved_model.load(self.sess, ['serve'], saved_model_dir)
 
@@ -550,11 +572,11 @@ class ServingDriver(object):
         'serving_default':
             tf.saved_model.predict_signature_def(
                 {signitures['image_arrays'].name: signitures['image_arrays']},
-                {signitures['prediction'].name: signitures['prediction']}),
+                {detection.name: detection for detection in signitures['prediction']}),
         'serving_base64':
             tf.saved_model.predict_signature_def(
                 {signitures['image_files'].name: signitures['image_files']},
-                {signitures['prediction'].name: signitures['prediction']}),
+                {detection.name: detection for detection in signitures['prediction']}),
     }
     b = tf.saved_model.Builder(output_dir)
     b.add_meta_graph_and_variables(
@@ -655,17 +677,14 @@ class InferenceDriver(object):
           class_outputs,
           box_outputs,
           scales,
-          min_score_thresh=kwargs.get('min_score_thresh',
-                                      anchors.MIN_SCORE_THRESH),
-          max_boxes_to_draw=kwargs.get('max_boxes_to_draw',
-                                       anchors.MAX_DETECTIONS_PER_IMAGE))
+          **kwargs)
       outputs_np = sess.run(detections_batch)
       # Visualize results.
       for i, output_np in enumerate(outputs_np):
-        # output_np has format [image_id, y, x, height, width, score, class]
-        boxes = output_np[:, 1:5]
-        classes = output_np[:, 6].astype(int)
-        scores = output_np[:, 5]
+        # output_np has format [y, x, height, width, score, class]
+        boxes = output_np[:, 0:4]
+        classes = output_np[:, 5].astype(int)
+        scores = output_np[:, 4]
 
         # This is not needed if disable_pyfun=True
         # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]

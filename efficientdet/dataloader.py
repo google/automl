@@ -298,7 +298,6 @@ class InputReader(object):
 
         source_id = tf.where(tf.equal(source_id, tf.constant('')), '-1',
                              source_id)
-        source_id = tf.string_to_number(source_id)
 
         # Pad groundtruth data for evaluation.
         image_scale = input_processor.image_scale_to_original

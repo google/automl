@@ -99,11 +99,11 @@ def decode_box_outputs_tf(rel_codes, anchors):
   Returns:
     outputs: bounding boxes.
   """
-  ycenter_a = (anchors[0] + anchors[2]) / 2
-  xcenter_a = (anchors[1] + anchors[3]) / 2
-  ha = anchors[2] - anchors[0]
-  wa = anchors[3] - anchors[1]
-  ty, tx, th, tw = tf.unstack(rel_codes, num=4)
+  ycenter_a = (anchors[:, 0] + anchors[:, 2]) / 2
+  xcenter_a = (anchors[:, 1] + anchors[:, 3]) / 2
+  ha = anchors[:, 2] - anchors[:, 0]
+  wa = anchors[:, 3] - anchors[:, 1]
+  ty, tx, th, tw = tf.unstack(rel_codes, num=4, axis=1)
 
   w = tf.math.exp(tw) * wa
   h = tf.math.exp(th) * ha
@@ -258,22 +258,21 @@ def _generate_anchor_boxes(image_size, anchor_scale, anchor_configs):
   return anchor_boxes
 
 
-def _generate_detections_tf(cls_outputs,
-                            box_outputs,
-                            anchor_boxes,
-                            indices,
-                            classes,
-                            image_id,
-                            image_scale,
-                            min_score_thresh=MIN_SCORE_THRESH,
-                            max_boxes_to_draw=MAX_DETECTIONS_PER_IMAGE,
-                            soft_nms_sigma=0.0,
-                            iou_threshold=0.5,
-                            use_native_nms=True):
+def generate_detections_tf(scores,
+                           box_outputs,
+                           anchor_boxes,
+                           classes,
+                           image_id,
+                           image_scale,
+                           min_score_thresh=MIN_SCORE_THRESH,
+                           max_boxes_to_draw=MAX_DETECTIONS_PER_IMAGE,
+                           soft_nms_sigma=0.0,
+                           iou_threshold=0.5,
+                           use_native_nms=True):
   """Generates detections with model outputs and anchors.
 
   Args:
-    cls_outputs: a numpy array with shape [N, 1], which has the highest class
+    scores: a numpy array with shape [N, 1], which has the highest class
       scores on all feature levels. The N is the number of selected
       top-K total anchors on all levels.  (k being MAX_DETECTION_POINTS)
     box_outputs: a numpy array with shape [N, 4], which stacks box regression
@@ -303,25 +302,30 @@ def _generate_detections_tf(cls_outputs,
 
   Returns:
     detections: detection results in a tensor with each row representing
-      [image_id, y, x, height, width, score, class]
+      [y, x, height, width, score, class]
   """
   logging.info('Using tf version of post-processing.')
-  anchor_boxes = tf.gather(anchor_boxes, indices)
-
-  scores = tf.math.sigmoid(cls_outputs)
   # apply bounding box regression to anchors
-  boxes = decode_box_outputs_tf(
-      tf.transpose(box_outputs, [1, 0]), tf.transpose(anchor_boxes, [1, 0]))
+  boxes = decode_box_outputs_tf(box_outputs, anchor_boxes)
 
   if use_native_nms:
     logging.info('Using native nms.')
-    top_detection_idx, scores = tf.image.non_max_suppression_with_scores(
-        boxes,
-        scores,
-        max_boxes_to_draw,
-        iou_threshold=iou_threshold,
-        score_threshold=min_score_thresh,
-        soft_nms_sigma=soft_nms_sigma)
+    if soft_nms_sigma > 0.:
+      top_detection_idx, scores = tf.image.non_max_suppression_with_scores(
+          boxes,
+          scores,
+          max_boxes_to_draw,
+          iou_threshold=iou_threshold,
+          score_threshold=min_score_thresh,
+          soft_nms_sigma=soft_nms_sigma)
+    else:
+      top_detection_idx = tf.image.non_max_suppression(
+          boxes,
+          scores,
+          max_boxes_to_draw,
+          iou_threshold=iou_threshold,
+          score_threshold=min_score_thresh)
+      scores = tf.gather(scores, top_detection_idx)
     boxes = tf.gather(boxes, top_detection_idx)
   else:
     logging.info('Using customized nms.')
@@ -335,14 +339,13 @@ def _generate_detections_tf(cls_outputs,
   width = boxes[:, 3] - boxes[:, 1]
 
   detections = tf.stack([
-      tf.cast(tf.tile(image_id, [tf.size(top_detection_idx)]), tf.float32),
       boxes[:, 0] * image_scale,
       boxes[:, 1] * image_scale,
       height * image_scale,
       width * image_scale,
       scores,
-      tf.cast(tf.gather(classes, top_detection_idx) + 1, tf.float32)
-  ], axis=1)
+      tf.gather(classes, top_detection_idx) + 1.
+  ], axis=1, name='detections_%s' % image_id)
   return detections
 
 
@@ -400,16 +403,14 @@ def _generate_detections(cls_outputs, box_outputs, anchor_boxes, indices,
     top_detections_cls[:, 2] -= top_detections_cls[:, 0]
     top_detections_cls[:, 3] -= top_detections_cls[:, 1]
     top_detections_cls = np.column_stack(
-        (np.repeat(image_id, len(top_detection_idx)),
-         top_detections_cls,
+        (top_detections_cls,
          np.repeat(c + 1, len(top_detection_idx)))
     )
     detections.append(top_detections_cls)
 
   def _generate_dummy_detections(number):
-    detections_dummy = np.zeros((number, 7), dtype=np.float32)
-    detections_dummy[:, 0] = image_id[0]
-    detections_dummy[:, 5] = _DUMMY_DETECTION_SCORE
+    detections_dummy = np.zeros((number, 6), dtype=np.float32)
+    detections_dummy[:, 4] = _DUMMY_DETECTION_SCORE
     return detections_dummy
 
   if detections:
@@ -425,7 +426,7 @@ def _generate_detections(cls_outputs, box_outputs, anchor_boxes, indices,
   else:
     detections = _generate_dummy_detections(max_boxes_to_draw)
 
-  detections[:, 1:5] *= image_scale
+  detections[:, 0:4] *= image_scale
 
   return detections
 
@@ -568,23 +569,9 @@ class AnchorLabeler(object):
                           classes,
                           image_id,
                           image_scale,
-                          min_score_thresh=MIN_SCORE_THRESH,
-                          max_boxes_to_draw=MAX_DETECTIONS_PER_IMAGE,
-                          disable_pyfun=None):
+                          max_boxes_to_draw=MAX_DETECTIONS_PER_IMAGE):
     """Generate detections based on class and box predictions."""
-    if disable_pyfun:
-      return _generate_detections_tf(
-          cls_outputs,
-          box_outputs,
-          self._anchors.boxes,
-          indices,
-          classes,
-          image_id,
-          image_scale,
-          min_score_thresh=min_score_thresh,
-          max_boxes_to_draw=max_boxes_to_draw)
-    else:
-      return tf.py_func(_generate_detections, [
-          cls_outputs, box_outputs, self._anchors.boxes, indices, classes,
-          image_id, image_scale, self._num_classes, max_boxes_to_draw,
-      ], tf.float32)
+    return tf.py_func(_generate_detections, [
+        cls_outputs, box_outputs, self._anchors.boxes, indices, classes,
+        image_id, image_scale, self._num_classes, max_boxes_to_draw,
+    ], tf.float32)
