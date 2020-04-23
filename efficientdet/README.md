@@ -127,7 +127,17 @@ On colab with a Tesla T4 GPU, end-to-end latency stats are (more on [tutorial](t
     # you can visualize the output /tmp/0.jpg
 
 
-Alternatively, if you only have one image, you can also also run the following command (it is slow becuase it needs to first construct the graph from scratch):
+Alternatively, if you want to do inference using frozen graph instead of saved model, you can 
+    # Step 0 and 1 is the same as before.
+    # Step 2: do inference with frozen graph.
+    !python model_inspect.py --runmode=saved_model_infer \
+      --model_name=efficientdet-d0   --ckpt_path=efficientdet-d0 \
+      --input_image_size=1920x1280  \
+      --saved_model_dir=/tmp/saved_model/efficientdet-d0_frozen.pb  \
+      --input_image=img.png --output_image_dir=/tmp/
+    # Notably, since we don't recommend frozen graph, here we simply reuse the saved_model_dir
+
+Lastly, if you only have one image and just want to run a quick test, you can also run the following command (it is slow because it needs to construct the graph from scratch):
 
     # Run inference for a single image.
     !python model_inspect.py --runmode=infer --model_name=$MODEL \

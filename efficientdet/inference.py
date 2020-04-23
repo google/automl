@@ -526,7 +526,8 @@ class ServingDriver(object):
         feed_dict={self.signitures['image_arrays']: image_arrays})
     return predictions
 
-  def load(self, saved_model_dir):
+  def load(self, saved_model_dir_or_frozen_graph: Text):
+    """Load the model using saved model or a frozen graph."""
     if not self.sess:
       self.sess = self._build_session()
     self.signitures = {
@@ -534,7 +535,17 @@ class ServingDriver(object):
         'image_arrays': 'image_arrays:0',
         'prediction': 'detections:0',
     }
-    return tf.saved_model.load(self.sess, ['serve'], saved_model_dir)
+
+    # Load saved model if it is a folder.
+    if tf.io.gfile.isdir(saved_model_dir_or_frozen_graph):
+      return tf.saved_model.load(
+          self.sess, ['serve'], saved_model_dir_or_frozen_graph)
+
+    # Load a frozen graph.
+    graph_def = tf.GraphDef()
+    with tf.gfile.GFile(saved_model_dir_or_frozen_graph, 'rb') as f:
+      graph_def.ParseFromString(f.read())
+    return tf.import_graph_def(graph_def, name='')
 
   def freeze(self):
     """Freeze the graph."""
