@@ -244,7 +244,6 @@ You can also run eval on test-dev set with the following command:
 
     # Finetune needs to use --ckpt rather than --backbone_ckpt.
     !python main.py --mode=train_and_eval \
-        --num_classes=20 \
         --training_file_pattern=tfrecord/pascal*.tfrecord \
         --validation_file_pattern=tfrecord/pascal*.tfrecord \
         --val_json_file=tfrecord/json_pascal.json \
