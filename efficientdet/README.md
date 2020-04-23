@@ -1,14 +1,19 @@
 # EfficientDet
 
 [1] Mingxing Tan, Ruoming Pang, Quoc V. Le. EfficientDet: Scalable and Efficient Object Detection. CVPR 2020.
-    Arxiv link: https://arxiv.org/abs/1911.09070
+Arxiv link: https://arxiv.org/abs/1911.09070
 
 Updates:
 
-  - **Apr1: Updated results for test-dev and added EfficientDet-D7 (52.2 AP).**
+  - **Apr22: Speed up end-to-end latency: D0 is 24ms on
+    Nvidia Tesla T4 GPU (see [tutorial.ipynb](tutorial.ipynb)).**
+    * A great collaboration with [@fsx950223](https://github.com/fsx950223).
+  - Apr1: Updated results for test-dev and added EfficientDet-D7 (52.2 AP).
   - Mar26: Fixed a few bugs and updated all checkpoints/results.
-  - Mar24: Added tutorial with visualization and coco eval: [tutorial.ipynb](tutorial.ipynb)
+  - Mar24: Added tutorial with visualization and coco eval.
   - Mar 13: Released the initial code and models.
+
+##Quick start tutorial: [tutorial.ipynb](tutorial.ipynb)##
 
 ## 1. About EfficientDet Models
 
@@ -60,18 +65,74 @@ We have provided a list of EfficientDet checkpoints and results as follows:
 
   ** <em>val</em> denotes validation results, <em>test-dev</em> denotes test-dev2017 results. AP<sup>val</sup> is for validation accuracy, all other AP results in the table are for COCO test-dev2017. All accuracy numbers are for single-model single-scale without ensemble or test-time augmentation. All checkpoints are trained with baseline preprocessing (no autoaugmentation).
 
-## 3. Run inference.
+## 3. Benchmark model latency.
 
-    # Download model and testing image.
+
+There are two types of latency: network latency and end-to-end latency.
+
+(1) To measure the network latency (from the fist conv to the last class/box
+prediction output), use the following command:
+
+    !python model_inspect.py --runmode=bm --model_name=efficientdet-d0
+
+
+(2) To measure the end-to-end latency (from the input image to the final rendered
+new image, including: image preprocessing, network, postprrocessing and NMS),
+use the following command:
+
+    !rm  -rf /tmp/benchmark/
+    !python model_inspect.py --runmode=saved_model --model_name=efficientdet-d0 \
+      --ckpt_path=efficientdet-d0 --saved_model_dir=/tmp/benchmark/
+
+    !python model_inspect.py --runmode=saved_model_benchmark \
+      --saved_model_dir=/tmp/benchmark/ \
+      --model_name=efficientdet-d0  --input_image=testdata/img1.jpg  \
+      --output_image_dir=/tmp/
+
+On colab with a Tesla T4 GPU, end-to-end latency stats are (more on [tutorial](tutorial.ipynb)):
+
+
+|       Model    |   mAP | batch1 latency | batch1 FPS |  batch4 FPS |
+| ------ | ------ | ------  | ------ | ------ | ------ |
+| EfficientDet-D0 |  33.8 | 23.8ms | 42.1 | 79.3 |
+| EfficientDet-D1 |  39.6 | 36.1ms | 27.7 | 39.1 |
+| EfficientDet-D2 |  43.0 | 50.7ms | 19.7 | 26.0 |
+| EfficientDet-D3 |  45.8 | 84.6ms | 11.8 | 13.3 |
+| EfficientDet-D4 |  49.4 | 140ms  |  7.1 |  7.5 |
+| EfficientDet-D5 |  50.7 | 298ms  |  3.6 | |
+| EfficientDet-D6 |  51.7 | 386ms  |  2.6 | |
+
+** FPS means frames per second (throughtput).
+
+## 4. Inference for images.
+
+    # Step0: download model and testing image.
     !export MODEL=efficientdet-d0
     !export CKPT_PATH=efficientdet-d0
     !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/${MODEL}.tar.gz
     !wget https://user-images.githubusercontent.com/11736571/77320690-099af300-6d37-11ea-9d86-24f14dc2d540.png -O img.png
     !tar xf ${MODEL}.tar.gz
 
-    # Run inference.
+    # Step 1: export saved model.
+    !python model_inspect.py --runmode=saved_model \
+      --model_name=efficientdet-d0 --ckpt_path=efficientdet-d0 \
+      --input_image_size=1920x1280 \
+      --saved_model_dir=/tmp/saved_model
+
+    # Step 2: do inference with saved model.
+    !python model_inspect.py --runmode=saved_model_infer \
+      --model_name=efficientdet-d0   --ckpt_path=efficientdet-d0 \
+      --input_image_size=1920x1280  \
+      --saved_model_dir=/tmp/saved_model  \
+      --input_image=img.png --output_image_dir=/tmp/
+    # you can visualize the output /tmp/0.jpg
+
+
+Alternatively, if you only have one image, you can also also run the following command (it is slow becuase it needs to first construct the graph from scratch):
+
+    # Run inference for a single image.
     !python model_inspect.py --runmode=infer --model_name=$MODEL \
-      --input_image_size=1920x1280 --max_boxes_to_draw=100   --min_score_thresh=0.2 \
+      --input_image_size=1920x1280 --max_boxes_to_draw=100   --min_score_thresh=0.4 \
       --ckpt_path=$CKPT_PATH --input_image=img.png --output_image_dir=/tmp
     # you can visualize the output /tmp/0.jpg
 
@@ -81,26 +142,30 @@ Here is an example of EfficientDet-D0 visualization: more on [tutorial](tutorial
 <img src="./g3doc/street.jpg" width="800" />
 </p>
 
-## 4. Using saved model for inference.
+## 5. Inference for videos.
 
-You can also export a saved model, and use it to serve image inference.
+You can run inference for a video and show the results online:
 
-    # Step 1: export model
+    # step 0: download the example video.
+    !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/data/video480p.mov -O input.mov
+
+    # step 1: export saved model.
     !python model_inspect.py --runmode=saved_model \
       --model_name=efficientdet-d0 --ckpt_path=efficientdet-d0 \
-      --input_image_size=1920x1280 --max_boxes_to_draw=100   --min_score_thresh=0.2 \
-      --saved_model_dir=/tmp/saved_model
+      --saved_model_dir=/tmp/savedmodel
 
-    # Step 2: do inference with saved model.
-    !python model_inspect.py --runmode=saved_model_infer \
+    # step 2: inference video using saved_model_video.
+    !python model_inspect.py --runmode=saved_model_video \
       --model_name=efficientdet-d0   --ckpt_path=efficientdet-d0 \
-      --input_image_size=1920x1280 \
-      --max_boxes_to_draw=100   --min_score_thresh=0.2 \
-      --line_thickness=4 --saved_model_dir=/tmp/saved_model  \
-      --input_image=img.png --output_image_dir=/tmp/
-    # you can visualize the output /tmp/0.jpg
+      --saved_model_dir=/tmp/savedmodel --input_video=input.mov
 
-## 5. Eval on COCO 2017 val or test-dev.
+    # alternative step 2: inference video and save the result.
+    !python model_inspect.py --runmode=saved_model_video \
+      --model_name=efficientdet-d0   --ckpt_path=efficientdet-d0 \
+      --saved_model_dir=/tmp/savedmodel --input_video=input.mov  \
+      --output_video=output.mov
+
+## 6. Eval on COCO 2017 val or test-dev.
 
     // Download coco data.
     !wget http://images.cocodataset.org/zips/val2017.zip
@@ -147,7 +212,7 @@ You can also run eval on test-dev set with the following command:
     # Now you can submit testdev_output/detections_test-dev2017_test_results.json to
     # coco server: https://competitions.codalab.org/competitions/20794#participate
 
-## 6. Train on PASCAL VOC 2012 with backbone ImageNet ckpt.
+## 7. Train on PASCAL VOC 2012 with backbone ImageNet ckpt.
 
     # Download and convert pascal data.
     !wget http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar
@@ -173,7 +238,7 @@ You can also run eval on test-dev set with the following command:
         --hparams="use_bfloat16=false,num_classes=20,moving_average_decay=0" \
         --use_tpu=False
 
-## 7. Finetune on PASCAL VOC 2012 with detector COCO ckpt.
+## 8. Finetune on PASCAL VOC 2012 with detector COCO ckpt.
     # Download efficientdet coco checkpoint.
     !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz
     !tar xf efficientdet-d0.tar.gz
@@ -193,7 +258,7 @@ You can also run eval on test-dev set with the following command:
         --hparams="use_bfloat16=false,num_classes=20,moving_average_decay=0" \
         --use_tpu=False
 
-## 8. Training EfficientDets on TPUs.
+## 9. Training EfficientDets on TPUs.
 
 To train this model on Cloud TPU, you will need:
 
