@@ -128,6 +128,7 @@ On colab with a Tesla T4 GPU, end-to-end latency stats are (more on [tutorial](t
 
 
 Alternatively, if you want to do inference using frozen graph instead of saved model, you can 
+
     # Step 0 and 1 is the same as before.
     # Step 2: do inference with frozen graph.
     !python model_inspect.py --runmode=saved_model_infer \
