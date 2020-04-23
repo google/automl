@@ -62,7 +62,7 @@ We have provided a list of EfficientDet checkpoints and results as follows:
 |     EfficientDet-D6 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d6.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d6_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d6_coco_test-dev2017.txt))    | 51.3 | 51.7 | 71.2 | 56.0 | 34.1 | 55.2 | 64.1 | | 51.9M  |  225.6B  |
 |     EfficientDet-D7 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d7.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d7_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d7_coco_test-dev2017.txt))    | 51.8 | 52.2 | 71.4 | 56.3 | 34.8 | 55.5 | 64.6 | | 51.9M  |  324.8B  |
 
-    ** <em>val</em> denotes validation results, <em>test-dev</em> denotes test-dev2017 results. AP<sup>val</sup> is for validation accuracy, all other AP results in the table are for COCO test-dev2017. All accuracy numbers are for single-model single-scale without ensemble or test-time augmentation. All checkpoints are trained with baseline preprocessing (no autoaugmentation).
+** <em>val</em> denotes validation results, <em>test-dev</em> denotes test-dev2017 results. AP<sup>val</sup> is for validation accuracy, all other AP results in the table are for COCO test-dev2017. All accuracy numbers are for single-model single-scale without ensemble or test-time augmentation. All checkpoints are trained with baseline preprocessing (no autoaugmentation).
 
 ## 3. Benchmark model latency.
 
@@ -101,7 +101,7 @@ On colab with a Tesla T4 GPU, end-to-end latency stats are (more on [tutorial](t
 | EfficientDet-D5 |  50.7 | 298ms  |  3.6 | |
 | EfficientDet-D6 |  51.7 | 386ms  |  2.6 | |
 
-    ** FPS means frames per second (throughtput).
+** FPS means frames per second (throughtput).
 
 ## 4. Inference for images.
 
