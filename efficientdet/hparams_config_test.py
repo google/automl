@@ -43,6 +43,9 @@ class HparamsConfigTest(tf.test.TestCase):
     c.override('a=100,,,b=2.3,')  # extra ',' is fine.
     self.assertEqual(c.as_dict(), {'a': 100, 'b': 2.3})
 
+    c.override('a=2x3,b=50')  # a is a special format for image size.
+    self.assertEqual(c.as_dict(), {'a': '2x3', 'b': 50})
+
     # overrride string must be in the format of xx=yy.
     with self.assertRaises(ValueError):
       c.override('a=true,invalid_string')

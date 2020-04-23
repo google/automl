@@ -421,7 +421,15 @@ def archive_ckpt(ckpt_eval, ckpt_objective, ckpt_path):
 
 
 def get_feat_sizes(image_size: Union[int, Tuple[int, int]], max_level: int):
-  """Get feat widths and heights for all levels."""
+  """Get feat widths and heights for all levels.
+
+  Args:
+    image_size: the image size, can be an integer, or a tuple (H, W).
+    max_level: maximum feature level.
+
+  Returns:
+    feat_sizes: a list of tuples (height, width) for each level.
+  """
   if isinstance(image_size, int):
     image_size = (image_size, image_size)
   feat_sizes = [{'height': image_size[0], 'width': image_size[1]}]

@@ -141,6 +141,11 @@ def main(argv):
   config = hparams_config.get_detection_config(FLAGS.model_name)
   config.override(FLAGS.hparams)
 
+  if isinstance(config.image_size, str) and 'x' in config.image_size:
+    # image size is in format of width x height.
+    width, height = config.image_size.split('x')
+    config.image_size = (int(height), int(width))
+
   # The following is for spatial partitioning. `features` has one tensor while
   # `labels` had 4 + (`max_level` - `min_level` + 1) * 2 tensors. The input
   # partition is performed on `features` and all partitionable tensors of

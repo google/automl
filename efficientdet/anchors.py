@@ -376,7 +376,6 @@ def _generate_detections(cls_outputs, box_outputs, anchor_boxes, indices,
     detections: detection results in a tensor with each row representing
       [image_id, x, y, width, height, score, class]
   """
-  logging.info('Using numpy version of post-processing.')
   anchor_boxes = anchor_boxes[indices, :]
   scores = sigmoid(cls_outputs)
   # apply bounding box regression to anchors

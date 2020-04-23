@@ -30,7 +30,7 @@ def eval_str_fn(val):
     return val == 'true'
   try:
     return ast.literal_eval(val)
-  except ValueError:
+  except (ValueError, SyntaxError):
     return val
 
 
@@ -131,7 +131,7 @@ def default_detection_configs():
   h.act_type = 'swish'
 
   # input preprocessing parameters
-  h.image_size = 640
+  h.image_size = 640   # An integer or a string WxH such as 640x320.
   h.input_rand_hflip = True
   h.train_scale_min = 0.1
   h.train_scale_max = 2.0
