@@ -48,6 +48,7 @@ flags.DEFINE_string('input_image_size', None, 'Size of input image. Enter a'
 flags.DEFINE_integer('threads', 0, 'Number of threads.')
 flags.DEFINE_integer('bm_runs', 10, 'Number of benchmark runs.')
 flags.DEFINE_string('tensorrt', None, 'TensorRT mode: {None, FP32, FP16, INT8}')
+flags.DEFINE_bool('use_batch_nms', False, 'use tf.image.combined_non_max_suppression to do nms')
 flags.DEFINE_bool('delete_logdir', True, 'Whether to delete logdir.')
 flags.DEFINE_bool('freeze', False, 'Freeze graph.')
 flags.DEFINE_bool('xla', False, 'Run with xla optimization.')
@@ -93,7 +94,8 @@ class ModelInspector(object):
                export_ckpt: Text = None,
                saved_model_dir: Text = None,
                data_format: Text = None,
-               batch_size: int = 1):
+               batch_size: int = 1,
+               use_batch_nms=False):
     self.model_name = model_name
     self.model_params = hparams_config.get_detection_config(model_name)
     self.logdir = logdir
@@ -103,6 +105,7 @@ class ModelInspector(object):
     self.enable_ema = enable_ema
     self.export_ckpt = export_ckpt
     self.saved_model_dir = saved_model_dir
+    self.use_batch_nms = use_batch_nms
 
     if image_size is None:
       image_size = hparams_config.get_detection_config(model_name).image_size
@@ -258,7 +261,8 @@ class ModelInspector(object):
   def inference_single_image(self, image_image_path, output_dir, **kwargs):
     driver = inference.InferenceDriver(self.model_name, self.ckpt_path,
                                        self.image_size, self.num_classes,
-                                       self.enable_ema, self.data_format)
+                                       self.enable_ema, self.data_format,
+                                       use_batch_nms=self.use_batch_nms)
     driver.inference(image_image_path, output_dir, **kwargs)
 
   def build_and_save_model(self):
@@ -472,7 +476,8 @@ def main(_):
       export_ckpt=FLAGS.export_ckpt,
       saved_model_dir=FLAGS.saved_model_dir,
       data_format=FLAGS.data_format,
-      batch_size=FLAGS.batch_size)
+      batch_size=FLAGS.batch_size,
+      use_batch_nms=FLAGS.use_batch_nms)
   inspector.run_model(FLAGS.runmode, FLAGS.threads)
 
 

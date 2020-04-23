@@ -22,19 +22,20 @@ from __future__ import print_function
 import copy
 import os
 import time
-from absl import logging
-import numpy as np
-from PIL import Image
-import tensorflow.compat.v1 as tf
 from typing import Text, Dict, Any, List, Tuple, Union
+
+import numpy as np
+import tensorflow.compat.v1 as tf
+from PIL import Image
+from absl import logging
 
 import anchors
 import dataloader
 import det_model_fn
 import hparams_config
 import utils
+from ops import box_utils
 from visualize import vis_utils
-
 
 coco_id_mapping = {
     1: 'person', 2: 'bicycle', 3: 'car', 4: 'motorcycle', 5: 'airplane',
@@ -152,6 +153,83 @@ def restore_ckpt(sess, ckpt_path, enable_ema=True, export_ckpt=None):
       sess.run(ema_assign_op)
     saver = tf.train.Saver(max_to_keep=1, save_relative_paths=True)
     saver.save(sess, export_ckpt)
+
+
+def det_post_process_batch_nms(params: Dict[Any, Any],
+                               cls_outputs: Dict[int, tf.Tensor],
+                               box_outputs: Dict[int, tf.Tensor],  #[y, x, h, w]
+                               scales: List[float],
+                               min_score_thresh=0.2,
+                               max_boxes_to_draw=50):
+  """Post preprocessing the box/class predictions.
+
+  Args:
+    params: a parameter dictionary that includes `min_level`, `max_level`,
+      `batch_size`, and `num_classes`.
+    cls_outputs: an OrderDict with keys representing levels and values
+      representing logits in [batch_size, height, width, num_anchors].
+    box_outputs: an OrderDict with keys representing levels and values
+      representing box regression targets in [batch_size, height, width,
+      num_anchors * 4].
+    scales: a list of float values indicating image scale.
+    min_score_thresh: A float representing the threshold for deciding when to
+      remove boxes based on score.
+    max_boxes_to_draw: Max number of boxes to draw.
+
+  Returns:
+    detections_batch: a batch of detection results. Each detection is a tensor
+      with each row representing [image_id, x, y, width, height, score, class].
+  """
+  num_classes = params['num_classes']
+  cls_outputs_all = []
+  box_outputs_all = []
+  # Concatenates class and box of all levels into one tensor.
+  for level in range(params['min_level'], params['max_level'] + 1):
+    cls_outputs_all.append(tf.reshape(cls_outputs[level], [params['batch_size'], -1, num_classes]))
+    box_outputs_all.append(tf.reshape(box_outputs[level], [params['batch_size'], -1, 4]))
+  cls_outputs_all = tf.concat(cls_outputs_all, 1) # [bs, anchor * levels(49104), num_classes]
+  box_outputs_all = tf.concat(box_outputs_all, 1) # [bs, anchor * levels(49104), 4]
+
+  # Create anchor_label for picking top-k predictions.
+  eval_anchors = anchors.Anchors(params['min_level'], params['max_level'],
+                                 params['num_scales'], params['aspect_ratios'],
+                                 params['anchor_scale'], params['image_size'])
+  anchor_labeler = anchors.AnchorLabeler(eval_anchors, params['num_classes'])
+  anchor_boxes = anchor_labeler._anchors.boxes # [N, 4]
+  batch_anchor_boxes = tf.tile(
+      tf.expand_dims(anchor_boxes, axis=0),
+      tf.constant([params['batch_size'], 1, 1])) # [bs, N, 4]
+
+  boxes = box_utils.decode_boxes(box_outputs_all, batch_anchor_boxes) # [ymin, xmin, ymax, xmax]
+
+  image_shape = eval_anchors.image_size
+  boxes = box_utils.clip_boxes(boxes, image_shape)
+  pre_nms_boxes = box_utils.normalize_boxes(boxes, image_shape)
+  batch_size = params['batch_size']
+  pre_nms_boxes = tf.reshape(pre_nms_boxes, [batch_size, -1, 1, 4])  # [bs, N, 1, 4]
+  pre_nms_scores = tf.math.sigmoid(cls_outputs_all)  # [bs, N, num_classes]
+
+  print('Using batch_nms: tf.image.combined_non_max_suppression')
+  post_nms_boxes, post_nms_scores, post_nms_classes, post_nms_num_valid_boxes = \
+      tf.image.combined_non_max_suppression(
+          pre_nms_boxes,
+          pre_nms_scores,
+          max_output_size_per_class=max_boxes_to_draw,
+          max_total_size=max_boxes_to_draw,
+          iou_threshold=0.5,
+          score_threshold=min_score_thresh,
+          pad_per_class=False
+      )
+
+  post_nms_boxes = box_utils.denormalize_boxes(post_nms_boxes, image_shape)  # [bs, N, 4], format [ymin, xmin, ymax, xmax]
+  post_nms_boxes_shape = post_nms_boxes.shape
+  tile_scales = tf.tile(
+    tf.reshape(tf.convert_to_tensor(scales, dtype=tf.float32), [-1, 1, 1]),
+    [1] +  post_nms_boxes_shape[1:]
+  )
+  post_nms_boxes = post_nms_boxes * tile_scales
+
+  return post_nms_boxes, post_nms_scores, post_nms_classes+1.0, post_nms_num_valid_boxes
 
 
 def det_post_process(params: Dict[Any, Any],
@@ -590,7 +668,8 @@ class InferenceDriver(object):
                num_classes: int = None,
                enable_ema: bool = True,
                data_format: Text = None,
-               label_id_mapping: Dict[int, Text] = None):
+               label_id_mapping: Dict[int, Text] = None,
+               use_batch_nms=False):
     """Initialize the inference driver.
 
     Args:
@@ -607,6 +686,7 @@ class InferenceDriver(object):
     self.model_name = model_name
     self.ckpt_path = ckpt_path
     self.label_id_mapping = label_id_mapping or coco_id_mapping
+    self.use_batch_nms = use_batch_nms
 
     self.params = hparams_config.get_detection_config(self.model_name).as_dict()
     self.params.update(dict(is_training_bn=False, use_bfloat16=False))
@@ -650,34 +730,55 @@ class InferenceDriver(object):
           dict(batch_size=len(raw_images), disable_pyfun=self.disable_pyfun))
 
       # Build postprocessing.
-      detections_batch = det_post_process(
+
+      if self.use_batch_nms:
+        post_nms_boxes, post_nms_scores, post_nms_classes, post_nms_num_valid_boxes = det_post_process_batch_nms(
           params,
           class_outputs,
           box_outputs,
           scales,
-          min_score_thresh=kwargs.get('min_score_thresh',
-                                      anchors.MIN_SCORE_THRESH),
-          max_boxes_to_draw=kwargs.get('max_boxes_to_draw',
-                                       anchors.MAX_DETECTIONS_PER_IMAGE))
-      outputs_np = sess.run(detections_batch)
+          min_score_thresh=kwargs.get('min_score_thresh', anchors.MIN_SCORE_THRESH),
+          max_boxes_to_draw=kwargs.get('max_boxes_to_draw', anchors.MAX_DETECTIONS_PER_IMAGE))
+        batch_det_boxes = post_nms_boxes  # [ymin, xmin, ymax, xax]
+        batch_det_scores = post_nms_scores
+        batch_det_classes = post_nms_classes
+
+
+      else:
+        detections_batch = det_post_process(
+          params,
+          class_outputs,
+          box_outputs,
+          scales,
+          min_score_thresh=kwargs.get('min_score_thresh', anchors.MIN_SCORE_THRESH),
+          max_boxes_to_draw=kwargs.get('max_boxes_to_draw', anchors.MAX_DETECTIONS_PER_IMAGE))
+
+        batch_det_boxes = detections_batch[..., 1:5]
+        batch_det_scores = detections_batch[..., 5]
+        batch_det_classes = detections_batch[..., 6]
+
+      start_time = time.time()
+      batch_det_classes = tf.cast(batch_det_classes, tf.int32)
+      (batch_np_boxes, batch_np_scores, batch_np_classes) = sess.run([batch_det_boxes, batch_det_scores, batch_det_classes])
+      end_time = time.time()
+      print(f'session run time: {end_time - start_time}')
+
       # Visualize results.
-      for i, output_np in enumerate(outputs_np):
-        # output_np has format [image_id, y, x, height, width, score, class]
-        boxes = output_np[:, 1:5]
-        classes = output_np[:, 6].astype(int)
-        scores = output_np[:, 5]
+      for i, (boxes, scores, classes) in enumerate(zip(batch_np_boxes, batch_np_scores, batch_np_classes)):
+        if not self.use_batch_nms:
+            # This is not needed if disable_pyfun=True
+            # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]
+            # TODO(tanmingxing): make this convertion more efficient.
+            if not self.disable_pyfun:
+              boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
+            boxes[:, 2:4] += boxes[:, 0:2]
 
-        # This is not needed if disable_pyfun=True
-        # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]
-        # TODO(tanmingxing): make this convertion more efficient.
-        if not self.disable_pyfun:
-          boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
+        # print(np.concatenate([boxes, np.expand_dims(scores, 1), np.expand_dims(classes, 1)], axis=-1))
 
-        boxes[:, 2:4] += boxes[:, 0:2]
         img = visualize_image(raw_images[i], boxes, classes, scores,
                               self.label_id_mapping, **kwargs)
         output_image_path = os.path.join(output_dir, str(i) + '.jpg')
         Image.fromarray(img).save(output_image_path)
-        logging.info('writing file to %s', output_image_path)
+        print(f'writing file to {output_image_path}')
 
-      return outputs_np
+      return batch_np_boxes, batch_np_scores, batch_np_classes
