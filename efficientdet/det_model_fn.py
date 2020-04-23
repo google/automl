@@ -346,7 +346,7 @@ def add_metric_fn_inputs(params,
     cls_outputs_all_reshape = tf.reshape(cls_outputs_all,
                                          [params['batch_size'], -1])
     _, cls_topk_indices = tf.math.top_k(cls_outputs_all_reshape,
-                                        k=anchors.MAX_DETECTION_POINTS,
+                                        k=max_detection_points,
                                         sorted=False)
     indices = cls_topk_indices // num_classes
     classes = cls_topk_indices % num_classes
