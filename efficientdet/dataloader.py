@@ -222,6 +222,7 @@ class InputReader(object):
     anchor_labeler = anchors.AnchorLabeler(input_anchors, params['num_classes'])
     example_decoder = tf_example_decoder.TfExampleDecoder()
 
+    @tf.autograph.experimental.do_not_convert
     def _dataset_parser(value):
       """Parse data to a fixed dimension input image and learning targets.
 
@@ -255,64 +256,65 @@ class InputReader(object):
         classes: Groundtruth classes annotations. The tensor is padded with -1
           to the fixed dimension [self._max_num_instances].
       """
-      with tf.name_scope('parser'):
-        data = example_decoder.decode(value)
-        source_id = data['source_id']
-        image = data['image']
-        boxes = data['groundtruth_boxes']
-        classes = data['groundtruth_classes']
-        classes = tf.reshape(tf.cast(classes, dtype=tf.float32), [-1, 1])
-        areas = data['groundtruth_area']
-        is_crowds = data['groundtruth_is_crowd']
-        classes = tf.reshape(tf.cast(classes, dtype=tf.float32), [-1, 1])
+      with tf.device('/cpu:0'):
+        with tf.name_scope('parser'):
+          data = example_decoder.decode(value)
+          source_id = data['source_id']
+          image = data['image']
+          boxes = data['groundtruth_boxes']
+          classes = data['groundtruth_classes']
+          classes = tf.reshape(tf.cast(classes, dtype=tf.float32), [-1, 1])
+          areas = data['groundtruth_area']
+          is_crowds = data['groundtruth_is_crowd']
+          classes = tf.reshape(tf.cast(classes, dtype=tf.float32), [-1, 1])
 
-        if params['skip_crowd_during_training'] and self._is_training:
-          indices = tf.where(tf.logical_not(data['groundtruth_is_crowd']))
-          classes = tf.gather_nd(classes, indices)
-          boxes = tf.gather_nd(boxes, indices)
+          if params['skip_crowd_during_training'] and self._is_training:
+            indices = tf.where(tf.logical_not(data['groundtruth_is_crowd']))
+            classes = tf.gather_nd(classes, indices)
+            boxes = tf.gather_nd(boxes, indices)
 
-        # NOTE: The autoaugment method works best when used alongside the
-        # standard horizontal flipping of images along with size jittering
-        # and normalization.
-        if params.get('autoaugment_policy', None) and self._is_training:
-          from aug import autoaugment  # pylint: disable=g-import-not-at-top
-          image, boxes = autoaugment.distort_image_with_autoaugment(
-              image, boxes, params['autoaugment_policy'])
+          # NOTE: The autoaugment method works best when used alongside the
+          # standard horizontal flipping of images along with size jittering
+          # and normalization.
+          if params.get('autoaugment_policy', None) and self._is_training:
+            from aug import autoaugment  # pylint: disable=g-import-not-at-top
+            image, boxes = autoaugment.distort_image_with_autoaugment(
+                image, boxes, params['autoaugment_policy'])
 
-        input_processor = DetectionInputProcessor(
-            image, params['image_size'], boxes, classes)
-        input_processor.normalize_image()
-        if self._is_training and params['input_rand_hflip']:
-          input_processor.random_horizontal_flip()
-        if self._is_training:
-          input_processor.set_training_random_scale_factors(
-              params['train_scale_min'], params['train_scale_max'])
-        else:
-          input_processor.set_scale_factors_to_output_size()
-        image = input_processor.resize_and_crop_image()
-        boxes, classes = input_processor.resize_and_crop_boxes()
+          input_processor = DetectionInputProcessor(
+              image, params['image_size'], boxes, classes)
+          input_processor.normalize_image()
+          if self._is_training and params['input_rand_hflip']:
+            input_processor.random_horizontal_flip()
+          if self._is_training:
+            input_processor.set_training_random_scale_factors(
+                params['train_scale_min'], params['train_scale_max'])
+          else:
+            input_processor.set_scale_factors_to_output_size()
+          image = input_processor.resize_and_crop_image()
+          boxes, classes = input_processor.resize_and_crop_boxes()
 
-        # Assign anchors.
-        (cls_targets, box_targets,
-         num_positives) = anchor_labeler.label_anchors(boxes, classes)
+          # Assign anchors.
+          (cls_targets, box_targets,
+           num_positives) = anchor_labeler.label_anchors(boxes, classes)
 
-        source_id = tf.where(tf.equal(source_id, tf.constant('')), '-1',
-                             source_id)
-        source_id = tf.string_to_number(source_id)
+          source_id = tf.where(tf.equal(source_id, tf.constant('')), '-1',
+                               source_id)
+          source_id = tf.string_to_number(source_id)
 
-        # Pad groundtruth data for evaluation.
-        image_scale = input_processor.image_scale_to_original
-        boxes *= image_scale
-        is_crowds = tf.cast(is_crowds, dtype=tf.float32)
-        boxes = pad_to_fixed_size(boxes, -1, [self._max_num_instances, 4])
-        is_crowds = pad_to_fixed_size(is_crowds, 0,
-                                      [self._max_num_instances, 1])
-        areas = pad_to_fixed_size(areas, -1, [self._max_num_instances, 1])
-        classes = pad_to_fixed_size(classes, -1, [self._max_num_instances, 1])
-        if params['use_bfloat16']:
-          image = tf.cast(image, dtype=tf.bfloat16)
-        return (image, cls_targets, box_targets, num_positives, source_id,
-                image_scale, boxes, is_crowds, areas, classes)
+          # Pad groundtruth data for evaluation.
+          image_scale = input_processor.image_scale_to_original
+          boxes *= image_scale
+          is_crowds = tf.cast(is_crowds, dtype=tf.float32)
+          boxes = pad_to_fixed_size(boxes, -1, [self._max_num_instances, 4])
+          is_crowds = pad_to_fixed_size(is_crowds, 0,
+                                        [self._max_num_instances, 1])
+          areas = pad_to_fixed_size(areas, -1, [self._max_num_instances, 1])
+          classes = pad_to_fixed_size(classes, -1, [self._max_num_instances, 1])
+          if params['use_bfloat16']:
+            image = tf.cast(image, dtype=tf.bfloat16)
+          return (image, cls_targets, box_targets, num_positives, source_id,
+                  image_scale, boxes, is_crowds, areas, classes)
 
     batch_size = params['batch_size']
     dataset = tf.data.Dataset.list_files(
