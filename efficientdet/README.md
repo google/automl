@@ -92,7 +92,7 @@ On colab with a Tesla T4 GPU, end-to-end latency stats are (more on [tutorial](t
 
 
 |       Model    |   mAP | batch1 latency | batch1 FPS |  batch4 FPS |
-| ------ | ------ | ------  | ------ | ------ | ------ |
+| ------ | ------ | ------  | ------ | ------ |
 | EfficientDet-D0 |  33.8 | 23.8ms | 42.1 | 79.3 |
 | EfficientDet-D1 |  39.6 | 36.1ms | 27.7 | 39.1 |
 | EfficientDet-D2 |  43.0 | 50.7ms | 19.7 | 26.0 |
