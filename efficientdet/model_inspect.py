@@ -390,7 +390,7 @@ class ModelInspector(object):
       for i in range(bm_runs):
         sess.run(output, feed_dict={inputs: img})
       end = time.perf_counter()
-      inference_time = (end - start) / 10
+      inference_time = (end - start) / bm_runs
       print('Per batch inference time: ', inference_time)
       print('FPS: ', self.batch_size / inference_time)
 
