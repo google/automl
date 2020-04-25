@@ -65,13 +65,13 @@ class Config(object):
       return
 
     for k, v in six.iteritems(config_dict):
-      if k not in self.__dict__.keys():
+      if k not in self.__dict__:
         if allow_new_keys:
           self.__setattr__(k, v)
         else:
           raise KeyError('Key `{}` does not exist for overriding. '.format(k))
       else:
-        if isinstance(v, dict):
+        if isinstance(self.__dict__[k], dict):
           self.__dict__[k]._update(v, allow_new_keys)
         else:
           self.__dict__[k] = copy.deepcopy(v)
@@ -160,7 +160,7 @@ def default_detection_configs():
 
   # input preprocessing parameters
   h.image_size = 640   # An integer or a string WxH such as 640x320.
-  h.batch_size=1
+  h.batch_size = 1
   h.input_rand_hflip = True
   h.train_scale_min = 0.1
   h.train_scale_max = 2.0
@@ -169,6 +169,7 @@ def default_detection_configs():
   # dataset specific parameters
   h.num_classes = 90
   h.skip_crowd_during_training = True
+  h.label_id_mapping = None
 
   # model architecture
   h.min_level = 3
