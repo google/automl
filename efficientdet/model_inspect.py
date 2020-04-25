@@ -168,9 +168,9 @@ class ModelInspector(object):
     driver = inference.ServingDriver(
         self.model_name,
         self.ckpt_path,
+        self.model_params,
         enable_ema=self.enable_ema,
         use_xla=self.use_xla,
-        params=self.model_params,
         **kwargs)
     driver.build()
     driver.export(self.saved_model_dir)
@@ -180,7 +180,7 @@ class ModelInspector(object):
     driver = inference.ServingDriver(
         self.model_name,
         self.ckpt_path,
-        params=self.model_params,
+        self.model_params,
         enable_ema=self.enable_ema,
         use_xla=self.use_xla,
         **kwargs)
@@ -206,6 +206,7 @@ class ModelInspector(object):
     driver = inference.ServingDriver(
         self.model_name,
         self.ckpt_path,
+        self.model_params,
         enable_ema=self.enable_ema,
         use_xla=self.use_xla,
         **kwargs)
@@ -224,7 +225,7 @@ class ModelInspector(object):
     driver = inference.ServingDriver(
         self.model_name,
         self.ckpt_path,
-        params=self.model_params,
+        self.model_params,
         enable_ema=self.enable_ema,
         use_xla=self.use_xla)
     driver.load(self.saved_model_dir)

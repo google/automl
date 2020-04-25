@@ -68,7 +68,7 @@ class Config(object):
       if k not in self.__dict__:
         if allow_new_keys:
           self.__setattr__(k, v)
-        else:
+        else:   
           raise KeyError('Key `{}` does not exist for overriding. '.format(k))
       else:
         if isinstance(self.__dict__[k], dict):
@@ -102,22 +102,17 @@ class Config(object):
 
   def parse_from_module(self, module_name: str) -> dict:
     """
-    Treat config_str as a module name with key=value pairs defined
-    as attributes and return dict.
+    Import config from module_name containing key=value pairs.
     """
     config_dict = {}
+    module = __import__(module_name)
 
-    try:
-      module = __import__(module_name)
-    except ModuleNotFoundError:
-      raise ValueError("%s.py is not an importable python module"
-                        % module_name)
     for attr in dir(module):
-      if not attr.startswith("__")  :
+      # skip built-ins and private attributes
+      if not attr.startswith("_"):
         config_dict[attr] = getattr(module, attr)
 
     return config_dict
-
 
   def parse_from_str(self, config_str):
     """parse from a string in format 'x=a,y=2' and return the dict."""
@@ -237,16 +232,6 @@ def default_detection_configs():
 
 
 efficientdet_model_param_dict = {
-        'efficientdet-m2':
-        dict(
-            name='efficientdet-m2',
-            backbone_name='efficientnet-lite0',
-            image_size=256,
-            fpn_num_filters=36,
-            fpn_cell_repeats=2,
-            box_class_repeats=2,
-        ),
-
     'efficientdet-d0':
         dict(
             name='efficientdet-d0',
