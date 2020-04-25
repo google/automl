@@ -68,7 +68,7 @@ class Config(object):
       if k not in self.__dict__:
         if allow_new_keys:
           self.__setattr__(k, v)
-        else:   
+        else:
           raise KeyError('Key `{}` does not exist for overriding. '.format(k))
       else:
         if isinstance(self.__dict__[k], dict):
@@ -89,7 +89,9 @@ class Config(object):
   def override(self, config_dict_or_str):
     """Update members while disallowing new keys."""
     if isinstance(config_dict_or_str, str):
-      if "=" in config_dict_or_str:
+      if not config_dict_or_str:
+        return
+      elif "=" in config_dict_or_str:
         config_dict = self.parse_from_str(config_dict_or_str)
       else:
         config_dict = self.parse_from_module(config_dict_or_str)
