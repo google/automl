@@ -47,6 +47,9 @@ class Config(object):
   def __getattr__(self, k):
     return self.__dict__[k]
 
+  def __getitem__(self, k):
+    return self.__dict__[k]
+
   def __repr__(self):
     return repr(self.as_dict())
 
@@ -80,16 +83,41 @@ class Config(object):
     """Update members while allowing new keys."""
     self._update(config_dict, allow_new_keys=True)
 
+  def keys(self):
+    return self.__dict__.keys()
+
   def override(self, config_dict_or_str):
     """Update members while disallowing new keys."""
     if isinstance(config_dict_or_str, str):
-      config_dict = self.parse_from_str(config_dict_or_str)
+      if "=" in config_dict_or_str:
+        config_dict = self.parse_from_str(config_dict_or_str)
+      else:
+        config_dict = self.parse_from_module(config_dict_or_str)
     elif isinstance(config_dict_or_str, dict):
       config_dict = config_dict_or_str
     else:
       raise ValueError('Unknown value type: {}'.format(config_dict_or_str))
 
     self._update(config_dict, allow_new_keys=False)
+
+  def parse_from_module(self, module_name: str) -> dict:
+    """
+    Treat config_str as a module name with key=value pairs defined
+    as attributes and return dict.
+    """
+    config_dict = {}
+
+    try:
+      module = __import__(module_name)
+    except ModuleNotFoundError:
+      raise ValueError("%s.py is not an importable python module"
+                        % module_name)
+    for attr in dir(module):
+      if not attr.startswith("__")  :
+        config_dict[attr] = getattr(module, attr)
+
+    return config_dict
+
 
   def parse_from_str(self, config_str):
     """parse from a string in format 'x=a,y=2' and return the dict."""
@@ -132,6 +160,7 @@ def default_detection_configs():
 
   # input preprocessing parameters
   h.image_size = 640   # An integer or a string WxH such as 640x320.
+  h.batch_size=1
   h.input_rand_hflip = True
   h.train_scale_min = 0.1
   h.train_scale_max = 2.0
@@ -207,6 +236,16 @@ def default_detection_configs():
 
 
 efficientdet_model_param_dict = {
+        'efficientdet-m2':
+        dict(
+            name='efficientdet-m2',
+            backbone_name='efficientnet-lite0',
+            image_size=256,
+            fpn_num_filters=36,
+            fpn_cell_repeats=2,
+            box_class_repeats=2,
+        ),
+
     'efficientdet-d0':
         dict(
             name='efficientdet-d0',

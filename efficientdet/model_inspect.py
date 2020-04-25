@@ -40,7 +40,9 @@ flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model.')
 flags.DEFINE_string('logdir', '/tmp/deff/', 'log directory.')
 flags.DEFINE_string('runmode', 'dry', 'Run mode: {freeze, bm, dry}')
 flags.DEFINE_string('trace_filename', None, 'Trace file name.')
-flags.DEFINE_integer('num_classes', 90, 'Number of classes.')
+flags.DEFINE_integer('num_classes', None,
+                     'Number of classes. Defaults to 90 '
+                     'for COCO as defined in hparams_config.py')
 flags.DEFINE_string('input_image_size', None, 'Size of input image. Enter a'
                     'single integer if the image height is equal to the width;'
                     'Otherwise, enter two integers seprated by a "x".'
@@ -57,6 +59,10 @@ flags.DEFINE_string('ckpt_path', None, 'checkpoint dir used for eval.')
 flags.DEFINE_string('export_ckpt', None, 'Path for exporting new models.')
 flags.DEFINE_bool('enable_ema', True, 'Use ema variables for eval.')
 flags.DEFINE_string('data_format', None, 'data format, e.g., channel_last.')
+
+flags.DEFINE_string('hparams', '',
+                    'Comma separated k=v pairs of hyperparameters or'
+                    ' a module containing attributes to use as hyperparameters.')
 
 flags.DEFINE_string('input_image', None, 'Input image path for inference.')
 flags.DEFINE_string('output_image_dir', None, 'Output dir for inference.')
@@ -93,9 +99,11 @@ class ModelInspector(object):
                export_ckpt: Text = None,
                saved_model_dir: Text = None,
                data_format: Text = None,
-               batch_size: int = 1):
+               batch_size: int = 1,
+               hparams: Text = ""):
     self.model_name = model_name
     self.model_params = hparams_config.get_detection_config(model_name)
+    self.model_params.override(hparams) # Add custom overrides
     self.logdir = logdir
     self.tensorrt = tensorrt
     self.use_xla = use_xla
@@ -105,7 +113,7 @@ class ModelInspector(object):
     self.saved_model_dir = saved_model_dir
 
     if image_size is None:
-      image_size = hparams_config.get_detection_config(model_name).image_size
+      image_size = self.model_params.image_size
       image_size = (image_size, image_size)
     elif 'x' in image_size:
       # image_size is in format of WIDTHxHEIGHT
@@ -115,25 +123,21 @@ class ModelInspector(object):
       # image_size is integer, witht the same width and height.
       image_size = (int(image_size), int(image_size))
 
-    self.model_overrides = {
-        'image_size': image_size,
-        'num_classes': num_classes
-    }
+    if num_classes:
+      self.model_params.update(dict(num_classes=num_classes))
 
     if data_format:
-      self.model_overrides.update(dict(data_format=data_format))
+      self.model_params.update(dict(data_format=data_format))
 
     # A few fixed parameters.
-    self.batch_size = batch_size
-    self.num_classes = num_classes
-    self.data_format = data_format
-    self.labels_shape = [self.batch_size, self.num_classes]
-    self.image_size = image_size
+    self.model_params.batch_size = batch_size
+    self.model_params.image_size = image_size
+    self.labels_shape = [self.model_params.batch_size, self.model_params.num_classes]
 
-    if data_format == 'channels_first':
-      self.inputs_shape = [self.batch_size, 3, image_size[0], image_size[1]]
+    if self.model_params.data_format == 'channels_first':
+      self.inputs_shape = [self.model_params.batch_size, 3, image_size[0], image_size[1]]
     else:
-      self.inputs_shape = [self.batch_size, image_size[0], image_size[1], 3]
+      self.inputs_shape = [self.model_params.batch_size, image_size[0], image_size[1], 3]
 
   def build_model(self, inputs: tf.Tensor,
                   is_training: bool = False) -> List[tf.Tensor]:
@@ -145,7 +149,7 @@ class ModelInspector(object):
         model_name=self.model_name,
         is_training_bn=is_training,
         use_bfloat16=False,
-        **self.model_overrides)
+        config=self.model_params)
 
     print('backbone+fpn+box params/flops = {:.6f}M, {:.9f}B'.format(
         *utils.num_params_flops()))
@@ -164,12 +168,11 @@ class ModelInspector(object):
     driver = inference.ServingDriver(
         self.model_name,
         self.ckpt_path,
-        batch_size=self.batch_size,
         enable_ema=self.enable_ema,
         use_xla=self.use_xla,
-        data_format=self.data_format,
+        params=self.model_params,
         **kwargs)
-    driver.build(params_override=self.model_overrides)
+    driver.build()
     driver.export(self.saved_model_dir)
 
   def saved_model_inference(self, image_path_pattern, output_dir, **kwargs):
@@ -177,14 +180,13 @@ class ModelInspector(object):
     driver = inference.ServingDriver(
         self.model_name,
         self.ckpt_path,
-        batch_size=self.batch_size,
+        params=self.model_params,
         enable_ema=self.enable_ema,
         use_xla=self.use_xla,
-        data_format=self.data_format,
         **kwargs)
     driver.load(self.saved_model_dir)
 
-    batch_size = self.batch_size
+    batch_size = self.model_params.batch_size
     all_files = list(tf.io.gfile.glob(image_path_pattern))
     num_batches = len(all_files) // batch_size
 
@@ -204,17 +206,15 @@ class ModelInspector(object):
     driver = inference.ServingDriver(
         self.model_name,
         self.ckpt_path,
-        batch_size=self.batch_size,
         enable_ema=self.enable_ema,
         use_xla=self.use_xla,
-        data_format=self.data_format,
         **kwargs)
     driver.load(self.saved_model_dir)
     raw_images = []
     all_files = list(tf.io.gfile.glob(image_path_pattern))
-    if len(all_files) < self.batch_size:
-      all_files = all_files * (self.batch_size // len(all_files) + 1)
-    raw_images = [np.array(Image.open(f)) for f in all_files[:self.batch_size]]
+    if len(all_files) < self.model_params.batch_size:
+      all_files = all_files * (self.model_params.batch_size // len(all_files) + 1)
+    raw_images = [np.array(Image.open(f)) for f in all_files[:self.model_params.batch_size]]
     driver.benchmark(raw_images, FLAGS.trace_filename)
 
   def saved_model_video(self, video_path: Text, output_video: Text, **kwargs):
@@ -224,6 +224,7 @@ class ModelInspector(object):
     driver = inference.ServingDriver(
         self.model_name,
         self.ckpt_path,
+        params=self.model_params,
         enable_ema=self.enable_ema,
         use_xla=self.use_xla)
     driver.load(self.saved_model_dir)
@@ -261,8 +262,8 @@ class ModelInspector(object):
 
   def inference_single_image(self, image_image_path, output_dir, **kwargs):
     driver = inference.InferenceDriver(self.model_name, self.ckpt_path,
-                                       self.image_size, self.num_classes,
-                                       self.enable_ema, self.data_format)
+                                       self.model_params,
+                                       self.enable_ema)
     driver.inference(image_image_path, output_dir, **kwargs)
 
   def build_and_save_model(self):
@@ -400,7 +401,7 @@ class ModelInspector(object):
       end = time.perf_counter()
       inference_time = (end - start) / 10
       print('Per batch inference time: ', inference_time)
-      print('FPS: ', self.batch_size / inference_time)
+      print('FPS: ', self.model_params.batch_size / inference_time)
 
       if trace_filename:
         run_options = tf.RunOptions()
@@ -484,7 +485,9 @@ def main(_):
       export_ckpt=FLAGS.export_ckpt,
       saved_model_dir=FLAGS.saved_model_dir,
       data_format=FLAGS.data_format,
-      batch_size=FLAGS.batch_size)
+      batch_size=FLAGS.batch_size,
+      hparams=FLAGS.hparams
+    )
   inspector.run_model(FLAGS.runmode, FLAGS.threads)
 
 

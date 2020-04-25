@@ -309,48 +309,33 @@ class ServingDriver(object):
   def __init__(self,
                model_name: Text,
                ckpt_path: Text,
-               image_size: Union[int, Tuple[int, int]] = None,
-               batch_size: int = 1,
-               num_classes: int = None,
+               params: dict,
                enable_ema: bool = True,
-               label_id_mapping: Dict[int, Text] = None,
                use_xla: bool = False,
-               data_format: Text = None,
                min_score_thresh: float = None,
                max_boxes_to_draw: float = None,
-               line_thickness: int = None):
+               line_thickness: int = None,
+               **kwargs):
     """Initialize the inference driver.
 
     Args:
       model_name: target model name, such as efficientdet-d0.
       ckpt_path: checkpoint path, such as /tmp/efficientdet-d0/.
-      image_size: single integer of image size for square image or tuple of two
-        integers, in the format of (image_height, image_width). If None, use the
-        default image size defined by model_name.
-      batch_size: batch size for inference.
-      num_classes: number of classes. If None, use the default COCO classes.
       enable_ema: whether to enable moving average.
-      label_id_mapping: a dictionary from id to name. If None, use the default
-        coco_id_mapping (with 90 classes).
       use_xla: Whether run with xla optimization.
-      data_format: data format such as 'channel_last'.
       min_score_thresh: minimal score threshold for filtering predictions.
       max_boxes_to_draw: the maximum number of boxes per image.
       line_thickness: the line thickness for drawing boxes.
     """
     self.model_name = model_name
     self.ckpt_path = ckpt_path
-    self.batch_size = batch_size
-    self.label_id_mapping = label_id_mapping or coco_id_mapping
+    self.batch_size = params["batch_size"]
 
-    self.params = hparams_config.get_detection_config(self.model_name).as_dict()
+    self.label_id_mapping = params.get("label_id_mapping", coco_id_mapping)
+
+    self.params = dict(params)
     self.params.update(dict(is_training_bn=False, use_bfloat16=False))
-    if image_size:
-      self.params.update(dict(image_size=image_size))
-    if num_classes:
-      self.params.update(dict(num_classes=num_classes))
-    if data_format:
-      self.params.update(dict(data_format=data_format))
+    self.params.update(kwargs)
 
     self.signitures = None
     self.sess = None
@@ -597,36 +582,25 @@ class InferenceDriver(object):
   def __init__(self,
                model_name: Text,
                ckpt_path: Text,
-               image_size: Union[int, Tuple[int, int]] = None,
-               num_classes: int = None,
+               params: dict,
                enable_ema: bool = True,
-               data_format: Text = None,
-               label_id_mapping: Dict[int, Text] = None):
+               **kwargs):
     """Initialize the inference driver.
 
     Args:
       model_name: target model name, such as efficientdet-d0.
       ckpt_path: checkpoint path, such as /tmp/efficientdet-d0/.
-      image_size: user specified image size. If None, use the default image size
-        defined by model_name.
-      num_classes: number of classes. If None, use the default COCO classes.
       enable_ema: whether to enable moving average.
-      data_format: data format such as 'channel_last'.
-      label_id_mapping: a dictionary from id to name. If None, use the default
-        coco_id_mapping (with 90 classes).
     """
     self.model_name = model_name
     self.ckpt_path = ckpt_path
-    self.label_id_mapping = label_id_mapping or coco_id_mapping
 
-    self.params = hparams_config.get_detection_config(self.model_name).as_dict()
+    # Allow label_id_mapping to be defined in config file
+    self.label_id_mapping = params.get("label_id_mapping", coco_id_mapping)
+
+    self.params = dict(params)
     self.params.update(dict(is_training_bn=False, use_bfloat16=False))
-    if image_size:
-      self.params.update(dict(image_size=image_size))
-    if num_classes:
-      self.params.update(dict(num_classes=num_classes))
-    if data_format:
-      self.params.update(dict(data_format=data_format))
+    self.params.update(kwargs)
 
     self.disable_pyfun = True
     self.enable_ema = enable_ema
