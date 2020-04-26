@@ -276,9 +276,15 @@ class ModelInspector(object):
       inputs_val = np.random.rand(*self.inputs_shape).astype(float)
       labels_val = np.zeros(self.labels_shape).astype(np.int64)
       labels_val[:, 0] = 1
-      sess.run(tf.global_variables_initializer())
-      # Run a single train step.
-      sess.run(outputs, feed_dict={inputs: inputs_val})
+
+      if self.ckpt_path:
+        # Load the true weights if available.
+        self.restore_model(sess, self.ckpt_path, self.enable_ema)
+      else:
+        sess.run(tf.global_variables_initializer())
+        # Run a single train step.
+        sess.run(outputs, feed_dict={inputs: inputs_val})
+
       all_saver = tf.train.Saver(save_relative_paths=True)
       all_saver.save(sess, os.path.join(self.logdir, self.model_name))
 
@@ -326,12 +332,16 @@ class ModelInspector(object):
       inputs = tf.placeholder(tf.float32, name='input', shape=self.inputs_shape)
       outputs = self.build_model(inputs, is_training=False)
 
-      checkpoint = tf.train.latest_checkpoint(self.logdir)
-      logging.info('Loading checkpoint: %s', checkpoint)
-      saver = tf.train.Saver()
-
-      # Restore the Variables from the checkpoint and frozen the Graph.
-      saver.restore(sess, checkpoint)
+      if self.ckpt_path:
+        # Load the true weights if available.
+        self.restore_model(sess, self.ckpt_path, self.enable_ema)
+      else:
+        # Load random weights if not checkpoint is not available.
+        self.build_and_save_model()
+        checkpoint = tf.train.latest_checkpoint(self.logdir)
+        logging.info('Loading checkpoint: %s', checkpoint)
+        saver = tf.train.Saver()
+        saver.restore(sess, checkpoint)
 
       output_node_names = [node.op.name for node in outputs]
       graphdef = tf.graph_util.convert_variables_to_constants(
@@ -347,8 +357,7 @@ class ModelInspector(object):
     """Benchmark model."""
     if self.tensorrt:
       print('Using tensorrt ', self.tensorrt)
-      self.build_and_save_model()
-      graphdef = self.freeze_model()
+      graph_def = self.freeze_model()
 
     if num_threads > 0:
       print('num_threads for benchmarking: {}'.format(num_threads))
@@ -434,7 +443,6 @@ class ModelInspector(object):
     if runmode == 'dry':
       self.build_and_save_model()
     elif runmode == 'freeze':
-      self.build_and_save_model()
       self.freeze_model()
     elif runmode == 'ckpt':
       self.eval_ckpt()
