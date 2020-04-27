@@ -22,6 +22,7 @@ from __future__ import print_function
 import copy
 import os
 import time
+import json
 from absl import logging
 import numpy as np
 from PIL import Image
@@ -257,6 +258,39 @@ def visualize_image(image,
   return img
 
 
+def get_label_id_mapping(params):
+  """
+  Take a Config object and return a label_id_mapping.
+
+  The label_id_mapping maps predicted classes, which are integers, to class names.
+
+  Example:
+
+    {
+      "1": "person",
+      "2": "dog"
+    }
+
+  The defualt mapping is for the COCO dataset. The label_id_mapping must be a dict or
+  a JSON filename.
+  """
+  if params["label_id_mapping"] is None:
+    return coco_id_mapping
+
+  if isinstance(params["label_id_mapping"], dict):
+    label_id_dict = params["label_id_mapping"]
+  elif isinstance(params["label_id_mapping"], str):
+    with open(params["label_id_mapping"]) as json_file:
+      label_id_dict = json.load(json_file)
+  else:
+    raise TypeError("label_id_mapping must be a dict or a filename to a json "
+                    "file containing a mapping from class ids to class names.")
+
+  # JSON keys must be strings, so convert all dict keys to ints
+  # so that {"1": "person"} becomes {1: "person"}
+  return {int(key): value for (key, value) in label_id_dict.items()}
+
+
 class ServingDriver(object):
   """A driver for serving single or batch images.
 
@@ -331,7 +365,7 @@ class ServingDriver(object):
     self.ckpt_path = ckpt_path
     self.batch_size = params["batch_size"]
 
-    self.label_id_mapping = params.get("label_id_mapping", coco_id_mapping)
+    self.label_id_mapping = get_label_id_mapping(params)
 
     self.params = dict(params)
     self.params.update(dict(is_training_bn=False, use_bfloat16=False))
@@ -595,9 +629,7 @@ class InferenceDriver(object):
     self.model_name = model_name
     self.ckpt_path = ckpt_path
 
-    # Allow label_id_mapping to be defined in config file
-    self.label_id_mapping = params.get("label_id_mapping", coco_id_mapping)
-
+    self.label_id_mapping = get_label_id_mapping(params)
     self.params = dict(params)
     self.params.update(dict(is_training_bn=False, use_bfloat16=False))
     self.params.update(kwargs)
