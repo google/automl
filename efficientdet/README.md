@@ -5,7 +5,7 @@ Arxiv link: https://arxiv.org/abs/1911.09070
 
 Updates:
 
-  - **Apr22: Speed up end-to-end latency: D0 is 24ms on Nvidia Tesla T4 GPU (see [tutorial.ipynb](tutorial.ipynb)).**
+  - **Apr22: Speed up end-to-end latency: D0 has up to 182 FPS throughput on Tesla V100.**
     * A great collaboration with [@fsx950223](https://github.com/fsx950223).
   - Apr1: Updated results for test-dev and added EfficientDet-D7 (52.2 AP).
   - Mar26: Fixed a few bugs and updated all checkpoints/results.
@@ -74,9 +74,11 @@ prediction output), use the following command:
 
     !python model_inspect.py --runmode=bm --model_name=efficientdet-d0
 
+On single Tesla V100 without TensorRT, our D0 network (no pre/post-processing)
+has 134 FPS (frame per second) for batch size 1, and 238 FPS for batch size 8.
 
 (2) To measure the end-to-end latency (from the input image to the final rendered
-new image, including: image preprocessing, network, postprrocessing and NMS),
+new image, including: image preprocessing, network, postprocessing and NMS),
 use the following command:
 
     !rm  -rf /tmp/benchmark/
@@ -84,24 +86,24 @@ use the following command:
       --ckpt_path=efficientdet-d0 --saved_model_dir=/tmp/benchmark/
 
     !python model_inspect.py --runmode=saved_model_benchmark \
-      --saved_model_dir=/tmp/benchmark/ \
+      --saved_model_dir=/tmp/benchmark/efficientdet-d0_frozen.pb \
       --model_name=efficientdet-d0  --input_image=testdata/img1.jpg  \
       --output_image_dir=/tmp/
 
-On colab with a Tesla T4 GPU, end-to-end latency stats are (more on [tutorial](tutorial.ipynb)):
+On single Tesla V100 without using TensorRT or TensorCore, our end-to-end
+latency and throughput are:
 
 
-|       Model    |   mAP | batch1 latency | batch1 FPS |  batch4 FPS |
+|       Model    |   mAP | FP32 batch1 latency | FP32 batch1 FPS | FP32 batch8 FPS |
 | ------ | ------ | ------  | ------ | ------ |
-| EfficientDet-D0 |  33.8 | 23.8ms | 42.1 | 79.3 |
-| EfficientDet-D1 |  39.6 | 36.1ms | 27.7 | 39.1 |
-| EfficientDet-D2 |  43.0 | 50.7ms | 19.7 | 26.0 |
-| EfficientDet-D3 |  45.8 | 84.6ms | 11.8 | 13.3 |
-| EfficientDet-D4 |  49.4 | 140ms  |  7.1 |  7.5 |
-| EfficientDet-D5 |  50.7 | 298ms  |  3.6 | |
-| EfficientDet-D6 |  51.7 | 386ms  |  2.6 | |
+| EfficientDet-D0 |  33.8 | 10.4ms | 96  | 182 |
+| EfficientDet-D1 |  39.6 | 16.8ms | 59  | 106 |
+| EfficientDet-D2 |  43.0 | 21.8ms | 46  | 71 |
+| EfficientDet-D3 |  45.8 | 36.3ms | 28  | 41 |
+| EfficientDet-D4 |  49.4 | 57.3ms | 17  | 23 |
+| EfficientDet-D5 |  50.7 | 106 ms | 9.4 | 11 |
 
-** FPS means frames per second (throughtput).
+** FPS means frames per second (throughput). FP16 performance coming soon.
 
 ## 4. Inference for images.
 
@@ -127,7 +129,7 @@ On colab with a Tesla T4 GPU, end-to-end latency stats are (more on [tutorial](t
     # you can visualize the output /tmp/0.jpg
 
 
-Alternatively, if you want to do inference using frozen graph instead of saved model, you can 
+Alternatively, if you want to do inference using frozen graph instead of saved model, you can run
 
     # Step 0 and 1 is the same as before.
     # Step 2: do inference with frozen graph.
@@ -136,7 +138,6 @@ Alternatively, if you want to do inference using frozen graph instead of saved m
       --input_image_size=1920x1280  \
       --saved_model_dir=/tmp/saved_model/efficientdet-d0_frozen.pb  \
       --input_image=img.png --output_image_dir=/tmp/
-    # Notably, since we don't recommend frozen graph, here we simply reuse the saved_model_dir
 
 Lastly, if you only have one image and just want to run a quick test, you can also run the following command (it is slow because it needs to construct the graph from scratch):
 

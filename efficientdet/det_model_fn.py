@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import re
+import functools
 from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
@@ -497,7 +498,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     var_list = tf.trainable_variables()
     if variable_filter_fn:
-      var_list = variable_filter_fn(var_list, params['resnet_depth'])
+      var_list = variable_filter_fn(var_list)
 
     if params.get('clip_gradients_norm', 0) > 0:
       logging.info('clip gradients norm by %f', params['clip_gradients_norm'])
@@ -631,23 +632,28 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
 def retinanet_model_fn(features, labels, mode, params):
   """RetinaNet model."""
+  variable_filter_fn = functools.partial(retinanet_arch.remove_variables,
+                                         resnet_depth=params['resnet_depth'])
   return _model_fn(
       features,
       labels,
       mode,
       params,
       model=retinanet_arch.retinanet,
-      variable_filter_fn=retinanet_arch.remove_variables)
+      variable_filter_fn=variable_filter_fn)
 
 
 def efficientdet_model_fn(features, labels, mode, params):
   """EfficientDet model."""
+  variable_filter_fn = functools.partial(efficientdet_arch.freeze_vars,
+                                         pattern=params['var_freeze_expr'])
   return _model_fn(
       features,
       labels,
       mode,
       params,
-      model=efficientdet_arch.efficientdet)
+      model=efficientdet_arch.efficientdet,
+      variable_filter_fn=variable_filter_fn)
 
 
 def get_model_arch(model_name='efficientdet-d0'):

@@ -104,6 +104,18 @@ class BackboneTest(tf.test.TestCase):
     self.assertEqual(feats[0].shape, [4, 224, 224, 3])
     self.assertEqual(feats[5].shape, [4, 7, 7, 320])
 
+class FreezeTest(tf.test.TestCase):
+  def test_freeze(self):
+    var_list = [tf.Variable(0., name='efficientnet'),
+                tf.Variable(0., name='fpn_cells'),
+                tf.Variable(0., name='class_net')]
+    freeze_var_list = efficientdet_arch.freeze_vars(var_list, None)
+    self.assertEqual(len(freeze_var_list), 3)
+    freeze_var_list = efficientdet_arch.freeze_vars(var_list, 'efficientnet')
+    self.assertEqual(len(freeze_var_list), 2)
+    freeze_var_list = efficientdet_arch.freeze_vars(var_list,
+                                                    '(efficientnet|fpn_cells)')
+    self.assertEqual(len(freeze_var_list), 1)
 
 class BiFPNTest(tf.test.TestCase):
 
