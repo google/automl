@@ -646,7 +646,7 @@ def retinanet_model_fn(features, labels, mode, params):
 def efficientdet_model_fn(features, labels, mode, params):
   """EfficientDet model."""
   variable_filter_fn = functools.partial(efficientdet_arch.freeze_vars,
-                                         pattern=params['pattern'])
+                                         pattern=params['var_freeze_expr'])
   return _model_fn(
       features,
       labels,
