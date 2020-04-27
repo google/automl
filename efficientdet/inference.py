@@ -717,4 +717,4 @@ class InferenceDriver():
         Image.fromarray(img).save(output_image_path)
         logging.info('writing file to %s', output_image_path)
 
-      return outputs_np
+      return predictions
