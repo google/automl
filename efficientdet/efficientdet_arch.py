@@ -25,6 +25,7 @@ from __future__ import print_function
 
 import functools
 import itertools
+import re
 from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
@@ -694,3 +695,18 @@ def efficientdet(features, model_name=None, config=None, **kwargs):
       *utils.num_params_flops()))
 
   return class_outputs, box_outputs
+
+
+def freeze_vars(variables, pattern):
+  """Removes backbone+fpn variables from the input.
+
+  Args:
+    variables: all the variables in training
+
+  Returns:
+    var_list: a list containing variables for training
+
+  """
+  if pattern:
+    variables = [v for v in variables if not re.match(pattern, v.name)]
+  return variables
