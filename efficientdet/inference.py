@@ -20,13 +20,15 @@ from __future__ import division
 from __future__ import print_function
 
 import copy
+import functools
 import os
 import time
+from typing import Text, Dict, Any, List, Tuple, Union
+
 from absl import logging
 import numpy as np
 from PIL import Image
 import tensorflow.compat.v1 as tf
-from typing import Text, Dict, Any, List, Tuple, Union
 
 import anchors
 import dataloader
@@ -74,6 +76,38 @@ def image_preprocess(image, image_size: Union[int, Tuple[int, int]]):
   image = input_processor.resize_and_crop_image()
   image_scale = input_processor.image_scale_to_original
   return image, image_scale
+
+
+def batch_image_preprocess(raw_images,
+                           image_size: Union[int, Tuple[int, int]],
+                           batch_size: int = None):
+  """Preprocess batched images for inference.
+
+  Args:
+    images: a list of images, each image can be a tensor or a numpy arary.
+    image_size: single integer of image size for square image or tuple of two
+      integers, in the format of (image_height, image_width).
+    batch_size: if None, use map_fn to deal with dynamic batch size.
+
+  Returns:
+    (image, scale): a tuple of processed images and scales.
+  """
+  if not batch_size:
+    # map_fn is a little bit slower due to some extra overhead.
+    map_fn = functools.partial(image_preprocess, image_size=image_size)
+    images, scales = tf.map_fn(map_fn, raw_images,
+                               dtype=(tf.float32, tf.float32), back_prop=False)
+    return (images, scales)
+
+  # If batch size is known, use a simple loop.
+  scales, images = [], []
+  for i in range(batch_size):
+    image, scale = image_preprocess(raw_images[i], image_size)
+    scales.append(scale)
+    images.append(image)
+  images = tf.stack(images)
+  scales = tf.stack(scales)
+  return (images, scales)
 
 
 def build_inputs(image_path_pattern: Text,
@@ -257,7 +291,36 @@ def visualize_image(image,
   return img
 
 
-class ServingDriver(object):
+def visualize_image_prediction(
+    image, prediction, disable_pyfun=True,
+    label_id_mapping=None, **kwargs):
+  """Viusalize detections on a given image.
+
+  Args:
+    image: Image content in shape of [height, width, 3].
+    prediction: a list of vector, with each vector has the format of
+      [image_id, x, y, width, height, score, class].
+    **kwargs: extra parameters for vistualization, such as
+      min_score_thresh, max_boxes_to_draw, and line_thickness.
+
+  Returns:
+    a list of annotated images.
+  """
+  boxes = prediction[:, 1:5]
+  classes = prediction[:, 6].astype(int)
+  scores = prediction[:, 5]
+
+  # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]
+  if not disable_pyfun:
+    boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
+
+  label_id_mapping = label_id_mapping or coco_id_mapping
+  boxes[:, 2:4] += boxes[:, 0:2]
+  return visualize_image(image, boxes, classes, scores, label_id_mapping,
+                         **kwargs)
+
+
+class ServingDriver():
   """A driver for serving single or batch images.
 
   This driver supports serving with image files or arrays, with configurable
@@ -392,13 +455,8 @@ class ServingDriver(object):
         raw_images.append(image)
       raw_images = tf.stack(raw_images, name='image_arrays')
 
-      scales, images = [], []
-      for i in range(self.batch_size):
-        image, scale = image_preprocess(raw_images[i], image_size)
-        scales.append(scale)
-        images.append(image)
-      scales = tf.stack(scales)
-      images = tf.stack(images)
+      images, scales = batch_image_preprocess(
+          raw_images, image_size, self.batch_size)
       if params['data_format'] == 'channels_first':
         images = tf.transpose(images, [0, 3, 1, 2])
       class_outputs, box_outputs = build_model(self.model_name, images,
@@ -426,32 +484,11 @@ class ServingDriver(object):
     }
     return self.signitures
 
-  def visualize(self, image, predictions, **kwargs):
-    """Visualize predictions on image.
-
-    Args:
-      image: Image content in shape of [height, width, 3].
-      predictions: a list of vector, with each vector has the format of
-        [image_id, x, y, width, height, score, class].
-      **kwargs: extra parameters for vistualization, such as
-        min_score_thresh, max_boxes_to_draw, and line_thickness.
-
-    Returns:
-      annotated image.
-    """
-    boxes = predictions[:, 1:5]
-    classes = predictions[:, 6].astype(int)
-    scores = predictions[:, 5]
-
-    # This is not needed if disable_pyfun=True
-    # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]
-    # TODO(tanmingxing): make this convertion more efficient.
-    if not self.disable_pyfun:
-      boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
-
-    boxes[:, 2:4] += boxes[:, 0:2]
-    return visualize_image(image, boxes, classes, scores, self.label_id_mapping,
-                           **kwargs)
+  def visualize(self, image, prediction, **kwargs):
+    """Visualize prediction on image."""
+    return visualize_image_prediction(
+        image, prediction, disable_pyfun=self.disable_pyfun,
+        label_id_mapping=self.label_id_mapping, **kwargs)
 
   def serve_files(self, image_files: List[Text]):
     """Serve a list of input image files.
@@ -584,7 +621,7 @@ class ServingDriver(object):
     logging.info('Free graph saved at %s', pb_path)
 
 
-class InferenceDriver(object):
+class InferenceDriver():
   """A driver for doing batch inference.
 
   Example usage:
@@ -670,23 +707,12 @@ class InferenceDriver(object):
                                       anchors.MIN_SCORE_THRESH),
           max_boxes_to_draw=kwargs.get('max_boxes_to_draw',
                                        anchors.MAX_DETECTIONS_PER_IMAGE))
-      outputs_np = sess.run(detections_batch)
+      predictions = sess.run(detections_batch)
       # Visualize results.
-      for i, output_np in enumerate(outputs_np):
-        # output_np has format [image_id, y, x, height, width, score, class]
-        boxes = output_np[:, 1:5]
-        classes = output_np[:, 6].astype(int)
-        scores = output_np[:, 5]
-
-        # This is not needed if disable_pyfun=True
-        # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]
-        # TODO(tanmingxing): make this convertion more efficient.
-        if not self.disable_pyfun:
-          boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
-
-        boxes[:, 2:4] += boxes[:, 0:2]
-        img = visualize_image(raw_images[i], boxes, classes, scores,
-                              self.label_id_mapping, **kwargs)
+      for i, prediction in enumerate(predictions):
+        img = visualize_image_prediction(
+            raw_images[i], prediction, disable_pyfun=self.disable_pyfun,
+            label_id_mapping=self.label_id_mapping, **kwargs)
         output_image_path = os.path.join(output_dir, str(i) + '.jpg')
         Image.fromarray(img).save(output_image_path)
         logging.info('writing file to %s', output_image_path)
