@@ -299,7 +299,7 @@ def visualize_image_prediction(
   Args:
     image: Image content in shape of [height, width, 3].
     prediction: a list of vector, with each vector has the format of
-      [image_id, x, y, width, height, score, class].
+      [image_id, y, x, height, width, score, class].
     **kwargs: extra parameters for vistualization, such as
       min_score_thresh, max_boxes_to_draw, and line_thickness.
 
@@ -310,8 +310,8 @@ def visualize_image_prediction(
   classes = prediction[:, 6].astype(int)
   scores = prediction[:, 5]
 
-  # convert [x, y, width, height] to [ymin, xmin, ymax, xmax]
   if not disable_pyfun:
+    # convert [x, y, width, height] to [y, x, height, width]
     boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
 
   label_id_mapping = label_id_mapping or coco_id_mapping
