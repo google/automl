@@ -200,6 +200,7 @@ def default_detection_configs():
 
   h.backbone_name = 'efficientnet-b1'
   h.backbone_config = None
+  h.var_freeze_expr = None
 
   # RetinaNet.
   h.resnet_depth = 50
