@@ -40,13 +40,7 @@ flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model.')
 flags.DEFINE_string('logdir', '/tmp/deff/', 'log directory.')
 flags.DEFINE_string('runmode', 'dry', 'Run mode: {freeze, bm, dry}')
 flags.DEFINE_string('trace_filename', None, 'Trace file name.')
-flags.DEFINE_integer('num_classes', None,
-                     'Number of classes. Defaults to 90 '
-                     'for COCO as defined in hparams_config.py')
-flags.DEFINE_string('input_image_size', None, 'Size of input image. Enter a'
-                    'single integer if the image height is equal to the width;'
-                    'Otherwise, enter two integers seprated by a "x".'
-                    'e.g. "1280x640" if width=1280 and height=640.')
+
 flags.DEFINE_integer('threads', 0, 'Number of threads.')
 flags.DEFINE_integer('bm_runs', 10, 'Number of benchmark runs.')
 flags.DEFINE_string('tensorrt', None, 'TensorRT mode: {None, FP32, FP16, INT8}')
@@ -57,8 +51,6 @@ flags.DEFINE_integer('batch_size', 1, 'Batch size for inference.')
 
 flags.DEFINE_string('ckpt_path', None, 'checkpoint dir used for eval.')
 flags.DEFINE_string('export_ckpt', None, 'Path for exporting new models.')
-flags.DEFINE_bool('enable_ema', True, 'Use ema variables for eval.')
-flags.DEFINE_string('data_format', None, 'data format, e.g., channel_last.')
 
 flags.DEFINE_string('hparams', '',
                     'Comma separated k=v pairs of hyperparameters or'
@@ -89,16 +81,12 @@ class ModelInspector(object):
 
   def __init__(self,
                model_name: Text,
-               image_size: Text,
-               num_classes: int,
                logdir: Text,
                tensorrt: Text = False,
                use_xla: bool = False,
                ckpt_path: Text = None,
-               enable_ema: bool = True,
                export_ckpt: Text = None,
                saved_model_dir: Text = None,
-               data_format: Text = None,
                batch_size: int = 1,
                hparams: Text = ""):
     self.model_name = model_name
@@ -108,36 +96,26 @@ class ModelInspector(object):
     self.tensorrt = tensorrt
     self.use_xla = use_xla
     self.ckpt_path = ckpt_path
-    self.enable_ema = enable_ema
     self.export_ckpt = export_ckpt
     self.saved_model_dir = saved_model_dir
 
-    if image_size is None:
-      image_size = self.model_params.image_size
-      image_size = (image_size, image_size)
-    elif 'x' in image_size:
-      # image_size is in format of WIDTHxHEIGHT
-      width, height = image_size.split('x')
-      image_size = (int(height), int(width))
-    else:
-      # image_size is integer, witht the same width and height.
-      image_size = (int(image_size), int(image_size))
-
-    if num_classes:
-      self.model_params.update(dict(num_classes=num_classes))
-
-    if data_format:
-      self.model_params.update(dict(data_format=data_format))
+    if isinstance(self.model_params.image_size, int):
+      # image_size is integer, with the same width and height.
+      self.model_params.image_size = (
+          self.model_params.image_size, self.model_params.image_size)
+    elif not isinstance(self.model_params.image_size, tuple):
+      raise ValueError("image_size must be an int or (height, width) tuple. "
+                       "Was %r" % self.model_params.image_size)
 
     # A few fixed parameters.
     self.model_params.batch_size = batch_size
-    self.model_params.image_size = image_size
     self.labels_shape = [self.model_params.batch_size, self.model_params.num_classes]
 
+    width, height = self.model_params.image_size
     if self.model_params.data_format == 'channels_first':
-      self.inputs_shape = [self.model_params.batch_size, 3, image_size[0], image_size[1]]
+      self.inputs_shape = [self.model_params.batch_size, 3, width, height]
     else:
-      self.inputs_shape = [self.model_params.batch_size, image_size[0], image_size[1], 3]
+      self.inputs_shape = [self.model_params.batch_size, width, height, 3]
 
   def build_model(self, inputs: tf.Tensor,
                   is_training: bool = False) -> List[tf.Tensor]:
@@ -169,7 +147,6 @@ class ModelInspector(object):
         self.model_name,
         self.ckpt_path,
         self.model_params,
-        enable_ema=self.enable_ema,
         use_xla=self.use_xla,
         **kwargs)
     driver.build()
@@ -181,7 +158,6 @@ class ModelInspector(object):
         self.model_name,
         self.ckpt_path,
         self.model_params,
-        enable_ema=self.enable_ema,
         use_xla=self.use_xla,
         **kwargs)
     driver.load(self.saved_model_dir)
@@ -207,7 +183,6 @@ class ModelInspector(object):
         self.model_name,
         self.ckpt_path,
         self.model_params,
-        enable_ema=self.enable_ema,
         use_xla=self.use_xla,
         **kwargs)
     driver.load(self.saved_model_dir)
@@ -226,7 +201,6 @@ class ModelInspector(object):
         self.model_name,
         self.ckpt_path,
         self.model_params,
-        enable_ema=self.enable_ema,
         use_xla=self.use_xla)
     driver.load(self.saved_model_dir)
 
@@ -263,8 +237,7 @@ class ModelInspector(object):
 
   def inference_single_image(self, image_image_path, output_dir, **kwargs):
     driver = inference.InferenceDriver(self.model_name, self.ckpt_path,
-                                       self.model_params,
-                                       self.enable_ema)
+                                       self.model_params)
     driver.inference(image_image_path, output_dir, **kwargs)
 
   def build_and_save_model(self):
@@ -288,30 +261,12 @@ class ModelInspector(object):
       with tf.io.gfile.GFile(tf_graph, 'wb') as f:
         f.write(sess.graph_def.SerializeToString())
 
-  def restore_model(self, sess, ckpt_path, enable_ema=True, export_ckpt=None):
-    """Restore variables from a given checkpoint."""
-    sess.run(tf.global_variables_initializer())
-    checkpoint = tf.train.latest_checkpoint(ckpt_path)
-    if enable_ema:
-      ema = tf.train.ExponentialMovingAverage(decay=0.0)
-      ema_vars = utils.get_ema_vars()
-      var_dict = ema.variables_to_restore(ema_vars)
-      ema_assign_op = ema.apply(ema_vars)
-    else:
-      var_dict = utils.get_ema_vars()
-      ema_assign_op = None
-
-    tf.train.get_or_create_global_step()
-    sess.run(tf.global_variables_initializer())
-    saver = tf.train.Saver(var_dict, max_to_keep=1)
-    saver.restore(sess, checkpoint)
-
-    if export_ckpt:
-      print('export model to {}'.format(export_ckpt))
+    if self.export_ckpt:
+      print('export model to {}'.format(self.export_ckpt))
       if ema_assign_op is not None:
         sess.run(ema_assign_op)
       saver = tf.train.Saver(max_to_keep=1, save_relative_paths=True)
-      saver.save(sess, export_ckpt)
+      saver.save(sess, self.export_ckpt)
 
   def eval_ckpt(self):
     """build and save the model into self.logdir."""
@@ -319,8 +274,9 @@ class ModelInspector(object):
       # Build model with inputs and labels.
       inputs = tf.placeholder(tf.float32, name='input', shape=self.inputs_shape)
       self.build_model(inputs, is_training=False)
-      self.restore_model(
-          sess, self.ckpt_path, self.enable_ema, self.export_ckpt)
+      inference.restore_ckpt(sess, self.ckpt_path,
+        enable_ema=self.model_params.enable_ema,
+        export_ckpt=self.export_ckpt)
 
   def freeze_model(self) -> Tuple[Text, Text]:
     """Freeze model and convert them into tflite and tf graph."""
@@ -476,16 +432,12 @@ def main(_):
 
   inspector = ModelInspector(
       model_name=FLAGS.model_name,
-      image_size=FLAGS.input_image_size,
-      num_classes=FLAGS.num_classes,
       logdir=FLAGS.logdir,
       tensorrt=FLAGS.tensorrt,
       use_xla=FLAGS.xla,
       ckpt_path=FLAGS.ckpt_path,
-      enable_ema=FLAGS.enable_ema,
       export_ckpt=FLAGS.export_ckpt,
       saved_model_dir=FLAGS.saved_model_dir,
-      data_format=FLAGS.data_format,
       batch_size=FLAGS.batch_size,
       hparams=FLAGS.hparams
     )

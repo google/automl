@@ -344,7 +344,6 @@ class ServingDriver(object):
                model_name: Text,
                ckpt_path: Text,
                params: dict,
-               enable_ema: bool = True,
                use_xla: bool = False,
                min_score_thresh: float = None,
                max_boxes_to_draw: float = None,
@@ -355,7 +354,6 @@ class ServingDriver(object):
     Args:
       model_name: target model name, such as efficientdet-d0.
       ckpt_path: checkpoint path, such as /tmp/efficientdet-d0/.
-      enable_ema: whether to enable moving average.
       use_xla: Whether run with xla optimization.
       min_score_thresh: minimal score threshold for filtering predictions.
       max_boxes_to_draw: the maximum number of boxes per image.
@@ -374,7 +372,6 @@ class ServingDriver(object):
     self.signitures = None
     self.sess = None
     self.disable_pyfun = True
-    self.enable_ema = enable_ema
     self.use_xla = use_xla
 
     self.min_score_thresh = min_score_thresh or anchors.MIN_SCORE_THRESH
@@ -435,7 +432,7 @@ class ServingDriver(object):
       restore_ckpt(
           self.sess,
           self.ckpt_path,
-          enable_ema=self.enable_ema,
+          enable_ema=self.params['enable_ema'],
           export_ckpt=None)
 
     self.signitures = {
@@ -617,14 +614,12 @@ class InferenceDriver(object):
                model_name: Text,
                ckpt_path: Text,
                params: dict,
-               enable_ema: bool = True,
                **kwargs):
     """Initialize the inference driver.
 
     Args:
       model_name: target model name, such as efficientdet-d0.
       ckpt_path: checkpoint path, such as /tmp/efficientdet-d0/.
-      enable_ema: whether to enable moving average.
     """
     self.model_name = model_name
     self.ckpt_path = ckpt_path
@@ -635,7 +630,6 @@ class InferenceDriver(object):
     self.params.update(kwargs)
 
     self.disable_pyfun = True
-    self.enable_ema = enable_ema
 
   def inference(self, image_path_pattern: Text, output_dir: Text, **kwargs):
     """Read and preprocess input images.
@@ -661,7 +655,7 @@ class InferenceDriver(object):
       class_outputs, box_outputs = build_model(self.model_name, images,
                                                **self.params)
       restore_ckpt(
-          sess, self.ckpt_path, enable_ema=self.enable_ema, export_ckpt=None)
+          sess, self.ckpt_path, enable_ema=self.params['enable_ema'], export_ckpt=None)
       # for postprocessing.
       params.update(
           dict(batch_size=len(raw_images), disable_pyfun=self.disable_pyfun))
