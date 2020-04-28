@@ -256,12 +256,13 @@ Create a config file for the PASCAL VOC dataset called voc_config.py and put thi
       num_classes=20
       moving_average_decay=0
 
+Download efficientdet coco checkpoint.
 
-    # Download efficientdet coco checkpoint.
     !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz
     !tar xf efficientdet-d0.tar.gz
 
-    # Finetune needs to use --ckpt rather than --backbone_ckpt.
+Finetune needs to use --ckpt rather than --backbone_ckpt.
+
     !python main.py --mode=train_and_eval \
         --training_file_pattern=tfrecord/pascal*.tfrecord \
         --validation_file_pattern=tfrecord/pascal*.tfrecord \
