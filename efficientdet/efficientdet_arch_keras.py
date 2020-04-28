@@ -27,6 +27,11 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     self.conv_after_downsample = conv_after_downsample
     self.use_native_resize_op = use_native_resize_op
     self.pooling_type = pooling_type
+    self.conv2d = tf.keras.layers.Conv2D(
+          self.target_num_channels,
+          (1, 1),
+          padding='same',
+          data_format=self.data_format)
 
   def build(self, input_shape):
     """Resample input feature map to have target number of channels and size."""
@@ -46,6 +51,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     self.width = width
     height_stride_size = int((self.height - 1) // self.target_height + 1)
     width_stride_size = int((self.width - 1) // self.target_width + 1)
+
     if self.pooling_type == 'max' or self.pooling_type is None:
       # Use max pooling in default.
       self.pool2d = tf.keras.layers.MaxPooling2D(
@@ -61,16 +67,17 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
         data_format=self.data_format)
     else:
       raise ValueError('Unknown pooling type: {}'.format(self.pooling_type))
+
+    height_scale = self.target_height // self.height
+    width_scale = self.target_width // self.width
+
+    self.upsample2d = tf.keras.layers.UpSampling2D((height_scale, width_scale), data_format=self.data_format)
     super(ResampleFeatureMap, self).build(input_shape)
 
   def _maybe_apply_1x1(self, feat):
     """Apply 1x1 conv to change layer width if necessary."""
     if self.num_channels != self.target_num_channels:
-      feat = tf.keras.layers.Conv2D(
-          self.target_num_channels,
-          (1, 1),
-          padding='same',
-          data_format=self.data_format)(feat)
+      feat = self.conv2d(feat)
       if self.apply_bn:
         feat = utils.batch_norm_act(
             feat,
@@ -97,12 +104,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
         width_scale = self.target_width // self.width
         if (self.use_native_resize_op or self.target_height % self.height != 0 or
             self.target_width % self.width != 0):
-          if self.data_format == 'channels_first':
-            feat = tf.transpose(feat, [0, 2, 3, 1])
-          feat = tf.image.resize_nearest_neighbor(feat,
-                                                  [self.target_height, self.target_width])
-          if self.data_format == 'channels_first':
-            feat = tf.transpose(feat, [0, 3, 1, 2])
+          feat = self.upsample2d(feat)
         else:
           feat = nearest_upsampling(
               feat,
