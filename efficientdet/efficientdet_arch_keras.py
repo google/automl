@@ -128,7 +128,6 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
         'conv_after_downsample': self.conv_after_downsample,
         'use_native_resize_op': self.use_native_resize_op,
         'pooling_type': self.pooling_type,
-        'conv2d': tf.keras.layers.serialize(self.conv2d),
     }
     base_config = super(ResampleFeatureMap, self).get_config()
     return dict(list(base_config.items()) + list(config.items()))
