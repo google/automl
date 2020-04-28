@@ -103,9 +103,12 @@ class ModelInspector(object):
       # image_size is integer, with the same width and height.
       self.model_params.image_size = (
           self.model_params.image_size, self.model_params.image_size)
+    elif isinstance(self.model_params.image_size, str):
+      width, height = self.model_params.image_size.lower().split('x')
+      self.model_params.image_size = (int(height), int(width))
     elif not isinstance(self.model_params.image_size, tuple):
-      raise ValueError("image_size must be an int or (height, width) tuple. "
-                       "Was %r" % self.model_params.image_size)
+      raise ValueError("image_size must be an int, heightXwidth string, or (height, width)"
+                       "tuple. Was %r" % self.model_params.image_size)
 
     # A few fixed parameters.
     self.model_params.batch_size = batch_size
@@ -254,7 +257,8 @@ class ModelInspector(object):
 
       if self.ckpt_path:
         # Load the true weights if available.
-        self.restore_model(sess, self.ckpt_path, self.enable_ema)
+        inference.restore_ckpt(
+          sess, self.ckpt_path, self.model_params.enable_ema, self.export_ckpt)
       else:
         sess.run(tf.global_variables_initializer())
         # Run a single train step.
@@ -280,9 +284,8 @@ class ModelInspector(object):
       # Build model with inputs and labels.
       inputs = tf.placeholder(tf.float32, name='input', shape=self.inputs_shape)
       self.build_model(inputs, is_training=False)
-      inference.restore_ckpt(sess, self.ckpt_path,
-        enable_ema=self.model_params.enable_ema,
-        export_ckpt=self.export_ckpt)
+      inference.restore_ckpt(
+          sess, self.ckpt_path, self.model_params.enable_ema, self.export_ckpt)
 
   def freeze_model(self) -> Tuple[Text, Text]:
     """Freeze model and convert them into tflite and tf graph."""
@@ -292,7 +295,8 @@ class ModelInspector(object):
 
       if self.ckpt_path:
         # Load the true weights if available.
-        self.restore_model(sess, self.ckpt_path, self.enable_ema)
+        inference.restore_ckpt(
+          sess, self.ckpt_path, self.model_params.enable_ema, self.export_ckpt)
       else:
         # Load random weights if not checkpoint is not available.
         self.build_and_save_model()

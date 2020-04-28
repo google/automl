@@ -139,7 +139,7 @@ def build_inputs(image_path_pattern: Text,
   return raw_images, tf.stack(images), tf.stack(scales)
 
 
-def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
+def build_model(model_name: Text, inputs: tf.Tensor, config=None, **kwargs):
   """Build model for a given model name.
 
   Args:
@@ -152,7 +152,7 @@ def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
     Each is a dictionary with key as feature level and value as predictions.
   """
   model_arch = det_model_fn.get_model_arch(model_name)
-  class_outputs, box_outputs = model_arch(inputs, model_name, **kwargs)
+  class_outputs, box_outputs = model_arch(inputs, model_name, config=config, **kwargs)
   return class_outputs, box_outputs
 
 
@@ -424,7 +424,6 @@ class ServingDriver():
     """
     self.model_name = model_name
     self.ckpt_path = ckpt_path
-    self.batch_size = params["batch_size"]
 
     self.label_id_mapping = get_label_id_mapping(params)
 
@@ -465,20 +464,19 @@ class ServingDriver():
       image_files = tf.placeholder(tf.string, name='image_files', shape=[None])
       image_size = params['image_size']
       raw_images = []
-      for i in range(self.batch_size):
+      for i in range(params["batch_size"]):
         image = tf.io.decode_image(image_files[i])
         image.set_shape([None, None, None])
         raw_images.append(image)
       raw_images = tf.stack(raw_images, name='image_arrays')
 
       images, scales = batch_image_preprocess(
-          raw_images, image_size, self.batch_size)
+          raw_images, image_size, params["batch_size"])
       if params['data_format'] == 'channels_first':
         images = tf.transpose(images, [0, 3, 1, 2])
-      class_outputs, box_outputs = build_model(self.model_name, images,
-                                               **params)
-      params.update(
-          dict(batch_size=self.batch_size, disable_pyfun=self.disable_pyfun))
+      class_outputs, box_outputs = build_model(
+        self.model_name, images, config=params)
+      params.update(dict(disable_pyfun=self.disable_pyfun))
       detections = det_post_process(
           params,
           class_outputs,
@@ -690,9 +688,10 @@ class InferenceDriver():
         images = tf.transpose(images, [0, 3, 1, 2])
       # Build model.
       class_outputs, box_outputs = build_model(self.model_name, images,
-                                               **self.params)
+                                               config=params)
       restore_ckpt(
           sess, self.ckpt_path, enable_ema=self.params['enable_ema'], export_ckpt=None)
+
       # for postprocessing.
       params.update(
           dict(batch_size=len(raw_images), disable_pyfun=self.disable_pyfun))
