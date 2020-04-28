@@ -12,7 +12,7 @@ Updates:
   - Mar24: Added tutorial with visualization and coco eval.
   - Mar 13: Released the initial code and models.
 
-##Quick start tutorial: [tutorial.ipynb](tutorial.ipynb)##
+**Quick start tutorial: [tutorial.ipynb](tutorial.ipynb)**
 
 ## 1. About EfficientDet Models
 
