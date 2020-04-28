@@ -28,7 +28,6 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     self.use_native_resize_op = use_native_resize_op
     self.pooling_type = pooling_type
 
-
   def build(self, input_shape):
     """Resample input feature map to have target number of channels and size."""
     if self.data_format == 'channels_first':
