@@ -26,6 +26,7 @@ from __future__ import print_function
 import functools
 import itertools
 import re
+
 from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
@@ -674,7 +675,7 @@ def efficientdet(features, model_name=None, config=None, **kwargs):
   if not config:
     config = hparams_config.get_efficientdet_config(model_name)
   elif isinstance(config, dict):
-    config = hparams_config.Config(config) # wrap dict in Config object
+    config = hparams_config.Config(config)  # wrap dict in Config object
 
   if kwargs:
     config.override(kwargs)
@@ -704,6 +705,7 @@ def freeze_vars(variables, pattern):
 
   Args:
     variables: all the variables in training
+    pattern: a reg experession such as ".*(efficientnet|fpn_cells).*".
 
   Returns:
     var_list: a list containing variables for training
