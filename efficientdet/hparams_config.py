@@ -21,6 +21,7 @@ from __future__ import print_function
 
 import ast
 import copy
+import json
 import six
 import tensorflow.compat.v1 as tf
 
@@ -58,7 +59,7 @@ class Config(object):
 
   def __str__(self):
     try:
-      return yaml.dumps(self.as_dict(), indent=4)
+      return json.dumps(self.as_dict(), indent=4)
     except TypeError:
       return str(self.as_dict())
 
