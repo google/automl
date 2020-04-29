@@ -23,6 +23,7 @@ import copy
 import functools
 import os
 import time
+import json
 from typing import Text, Dict, Any, List, Tuple, Union
 
 from absl import logging
@@ -138,7 +139,7 @@ def build_inputs(image_path_pattern: Text,
   return raw_images, tf.stack(images), tf.stack(scales)
 
 
-def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
+def build_model(model_name: Text, inputs: tf.Tensor, config=None, **kwargs):
   """Build model for a given model name.
 
   Args:
@@ -151,7 +152,7 @@ def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
     Each is a dictionary with key as feature level and value as predictions.
   """
   model_arch = det_model_fn.get_model_arch(model_name)
-  class_outputs, box_outputs = model_arch(inputs, model_name, **kwargs)
+  class_outputs, box_outputs = model_arch(inputs, model_name, config=config, **kwargs)
   return class_outputs, box_outputs
 
 
@@ -291,6 +292,39 @@ def visualize_image(image,
   return img
 
 
+def get_label_id_mapping(params):
+  """
+  Take a Config object and return a label_id_mapping.
+
+  The label_id_mapping maps predicted classes, which are integers, to class names.
+
+  Example:
+
+    {
+      "1": "person",
+      "2": "dog"
+    }
+
+  The defualt mapping is for the COCO dataset. The label_id_mapping must be a dict or
+  a JSON filename.
+  """
+  if params["label_id_mapping"] is None:
+    return coco_id_mapping
+
+  if isinstance(params["label_id_mapping"], dict):
+    label_id_dict = params["label_id_mapping"]
+  elif isinstance(params["label_id_mapping"], str):
+    with open(params["label_id_mapping"]) as json_file:
+      label_id_dict = json.load(json_file)
+  else:
+    raise TypeError("label_id_mapping must be a dict or a filename to a json "
+                    "file containing a mapping from class ids to class names.")
+
+  # JSON keys must be strings, so convert all dict keys to ints
+  # so that {"1": "person"} becomes {1: "person"}
+  return {int(key): value for (key, value) in label_id_dict.items()}
+
+
 def visualize_image_prediction(
     image, prediction, disable_pyfun=True,
     label_id_mapping=None, **kwargs):
@@ -372,53 +406,34 @@ class ServingDriver():
   def __init__(self,
                model_name: Text,
                ckpt_path: Text,
-               image_size: Union[int, Tuple[int, int]] = None,
-               batch_size: int = 1,
-               num_classes: int = None,
-               enable_ema: bool = True,
-               label_id_mapping: Dict[int, Text] = None,
+               params: dict,
                use_xla: bool = False,
-               data_format: Text = None,
                min_score_thresh: float = None,
                max_boxes_to_draw: float = None,
-               line_thickness: int = None):
+               line_thickness: int = None,
+               **kwargs):
     """Initialize the inference driver.
 
     Args:
       model_name: target model name, such as efficientdet-d0.
       ckpt_path: checkpoint path, such as /tmp/efficientdet-d0/.
-      image_size: single integer of image size for square image or tuple of two
-        integers, in the format of (image_height, image_width). If None, use the
-        default image size defined by model_name.
-      batch_size: batch size for inference.
-      num_classes: number of classes. If None, use the default COCO classes.
-      enable_ema: whether to enable moving average.
-      label_id_mapping: a dictionary from id to name. If None, use the default
-        coco_id_mapping (with 90 classes).
       use_xla: Whether run with xla optimization.
-      data_format: data format such as 'channel_last'.
       min_score_thresh: minimal score threshold for filtering predictions.
       max_boxes_to_draw: the maximum number of boxes per image.
       line_thickness: the line thickness for drawing boxes.
     """
     self.model_name = model_name
     self.ckpt_path = ckpt_path
-    self.batch_size = batch_size
-    self.label_id_mapping = label_id_mapping or coco_id_mapping
 
-    self.params = hparams_config.get_detection_config(self.model_name).as_dict()
+    self.label_id_mapping = get_label_id_mapping(params)
+
+    self.params = dict(params)
     self.params.update(dict(is_training_bn=False, use_bfloat16=False))
-    if image_size:
-      self.params.update(dict(image_size=image_size))
-    if num_classes:
-      self.params.update(dict(num_classes=num_classes))
-    if data_format:
-      self.params.update(dict(data_format=data_format))
+    self.params.update(kwargs)
 
     self.signitures = None
     self.sess = None
     self.disable_pyfun = True
-    self.enable_ema = enable_ema
     self.use_xla = use_xla
 
     self.min_score_thresh = min_score_thresh or anchors.MIN_SCORE_THRESH
@@ -449,20 +464,19 @@ class ServingDriver():
       image_files = tf.placeholder(tf.string, name='image_files', shape=[None])
       image_size = params['image_size']
       raw_images = []
-      for i in range(self.batch_size):
+      for i in range(params["batch_size"]):
         image = tf.io.decode_image(image_files[i])
         image.set_shape([None, None, None])
         raw_images.append(image)
       raw_images = tf.stack(raw_images, name='image_arrays')
 
       images, scales = batch_image_preprocess(
-          raw_images, image_size, self.batch_size)
+          raw_images, image_size, params["batch_size"])
       if params['data_format'] == 'channels_first':
         images = tf.transpose(images, [0, 3, 1, 2])
-      class_outputs, box_outputs = build_model(self.model_name, images,
-                                               **params)
-      params.update(
-          dict(batch_size=self.batch_size, disable_pyfun=self.disable_pyfun))
+      class_outputs, box_outputs = build_model(
+        self.model_name, images, config=params)
+      params.update(dict(disable_pyfun=self.disable_pyfun))
       detections = det_post_process(
           params,
           class_outputs,
@@ -474,7 +488,7 @@ class ServingDriver():
       restore_ckpt(
           self.sess,
           self.ckpt_path,
-          enable_ema=self.enable_ema,
+          enable_ema=self.params['enable_ema'],
           export_ckpt=None)
 
     self.signitures = {
@@ -634,39 +648,23 @@ class InferenceDriver():
   def __init__(self,
                model_name: Text,
                ckpt_path: Text,
-               image_size: Union[int, Tuple[int, int]] = None,
-               num_classes: int = None,
-               enable_ema: bool = True,
-               data_format: Text = None,
-               label_id_mapping: Dict[int, Text] = None):
+               params: dict,
+               **kwargs):
     """Initialize the inference driver.
 
     Args:
       model_name: target model name, such as efficientdet-d0.
       ckpt_path: checkpoint path, such as /tmp/efficientdet-d0/.
-      image_size: user specified image size. If None, use the default image size
-        defined by model_name.
-      num_classes: number of classes. If None, use the default COCO classes.
-      enable_ema: whether to enable moving average.
-      data_format: data format such as 'channel_last'.
-      label_id_mapping: a dictionary from id to name. If None, use the default
-        coco_id_mapping (with 90 classes).
     """
     self.model_name = model_name
     self.ckpt_path = ckpt_path
-    self.label_id_mapping = label_id_mapping or coco_id_mapping
 
-    self.params = hparams_config.get_detection_config(self.model_name).as_dict()
+    self.label_id_mapping = get_label_id_mapping(params)
+    self.params = dict(params)
     self.params.update(dict(is_training_bn=False, use_bfloat16=False))
-    if image_size:
-      self.params.update(dict(image_size=image_size))
-    if num_classes:
-      self.params.update(dict(num_classes=num_classes))
-    if data_format:
-      self.params.update(dict(data_format=data_format))
+    self.params.update(kwargs)
 
     self.disable_pyfun = True
-    self.enable_ema = enable_ema
 
   def inference(self, image_path_pattern: Text, output_dir: Text, **kwargs):
     """Read and preprocess input images.
@@ -690,9 +688,10 @@ class InferenceDriver():
         images = tf.transpose(images, [0, 3, 1, 2])
       # Build model.
       class_outputs, box_outputs = build_model(self.model_name, images,
-                                               **self.params)
+                                               config=params)
       restore_ckpt(
-          sess, self.ckpt_path, enable_ema=self.enable_ema, export_ckpt=None)
+          sess, self.ckpt_path, enable_ema=self.params['enable_ema'], export_ckpt=None)
+
       # for postprocessing.
       params.update(
           dict(batch_size=len(raw_images), disable_pyfun=self.disable_pyfun))

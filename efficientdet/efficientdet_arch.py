@@ -673,6 +673,8 @@ def efficientdet(features, model_name=None, config=None, **kwargs):
 
   if not config:
     config = hparams_config.get_efficientdet_config(model_name)
+  elif isinstance(config, dict):
+    config = hparams_config.Config(config) # wrap dict in Config object
 
   if kwargs:
     config.override(kwargs)

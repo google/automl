@@ -47,6 +47,9 @@ class Config(object):
   def __getattr__(self, k):
     return self.__dict__[k]
 
+  def __getitem__(self, k):
+    return self.__dict__[k]
+
   def __repr__(self):
     return repr(self.as_dict())
 
@@ -62,13 +65,13 @@ class Config(object):
       return
 
     for k, v in six.iteritems(config_dict):
-      if k not in self.__dict__.keys():
+      if k not in self.__dict__:
         if allow_new_keys:
           self.__setattr__(k, v)
         else:
           raise KeyError('Key `{}` does not exist for overriding. '.format(k))
       else:
-        if isinstance(v, dict):
+        if isinstance(self.__dict__[k], dict):
           self.__dict__[k]._update(v, allow_new_keys)
         else:
           self.__dict__[k] = copy.deepcopy(v)
@@ -80,16 +83,38 @@ class Config(object):
     """Update members while allowing new keys."""
     self._update(config_dict, allow_new_keys=True)
 
+  def keys(self):
+    return self.__dict__.keys()
+
   def override(self, config_dict_or_str):
     """Update members while disallowing new keys."""
     if isinstance(config_dict_or_str, str):
-      config_dict = self.parse_from_str(config_dict_or_str)
+      if not config_dict_or_str:
+        return
+      elif "=" in config_dict_or_str:
+        config_dict = self.parse_from_str(config_dict_or_str)
+      else:
+        config_dict = self.parse_from_module(config_dict_or_str)
     elif isinstance(config_dict_or_str, dict):
       config_dict = config_dict_or_str
     else:
       raise ValueError('Unknown value type: {}'.format(config_dict_or_str))
 
     self._update(config_dict, allow_new_keys=False)
+
+  def parse_from_module(self, module_name: str) -> dict:
+    """
+    Import config from module_name containing key=value pairs.
+    """
+    config_dict = {}
+    module = __import__(module_name)
+
+    for attr in dir(module):
+      # skip built-ins and private attributes
+      if not attr.startswith("_"):
+        config_dict[attr] = getattr(module, attr)
+
+    return config_dict
 
   def parse_from_str(self, config_str):
     """parse from a string in format 'x=a,y=2' and return the dict."""
@@ -140,6 +165,7 @@ def default_detection_configs():
   # dataset specific parameters
   h.num_classes = 90
   h.skip_crowd_during_training = True
+  h.label_id_mapping = None
 
   # model architecture
   h.min_level = 3
@@ -160,6 +186,7 @@ def default_detection_configs():
   h.clip_gradients_norm = 10.0
   h.num_epochs = 300
   h.data_format = 'channels_last'
+  h.enable_ema = True
 
   # classification loss
   h.alpha = 0.25

@@ -66,7 +66,8 @@ flags.DEFINE_string('ckpt', None,
                     'Start training from this EfficientDet checkpoint.')
 
 flags.DEFINE_string('hparams', '',
-                    'Comma separated k=v pairs of hyperparameters.')
+                    'Comma separated k=v pairs of hyperparameters or'
+                    ' a module containing attributes to use as hyperparameters.')
 flags.DEFINE_integer(
     'num_cores', default=8, help='Number of TPU cores for training')
 flags.DEFINE_bool('use_spatial_partition', False, 'Use spatial partition.')

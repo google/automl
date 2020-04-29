@@ -117,13 +117,13 @@ latency and throughput are:
     # Step 1: export saved model.
     !python model_inspect.py --runmode=saved_model \
       --model_name=efficientdet-d0 --ckpt_path=efficientdet-d0 \
-      --input_image_size=1920x1280 \
+      --hparams="image_size=1920x1280" \
       --saved_model_dir=/tmp/saved_model
 
     # Step 2: do inference with saved model.
     !python model_inspect.py --runmode=saved_model_infer \
       --model_name=efficientdet-d0   --ckpt_path=efficientdet-d0 \
-      --input_image_size=1920x1280  \
+      --hparams="image_size=1920x1280"  \
       --saved_model_dir=/tmp/saved_model  \
       --input_image=img.png --output_image_dir=/tmp/
     # you can visualize the output /tmp/0.jpg
@@ -135,7 +135,7 @@ Alternatively, if you want to do inference using frozen graph instead of saved m
     # Step 2: do inference with frozen graph.
     !python model_inspect.py --runmode=saved_model_infer \
       --model_name=efficientdet-d0   --ckpt_path=efficientdet-d0 \
-      --input_image_size=1920x1280  \
+      --hparams="image_size=1920x1280"  \
       --saved_model_dir=/tmp/saved_model/efficientdet-d0_frozen.pb  \
       --input_image=img.png --output_image_dir=/tmp/
 
@@ -143,7 +143,7 @@ Lastly, if you only have one image and just want to run a quick test, you can al
 
     # Run inference for a single image.
     !python model_inspect.py --runmode=infer --model_name=$MODEL \
-      --input_image_size=1920x1280 --max_boxes_to_draw=100   --min_score_thresh=0.4 \
+      --hparams="image_size=1920x1280"  --max_boxes_to_draw=100   --min_score_thresh=0.4 \
       --ckpt_path=$CKPT_PATH --input_image=img.png --output_image_dir=/tmp
     # you can visualize the output /tmp/0.jpg
 
@@ -250,11 +250,19 @@ You can also run eval on test-dev set with the following command:
         --use_tpu=False
 
 ## 8. Finetune on PASCAL VOC 2012 with detector COCO ckpt.
-    # Download efficientdet coco checkpoint.
+Create a config file for the PASCAL VOC dataset called voc_config.py and put this in it.
+
+      use_bfloat16=False
+      num_classes=20
+      moving_average_decay=0
+
+Download efficientdet coco checkpoint.
+
     !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz
     !tar xf efficientdet-d0.tar.gz
 
-    # Finetune needs to use --ckpt rather than --backbone_ckpt.
+Finetune needs to use --ckpt rather than --backbone_ckpt.
+
     !python main.py --mode=train_and_eval \
         --training_file_pattern=tfrecord/pascal*.tfrecord \
         --validation_file_pattern=tfrecord/pascal*.tfrecord \
@@ -265,7 +273,7 @@ You can also run eval on test-dev set with the following command:
         --train_batch_size=8 \
         --eval_batch_size=8 --eval_samples=1024 \
         --num_examples_per_epoch=5717 --num_epochs=1  \
-        --hparams="use_bfloat16=false,num_classes=20,moving_average_decay=0" \
+        --hparams=voc_config \
         --use_tpu=False
 
 ## 9. Training EfficientDets on TPUs.
