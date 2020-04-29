@@ -1,7 +1,9 @@
+import functools
 import tensorflow.compat.v1 as tf
+from tensorflow.python.keras.utils import conv_utils
 from efficientdet_arch import nearest_upsampling
 import utils
-from tensorflow.python.keras.utils import conv_utils
+
 
 class ResampleFeatureMap(tf.keras.layers.Layer):
   def __init__(self,
@@ -28,10 +30,10 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     self.use_native_resize_op = use_native_resize_op
     self.pooling_type = pooling_type
     self.conv2d = tf.keras.layers.Conv2D(
-          self.target_num_channels,
-          (1, 1),
-          padding='same',
-          data_format=self.data_format)
+        self.target_num_channels,
+        (1, 1),
+        padding='same',
+        data_format=self.data_format)
 
   def build(self, input_shape):
     """Resample input feature map to have target number of channels and size."""
@@ -55,23 +57,31 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     if self.pooling_type == 'max' or self.pooling_type is None:
       # Use max pooling in default.
       self.pool2d = tf.keras.layers.MaxPooling2D(
-        pool_size=[height_stride_size + 1, width_stride_size + 1],
-        strides=[height_stride_size, width_stride_size],
-        padding='SAME',
-        data_format=self.data_format)
+          pool_size=[height_stride_size + 1, width_stride_size + 1],
+          strides=[height_stride_size, width_stride_size],
+          padding='SAME',
+          data_format=self.data_format)
     elif self.pooling_type == 'avg':
       self.pool2d = tf.keras.layers.AveragePooling2D(
-        pool_size=[height_stride_size + 1, width_stride_size + 1],
-        strides=[height_stride_size, width_stride_size],
-        padding='SAME',
-        data_format=self.data_format)
+          pool_size=[height_stride_size + 1, width_stride_size + 1],
+          strides=[height_stride_size, width_stride_size],
+          padding='SAME',
+          data_format=self.data_format)
     else:
       raise ValueError('Unknown pooling type: {}'.format(self.pooling_type))
 
     height_scale = self.target_height // self.height
     width_scale = self.target_width // self.width
-
-    self.upsample2d = tf.keras.layers.UpSampling2D((height_scale, width_scale), data_format=self.data_format)
+    if (self.use_native_resize_op or self.target_height % self.height != 0 or
+        self.target_width % self.width != 0):
+      self.upsample2d = tf.keras.layers.UpSampling2D(
+          (height_scale, width_scale),
+          data_format=self.data_format)
+    else:
+      self.upsample2d = functools.partial(nearest_upsampling,
+                                          height_scale=height_scale,
+                                          width_scale=width_scale,
+                                          data_format=self.data_format)
     super(ResampleFeatureMap, self).build(input_shape)
 
   def _maybe_apply_1x1(self, feat):
@@ -100,17 +110,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     elif self.height <= self.target_height and self.width <= self.target_width:
       feat = self._maybe_apply_1x1(feat)
       if self.height < self.target_height or self.width < self.target_width:
-        height_scale = self.target_height // self.height
-        width_scale = self.target_width // self.width
-        if (self.use_native_resize_op or self.target_height % self.height != 0 or
-            self.target_width % self.width != 0):
-          feat = self.upsample2d(feat)
-        else:
-          feat = nearest_upsampling(
-              feat,
-              height_scale=height_scale,
-              width_scale=width_scale,
-              data_format=self.data_format)
+        feat = self.upsample2d(feat)
     else:
       raise ValueError(
           'Incompatible target feature map size: target_height: {},'
