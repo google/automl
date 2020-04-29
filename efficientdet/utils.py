@@ -420,18 +420,43 @@ def archive_ckpt(ckpt_eval, ckpt_objective, ckpt_path):
   return True
 
 
-def get_feat_sizes(image_size: Union[int, Tuple[int, int]], max_level: int):
+def parse_image_size(image_size: Union[Text, int, Tuple[int, int]]):
+  """Parse the image size and return (height, width).
+
+  Args:
+    image_size: A integer, a tuple (H, W), or a string with HxW format.
+
+  Returns:
+    A tuple of integer (height, width).
+  """
+  if isinstance(image_size, int):
+    # image_size is integer, with the same width and height.
+    return (image_size, image_size)
+
+  if isinstance(image_size, str):
+    # image_size is a string with format WxH
+    width, height = image_size.lower().split('x')
+    return (int(height), int(width))
+
+  if isinstance(image_size, tuple):
+    return image_size
+
+  raise ValueError('image_size must be an int, WxH string, or (height, width)'
+                   'tuple. Was %r' % image_size)
+
+
+def get_feat_sizes(image_size: Union[Text, int, Tuple[int, int]],
+                   max_level: int):
   """Get feat widths and heights for all levels.
 
   Args:
-    image_size: the image size, can be an integer, or a tuple (H, W).
+    image_size: A integer, a tuple (H, W), or a string with HxW format.
     max_level: maximum feature level.
 
   Returns:
     feat_sizes: a list of tuples (height, width) for each level.
   """
-  if isinstance(image_size, int):
-    image_size = (image_size, image_size)
+  image_size = parse_image_size(image_size)
   feat_sizes = [{'height': image_size[0], 'width': image_size[1]}]
   feat_size = image_size
   for _ in range(1, max_level + 1):

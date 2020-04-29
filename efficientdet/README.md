@@ -250,11 +250,11 @@ You can also run eval on test-dev set with the following command:
         --use_tpu=False
 
 ## 8. Finetune on PASCAL VOC 2012 with detector COCO ckpt.
-Create a config file for the PASCAL VOC dataset called voc_config.py and put this in it.
+Create a config file for the PASCAL VOC dataset called voc_config.yaml and put this in it.
 
-      use_bfloat16=False
-      num_classes=20
-      moving_average_decay=0
+      use_bfloat16: False
+      num_classes: 20
+      moving_average_decay: 0
 
 Download efficientdet coco checkpoint.
 
@@ -273,7 +273,7 @@ Finetune needs to use --ckpt rather than --backbone_ckpt.
         --train_batch_size=8 \
         --eval_batch_size=8 --eval_samples=1024 \
         --num_examples_per_epoch=5717 --num_epochs=1  \
-        --hparams=voc_config \
+        --hparams=voc_config.yaml \
         --use_tpu=False
 
 ## 9. Training EfficientDets on TPUs.

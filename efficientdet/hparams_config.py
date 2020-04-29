@@ -21,8 +21,11 @@ from __future__ import print_function
 
 import ast
 import copy
-import json
 import six
+import tensorflow.compat.v1 as tf
+
+from typing import Any, Dict, Text
+import yaml
 
 
 def eval_str_fn(val):
@@ -55,7 +58,7 @@ class Config(object):
 
   def __str__(self):
     try:
-      return json.dumps(self.as_dict(), indent=4)
+      return yaml.dump(self.as_dict(), indent=4)
     except TypeError:
       return str(self.as_dict())
 
@@ -91,10 +94,14 @@ class Config(object):
     if isinstance(config_dict_or_str, str):
       if not config_dict_or_str:
         return
-      elif "=" in config_dict_or_str:
+      elif config_dict_or_str.endswith('.yaml'):
+        config_dict = self.parse_from_yaml(config_dict_or_str)
+      elif '=' in config_dict_or_str:
         config_dict = self.parse_from_str(config_dict_or_str)
       else:
-        config_dict = self.parse_from_module(config_dict_or_str)
+        raise ValueError(
+            'Invalid string {}, must end with .yaml or contains "=".'.format(
+                config_dict_or_str))
     elif isinstance(config_dict_or_str, dict):
       config_dict = config_dict_or_str
     else:
@@ -102,21 +109,30 @@ class Config(object):
 
     self._update(config_dict, allow_new_keys=False)
 
-  def parse_from_module(self, module_name: str) -> dict:
-    """
-    Import config from module_name containing key=value pairs.
-    """
+  def parse_from_module(self, module_name: Text) -> Dict[Any, Any]:
+    """Import config from module_name containing key=value pairs."""
     config_dict = {}
     module = __import__(module_name)
 
     for attr in dir(module):
       # skip built-ins and private attributes
-      if not attr.startswith("_"):
+      if not attr.startswith('_'):
         config_dict[attr] = getattr(module, attr)
 
     return config_dict
 
-  def parse_from_str(self, config_str):
+  def parse_from_yaml(self, yaml_file_path: Text) -> Dict[Any, Any]:
+    """Parses a yaml file and returns a dictionary."""
+    with tf.io.gfile.GFile(yaml_file_path, 'r') as f:
+      config_dict = yaml.load(f, Loader=yaml.FullLoader)
+      return config_dict
+
+  def save_to_yaml(self, yaml_file_path):
+    """Write a dictionary into a yaml file."""
+    with tf.gfile.Open(yaml_file_path, 'w') as f:
+      yaml.dump(self.as_dict(), f, default_flow_style=False)
+
+  def parse_from_str(self, config_str: Text) -> Dict[Any, Any]:
     """parse from a string in format 'x=a,y=2' and return the dict."""
     if not config_str:
       return {}
@@ -186,7 +202,6 @@ def default_detection_configs():
   h.clip_gradients_norm = 10.0
   h.num_epochs = 300
   h.data_format = 'channels_last'
-  h.enable_ema = True
 
   # classification loss
   h.alpha = 0.25

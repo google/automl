@@ -69,6 +69,11 @@ class UtilsTest(tf.test.TestCase):
     self.assertTrue(tf.io.gfile.exists(os.path.join(model_dir, 'archive')))
     self.assertTrue(tf.io.gfile.exists(os.path.join(model_dir, 'backup')))
 
+  def test_image_size(self):
+    self.assertEqual(utils.parse_image_size('1280x640'), (640, 1280))
+    self.assertEqual(utils.parse_image_size(1280), (1280, 1280))
+    self.assertEqual(utils.parse_image_size((1280, 640)), (1280, 640))
+
   def test_get_feat_sizes(self):
     feats = utils.get_feat_sizes(640, 2)
     self.assertEqual(feats, [{

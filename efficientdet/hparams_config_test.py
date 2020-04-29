@@ -18,7 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+import tempfile
 import tensorflow.compat.v1 as tf
+import yaml
+
 import hparams_config
 
 
@@ -34,9 +38,6 @@ class HparamsConfigTest(tf.test.TestCase):
     c.b = 20
     self.assertEqual(c.as_dict(), {'a': 10, 'b': 20})
 
-    c.override(',')   # override with empty string has no effect.
-    self.assertEqual(c.as_dict(), {'a': 10, 'b': 20})
-
     c.override('a=true,b=ss')
     self.assertEqual(c.as_dict(), {'a': True, 'b': 'ss'})
 
@@ -49,6 +50,24 @@ class HparamsConfigTest(tf.test.TestCase):
     # overrride string must be in the format of xx=yy.
     with self.assertRaises(ValueError):
       c.override('a=true,invalid_string')
+
+  def test_config_yaml(self):
+    tmpdir = tempfile.gettempdir()
+    yaml_file_path = os.path.join(tmpdir, 'x.yaml')
+    with open(yaml_file_path, 'w') as f:
+      f.write("""
+        x: 2
+        y: 'test'
+      """)
+    c = hparams_config.Config(dict(x=234, y=2342))
+    c.override(yaml_file_path)
+    self.assertEqual(c.as_dict(), {'x': 2, 'y': 'test'})
+
+    yaml_file_path2 = os.path.join(tmpdir, 'y.yaml')
+    c.save_to_yaml(yaml_file_path2)
+    with open(yaml_file_path2, 'r') as f:
+      config_dict = yaml.load(f, Loader=yaml.FullLoader)
+    self.assertEqual(config_dict, {'x': 2, 'y': 'test'})
 
 
 if __name__ == '__main__':

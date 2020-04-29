@@ -18,8 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import re
 import functools
+import re
 from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
@@ -530,6 +530,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     def metric_fn(**kwargs):
       """Returns a dictionary that has the evaluation metrics."""
       batch_size = params['batch_size']
+      if params['use_tpu']:
+        batch_size = params['batch_size'] * params['num_shards']
       eval_anchors = anchors.Anchors(params['min_level'],
                                      params['max_level'],
                                      params['num_scales'],

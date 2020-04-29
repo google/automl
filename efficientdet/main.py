@@ -65,9 +65,9 @@ flags.DEFINE_string('backbone_ckpt', '',
 flags.DEFINE_string('ckpt', None,
                     'Start training from this EfficientDet checkpoint.')
 
-flags.DEFINE_string('hparams', '',
-                    'Comma separated k=v pairs of hyperparameters or'
-                    ' a module containing attributes to use as hyperparameters.')
+flags.DEFINE_string(
+    'hparams', '', 'Comma separated k=v pairs of hyperparameters or a module'
+    ' containing attributes to use as hyperparameters.')
 flags.DEFINE_integer(
     'num_cores', default=8, help='Number of TPU cores for training')
 flags.DEFINE_bool('use_spatial_partition', False, 'Use spatial partition.')
@@ -141,13 +141,11 @@ def main(argv):
   # Parse and override hparams
   config = hparams_config.get_detection_config(FLAGS.model_name)
   config.override(FLAGS.hparams)
-  if FLAGS.num_epochs:  # TODO: remove this flag after updating all docs.
+  if FLAGS.num_epochs:  # NOTE: remove this flag after updating all docs.
     config.num_epochs = FLAGS.num_epochs
 
-  if isinstance(config.image_size, str) and 'x' in config.image_size:
-    # image size is in format of width x height.
-    width, height = config.image_size.split('x')
-    config.image_size = (int(height), int(width))
+  # Parse image size in case it is in string format.
+  config.image_size = utils.parse_image_size(config.image_size)
 
   # The following is for spatial partitioning. `features` has one tensor while
   # `labels` had 4 + (`max_level` - `min_level` + 1) * 2 tensors. The input
