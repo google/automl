@@ -19,6 +19,7 @@ from __future__ import division
 # gtype import
 from __future__ import print_function
 
+import contextlib
 import os
 import re
 from absl import logging
@@ -27,7 +28,7 @@ import tensorflow.compat.v1 as tf
 import tensorflow.compat.v2 as tf2
 from typing import Text, Tuple, Union
 
-from tensorflow.python.tpu import tpu_function  # pylint:disable=g-direct-tensorflow-import
+from tensorflow.contrib.tpu.python.tpu import tpu_function  # pylint:disable=g-direct-tensorflow-import
 # pylint: disable=logging-format-interpolation
 
 
@@ -463,3 +464,82 @@ def get_feat_sizes(image_size: Union[Text, int, Tuple[int, int]],
     feat_size = ((feat_size[0] - 1) // 2 + 1, (feat_size[1] - 1) // 2 + 1)
     feat_sizes.append({'height': feat_size[0], 'width': feat_size[1]})
   return feat_sizes
+
+
+@contextlib.contextmanager
+def float16_scope():
+  """Scope class for float16."""
+
+  def _custom_getter(getter, *args, **kwargs):
+    """Returns a custom getter that methods must be called under."""
+    cast_to_float16 = False
+    requested_dtype = kwargs['dtype']
+    if requested_dtype == tf.float16:
+      kwargs['dtype'] = tf.float32
+      cast_to_float16 = True
+    var = getter(*args, **kwargs)
+    if cast_to_float16:
+      var = tf.cast(var, tf.float16)
+    return var
+
+  with tf.variable_scope('', custom_getter=_custom_getter) as varscope:
+    yield varscope
+
+
+def set_precision_policy(policy_name: Text = 'float32'):
+  """Set precision policy according to the name.
+
+  Args:
+    policy_name: precision policy name, one of 'float32', 'mixed_float16',
+      'mixed_bfloat16', or None.
+  """
+  if not policy_name or policy_name == 'float32':
+    return
+
+  assert policy_name in ('mixed_float16', 'mixed_bfloat16')
+  print('use mixed precision policy name ', policy_name)
+  # TODO(tanmingxing): use tf.keras.layers.enable_v2_dtype_behavior() when it
+  # available in stable TF release.
+  from tensorflow.python.keras.engine import base_layer_utils  # pylint: disable=g-import-not-at-top,g-direct-tensorflow-import
+  base_layer_utils.enable_v2_dtype_behavior()
+  # mixed_float16 training is not supported for now, so disable loss_scale.
+  # float32 and mixed_bfloat16 do not need loss scale for training.
+  policy = tf2.keras.mixed_precision.experimental.Policy(
+      policy_name, loss_scale=None)
+  tf2.keras.mixed_precision.experimental.set_policy(policy)
+
+
+def build_model_with_precision(pp, mm, ii, **kwargs):
+  """Build model with its inputs/params for a specified precision context.
+
+  This is highly specific to this codebase, and not intended to be general API.
+  Advanced users only. DO NOT use it if you don't know what it does.
+  NOTE: short argument names are intended to avoid conficts with kwargs.
+
+  Args:
+    pp: A string, precision policy name, such as "mixed_float16".
+    mm: A function, for rmodel builder.
+    ii: A tensor, for model inputs.
+    **kwargs: A dict, extra model parameters.
+
+  Returns:
+    the output of mm model.
+  """
+  if pp == 'mixed_bfloat16':
+    set_precision_policy(pp)
+    inputs = tf.cast(ii, tf.bfloat16)
+    with tf.tpu.bfloat16_scope():
+      outputs = mm(inputs, **kwargs)
+    set_precision_policy('float32')
+  elif pp == 'mixed_float16':
+    set_precision_policy(pp)
+    inputs = tf.cast(ii, tf.float16)
+    with float16_scope():
+      outputs = mm(inputs, **kwargs)
+    set_precision_policy('float32')
+  else:
+    outputs = mm(ii, **kwargs)
+
+  # Users are responsible to convert the dtype of all outputs.
+  return outputs
+
