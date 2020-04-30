@@ -324,6 +324,7 @@ def add_metric_fn_inputs(params,
     max_detection_points: an integer specifing the maximum detection points to
       keep before NMS. Keep all anchors if max_detection_points <= 0.
   """
+  batch_size = params['batch_size']
   num_classes = params['num_classes']
   cls_outputs_all = []
   box_outputs_all = []
@@ -335,9 +336,9 @@ def add_metric_fn_inputs(params,
 
     cls_outputs_all.append(tf.reshape(
         cls_outputs[level],
-        [params['batch_size'], -1, num_classes]))
+        [batch_size, -1, num_classes]))
     box_outputs_all.append(tf.reshape(
-        box_outputs[level], [params['batch_size'], -1, 4]))
+        box_outputs[level], [batch_size, -1, 4]))
   cls_outputs_all = tf.concat(cls_outputs_all, 1)
   box_outputs_all = tf.concat(box_outputs_all, 1)
 
@@ -345,7 +346,7 @@ def add_metric_fn_inputs(params,
     # Prune anchors and detections to only keep max_detection_points.
     # Due to some issues, top_k is currently slow in graph model.
     cls_outputs_all_reshape = tf.reshape(cls_outputs_all,
-                                         [params['batch_size'], -1])
+                                         [batch_size, -1])
     _, cls_topk_indices = tf.math.top_k(cls_outputs_all_reshape,
                                         k=max_detection_points,
                                         sorted=False)
@@ -363,9 +364,8 @@ def add_metric_fn_inputs(params,
     num_anchors = cls_outputs_all.shape[1]
 
     classes = cls_outputs_idx
-    indices = tf.reshape(
-        tf.tile(tf.range(num_anchors), [params['batch_size']]),
-        [-1, num_anchors])
+    indices = tf.tile(tf.expand_dims(tf.range(num_anchors), axis=0),
+                      [batch_size, 1])
     cls_outputs_all_after_topk = tf.reduce_max(cls_outputs_all, -1)
     box_outputs_all_after_topk = box_outputs_all
 
