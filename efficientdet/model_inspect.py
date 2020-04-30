@@ -174,7 +174,10 @@ class ModelInspector(object):
         Image.fromarray(img).save(output_image_path)
         logging.info('writing file to %s', output_image_path)
 
-  def saved_model_benchmark(self, image_path_pattern, **kwargs):
+  def saved_model_benchmark(self,
+                            image_path_pattern,
+                            trace_filename=None,
+                            **kwargs):
     """Perform inference for the given saved model."""
     driver = inference.ServingDriver(
         self.model_name,
@@ -189,7 +192,7 @@ class ModelInspector(object):
     if len(all_files) < self.batch_size:
       all_files = all_files * (self.batch_size // len(all_files) + 1)
     raw_images = [np.array(Image.open(f)) for f in all_files[:self.batch_size]]
-    driver.benchmark(raw_images, FLAGS.trace_filename)
+    driver.benchmark(raw_images, trace_filename)
 
   def saved_model_video(self, video_path: Text, output_video: Text, **kwargs):
     """Perform video inference for the given saved model."""
@@ -229,10 +232,9 @@ class ModelInspector(object):
       else:
         # show the frame online, mainly used for real-time speed test.
         cv2.imshow('Frame', new_frame)
-
-      # Press Q on keyboard to  exit
-      if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+        # Press Q on keyboard to  exit
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+          break
 
   def inference_single_image(self, image_image_path, output_dir, **kwargs):
     driver = inference.InferenceDriver(self.model_name, self.ckpt_path,
@@ -394,7 +396,7 @@ class ModelInspector(object):
     goutput = tf.import_graph_def(infer_graph, return_elements=fetches)
     return goutput
 
-  def run_model(self, runmode, threads=0):
+  def run_model(self, runmode, **kwargs):
     """Run the model on devices."""
     if runmode == 'dry':
       self.build_and_save_model()
@@ -403,32 +405,34 @@ class ModelInspector(object):
     elif runmode == 'ckpt':
       self.eval_ckpt()
     elif runmode == 'saved_model_benchmark':
-      self.saved_model_benchmark(FLAGS.input_image)
+      self.saved_model_benchmark(
+          kwargs['input_image'],
+          trace_filename=kwargs.get('trace_filename', None))
     elif runmode in ('infer', 'saved_model', 'saved_model_infer',
                      'saved_model_video'):
       config_dict = {}
-      if FLAGS.line_thickness:
-        config_dict['line_thickness'] = FLAGS.line_thickness
-      if FLAGS.max_boxes_to_draw:
-        config_dict['max_boxes_to_draw'] = FLAGS.max_boxes_to_draw
-      if FLAGS.min_score_thresh:
-        config_dict['min_score_thresh'] = FLAGS.min_score_thresh
+      if kwargs.get('line_thickness', None):
+        config_dict['line_thickness'] = kwargs.get('line_thickness')
+      if kwargs.get('max_boxes_to_draw', None):
+        config_dict['max_boxes_to_draw'] = kwargs.get('max_boxes_to_draw')
+      if kwargs.get('min_score_thresh', None):
+        config_dict['min_score_thresh'] = kwargs.get('min_score_thresh')
 
-      if runmode == 'infer':
-        self.inference_single_image(
-            FLAGS.input_image, FLAGS.output_image_dir, **config_dict)
-      elif runmode == 'saved_model':
+      if runmode == 'saved_model':
         self.export_saved_model(**config_dict)
+      elif runmode == 'infer':
+        self.inference_single_image(
+            kwargs['input_image'], kwargs['output_image_dir'], **config_dict)
       elif runmode == 'saved_model_infer':
         self.saved_model_inference(
-            FLAGS.input_image, FLAGS.output_image_dir, **config_dict)
+            kwargs['input_image'], kwargs['output_image_dir'], **config_dict)
       elif runmode == 'saved_model_video':
         self.saved_model_video(
-            FLAGS.input_video, FLAGS.output_video, **config_dict)
+            kwargs['input_video'], kwargs['output_video'], **config_dict)
     elif runmode == 'bm':
-      self.benchmark_model(warmup_runs=5, bm_runs=FLAGS.bm_runs,
-                           num_threads=threads,
-                           trace_filename=FLAGS.trace_filename)
+      self.benchmark_model(warmup_runs=5, bm_runs=kwargs.get('bm_runs', 10),
+                           num_threads=kwargs.get('threads', 0),
+                           trace_filename=kwargs.get('trace_filename', None))
 
 
 def main(_):
@@ -446,7 +450,18 @@ def main(_):
       saved_model_dir=FLAGS.saved_model_dir,
       batch_size=FLAGS.batch_size,
       hparams=FLAGS.hparams)
-  inspector.run_model(FLAGS.runmode, FLAGS.threads)
+  inspector.run_model(
+      FLAGS.runmode,
+      input_image=FLAGS.input_image,
+      output_image_dir=FLAGS.output_image_dir,
+      input_video=FLAGS.input_video,
+      output_video=FLAGS.output_video,
+      line_thickness=FLAGS.line_thickness,
+      max_boxes_to_draw=FLAGS.max_boxes_to_draw,
+      min_score_thresh=FLAGS.min_score_thresh,
+      bm_runs=FLAGS.bm_runs,
+      threads=FLAGS.threads,
+      trace_filename=FLAGS.trace_filename)
 
 
 if __name__ == '__main__':
