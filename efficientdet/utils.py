@@ -547,8 +547,10 @@ def build_model_with_precision(pp, mm, ii, *args, **kwargs):
     with float16_scope():
       outputs = mm(inputs, *args, **kwargs)
     set_precision_policy('float32')
-  else:
+  elif not pp or pp == 'float32':
     outputs = mm(ii, *args, **kwargs)
+  else:
+    raise ValueError('Unknow precision name {}'.format(pp))
 
   # Users are responsible to convert the dtype of all outputs.
   return outputs
