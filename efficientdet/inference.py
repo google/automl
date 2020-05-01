@@ -147,12 +147,18 @@ def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
     **kwargs: extra parameters for model builder.
 
   Returns:
-    (class_outputs, box_outputs): the outputs for class and box predictions.
+    (cls_outputs, box_outputs): the outputs for class and box predictions.
     Each is a dictionary with key as feature level and value as predictions.
   """
   model_arch = det_model_fn.get_model_arch(model_name)
-  class_outputs, box_outputs = model_arch(inputs, model_name, **kwargs)
-  return class_outputs, box_outputs
+  cls_outputs, box_outputs = utils.build_model_with_precision(
+      kwargs.get('precision', None), model_arch, inputs, model_name, **kwargs)
+  if kwargs.get('precision', None):
+    # Post-processing has multiple places with hard-coded float32.
+    # TODO(tanmingxing): Remove them once post-process can adpat to dtypes.
+    cls_outputs = {k: tf.cast(v, tf.float32) for k, v in cls_outputs.items()}
+    box_outputs = {k: tf.cast(v, tf.float32) for k, v in box_outputs.items()}
+  return cls_outputs, box_outputs
 
 
 def restore_ckpt(sess, ckpt_path, ema_decay=0.9998, export_ckpt=None):

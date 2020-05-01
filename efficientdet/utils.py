@@ -46,12 +46,6 @@ def activation_fn(features: tf.Tensor, act_type: Text):
     raise ValueError('Unsupported act_type {}'.format(act_type))
 
 
-class DepthwiseConv2D(tf.keras.layers.DepthwiseConv2D, tf.layers.Layer):
-  """Wrap keras DepthwiseConv2D to tf.layers."""
-
-  pass
-
-
 def get_ema_vars():
   """Get all exponential moving average (ema) variables."""
   ema_vars = tf.trainable_variables() + tf.get_collection('moving_vars')
@@ -168,11 +162,12 @@ def get_ckpt_var_map_ema(ckpt_path, ckpt_scope, var_scope, var_exclude_expr):
   return var_map
 
 
-class TpuBatchNormalization(tf.layers.BatchNormalization):
-  # class TpuBatchNormalization(tf.layers.BatchNormalization):
+class TpuBatchNormalization(tf.keras.layers.BatchNormalization):
   """Cross replica batch normalization."""
 
   def __init__(self, fused=False, **kwargs):
+    if not kwargs.get('name', None):
+      kwargs['name'] = 'tpu_batch_normalization'
     if fused in (True, None):
       raise ValueError('TpuBatchNormalization does not support fused=True.')
     super(TpuBatchNormalization, self).__init__(fused=fused, **kwargs)
@@ -217,14 +212,28 @@ class TpuBatchNormalization(tf.layers.BatchNormalization):
     else:
       return (shard_mean, shard_variance)
 
+  def call(self, *args, **kwargs):
+    outputs = super(TpuBatchNormalization, self).call(*args, **kwargs)
+    # A temporary hack for tf1 compatibility with keras batch norm.
+    for u in self.updates:
+      tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, u)
+    return outputs
 
-class BatchNormalization(tf.layers.BatchNormalization):
+
+class BatchNormalization(tf.keras.layers.BatchNormalization):
   """Fixed default name of BatchNormalization to match TpuBatchNormalization."""
 
   def __init__(self, **kwargs):
     if not kwargs.get('name', None):
       kwargs['name'] = 'tpu_batch_normalization'
     super(BatchNormalization, self).__init__(**kwargs)
+
+  def call(self, *args, **kwargs):
+    outputs = super(BatchNormalization, self).call(*args, **kwargs)
+    # A temporary hack for tf1 compatibility with keras batch norm.
+    for u in self.updates:
+      tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, u)
+    return outputs
 
 
 def batch_norm_class(is_training, use_tpu=False,):
@@ -497,7 +506,7 @@ def set_precision_policy(policy_name: Text = 'float32'):
     return
 
   assert policy_name in ('mixed_float16', 'mixed_bfloat16')
-  print('use mixed precision policy name ', policy_name)
+  logging.info('use mixed precision policy name %s', policy_name)
   # TODO(tanmingxing): use tf.keras.layers.enable_v2_dtype_behavior() when it
   # available in stable TF release.
   from tensorflow.python.keras.engine import base_layer_utils  # pylint: disable=g-import-not-at-top,g-direct-tensorflow-import
@@ -509,7 +518,7 @@ def set_precision_policy(policy_name: Text = 'float32'):
   tf2.keras.mixed_precision.experimental.set_policy(policy)
 
 
-def build_model_with_precision(pp, mm, ii, **kwargs):
+def build_model_with_precision(pp, mm, ii, *args, **kwargs):
   """Build model with its inputs/params for a specified precision context.
 
   This is highly specific to this codebase, and not intended to be general API.
@@ -520,6 +529,7 @@ def build_model_with_precision(pp, mm, ii, **kwargs):
     pp: A string, precision policy name, such as "mixed_float16".
     mm: A function, for rmodel builder.
     ii: A tensor, for model inputs.
+    *args: A list of model arguments.
     **kwargs: A dict, extra model parameters.
 
   Returns:
@@ -529,17 +539,16 @@ def build_model_with_precision(pp, mm, ii, **kwargs):
     set_precision_policy(pp)
     inputs = tf.cast(ii, tf.bfloat16)
     with tf.tpu.bfloat16_scope():
-      outputs = mm(inputs, **kwargs)
+      outputs = mm(inputs, *args, **kwargs)
     set_precision_policy('float32')
   elif pp == 'mixed_float16':
     set_precision_policy(pp)
     inputs = tf.cast(ii, tf.float16)
     with float16_scope():
-      outputs = mm(inputs, **kwargs)
+      outputs = mm(inputs, *args, **kwargs)
     set_precision_policy('float32')
   else:
-    outputs = mm(ii, **kwargs)
+    outputs = mm(ii, *args, **kwargs)
 
   # Users are responsible to convert the dtype of all outputs.
   return outputs
-

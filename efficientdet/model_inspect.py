@@ -30,7 +30,6 @@ from PIL import Image
 import tensorflow.compat.v1 as tf
 from typing import Text, Tuple, List
 
-import det_model_fn
 import hparams_config
 import inference
 import utils
@@ -116,10 +115,9 @@ class ModelInspector(object):
                   is_training: bool = False) -> List[tf.Tensor]:
     """Build model with inputs and labels and print out model stats."""
     logging.info('start building model')
-    model_arch = det_model_fn.get_model_arch(self.model_name)
-    cls_outputs, box_outputs = model_arch(
+    cls_outputs, box_outputs = inference.build_model(
+        self.model_name,
         inputs,
-        model_name=self.model_name,
         is_training_bn=is_training,
         config=self.model_config)
 

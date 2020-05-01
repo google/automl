@@ -282,13 +282,12 @@ def build_model(images,
         f.write('global_params= %s\n\n' % str(global_params))
         f.write('blocks_args= %s\n\n' % str(blocks_args))
 
-  with tf.variable_scope(model_name):
-    model = efficientnet_model.Model(blocks_args, global_params)
-    outputs = model(
-        images,
-        training=training,
-        features_only=features_only,
-        pooled_features_only=pooled_features_only)
+  model = efficientnet_model.Model(blocks_args, global_params, model_name)
+  outputs = model(
+      images,
+      training=training,
+      features_only=features_only,
+      pooled_features_only=pooled_features_only)
   if features_only:
     outputs = tf.identity(outputs, 'features')
   elif pooled_features_only:
@@ -323,9 +322,6 @@ def build_model_base(images, model_name, training, override_params=None):
 
   blocks_args, global_params = get_model_params(model_name, override_params)
 
-  with tf.variable_scope(model_name):
-    model = efficientnet_model.Model(blocks_args, global_params)
-    features = model(images, training=training, features_only=True)
-
-  features = tf.identity(features, 'features')
+  model = efficientnet_model.Model(blocks_args, global_params, model_name)
+  features = model(images, training=training, features_only=True)
   return features, model.endpoints
