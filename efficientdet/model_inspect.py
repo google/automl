@@ -121,7 +121,6 @@ class ModelInspector(object):
         inputs,
         model_name=self.model_name,
         is_training_bn=is_training,
-        use_bfloat16=False,
         config=self.model_config)
 
     print('backbone+fpn+box params/flops = {:.6f}M, {:.9f}B'.format(

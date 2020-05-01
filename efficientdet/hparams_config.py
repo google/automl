@@ -212,8 +212,9 @@ def default_detection_configs():
   # regularization l2 loss.
   h.weight_decay = 4e-5
   # enable bfloat
-  h.use_bfloat16 = True
   h.use_tpu = True
+  # precision: one of 'float32', 'mixed_float16', 'mixed_bfloat16'.
+  h.precision = None   # If None, use float32.
 
   # For detection.
   h.box_class_repeats = 3

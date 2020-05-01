@@ -439,19 +439,16 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   # Convert params (dict) to Config for easier access.
   if params['data_format'] == 'channels_first':
     features = tf.transpose(features, [0, 3, 1, 2])
-  def _model_outputs():
-    return model(features, config=hparams_config.Config(params))
+  def _model_outputs(inputs):
+    return model(inputs, config=hparams_config.Config(params))
 
-  if params['use_bfloat16']:
-    with tf.tpu.bfloat16_scope():
-      cls_outputs, box_outputs = _model_outputs()
-      levels = cls_outputs.keys()
-      for level in levels:
-        cls_outputs[level] = tf.cast(cls_outputs[level], tf.float32)
-        box_outputs[level] = tf.cast(box_outputs[level], tf.float32)
-  else:
-    cls_outputs, box_outputs = _model_outputs()
-    levels = cls_outputs.keys()
+  cls_outputs, box_outputs = utils.build_model_with_precision(
+      params['precision'], _model_outputs, features)
+
+  levels = cls_outputs.keys()
+  for level in levels:
+    cls_outputs[level] = tf.cast(cls_outputs[level], tf.float32)
+    box_outputs[level] = tf.cast(box_outputs[level], tf.float32)
 
   # First check if it is in PREDICT mode.
   if mode == tf.estimator.ModeKeys.PREDICT:

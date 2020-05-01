@@ -309,8 +309,6 @@ class InputReader(object):
                                       [self._max_num_instances, 1])
         areas = pad_to_fixed_size(areas, -1, [self._max_num_instances, 1])
         classes = pad_to_fixed_size(classes, -1, [self._max_num_instances, 1])
-        if params['use_bfloat16']:
-          image = tf.cast(image, dtype=tf.bfloat16)
         return (image, cls_targets, box_targets, num_positives, source_id,
                 image_scale, boxes, is_crowds, areas, classes)
 

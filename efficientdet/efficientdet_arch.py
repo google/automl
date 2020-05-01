@@ -38,6 +38,21 @@ from backbone import efficientnet_builder
 
 
 ################################################################################
+def freeze_vars(variables, pattern):
+  """Removes backbone+fpn variables from the input.
+
+  Args:
+    variables: all the variables in training
+    pattern: a reg experession such as ".*(efficientnet|fpn_cells).*".
+
+  Returns:
+    var_list: a list containing variables for training
+  """
+  if pattern:
+    variables = [v for v in variables if not re.match(pattern, v.name)]
+  return variables
+
+
 def nearest_upsampling(data, height_scale, width_scale, data_format):
   """Nearest neighbor upsampling implementation."""
   with tf.name_scope('nearest_upsampling'):
@@ -698,19 +713,3 @@ def efficientdet(features, model_name=None, config=None, **kwargs):
       *utils.num_params_flops()))
 
   return class_outputs, box_outputs
-
-
-def freeze_vars(variables, pattern):
-  """Removes backbone+fpn variables from the input.
-
-  Args:
-    variables: all the variables in training
-    pattern: a reg experession such as ".*(efficientnet|fpn_cells).*".
-
-  Returns:
-    var_list: a list containing variables for training
-
-  """
-  if pattern:
-    variables = [v for v in variables if not re.match(pattern, v.name)]
-  return variables

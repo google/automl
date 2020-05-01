@@ -105,6 +105,9 @@ flags.DEFINE_string('model_name', 'efficientdet-d1',
                     'Model name: retinanet or efficientdet')
 flags.DEFINE_bool('eval_after_training', False, 'Run one eval after the '
                   'training finishes.')
+flags.DEFINE_integer(
+    'tf_random_seed', None, 'Sets the TF graph seed for deterministic execution'
+    ' across runs (for debugging).')
 
 # For Eval mode
 flags.DEFINE_integer('min_eval_interval', 180,
@@ -239,6 +242,7 @@ def main(argv):
       log_step_count_steps=FLAGS.iterations_per_loop,
       session_config=config_proto,
       tpu_config=tpu_config,
+      tf_random_seed=FLAGS.tf_random_seed,
   )
 
   model_fn_instance = det_model_fn.get_model_fn(FLAGS.model_name)
@@ -263,14 +267,14 @@ def main(argv):
       # Run evaluation after training finishes.
       eval_params = dict(
           params,
-          use_tpu=False,
+          use_tpu=FLAGS.use_tpu,
           input_rand_hflip=False,
           is_training_bn=False,
-          use_bfloat16=False,
+          precision=None,
       )
       eval_estimator = tf.estimator.tpu.TPUEstimator(
           model_fn=model_fn_instance,
-          use_tpu=False,
+          use_tpu=FLAGS.use_tpu,
           train_batch_size=FLAGS.train_batch_size,
           eval_batch_size=FLAGS.eval_batch_size,
           config=run_config,
@@ -287,18 +291,17 @@ def main(argv):
     # Eval only runs on CPU or GPU host with batch_size = 1.
     # Override the default options: disable randomization in the input pipeline
     # and don't run on the TPU.
-    # Also, disable use_bfloat16 for eval on CPU/GPU.
     eval_params = dict(
         params,
-        use_tpu=False,
+        use_tpu=FLAGS.use_tpu,
         input_rand_hflip=False,
         is_training_bn=False,
-        use_bfloat16=False,
+        precision=None,
     )
 
     eval_estimator = tf.estimator.tpu.TPUEstimator(
         model_fn=model_fn_instance,
-        use_tpu=False,
+        use_tpu=FLAGS.use_tpu,
         train_batch_size=FLAGS.train_batch_size,
         eval_batch_size=FLAGS.eval_batch_size,
         config=run_config,
@@ -366,14 +369,14 @@ def main(argv):
       # Run evaluation after every epoch.
       eval_params = dict(
           params,
-          use_tpu=False,
+          use_tpu=FLAGS.use_tpu,
           input_rand_hflip=False,
           is_training_bn=False,
       )
 
       eval_estimator = tf.estimator.tpu.TPUEstimator(
           model_fn=model_fn_instance,
-          use_tpu=False,
+          use_tpu=FLAGS.use_tpu,
           train_batch_size=FLAGS.train_batch_size,
           eval_batch_size=FLAGS.eval_batch_size,
           config=run_config,

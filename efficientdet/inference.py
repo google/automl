@@ -431,7 +431,7 @@ class ServingDriver(object):
 
     if model_params:
       self.params.update(model_params)
-    self.params.update(dict(is_training_bn=False, use_bfloat16=False))
+    self.params.update(dict(is_training_bn=False))
     self.label_id_mapping = parse_label_id_mapping(
         self.params.get('label_id_mapping', None))
 
@@ -665,7 +665,7 @@ class InferenceDriver(object):
     self.params = hparams_config.get_detection_config(model_name).as_dict()
     if model_params:
       self.params.update(model_params)
-    self.params.update(dict(is_training_bn=False, use_bfloat16=False))
+    self.params.update(dict(is_training_bn=False))
     self.label_id_mapping = parse_label_id_mapping(
         self.params.get('label_id_mapping', None))
 
