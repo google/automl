@@ -197,7 +197,7 @@ You can run inference for a video and show the results online:
         --model_name=${MODEL}  --model_dir=${CKPT_PATH}  \
         --validation_file_pattern=tfrecord/val*  \
         --val_json_file=annotations/instances_val2017.json  \
-        --hparams="use_bfloat16=false" --use_tpu=False
+        --use_tpu=False
 
 You can also run eval on test-dev set with the following command:
 
@@ -219,7 +219,7 @@ You can also run eval on test-dev set with the following command:
         --model_name=${MODEL}  --model_dir=${CKPT_PATH}  \
         --validation_file_pattern=tfrecord/testdev*  \
         --testdev_dir='testdev_output' --eval_samples=20288 \
-        --hparams="use_bfloat16=false" --use_tpu=False
+        --use_tpu=False
     # Now you can submit testdev_output/detections_test-dev2017_test_results.json to
     # coco server: https://competitions.codalab.org/competitions/20794#participate
 
@@ -246,13 +246,12 @@ You can also run eval on test-dev set with the following command:
         --train_batch_size=8 \
         --eval_batch_size=8 --eval_samples=512 \
         --num_examples_per_epoch=5717 --num_epochs=1  \
-        --hparams="use_bfloat16=false,num_classes=20,moving_average_decay=0" \
+        --hparams="num_classes=20,moving_average_decay=0" \
         --use_tpu=False
 
 ## 8. Finetune on PASCAL VOC 2012 with detector COCO ckpt.
 Create a config file for the PASCAL VOC dataset called voc_config.yaml and put this in it.
 
-      use_bfloat16: False
       num_classes: 20
       moving_average_decay: 0
 
