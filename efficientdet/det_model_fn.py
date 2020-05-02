@@ -335,18 +335,15 @@ def add_metric_fn_inputs(params,
       box_outputs[level] = tf.transpose(box_outputs[level], [0, 2, 3, 1])
 
     cls_outputs_all.append(tf.reshape(
-        cls_outputs[level],
-        [batch_size, -1, num_classes]))
-    box_outputs_all.append(tf.reshape(
-        box_outputs[level], [batch_size, -1, 4]))
+        cls_outputs[level], [batch_size, -1, num_classes]))
+    box_outputs_all.append(tf.reshape(box_outputs[level], [batch_size, -1, 4]))
   cls_outputs_all = tf.concat(cls_outputs_all, 1)
   box_outputs_all = tf.concat(box_outputs_all, 1)
 
   if max_detection_points > 0:
     # Prune anchors and detections to only keep max_detection_points.
     # Due to some issues, top_k is currently slow in graph model.
-    cls_outputs_all_reshape = tf.reshape(cls_outputs_all,
-                                         [batch_size, -1])
+    cls_outputs_all_reshape = tf.reshape(cls_outputs_all, [batch_size, -1])
     _, cls_topk_indices = tf.math.top_k(cls_outputs_all_reshape,
                                         k=max_detection_points,
                                         sorted=False)

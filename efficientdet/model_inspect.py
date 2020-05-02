@@ -100,7 +100,8 @@ class ModelInspector(object):
     model_config.override(hparams)  # Add custom overrides
     model_config.image_size = utils.parse_image_size(model_config.image_size)
 
-    self.batch_size = batch_size
+    # If batch size is 0, then build a graph with dynamic batch size.
+    self.batch_size = batch_size or None
     self.labels_shape = [batch_size, model_config.num_classes]
 
     width, height = model_config.image_size
@@ -156,6 +157,7 @@ class ModelInspector(object):
         **kwargs)
     driver.load(self.saved_model_dir)
 
+    # Serving time batch size should be fixed.
     batch_size = self.batch_size or 1
     all_files = list(tf.io.gfile.glob(image_path_pattern))
     num_batches = len(all_files) // batch_size
