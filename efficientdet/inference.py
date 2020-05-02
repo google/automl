@@ -77,6 +77,14 @@ def image_preprocess(image, image_size: Union[int, Tuple[int, int]]):
   image_scale = input_processor.image_scale_to_original
   return image, image_scale
 
+@tf.autograph.to_graph
+def batch_image_files_decode(image_files):
+  raw_images = tf.TensorArray(tf.uint8, size=0, dynamic_size=True)
+  for i in tf.range(tf.shape(image_files)[0]):
+    image = tf.io.decode_image(image_files[i])
+    image.set_shape([None, None, None])
+    raw_images = raw_images.write(i, image)
+  return raw_images.stack()
 
 def batch_image_preprocess(raw_images,
                            image_size: Union[int, Tuple[int, int]],
@@ -516,13 +524,8 @@ class ServingDriver(object):
     with self.sess.graph.as_default():
       image_files = tf.placeholder(tf.string, name='image_files', shape=[None])
       image_size = params['image_size']
-      raw_images = []
-      for i in range(self.batch_size):
-        image = tf.io.decode_image(image_files[i])
-        image.set_shape([None, None, None])
-        raw_images.append(image)
-      raw_images = tf.stack(raw_images, name='image_arrays')
-
+      raw_images = batch_image_files_decode(image_files)
+      raw_images = tf.identity(raw_images, name='image_arrays')
       images, scales = batch_image_preprocess(raw_images, image_size,
                                               self.batch_size)
       if params['data_format'] == 'channels_first':
