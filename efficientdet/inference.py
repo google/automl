@@ -222,7 +222,7 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
   eval_anchors = anchors.Anchors(params['min_level'], params['max_level'],
                                  params['num_scales'], params['aspect_ratios'],
                                  params['anchor_scale'], params['image_size'])
-  anchor_labeler = anchors.AnchorLabeler(eval_anchors, num_classes)
+
   if params['batch_size'] is None:
     batch_size = tf.shape(list(cls_outputs.values())[0])[0]
     cls_outputs_all = []
@@ -240,7 +240,7 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
           box_outputs[level], [batch_size, -1, 4]))
     cls_outputs_all = tf.concat(cls_outputs_all, 1)
     box_outputs_all = tf.concat(box_outputs_all, 1)
-    anchor_boxes = anchor_labeler._anchors.boxes
+    anchor_boxes = eval_anchors.boxes
     scores = tf.math.sigmoid(cls_outputs_all)
     # apply bounding box regression to anchors
     boxes = anchors.decode_box_outputs_tf(box_outputs_all, anchor_boxes)
@@ -254,7 +254,7 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
     height = nmsed_boxes[..., 2] - nmsed_boxes[..., 0]
     width = nmsed_boxes[..., 3] - nmsed_boxes[..., 1]
     detections = tf.stack([
-        tf.cast(tf.tile(tf.expand_dims(tf.range(tf.shape(cls_outputs_all)[0]), axis=1),
+        tf.cast(tf.tile(tf.expand_dims(tf.range(batch_size), axis=1),
           [1, anchors.MAX_DETECTIONS_PER_IMAGE]), tf.float32),
         nmsed_boxes[..., 0] * scales,
         nmsed_boxes[..., 1] * scales,
@@ -272,8 +272,8 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
       'indices_all': [None],
       'classes_all': [None]
   }
-  det_model_fn.add_metric_fn_inputs(params, cls_outputs, box_outputs, outputs,
-                                    -1)
+  det_model_fn.add_metric_fn_inputs(params, cls_outputs, box_outputs, outputs, -1)
+  anchor_labeler = anchors.AnchorLabeler(eval_anchors, num_classes)
 
   # Add all detections for each input image.
   detections_batch = []
@@ -751,7 +751,7 @@ class InferenceDriver(object):
 
       # for postprocessing.
       params.update(
-          dict(batch_size=len(raw_images), disable_pyfun=self.disable_pyfun))
+          dict(batch_size=None, disable_pyfun=self.disable_pyfun))
 
       # Build postprocessing.
       detections_batch = det_post_process(
