@@ -94,10 +94,10 @@ class Config(object):
     if isinstance(config_dict_or_str, str):
       if not config_dict_or_str:
         return
-      elif config_dict_or_str.endswith('.yaml'):
-        config_dict = self.parse_from_yaml(config_dict_or_str)
       elif '=' in config_dict_or_str:
         config_dict = self.parse_from_str(config_dict_or_str)
+      elif config_dict_or_str.endswith('.yaml'):
+        config_dict = self.parse_from_yaml(config_dict_or_str)
       else:
         raise ValueError(
             'Invalid string {}, must end with .yaml or contains "=".'.format(
