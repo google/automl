@@ -253,7 +253,6 @@ You can also run eval on test-dev set with the following command:
         --hparams="num_classes=20,moving_average_decay=0" \
         --use_tpu=False
 
-
 ## 8. Finetune on PASCAL VOC 2012 with detector COCO ckpt.
 Create a config file for the PASCAL VOC dataset called voc_config.yaml and put this in it.
 
