@@ -194,6 +194,68 @@ def restore_ckpt(sess, ckpt_path, ema_decay=0.9998, export_ckpt=None):
     saver.save(sess, export_ckpt)
 
 
+def det_post_process_combined(params, cls_outputs, box_outputs, scales,
+                              min_score_thresh, max_boxes_to_draw):
+  """Post processing with combined nms."""
+  num_classes = params['num_classes']
+  max_boxes_to_draw = max_boxes_to_draw or anchors.MAX_DETECTIONS_PER_IMAGE
+  # Create anchor_label for picking top-k predictions.
+  eval_anchors = anchors.Anchors(params['min_level'], params['max_level'],
+                                 params['num_scales'], params['aspect_ratios'],
+                                 params['anchor_scale'], params['image_size'])
+  anchor_labeler = anchors.AnchorLabeler(eval_anchors, num_classes)
+
+  batch_size = tf.shape(list(cls_outputs.values())[0])[0]
+  cls_outputs_all = []
+  box_outputs_all = []
+  # Concatenates class and box of all levels into one tensor.
+  for level in range(params['min_level'], params['max_level'] + 1):
+    if params['data_format'] == 'channels_first':
+      cls_outputs[level] = tf.transpose(cls_outputs[level], [0, 2, 3, 1])
+      box_outputs[level] = tf.transpose(box_outputs[level], [0, 2, 3, 1])
+
+    cls_outputs_all.append(
+        tf.reshape(cls_outputs[level], [batch_size, -1, num_classes]))
+    box_outputs_all.append(tf.reshape(box_outputs[level], [batch_size, -1, 4]))
+  cls_outputs_all = tf.concat(cls_outputs_all, 1)
+  box_outputs_all = tf.concat(box_outputs_all, 1)
+  anchor_boxes = anchor_labeler.anchors.boxes
+  scores = tf.math.sigmoid(cls_outputs_all)
+  # apply bounding box regression to anchors
+  boxes = anchors.decode_box_outputs_tf(box_outputs_all, anchor_boxes)
+  boxes = tf.expand_dims(boxes, axis=2)
+  boxes = tf.Print(boxes, [boxes], 'boxes')
+  scores = tf.Print(scores, [scores], 'scores')
+  nmsed_boxes, nmsed_scores, nmsed_classes, valid_detections = (
+      tf.image.combined_non_max_suppression(
+          boxes,
+          scores,
+          max_boxes_to_draw,
+          max_boxes_to_draw,
+          score_threshold=min_score_thresh,
+          clip_boxes=False))
+
+  # The following code is just for compatibility, should be removed in future.
+  scales = tf.expand_dims(scales, 1)
+  y = nmsed_boxes[..., 0] * scales
+  x = nmsed_boxes[..., 1] * scales
+  height = nmsed_boxes[..., 2] * scales - y
+  width = nmsed_boxes[..., 3] * scales - x
+  # Use fake ids for now.
+  image_ids = tf.ones([batch_size, max_boxes_to_draw], dtype=tf.float32)
+
+  # Format is [image_id, y, x, height, width, score, class]
+  detection_list = [
+      image_ids, y, x, height, width, nmsed_scores,
+      tf.cast(nmsed_classes + 1, tf.float32)
+  ]
+
+  # Contains the number of valid detctions per sample in the batch.
+  del valid_detections  # To be fixed.
+
+  return tf.stack(detection_list, axis=2, name='detections')
+
+
 def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
                      box_outputs: Dict[int, tf.Tensor], scales: List[float],
                      min_score_thresh, max_boxes_to_draw):
@@ -216,6 +278,10 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
     detections_batch: a batch of detection results. Each detection is a tensor
       with each row representing [image_id, x, y, width, height, score, class].
   """
+  if not params.get('batch_size', None):
+    return det_post_process_combined(params, cls_outputs, box_outputs, scales,
+                                     min_score_thresh, max_boxes_to_draw)
+
   # TODO(tanmingxing): refactor the code to make it more explicity.
   outputs = {
       'cls_outputs_all': [None],
@@ -471,14 +537,18 @@ class ServingDriver(object):
     if not self.sess:
       self.sess = self._build_session()
     with self.sess.graph.as_default():
-      image_files = tf.placeholder(tf.string, name='image_files', shape=[None])
       image_size = params['image_size']
-      raw_images = []
-      for i in range(self.batch_size):
-        image = tf.io.decode_image(image_files[i])
-        image.set_shape([None, None, None])
-        raw_images.append(image)
-      raw_images = tf.stack(raw_images, name='image_arrays')
+      image_files = tf.placeholder(tf.string, name='image_files', shape=[None])
+      if self.batch_size:
+        raw_images = []
+        for i in range(self.batch_size or 1):
+          image = tf.io.decode_image(image_files[i])
+          image.set_shape([None, None, None])
+          raw_images.append(image)
+        raw_images = tf.stack(raw_images, name='image_arrays')
+      else:
+        raw_images = tf.placeholder(
+            tf.float32, name='image_arrays', shape=[None, None, None, None])
 
       images, scales = batch_image_preprocess(raw_images, image_size,
                                               self.batch_size)
@@ -585,6 +655,7 @@ class ServingDriver(object):
     predictions = self.sess.run(
         self.signitures['prediction'],
         feed_dict={self.signitures['image_arrays']: image_arrays})
+    print(predictions)
     return predictions
 
   def load(self, saved_model_dir_or_frozen_graph: Text):

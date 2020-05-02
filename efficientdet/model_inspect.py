@@ -100,7 +100,7 @@ class ModelInspector(object):
     model_config.override(hparams)  # Add custom overrides
     model_config.image_size = utils.parse_image_size(model_config.image_size)
 
-    self.batch_size = batch_size
+    self.batch_size = batch_size or None
     self.labels_shape = [batch_size, model_config.num_classes]
 
     width, height = model_config.image_size

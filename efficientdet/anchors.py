@@ -99,11 +99,11 @@ def decode_box_outputs_tf(rel_codes, anchors):
   Returns:
     outputs: bounding boxes.
   """
-  ycenter_a = (anchors[0] + anchors[2]) / 2
-  xcenter_a = (anchors[1] + anchors[3]) / 2
-  ha = anchors[2] - anchors[0]
-  wa = anchors[3] - anchors[1]
-  ty, tx, th, tw = tf.unstack(rel_codes, num=4)
+  ycenter_a = (anchors[..., 0] + anchors[..., 2]) / 2
+  xcenter_a = (anchors[..., 1] + anchors[..., 3]) / 2
+  ha = anchors[..., 2] - anchors[..., 0]
+  wa = anchors[..., 3] - anchors[..., 1]
+  ty, tx, th, tw = tf.unstack(rel_codes, num=4, axis=-1)
 
   w = tf.math.exp(tw) * wa
   h = tf.math.exp(th) * ha
@@ -113,7 +113,7 @@ def decode_box_outputs_tf(rel_codes, anchors):
   xmin = xcenter - w / 2.
   ymax = ycenter + h / 2.
   xmax = xcenter + w / 2.
-  return tf.stack([ymin, xmin, ymax, xmax], axis=1)
+  return tf.stack([ymin, xmin, ymax, xmax], axis=-1)
 
 
 @tf.autograph.to_graph
@@ -310,8 +310,7 @@ def _generate_detections_tf(cls_outputs,
 
   scores = tf.math.sigmoid(cls_outputs)
   # apply bounding box regression to anchors
-  boxes = decode_box_outputs_tf(
-      tf.transpose(box_outputs, [1, 0]), tf.transpose(anchor_boxes, [1, 0]))
+  boxes = decode_box_outputs_tf(box_outputs, anchor_boxes)
 
   if use_native_nms:
     logging.info('Using native nms.')
@@ -501,14 +500,14 @@ class AnchorLabeler(object):
 
     self._target_assigner = target_assigner.TargetAssigner(
         similarity_calc, matcher, box_coder)
-    self._anchors = anchors
+    self.anchors = anchors
     self._match_threshold = match_threshold
     self._num_classes = num_classes
 
   def _unpack_labels(self, labels):
     """Unpacks an array of labels into multiscales labels."""
     labels_unpacked = collections.OrderedDict()
-    anchors = self._anchors
+    anchors = self.anchors
     count = 0
     for level in range(anchors.min_level, anchors.max_level + 1):
       feat_size = anchors.feat_sizes[level]
@@ -542,7 +541,7 @@ class AnchorLabeler(object):
       num_positives: scalar tensor storing number of positives in an image.
     """
     gt_box_list = box_list.BoxList(gt_boxes)
-    anchor_box_list = box_list.BoxList(self._anchors.boxes)
+    anchor_box_list = box_list.BoxList(self.anchors.boxes)
 
     # cls_weights, box_weights are not used
     cls_targets, _, box_targets, _, matches = self._target_assigner.assign(
@@ -575,7 +574,7 @@ class AnchorLabeler(object):
       return _generate_detections_tf(
           cls_outputs,
           box_outputs,
-          self._anchors.boxes,
+          self.anchors.boxes,
           indices,
           classes,
           image_id,
@@ -584,6 +583,6 @@ class AnchorLabeler(object):
           max_boxes_to_draw=max_boxes_to_draw)
     else:
       return tf.py_func(_generate_detections, [
-          cls_outputs, box_outputs, self._anchors.boxes, indices, classes,
+          cls_outputs, box_outputs, self.anchors.boxes, indices, classes,
           image_id, image_scale, self._num_classes, max_boxes_to_draw,
       ], tf.float32)
