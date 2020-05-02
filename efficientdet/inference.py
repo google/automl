@@ -77,6 +77,14 @@ def image_preprocess(image, image_size: Union[int, Tuple[int, int]]):
   image_scale = input_processor.image_scale_to_original
   return image, image_scale
 
+@tf.autograph.to_graph
+def batch_image_files_decode(image_files):
+  raw_images = tf.TensorArray(tf.uint8, size=0, dynamic_size=True)
+  for i in tf.range(tf.shape(image_files)[0]):
+    image = tf.io.decode_image(image_files[i])
+    image.set_shape([None, None, None])
+    raw_images = raw_images.write(i, image)
+  return raw_images.stack()
 
 def batch_image_preprocess(raw_images,
                            image_size: Union[int, Tuple[int, int]],
@@ -216,6 +224,55 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
     detections_batch: a batch of detection results. Each detection is a tensor
       with each row representing [image_id, x, y, width, height, score, class].
   """
+  batch_size = params['batch_size']
+  num_classes = params['num_classes']
+  # Create anchor_label for picking top-k predictions.
+  eval_anchors = anchors.Anchors(params['min_level'], params['max_level'],
+                                 params['num_scales'], params['aspect_ratios'],
+                                 params['anchor_scale'], params['image_size'])
+
+  if params['batch_size'] is None:
+    batch_size = tf.shape(list(cls_outputs.values())[0])[0]
+    cls_outputs_all = []
+    box_outputs_all = []
+    # Concatenates class and box of all levels into one tensor.
+    for level in range(params['min_level'], params['max_level'] + 1):
+      if params['data_format'] == 'channels_first':
+        cls_outputs[level] = tf.transpose(cls_outputs[level], [0, 2, 3, 1])
+        box_outputs[level] = tf.transpose(box_outputs[level], [0, 2, 3, 1])
+
+      cls_outputs_all.append(tf.reshape(
+          cls_outputs[level],
+          [batch_size, -1, num_classes]))
+      box_outputs_all.append(tf.reshape(
+          box_outputs[level], [batch_size, -1, 4]))
+    cls_outputs_all = tf.concat(cls_outputs_all, 1)
+    box_outputs_all = tf.concat(box_outputs_all, 1)
+    anchor_boxes = eval_anchors.boxes
+    scores = tf.math.sigmoid(cls_outputs_all)
+    # apply bounding box regression to anchors
+    boxes = anchors.decode_box_outputs_tf(box_outputs_all, anchor_boxes)
+    boxes = tf.expand_dims(boxes, axis=2)
+    nmsed_boxes, nmsed_scores, nmsed_classes, valid_detections = tf.image.combined_non_max_suppression(
+      boxes, scores,
+      anchors.MAX_DETECTIONS_PER_IMAGE,
+      anchors.MAX_DETECTIONS_PER_IMAGE,
+      score_threshold=min_score_thresh,
+      clip_boxes=False)
+    height = nmsed_boxes[..., 2] - nmsed_boxes[..., 0]
+    width = nmsed_boxes[..., 3] - nmsed_boxes[..., 1]
+    detections = tf.stack([
+        tf.cast(tf.tile(tf.expand_dims(tf.range(batch_size), axis=1),
+          [1, anchors.MAX_DETECTIONS_PER_IMAGE]), tf.float32),
+        nmsed_boxes[..., 0] * scales,
+        nmsed_boxes[..., 1] * scales,
+        height * scales,
+        width * scales,
+        nmsed_scores,
+        tf.cast(nmsed_classes + 1, tf.float32)
+    ], axis=2, name='detections')
+    return detections
+
   # TODO(tanmingxing): refactor the code to make it more explicity.
   outputs = {
       'cls_outputs_all': [None],
@@ -223,18 +280,12 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
       'indices_all': [None],
       'classes_all': [None]
   }
-  det_model_fn.add_metric_fn_inputs(params, cls_outputs, box_outputs, outputs,
-                                    -1)
-
-  # Create anchor_label for picking top-k predictions.
-  eval_anchors = anchors.Anchors(params['min_level'], params['max_level'],
-                                 params['num_scales'], params['aspect_ratios'],
-                                 params['anchor_scale'], params['image_size'])
-  anchor_labeler = anchors.AnchorLabeler(eval_anchors, params['num_classes'])
+  det_model_fn.add_metric_fn_inputs(params, cls_outputs, box_outputs, outputs, -1)
+  anchor_labeler = anchors.AnchorLabeler(eval_anchors, num_classes)
 
   # Add all detections for each input image.
   detections_batch = []
-  for index in range(params['batch_size']):
+  for index in range(batch_size):
     cls_outputs_per_sample = outputs['cls_outputs_all'][index]
     box_outputs_per_sample = outputs['box_outputs_all'][index]
     indices_per_sample = outputs['indices_all'][index]
@@ -473,13 +524,8 @@ class ServingDriver(object):
     with self.sess.graph.as_default():
       image_files = tf.placeholder(tf.string, name='image_files', shape=[None])
       image_size = params['image_size']
-      raw_images = []
-      for i in range(self.batch_size):
-        image = tf.io.decode_image(image_files[i])
-        image.set_shape([None, None, None])
-        raw_images.append(image)
-      raw_images = tf.stack(raw_images, name='image_arrays')
-
+      raw_images = batch_image_files_decode(image_files)
+      raw_images = tf.identity(raw_images, name='image_arrays')
       images, scales = batch_image_preprocess(raw_images, image_size,
                                               self.batch_size)
       if params['data_format'] == 'channels_first':
@@ -708,7 +754,7 @@ class InferenceDriver(object):
 
       # for postprocessing.
       params.update(
-          dict(batch_size=len(raw_images), disable_pyfun=self.disable_pyfun))
+          dict(batch_size=None, disable_pyfun=self.disable_pyfun))
 
       # Build postprocessing.
       detections_batch = det_post_process(

@@ -99,11 +99,11 @@ def decode_box_outputs_tf(rel_codes, anchors):
   Returns:
     outputs: bounding boxes.
   """
-  ycenter_a = (anchors[0] + anchors[2]) / 2
-  xcenter_a = (anchors[1] + anchors[3]) / 2
-  ha = anchors[2] - anchors[0]
-  wa = anchors[3] - anchors[1]
-  ty, tx, th, tw = tf.unstack(rel_codes, num=4)
+  ycenter_a = (anchors[..., 0] + anchors[..., 2]) / 2
+  xcenter_a = (anchors[..., 1] + anchors[..., 3]) / 2
+  ha = anchors[..., 2] - anchors[..., 0]
+  wa = anchors[..., 3] - anchors[..., 1]
+  ty, tx, th, tw = tf.unstack(rel_codes, num=4, axis=-1)
 
   w = tf.math.exp(tw) * wa
   h = tf.math.exp(th) * ha
@@ -113,7 +113,7 @@ def decode_box_outputs_tf(rel_codes, anchors):
   xmin = xcenter - w / 2.
   ymax = ycenter + h / 2.
   xmax = xcenter + w / 2.
-  return tf.stack([ymin, xmin, ymax, xmax], axis=1)
+  return tf.stack([ymin, xmin, ymax, xmax], axis=-1)
 
 
 @tf.autograph.to_graph
@@ -310,8 +310,7 @@ def _generate_detections_tf(cls_outputs,
 
   scores = tf.math.sigmoid(cls_outputs)
   # apply bounding box regression to anchors
-  boxes = decode_box_outputs_tf(
-      tf.transpose(box_outputs, [1, 0]), tf.transpose(anchor_boxes, [1, 0]))
+  boxes = decode_box_outputs_tf(box_outputs, anchor_boxes)
 
   if use_native_nms:
     logging.info('Using native nms.')

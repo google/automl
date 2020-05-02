@@ -156,7 +156,7 @@ class ModelInspector(object):
         **kwargs)
     driver.load(self.saved_model_dir)
 
-    batch_size = self.batch_size
+    batch_size = self.batch_size or 1
     all_files = list(tf.io.gfile.glob(image_path_pattern))
     num_batches = len(all_files) // batch_size
 
