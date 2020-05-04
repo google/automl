@@ -435,7 +435,11 @@ class ModelInspector(object):
                            trace_filename=kwargs.get('trace_filename', None))
 
 
-def main(_):
+def main(argv):
+  assert len(argv) >= 1
+  if len(argv) > 1:  # Do not accept unknown args.
+    raise ValueError('Received unknown arguments: {}'.format(argv[1:]))
+
   if tf.io.gfile.exists(FLAGS.logdir) and FLAGS.delete_logdir:
     logging.info('Deleting log dir ...')
     tf.io.gfile.rmtree(FLAGS.logdir)

@@ -120,7 +120,9 @@ FLAGS = flags.FLAGS
 
 
 def main(argv):
-  del argv  # Unused.
+  assert len(argv) >= 1
+  if len(argv) > 1:  # Do not accept unknown args.
+    raise ValueError('Received unknown arguments: {}'.format(argv[1:]))
 
   if FLAGS.use_tpu:
     tpu_cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
