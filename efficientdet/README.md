@@ -279,6 +279,16 @@ Finetune needs to use --ckpt rather than --backbone_ckpt.
         --hparams=voc_config.yaml \
         --use_tpu=False
 
+If you want to do inference for custom data, you can run
+
+    # Setting hparams-flag is needed sometimes.
+    !python model_inspect.py --runmode=infer \
+      --model_name=efficientdet-d0   --ckpt_path=efficientdet-d0 \
+      --hparams=voc_config.yaml  \
+      --input_image=img.png --output_image_dir=/tmp/
+  
+You should check more details of runmode which is written in caption-4.
+
 ## 9. Training EfficientDets on TPUs.
 
 To train this model on Cloud TPU, you will need:
