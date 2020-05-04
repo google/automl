@@ -271,7 +271,7 @@ Finetune needs to use --ckpt rather than --backbone_ckpt.
         --validation_file_pattern=tfrecord/pascal*.tfrecord \
         --val_json_file=tfrecord/json_pascal.json \
         --model_name=efficientdet-d0 \
-        --model_dir=/tmp/efficientdet-d0-scratch  \
+        --model_dir=/tmp/efficientdet-d0-finetune  \
         --ckpt=efficientdet-d0  \
         --train_batch_size=8 \
         --eval_batch_size=8 --eval_samples=1024 \
