@@ -72,7 +72,7 @@ class BoxList(object):
       Number of boxes held in collection (integer) or None if this is not
         inferable at graph construction time.
     """
-    return self.data['boxes'].get_shape()[0].value
+    return self.data['boxes'].get_shape().as_list()[0]
 
   def get_all_fields(self):
     """Returns all fields."""

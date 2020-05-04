@@ -252,5 +252,4 @@ class ModelTest(tf.test.TestCase):
     self.assertNotIn('reduction_2', model.endpoints)
 
 if __name__ == '__main__':
-  tf.disable_v2_behavior()
   tf.test.main()

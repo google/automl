@@ -136,7 +136,6 @@ def superpixel_kernel_initializer(shape, dtype='float32', partition_info=None):
 
 def round_filters(filters, global_params, skip=False):
   """Round number of filters based on depth multiplier."""
-  orig_f = filters
   multiplier = global_params.width_coefficient
   divisor = global_params.depth_divisor
   min_depth = global_params.min_depth
@@ -149,7 +148,6 @@ def round_filters(filters, global_params, skip=False):
   # Make sure that round down does not go down by more than 10%.
   if new_filters < 0.9 * filters:
     new_filters += divisor
-  logging.info('round_filter input=%s output=%s', orig_f, new_filters)
   return int(new_filters)
 
 
@@ -342,7 +340,7 @@ class MBConvBlock(tf.keras.layers.Layer):
     Returns:
       A output tensor.
     """
-    logging.info('Block input: %s shape: %s', inputs.name, inputs.shape)
+    logging.info('Block %s  input shape: %s', self.name, inputs.shape)
     x = inputs
 
     fused_conv_fn = self._fused_conv
@@ -355,21 +353,20 @@ class MBConvBlock(tf.keras.layers.Layer):
       with tf.name_scope('super_pixel'):
         x = self._relu_fn(
             self._bnsp(self._superpixel(x), training=training))
-      logging.info(
-          'Block start with SuperPixel: %s shape: %s', x.name, x.shape)
+      logging.info('Block start with SuperPixel shape: %s', x.shape)
 
     if self._block_args.fused_conv:
       # If use fused mbconv, skip expansion and use regular conv.
       x = self._relu_fn(self._bn1(fused_conv_fn(x), training=training))
-      logging.info('Conv2D: %s shape: %s', x.name, x.shape)
+      logging.info('Conv2D shape: %s', x.shape)
     else:
       # Otherwise, first apply expansion and then apply depthwise conv.
       if self._block_args.expand_ratio != 1:
         x = self._relu_fn(self._bn0(expand_conv_fn(x), training=training))
-        logging.info('Expand: %s shape: %s', x.name, x.shape)
+        logging.info('Expand shape: %s', x.shape)
 
       x = self._relu_fn(self._bn1(depthwise_conv_fn(x), training=training))
-      logging.info('DWConv: %s shape: %s', x.name, x.shape)
+      logging.info('DWConv shape: %s', x.shape)
 
     if self._has_se:
       with tf.name_scope('se'):
@@ -391,7 +388,7 @@ class MBConvBlock(tf.keras.layers.Layer):
         if survival_prob:
           x = utils.drop_connect(x, training, survival_prob)
         x = tf.add(x, inputs)
-    logging.info('Project: %s shape: %s', x.name, x.shape)
+    logging.info('Project shape: %s', x.shape)
     return x
 
 
@@ -440,12 +437,12 @@ class MBConvBlockWithoutDepthwise(MBConvBlock):
     Returns:
       A output tensor.
     """
-    logging.info('Block input: %s shape: %s', inputs.name, inputs.shape)
+    logging.info('Block %s  input shape: %s', self.name, inputs.shape)
     if self._block_args.expand_ratio != 1:
       x = self._relu_fn(self._bn0(self._expand_conv(inputs), training=training))
     else:
       x = inputs
-    logging.info('Expand: %s shape: %s', x.name, x.shape)
+    logging.info('Expand shape: %s', x.shape)
 
     self.endpoints = {'expansion_output': x}
 
@@ -464,7 +461,7 @@ class MBConvBlockWithoutDepthwise(MBConvBlock):
         if survival_prob:
           x = utils.drop_connect(x, training, survival_prob)
         x = tf.add(x, inputs)
-    logging.info('Project: %s shape: %s', x.name, x.shape)
+    logging.info('Project shape: %s', x.shape)
     return x
 
 

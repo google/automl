@@ -341,10 +341,19 @@ conv_kernel_initializer = tf.initializers.variance_scaling()
 dense_kernel_initializer = tf.initializers.variance_scaling()
 
 
+class Pair(tuple):
+
+  def __new__(cls, name, value):
+    return super(Pair, cls).__new__(cls, (name, value))
+
+  def __init__(self, name, _):  # pylint: disable=super-init-not-called
+    self.name = name
+
+
 def scalar(name, tensor):
   """Stores a (name, Tensor) tuple in a custom collection."""
-  logging.info('Adding summary {}'.format((name, tensor)))
-  tf.add_to_collection('edsummaries', (name, tf.reduce_mean(tensor)))
+  logging.info('Adding summary {}'.format(Pair(name, tensor)))
+  tf.add_to_collection('edsummaries', Pair(name, tf.reduce_mean(tensor)))
 
 
 def get_scalar_summaries():

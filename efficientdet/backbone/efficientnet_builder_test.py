@@ -109,5 +109,6 @@ class EfficientnetBuilderTest(tf.test.TestCase):
 
 
 if __name__ == '__main__':
-  tf.disable_v2_behavior()
+  # Disable eager to allow tf.profile works for #params/#flops.
+  tf.disable_eager_execution()
   tf.test.main()

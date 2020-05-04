@@ -244,9 +244,10 @@ def det_post_process_combined(params, cls_outputs, box_outputs, scales,
           clip_boxes=False))
   del valid_detections  # to be used in futue.
 
-  image_ids = tf.tile(
-      tf.expand_dims(tf.range(batch_size, dtype=tf.float32), axis=1),
-      [1, max_boxes_to_draw])
+  image_ids = tf.cast(
+      tf.tile(
+          tf.expand_dims(tf.range(batch_size), axis=1), [1, max_boxes_to_draw]),
+      dtype=tf.float32)
   y = nmsed_boxes[..., 0] * scales
   x = nmsed_boxes[..., 1] * scales
   height = nmsed_boxes[..., 2] * scales - y

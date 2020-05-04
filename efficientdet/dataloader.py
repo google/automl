@@ -71,26 +71,26 @@ class InputProcessor(object):
     """Set the parameters for multiscale training."""
     # Select a random scale factor.
     random_scale_factor = tf.random_uniform([], scale_min, scale_max)
-    scaled_size_y = tf.to_int32(random_scale_factor * self._output_size[0])
-    scaled_size_x = tf.to_int32(random_scale_factor * self._output_size[1])
+    scaled_y = tf.cast(random_scale_factor * self._output_size[0], tf.int32)
+    scaled_x = tf.cast(random_scale_factor * self._output_size[1], tf.int32)
 
     # Recompute the accurate scale_factor using rounded scaled image size.
-    height = tf.shape(self._image)[0]
-    width = tf.shape(self._image)[1]
-    image_scale_y = tf.to_float(scaled_size_y) / tf.to_float(height)
-    image_scale_x = tf.to_float(scaled_size_x) / tf.to_float(width)
+    height = tf.cast(tf.shape(self._image)[0], tf.float32)
+    width = tf.cast(tf.shape(self._image)[1], tf.float32)
+    image_scale_y = tf.cast(scaled_y, tf.float32) / height
+    image_scale_x = tf.cast(scaled_x, tf.float32) / width
     image_scale = tf.minimum(image_scale_x, image_scale_y)
 
     # Select non-zero random offset (x, y) if scaled image is larger than
     # self._output_size.
-    scaled_height = tf.to_int32(tf.to_float(height) * image_scale)
-    scaled_width = tf.to_int32(tf.to_float(width) * image_scale)
-    offset_y = tf.to_float(scaled_height - self._output_size[0])
-    offset_x = tf.to_float(scaled_width - self._output_size[1])
+    scaled_height = tf.cast(height * image_scale, tf.int32)
+    scaled_width = tf.cast(width * image_scale, tf.int32)
+    offset_y = tf.cast(scaled_height - self._output_size[0], tf.float32)
+    offset_x = tf.cast(scaled_width - self._output_size[1], tf.float32)
     offset_y = tf.maximum(0.0, offset_y) * tf.random_uniform([], 0, 1)
     offset_x = tf.maximum(0.0, offset_x) * tf.random_uniform([], 0, 1)
-    offset_y = tf.to_int32(offset_y)
-    offset_x = tf.to_int32(offset_x)
+    offset_y = tf.cast(offset_y, tf.int32)
+    offset_x = tf.cast(offset_x, tf.int32)
     self._image_scale = image_scale
     self._scaled_height = scaled_height
     self._scaled_width = scaled_width
@@ -100,13 +100,13 @@ class InputProcessor(object):
   def set_scale_factors_to_output_size(self):
     """Set the parameters to resize input image to self._output_size."""
     # Compute the scale_factor using rounded scaled image size.
-    height = tf.shape(self._image)[0]
-    width = tf.shape(self._image)[1]
-    image_scale_y = tf.to_float(self._output_size[0]) / tf.to_float(height)
-    image_scale_x = tf.to_float(self._output_size[1]) / tf.to_float(width)
+    height = tf.cast(tf.shape(self._image)[0], tf.float32)
+    width = tf.cast(tf.shape(self._image)[1], tf.float32)
+    image_scale_y = tf.cast(self._output_size[0], tf.float32) / height
+    image_scale_x = tf.cast(self._output_size[1], tf.float32) / width
     image_scale = tf.minimum(image_scale_x, image_scale_y)
-    scaled_height = tf.to_int32(tf.to_float(height) * image_scale)
-    scaled_width = tf.to_int32(tf.to_float(width) * image_scale)
+    scaled_height = tf.cast(height * image_scale, tf.int32)
+    scaled_width = tf.cast(width * image_scale, tf.int32)
     self._image_scale = image_scale
     self._scaled_height = scaled_height
     self._scaled_width = scaled_width
@@ -151,7 +151,7 @@ class DetectionInputProcessor(InputProcessor):
     # Adjust box coordinates based on the offset.
     box_offset = tf.stack([self._crop_offset_y, self._crop_offset_x,
                            self._crop_offset_y, self._crop_offset_x,])
-    boxes -= tf.to_float(tf.reshape(box_offset, [1, 4]))
+    boxes -= tf.cast(tf.reshape(box_offset, [1, 4]), tf.float32)
     # Clip the boxes.
     boxes = self.clip_boxes(boxes)
     # Filter out ground truth boxes that are all zeros.

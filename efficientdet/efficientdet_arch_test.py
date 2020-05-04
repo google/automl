@@ -38,7 +38,7 @@ class EfficientDetArchTest(tf.test.TestCase):
       inputs_shape = [1, 3, isize[0], isize[1]]
     else:
       inputs_shape = [1, isize[0], isize[1], 3]
-    inputs = tf.placeholder(tf.float32, name='input', shape=inputs_shape)
+    inputs = tf.ones(shape=inputs_shape, name='input', dtype=tf.float32)
     efficientdet_arch.efficientdet(
         inputs,
         model_name=model_name,
@@ -107,7 +107,7 @@ class EfficientDetArchPrecisionTest(tf.test.TestCase):
     return utils.build_model_with_precision(precision, _model_fn, features)
 
   def test_float16(self):
-    inputs = tf.placeholder(tf.float32, name='input', shape=[1, 512, 512, 3])
+    inputs = tf.ones(shape=[1, 512, 512, 3], name='input', dtype=tf.float32)
     cls_out, _ = self.build_model(inputs, True, 'mixed_float16')
     for v in tf.global_variables():
       # All variables should be float32.
@@ -117,7 +117,7 @@ class EfficientDetArchPrecisionTest(tf.test.TestCase):
       self.assertIs(v.dtype, tf.float16)
 
   def test_bfloat16(self):
-    inputs = tf.placeholder(tf.float32, name='input', shape=[1, 512, 512, 3])
+    inputs = tf.ones(shape=[1, 512, 512, 3], name='input', dtype=tf.float32)
     cls_out, _ = self.build_model(inputs, True, 'mixed_bfloat16')
     for v in tf.global_variables():
       # All variables should be float32.
@@ -126,7 +126,7 @@ class EfficientDetArchPrecisionTest(tf.test.TestCase):
       self.assertEqual(v.dtype, tf.bfloat16)
 
   def test_float32(self):
-    inputs = tf.placeholder(tf.float32, name='input', shape=[1, 512, 512, 3])
+    inputs = tf.ones(shape=[1, 512, 512, 3], name='input', dtype=tf.float32)
     cls_out, _ = self.build_model(inputs, True, 'float32')
     for v in tf.global_variables():
       # All variables should be float32.
@@ -189,4 +189,5 @@ class BiFPNTest(tf.test.TestCase):
 
 
 if __name__ == '__main__':
+  tf.disable_eager_execution()
   tf.test.main()

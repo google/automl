@@ -160,6 +160,7 @@ class ModelInspector(object):
     # Serving time batch size should be fixed.
     batch_size = self.batch_size or 1
     all_files = list(tf.io.gfile.glob(image_path_pattern))
+    print('all_files=', all_files)
     num_batches = len(all_files) // batch_size
 
     for i in range(num_batches):
@@ -465,5 +466,5 @@ def main(_):
 
 if __name__ == '__main__':
   logging.set_verbosity(logging.WARNING)
-  tf.disable_v2_behavior()
+  tf.disable_eager_execution()
   tf.app.run(main)
