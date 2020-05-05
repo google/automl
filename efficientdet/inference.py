@@ -321,6 +321,10 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
         min_score_thresh=min_score_thresh,
         max_boxes_to_draw=max_boxes_to_draw,
         disable_pyfun=params.get('disable_pyfun'))
+    if params['batch_size'] > 1:
+      # pad to fixed length if batch size > 1.
+      padding_size = max_boxes_to_draw - tf.shape(detections)[0]
+      detections = tf.pad(detections, [[0, padding_size], [0, 0]])
     detections_batch.append(detections)
   return tf.stack(detections_batch, name='detections')
 

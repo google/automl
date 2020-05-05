@@ -104,11 +104,11 @@ class ModelInspector(object):
     self.batch_size = batch_size or None
     self.labels_shape = [batch_size, model_config.num_classes]
 
-    width, height = model_config.image_size
+    height, width = model_config.image_size
     if model_config.data_format == 'channels_first':
-      self.inputs_shape = [batch_size, 3, width, height]
+      self.inputs_shape = [batch_size, 3, height, width]
     else:
-      self.inputs_shape = [batch_size, width, height, 3]
+      self.inputs_shape = [batch_size, height, width, 3]
 
     self.model_config = model_config
 
@@ -161,13 +161,20 @@ class ModelInspector(object):
     batch_size = self.batch_size or 1
     all_files = list(tf.io.gfile.glob(image_path_pattern))
     print('all_files=', all_files)
-    num_batches = len(all_files) // batch_size
+    num_batches = (len(all_files) + batch_size - 1) // batch_size
 
     for i in range(num_batches):
       batch_files = all_files[i * batch_size: (i + 1) * batch_size]
-      raw_images = [np.array(Image.open(f)) for f in batch_files]
+      height, width = self.model_config.image_size
+      raw_images = [np.array(Image.open(f).resize((width, height)))
+                    for f in batch_files]
+      size_before_pad = len(raw_images)
+      if size_before_pad < batch_size:
+        padding_size = batch_size - size_before_pad
+        raw_images += [np.zeros_like(raw_images[0])] * padding_size
+      
       detections_bs = driver.serve_images(raw_images)
-      for j in range(len(raw_images)):
+      for j in range(size_before_pad):
         img = driver.visualize(raw_images[j], detections_bs[j], **kwargs)
         img_id = str(i * batch_size + j)
         output_image_path = os.path.join(output_dir, img_id + '.jpg')
