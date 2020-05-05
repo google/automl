@@ -236,7 +236,7 @@ class BatchNormalization(tf.keras.layers.BatchNormalization):
     return outputs
 
 
-def batch_norm_class(is_training, use_tpu=False,):
+def batch_norm_class(is_training, use_tpu=False):
   if is_training and use_tpu:
     return TpuBatchNormalization
   else:
