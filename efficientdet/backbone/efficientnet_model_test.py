@@ -35,7 +35,7 @@ class ModelTest(tf.test.TestCase):
         0,
         'channels_last',
         num_classes=10,
-        batch_norm=utils.TpuBatchNormalization)
+        batch_norm=utils.batch_norm_class(False))
     blocks_args = [
         efficientnet_model.BlockArgs(
             kernel_size=3,

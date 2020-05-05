@@ -38,7 +38,7 @@ class EfficientnetBuilderTest(tf.test.TestCase):
         images,
         model_name=model_name,
         override_params=override_params,
-        training=True,
+        training=False,
         features_only=features_only,
         pooled_features_only=pooled_features_only)
     num_params = np.sum([np.prod(v.shape) for v in tf.trainable_variables()])
@@ -91,7 +91,7 @@ class EfficientnetBuilderTest(tf.test.TestCase):
       efficientnet_builder.build_model(
           None,
           model_name='efficientnet-b0',
-          training=True,
+          training=False,
           features_only=True,
           pooled_features_only=True)
 
@@ -99,7 +99,7 @@ class EfficientnetBuilderTest(tf.test.TestCase):
     # Creates a base model using the model configuration.
     images = tf.zeros((1, 224, 224, 3), dtype=tf.float32)
     _, endpoints = efficientnet_builder.build_model_base(
-        images, model_name='efficientnet-b0', training=True)
+        images, model_name='efficientnet-b0', training=False)
 
     # reduction_1 to reduction_5 should be in endpoints
     self.assertIn('reduction_1', endpoints)

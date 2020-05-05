@@ -38,7 +38,7 @@ class EfficientnetBuilderTest(tf.test.TestCase):
         images,
         model_name=model_name,
         override_params=override_params,
-        training=True,
+        training=False,
         features_only=features_only,
         pooled_features_only=pooled_features_only)
     num_params = np.sum([np.prod(v.shape) for v in tf.trainable_variables()])
