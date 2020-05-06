@@ -79,7 +79,7 @@ class TfExampleDecoder(object):
     width = parsed_tensors['image/width']
     masks = parsed_tensors['image/object/mask']
     return tf.cond(
-        tf.greater(tf.size(masks), 0),
+        tf.greater(tf.shape(masks)[0], 0),
         lambda: tf.map_fn(_decode_png_mask, masks, dtype=tf.float32),
         lambda: tf.zeros([0, height, width], dtype=tf.float32))
 

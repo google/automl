@@ -130,7 +130,7 @@ def nms_tf(dets, thresh):
 
   keep = tf.TensorArray(tf.int32, size=0, dynamic_size=True)
   index = 0
-  while tf.size(order) > 0:
+  while tf.shape(order)[0] > 0:
     i = order[0]
     keep = keep.write(index, i)
     xx1 = tf.maximum(x1[i], tf.gather(x1, order[1:]))
@@ -334,7 +334,7 @@ def _generate_detections_tf(cls_outputs,
   width = boxes[:, 3] - boxes[:, 1]
 
   detections = tf.stack([
-      tf.cast(tf.tile(image_id, [tf.size(top_detection_idx)]), tf.float32),
+      tf.cast(tf.tile(image_id, [tf.shape(top_detection_idx)[0]]), tf.float32),
       boxes[:, 0] * image_scale,
       boxes[:, 1] * image_scale,
       height * image_scale,

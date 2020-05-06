@@ -92,7 +92,7 @@ class Match(object):
 
   def num_matched_columns(self):
     """Returns number (int32 scalar tensor) of matched columns."""
-    return tf.size(self.matched_column_indices())
+    return tf.shape(self.matched_column_indices())[0]
 
   def unmatched_column_indices(self):
     """Returns column indices that do not match any row.
@@ -114,7 +114,7 @@ class Match(object):
 
   def num_unmatched_columns(self):
     """Returns number (int32 scalar tensor) of unmatched columns."""
-    return tf.size(self.unmatched_column_indices())
+    return tf.shape(self.unmatched_column_indices())[0]
 
   def ignored_column_indices(self):
     """Returns column indices that are ignored (neither Matched nor Unmatched).
@@ -137,7 +137,7 @@ class Match(object):
 
   def num_ignored_columns(self):
     """Returns number (int32 scalar tensor) of matched columns."""
-    return tf.size(self.ignored_column_indices())
+    return tf.shape(self.ignored_column_indices())[0]
 
   def unmatched_or_ignored_column_indices(self):
     """Returns column indices that are unmatched or ignored.

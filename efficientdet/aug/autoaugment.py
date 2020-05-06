@@ -657,7 +657,7 @@ def _apply_multi_bbox_augmentation(image, bboxes, prob, aug_func,
 
   # If the bboxes are empty, then just give it _INVALID_BOX. The result
   # will be thrown away.
-  bboxes = tf.cond(tf.equal(tf.size(bboxes), 0),
+  bboxes = tf.cond(tf.equal(tf.shape(bboxes)[0], 0),
                    lambda: tf.constant(_INVALID_BOX),
                    lambda: bboxes)
 
@@ -1352,7 +1352,7 @@ def bbox_cutout(image, bboxes, pad_fraction, replace_with_mean):
     return image
 
   # Check to see if there are boxes, if so then apply boxcutout.
-  image = tf.cond(tf.equal(tf.size(bboxes), 0), lambda: image,
+  image = tf.cond(tf.equal(tf.shape(bboxes)[0], 0), lambda: image,
                   lambda: apply_bbox_cutout(image, bboxes, pad_fraction))
 
   return image, bboxes
