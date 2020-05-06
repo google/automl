@@ -65,7 +65,26 @@ We have provided a list of EfficientDet checkpoints and results as follows:
 ** <em>val</em> denotes validation results, <em>test-dev</em> denotes test-dev2017 results. AP<sup>val</sup> is for validation accuracy, all other AP results in the table are for COCO test-dev2017. All accuracy numbers are for single-model single-scale without ensemble or test-time augmentation. All checkpoints are trained with baseline preprocessing (no autoaugmentation).
 ** EfficientNet-D0 to D6 are trained with 300 epochs, EfficientNet-D7 is trained with 500 epochs.
 
-## 3. Benchmark model latency.
+
+## 3. Export SavedModel, frozen graph, or tflite.
+
+Run the following command line to export models:
+
+    !rm  -rf savedmodeldir
+    !python model_inspect.py --runmode=saved_model --model_name=efficientdet-d0 \
+      --ckpt_path=efficientdet-d0 --saved_model_dir=savedmodeldir \
+      --tflite_path=efficientdet-d0.tflite
+
+Then you will get:
+
+ - saved model under savedmodeldir/
+ - frozen graph with name savedmodeldir/efficientdet-d0_frozen.pb
+ - tflite file with name efficientdet-d0.tflite
+
+Notably, --tflite_path is optinal, and it only works after 2.2.0-rc4.
+
+
+## 4. Benchmark model latency.
 
 
 There are two types of latency: network latency and end-to-end latency.
@@ -73,8 +92,9 @@ There are two types of latency: network latency and end-to-end latency.
 (1) To measure the network latency (from the fist conv to the last class/box
 prediction output), use the following command:
 
-    !python model_inspect.py --runmode=bm --model_name=efficientdet-d0 \
-      # --hparams="precision=mixed-float16"  # uncomment if on V100
+    !python model_inspect.py --runmode=bm --model_name=efficientdet-d0
+
+** add --hparams="precision=mixed-float16" if running on V100.
 
 On single Tesla V100 without TensorRT, our D0 network (no pre/post-processing)
 has 134 FPS (frame per second) for batch size 1, and 238 FPS for batch size 8.
@@ -86,13 +106,11 @@ use the following command:
     !rm  -rf /tmp/benchmark/
     !python model_inspect.py --runmode=saved_model --model_name=efficientdet-d0 \
       --ckpt_path=efficientdet-d0 --saved_model_dir=/tmp/benchmark/ \
-      # --hparams="precision=mixed-float16"  # uncomment if on V100
 
     !python model_inspect.py --runmode=saved_model_benchmark \
       --saved_model_dir=/tmp/benchmark/efficientdet-d0_frozen.pb \
       --model_name=efficientdet-d0  --input_image=testdata/img1.jpg  \
       --output_image_dir=/tmp/  \
-      # --hparams="precision=mixed-float16"  # uncomment if on V100
 
 On single Tesla V100 without using TensorRT, our end-to-end
 latency and throughput are:
@@ -109,7 +127,7 @@ latency and throughput are:
 
 ** FPS means frames per second (or images/second).
 
-## 4. Inference for images.
+## 5. Inference for images.
 
     # Step0: download model and testing image.
     !export MODEL=efficientdet-d0
@@ -157,7 +175,7 @@ Here is an example of EfficientDet-D0 visualization: more on [tutorial](tutorial
 <img src="./g3doc/street.jpg" width="800" />
 </p>
 
-## 5. Inference for videos.
+## 6. Inference for videos.
 
 You can run inference for a video and show the results online:
 
@@ -180,7 +198,7 @@ You can run inference for a video and show the results online:
       --saved_model_dir=/tmp/savedmodel --input_video=input.mov  \
       --output_video=output.mov
 
-## 6. Eval on COCO 2017 val or test-dev.
+## 7. Eval on COCO 2017 val or test-dev.
 
     // Download coco data.
     !wget http://images.cocodataset.org/zips/val2017.zip
@@ -227,7 +245,7 @@ You can also run eval on test-dev set with the following command:
     # Now you can submit testdev_output/detections_test-dev2017_test_results.json to
     # coco server: https://competitions.codalab.org/competitions/20794#participate
 
-## 7. Train on PASCAL VOC 2012 with backbone ImageNet ckpt.
+## 8. Train on PASCAL VOC 2012 with backbone ImageNet ckpt.
 
     # Download and convert pascal data.
     !wget http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar
@@ -253,7 +271,7 @@ You can also run eval on test-dev set with the following command:
         --hparams="num_classes=20,moving_average_decay=0" \
         --use_tpu=False
 
-## 8. Finetune on PASCAL VOC 2012 with detector COCO ckpt.
+## 9. Finetune on PASCAL VOC 2012 with detector COCO ckpt.
 Create a config file for the PASCAL VOC dataset called voc_config.yaml and put this in it.
 
       num_classes: 20
@@ -289,7 +307,7 @@ If you want to do inference for custom data, you can run
   
 You should check more details of runmode which is written in caption-4.
 
-## 9. Training EfficientDets on TPUs.
+## 10. Training EfficientDets on TPUs.
 
 To train this model on Cloud TPU, you will need:
 

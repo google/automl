@@ -699,7 +699,7 @@ class ServingDriver(object):
     converter.target_spec.supported_ops = supported_ops
     return converter.convert()
 
-  def export(self, output_dir, frozen_pb=True, tflite=True):
+  def export(self, output_dir, frozen_pb=True, tflite_path=None):
     """Export a saved model."""
     signitures = self.signitures
     signature_def_map = {
@@ -729,12 +729,11 @@ class ServingDriver(object):
       tf.io.gfile.GFile(pb_path, 'wb').write(graphdef.SerializeToString())
       logging.info('Free graph saved at %s', pb_path)
 
-    if tflite:
+    if tflite_path:
       ver = tf.__version__
       if ver < '2.2.0-dev20200501' or ('dev' not in ver and ver < '2.2.0-rc4'):
         raise ValueError('TFLite requires TF 2.2.0rc4 or laterr version.')
       tflite_model = self.to_tflite(output_dir)
-      tflite_path = os.path.join(output_dir, self.model_name + '.tflite')
       with tf.io.gfile.GFile(tflite_path, 'wb') as f:
         f.write(tflite_model)
 
