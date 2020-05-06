@@ -265,6 +265,7 @@ def _generate_detections_tf(cls_outputs,
                             classes,
                             image_id,
                             image_scale,
+                            image_size,
                             min_score_thresh=MIN_SCORE_THRESH,
                             max_boxes_to_draw=MAX_DETECTIONS_PER_IMAGE,
                             soft_nms_sigma=0.0,
@@ -303,7 +304,7 @@ def _generate_detections_tf(cls_outputs,
 
   Returns:
     detections: detection results in a tensor with each row representing
-      [image_id, y, x, height, width, score, class]
+      [image_id, ymin, xmin, ymax, xmax, score, class]
   """
   logging.info('Using tf version of post-processing.')
   anchor_boxes = tf.gather(anchor_boxes, indices)
@@ -330,15 +331,13 @@ def _generate_detections_tf(cls_outputs,
     detections = tf.gather(all_detections, top_detection_idx)
     scores = detections[:, 4]
     boxes = detections[:, :4]
-  height = boxes[:, 2] - boxes[:, 0]
-  width = boxes[:, 3] - boxes[:, 1]
 
   detections = tf.stack([
-      tf.cast(tf.tile(image_id, [tf.shape(top_detection_idx)[0]]), tf.float32),
-      boxes[:, 0] * image_scale,
-      boxes[:, 1] * image_scale,
-      height * image_scale,
-      width * image_scale,
+      tf.cast(tf.tile(image_id, tf.shape(top_detection_idx)), tf.float32),
+      tf.clip_by_value(boxes[:, 0], 0, image_size[0]) * image_scale,
+      tf.clip_by_value(boxes[:, 1], 0, image_size[1]) * image_scale,
+      tf.clip_by_value(boxes[:, 2], 0, image_size[0]) * image_scale,
+      tf.clip_by_value(boxes[:, 3], 0, image_size[1]) * image_scale,
       scores,
       tf.cast(tf.gather(classes, top_detection_idx) + 1, tf.float32)
   ], axis=1)
@@ -566,6 +565,7 @@ class AnchorLabeler(object):
                           classes,
                           image_id,
                           image_scale,
+                          image_size,
                           min_score_thresh=MIN_SCORE_THRESH,
                           max_boxes_to_draw=MAX_DETECTIONS_PER_IMAGE,
                           disable_pyfun=None):
@@ -579,6 +579,7 @@ class AnchorLabeler(object):
           classes,
           image_id,
           image_scale,
+          image_size,
           min_score_thresh=min_score_thresh,
           max_boxes_to_draw=max_boxes_to_draw)
     else:

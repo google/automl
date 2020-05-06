@@ -248,13 +248,15 @@ def det_post_process_combined(params, cls_outputs, box_outputs, scales,
       tf.tile(
           tf.expand_dims(tf.range(batch_size), axis=1), [1, max_boxes_to_draw]),
       dtype=tf.float32)
-  y = nmsed_boxes[..., 0] * scales
-  x = nmsed_boxes[..., 1] * scales
-  height = nmsed_boxes[..., 2] * scales - y
-  width = nmsed_boxes[..., 3] * scales - x
+  image_size = params['image_size']
+  ymin = tf.clip_by_value(nmsed_boxes[..., 0], 0, image_size[0]) * scales
+  xmin = tf.clip_by_value(nmsed_boxes[..., 1], 0, image_size[1]) * scales
+  ymax = tf.clip_by_value(nmsed_boxes[..., 2], 0, image_size[0]) * scales
+  xmax = tf.clip_by_value(nmsed_boxes[..., 3], 0, image_size[1]) * scales
+
   detection_list = [
-      # Format: (image_ids, y, x, height, width, score, class)
-      image_ids, y, x, height, width, nmsed_scores,
+      # Format: (image_ids, ymin, xmin, ymax, xmax, score, class)
+      image_ids, ymin, xmin, ymax, xmax, nmsed_scores,
       tf.cast(nmsed_classes + 1, tf.float32)
   ]
   detections = tf.stack(detection_list, axis=2, name='detections')
@@ -281,7 +283,7 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
 
   Returns:
     detections_batch: a batch of detection results. Each detection is a tensor
-      with each row representing [image_id, x, y, width, height, score, class].
+      with each row representing [image_id, ymin, xmin, ymax, xmax, score, class].
   """
   if not params['batch_size']:
     # Use combined version for dynamic batch size.
@@ -318,6 +320,7 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
         classes_per_sample,
         image_id=[index],
         image_scale=[scales[index]],
+        image_size=params['image_size'],
         min_score_thresh=min_score_thresh,
         max_boxes_to_draw=max_boxes_to_draw,
         disable_pyfun=params.get('disable_pyfun'))
@@ -412,7 +415,7 @@ def visualize_image_prediction(image,
   Args:
     image: Image content in shape of [height, width, 3].
     prediction: a list of vector, with each vector has the format of [image_id,
-      y, x, height, width, score, class].
+      ymin, xmin, ymax, xmax, score, class].
     disable_pyfun: disable pyfunc for faster post processing.
     label_id_mapping: a map from label id to name.
     **kwargs: extra parameters for vistualization, such as min_score_thresh,
@@ -430,7 +433,7 @@ def visualize_image_prediction(image,
     boxes[:, [0, 1, 2, 3]] = boxes[:, [1, 0, 3, 2]]
 
   label_id_mapping = label_id_mapping or coco_id_mapping
-  boxes[:, 2:4] += boxes[:, 0:2]
+
   return visualize_image(image, boxes, classes, scores, label_id_mapping,
                          **kwargs)
 
