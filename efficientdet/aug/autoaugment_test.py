@@ -26,10 +26,12 @@ from aug import autoaugment
 class AutoaugmentTest(tf.test.TestCase):
 
   def test_autoaugment_policy(self):
+    tf.disable_eager_execution()
     # A very simple test to verify no syntax error.
     image = tf.placeholder(tf.uint8, shape=[640, 640, 3])
     bboxes = tf.placeholder(tf.float32, shape=[4, 4])
     autoaugment.distort_image_with_autoaugment(image, bboxes, 'test')
+    autoaugment.distort_image_with_autoaugment(image, bboxes, 'test', use_augmix=True)
 
 
 if __name__ == '__main__':
