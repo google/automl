@@ -42,10 +42,10 @@ def _get_v(b1_height: FloatType, b1_width: FloatType, b2_height: FloatType,
         tf.math.divide_no_nan(width, height))
     v = 4 * ((arctan / math.pi)**2)
 
-    def _grad_v(dv):
+    def _grad_v(dv, variables=None):
       gdw = dv * 8 * arctan * height / (math.pi**2)
       gdh = -dv * 8 * arctan * width / (math.pi**2)
-      return [gdh, gdw]
+      return [gdh, gdw], tf.gradients(v, variables, grad_ys=dv)
 
     return v, _grad_v
 
@@ -156,7 +156,7 @@ def iou_loss(pred_boxes: FloatType,
   """
   if iou_type not in ('iou', 'ciou', 'diou', 'giou'):
     raise ValueError(
-        'Unknown loss_type {}, not ioiu/ciou/iou/giou'.format(iou_type))
+        'Unknown loss_type {}, not iou/ciou/diou/giou'.format(iou_type))
 
   pred_boxes = tf.convert_to_tensor(pred_boxes, tf.float32)
   target_boxes = tf.cast(target_boxes, pred_boxes.dtype)
