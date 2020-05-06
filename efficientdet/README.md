@@ -81,7 +81,7 @@ Then you will get:
  - frozen graph with name savedmodeldir/efficientdet-d0_frozen.pb
  - tflite file with name efficientdet-d0.tflite
 
-Notably, --tflite_path is optinal, and it only works after 2.2.0-rc4.
+Notably, --tflite_path is optional, and it only works with tensorflow >= 2.2.0-rc4.
 
 
 ## 4. Benchmark model latency.
