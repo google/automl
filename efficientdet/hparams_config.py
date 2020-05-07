@@ -209,6 +209,8 @@ def default_detection_configs():
   # localization loss
   h.delta = 0.1
   h.box_loss_weight = 50.0
+  h.iou_loss_type = None
+  h.iou_loss_weight = 1.0
   # regularization l2 loss.
   h.weight_decay = 4e-5
   # enable bfloat

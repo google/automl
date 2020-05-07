@@ -28,6 +28,7 @@ import anchors
 import coco_metric
 import efficientdet_arch
 import hparams_config
+import iou_utils
 import retinanet_arch
 import utils
 
@@ -230,6 +231,14 @@ def _box_loss(box_outputs, box_targets, num_positives, delta=0.1):
   return box_loss
 
 
+def _box_iou_loss(box_outputs, box_targets, num_positives, iou_loss_type):
+  """Computes box iou loss."""
+  normalizer = num_positives * 4.0
+  box_iou_loss = iou_utils.iou_loss(box_outputs, box_targets, iou_loss_type)
+  box_iou_loss = tf.reduce_sum(box_iou_loss) / normalizer
+  return box_iou_loss
+
+
 def detection_loss(cls_outputs, box_outputs, labels, params):
   """Computes total detection loss.
 
@@ -249,6 +258,7 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
       class and box losses from all levels.
     cls_loss: an integer tensor representing total class loss.
     box_loss: an integer tensor representing total box regression loss.
+    box_iou_loss: an integer tensor representing total box iou loss.
   """
   # Sum all positives in a batch for normalization and avoid zero
   # num_positives_sum, which would lead to inf loss during training
@@ -257,6 +267,7 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
 
   cls_losses = []
   box_losses = []
+  box_iou_losses = []
   for level in levels:
     if params['data_format'] == 'channels_first':
       labels['cls_targets_%d' % level] = tf.transpose(
@@ -297,12 +308,19 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
             box_targets_at_level,
             num_positives_sum,
             delta=params['delta']))
+    if params['iou_loss_type']:
+      box_iou_losses.append(
+          _box_iou_loss(box_outputs[level], box_targets_at_level,
+                        num_positives_sum, params['iou_loss_type']))
 
   # Sum per level losses to total loss.
   cls_loss = tf.add_n(cls_losses)
   box_loss = tf.add_n(box_losses)
-  total_loss = cls_loss + params['box_loss_weight'] * box_loss
-  return total_loss, cls_loss, box_loss
+  box_iou_loss = tf.add_n(box_iou_losses) if box_iou_losses else 0.0
+  total_loss = (
+      cls_loss + params['box_loss_weight'] * box_loss +
+      params['iou_loss_weight'] * box_iou_loss)
+  return total_loss, cls_loss, box_loss, box_iou_loss
 
 
 def add_metric_fn_inputs(params,
@@ -463,8 +481,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   learning_rate = learning_rate_schedule(params, global_step)
 
   # cls_loss and box_loss are for logging. only total_loss is optimized.
-  det_loss, cls_loss, box_loss = detection_loss(cls_outputs, box_outputs,
-                                                labels, params)
+  det_loss, cls_loss, box_loss, box_iou_loss = detection_loss(
+      cls_outputs, box_outputs, labels, params)
   l2loss = reg_l2_loss(params['weight_decay'])
   total_loss = det_loss + l2loss
 
@@ -472,6 +490,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     utils.scalar('lrn_rate', learning_rate)
     utils.scalar('trainloss/cls_loss', cls_loss)
     utils.scalar('trainloss/box_loss', box_loss)
+    utils.scalar('trainloss/box_iou_loss', box_iou_loss)
     utils.scalar('trainloss/det_loss', det_loss)
     utils.scalar('trainloss/l2_loss', l2loss)
     utils.scalar('trainloss/loss', total_loss)
