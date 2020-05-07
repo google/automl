@@ -116,41 +116,6 @@ def decode_box_outputs_tf(rel_codes, anchors):
   return tf.stack([ymin, xmin, ymax, xmax], axis=-1)
 
 
-@tf.autograph.to_graph
-def nms_tf(dets, thresh):
-  """Non-maximum suppression with tf graph mode."""
-  x1 = dets[:, 0]
-  y1 = dets[:, 1]
-  x2 = dets[:, 2]
-  y2 = dets[:, 3]
-  scores = dets[:, 4]
-
-  areas = (x2 - x1 + 1) * (y2 - y1 + 1)
-  order = tf.argsort(scores, direction='DESCENDING')
-
-  keep = tf.TensorArray(tf.int32, size=0, dynamic_size=True)
-  index = 0
-  while tf.shape(order)[0] > 0:
-    i = order[0]
-    keep = keep.write(index, i)
-    xx1 = tf.maximum(x1[i], tf.gather(x1, order[1:]))
-    yy1 = tf.maximum(y1[i], tf.gather(y1, order[1:]))
-    xx2 = tf.minimum(x2[i], tf.gather(x2, order[1:]))
-    yy2 = tf.minimum(y2[i], tf.gather(y2, order[1:]))
-
-    w = tf.maximum(0.0, xx2 - xx1 + 1)
-    h = tf.maximum(0.0, yy2 - yy1 + 1)
-    intersection = w * h
-    overlap = intersection / (
-        areas[i] + tf.gather(areas, order[1:]) - intersection)
-
-    inds = tf.where_v2(overlap <= thresh)
-    order = tf.concat(tf.gather(order, inds + 1), axis=1)
-    order = tf.squeeze(order, axis=-1)
-    index += 1
-  return keep.stack()
-
-
 def nms(dets, thresh):
   """Non-maximum suppression."""
   x1 = dets[:, 0]
@@ -257,6 +222,45 @@ def _generate_anchor_boxes(image_size, anchor_scale, anchor_configs):
   anchor_boxes = np.vstack(boxes_all)
   return anchor_boxes
 
+def _generate_anchor_boxes_mannual(image_size, anchor_configs):
+  """Generates multiscale anchor boxes.
+
+  Args:
+    image_size: tuple of integer numbers of input image size.
+    anchor_configs: a dictionary with keys as the levels of anchors and
+      values as a list of anchor configuration.
+
+  Returns:
+    anchor_boxes: a numpy array with shape [N, 4], which stacks anchors on all
+      feature levels.
+  Raises:
+    ValueError: input size must be the multiple of largest feature stride.
+  """
+  boxes_all = []
+  for _, configs in anchor_configs.items():
+    boxes_level = []
+    for config in configs:
+      stride, anchor = config
+      anchor_size_x_2 = anchor[0]
+      anchor_size_y_2 = anchor[1]
+
+      x = np.arange(stride[1] / 2, image_size[1], stride[1])
+      y = np.arange(stride[0] / 2, image_size[0], stride[0])
+      xv, yv = np.meshgrid(x, y)
+      xv = xv.reshape(-1)
+      yv = yv.reshape(-1)
+
+      boxes = np.vstack((yv - anchor_size_y_2, xv - anchor_size_x_2,
+                         yv + anchor_size_y_2, xv + anchor_size_x_2))
+      boxes = np.swapaxes(boxes, 0, 1)
+      boxes_level.append(np.expand_dims(boxes, axis=1))
+    # concat anchors on the same level to the reshape NxAx4
+    boxes_level = np.concatenate(boxes_level, axis=1)
+    boxes_all.append(boxes_level.reshape([-1, 4]))
+
+  anchor_boxes = np.vstack(boxes_all)
+  return anchor_boxes
+
 
 def _generate_detections_tf(cls_outputs,
                             box_outputs,
@@ -269,8 +273,7 @@ def _generate_detections_tf(cls_outputs,
                             min_score_thresh=MIN_SCORE_THRESH,
                             max_boxes_to_draw=MAX_DETECTIONS_PER_IMAGE,
                             soft_nms_sigma=0.0,
-                            iou_threshold=0.5,
-                            use_native_nms=True):
+                            iou_threshold=0.5):
   """Generates detections with model outputs and anchors.
 
   Args:
@@ -317,24 +320,15 @@ def _generate_detections_tf(cls_outputs,
   # apply bounding box regression to anchors
   boxes = decode_box_outputs_tf(box_outputs, anchor_boxes)
 
-  if use_native_nms:
-    logging.info('Using native nms.')
-    top_detection_idx, scores = tf.image.non_max_suppression_with_scores(
-        boxes,
-        scores,
-        max_boxes_to_draw,
-        iou_threshold=iou_threshold,
-        score_threshold=min_score_thresh,
-        soft_nms_sigma=soft_nms_sigma)
-    boxes = tf.gather(boxes, top_detection_idx)
-  else:
-    logging.info('Using customized nms.')
-    scores = tf.expand_dims(scores, axis=1)
-    all_detections = tf.concat([boxes, scores], axis=1)
-    top_detection_idx = nms_tf(all_detections, iou_threshold)
-    detections = tf.gather(all_detections, top_detection_idx)
-    scores = detections[:, 4]
-    boxes = detections[:, :4]
+  logging.info('Using native nms.')
+  top_detection_idx, scores = tf.image.non_max_suppression_with_scores(
+      boxes,
+      scores,
+      max_boxes_to_draw,
+      iou_threshold=iou_threshold,
+      score_threshold=min_score_thresh,
+      soft_nms_sigma=soft_nms_sigma)
+  boxes = tf.gather(boxes, top_detection_idx)
 
   image_size = utils.parse_image_size(image_size)
   detections = tf.stack([
