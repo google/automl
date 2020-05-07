@@ -262,21 +262,10 @@ def batch_norm_class(is_training, use_tpu=False):
   else:
     return BatchNormalization
 
-
 def tpu_batch_normalization(inputs, training=False, use_tpu=False, **kwargs):
   """A wrapper for TpuBatchNormalization."""
   layer = batch_norm_class(training, use_tpu)(**kwargs)
   return layer.apply(inputs, training=training)
-
-
-class Tpu_batch_normalization(tf.keras.layers.Layer):
-  def __init__(self, training=False, use_tpu=False, **kwargs):
-    self.training = training
-    self.layer = batch_norm_class(training, use_tpu)(**kwargs)
-
-  def call(self, inputs, **kwargs):
-    return self.layer.call(inputs, training=self.training)
-
 
 def batch_norm_act(inputs,
                    is_training_bn: bool,
@@ -344,7 +333,10 @@ class Batch_norm_act(tf.keras.layers.Layer):
                name: Text = None
                ):
 
+    super(Batch_norm_act, self).__init__(name='batch_norm_act')
+
     self.act_type = act_type
+    self.training = is_training_bn
 
     if init_zero:
       self.gamma_initializer = tf.zeros_initializer()
@@ -356,21 +348,28 @@ class Batch_norm_act(tf.keras.layers.Layer):
     else:
       self.axis = 3
 
-    self.layer = Tpu_batch_normalization(axis=self.axis,
+    if is_training_bn and use_tpu:
+      self.layer = TpuBatchNormalization(axis=self.axis,
                                          momentum=momentum,
                                          epsilon=epsilon,
                                          center=True,
                                          scale=True,
-                                         training=is_training_bn,
-                                         use_tpu=use_tpu,
                                          gamma_initializer=self.gamma_initializer,
                                          name=name)
+    else:
+      self.layer = BatchNormalization(axis=self.axis,
+                                      momentum=momentum,
+                                      epsilon=epsilon,
+                                      center=True,
+                                      scale=True,
+                                      gamma_initializer=self.gamma_initializer,
+                                      name=name)
 
     if self.act_type:
       self.act = Activation_fn(act_type)
 
   def call(self, inputs, **kwargs):
-    x = self.layer.call(inputs)
+    x = self.layer.apply(inputs, training=self.training)
     if self.act_type:
       x = self.act.call(x)
     return x
@@ -393,6 +392,25 @@ def drop_connect(inputs, is_training, survival_prob):
   # needed at test time.
   output = tf.div(inputs, survival_prob) * binary_tensor
   return output
+
+class Drop_connect(tf.keras.layers.Layer):
+  def __init__(self, survival_prob, name='drop_connect'):
+
+    super(Drop_connect, self).__init__(name=name)
+    self.survival_prob = survival_prob
+
+
+    def call(self, inputs: tf.Tensor):
+      # Compute tensor.
+      batch_size = tf.shape(inputs)[0]
+      random_tensor = self.survival_prob
+      random_tensor += tf.random_uniform([batch_size, 1, 1, 1], dtype=inputs.dtype)
+      binary_tensor = tf.floor(random_tensor)
+      # Unlike conventional way that multiply survival_prob at test time, here we
+      # divide survival_prob at training time, such that no addition compute is
+      # needed at test time.
+      output = tf.div(inputs, self.survival_prob) * binary_tensor
+      return output
 
 
 def num_params_flops(readable_format=True):
