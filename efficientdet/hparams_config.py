@@ -177,6 +177,9 @@ def default_detection_configs():
   h.train_scale_min = 0.1
   h.train_scale_max = 2.0
   h.autoaugment_policy = None
+  h.use_augmix = False
+  # mixture_width, mixture_depth, alpha
+  h.augmix_params = (3, -1, 1)
 
   # dataset specific parameters
   h.num_classes = 90
