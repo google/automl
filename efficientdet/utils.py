@@ -47,15 +47,18 @@ def activation_fn(features: tf.Tensor, act_type: Text):
 
 
 class Activation_fn(tf.keras.layers.Layer):
-  def __init__(self, act_type: Text):
+  def __init__(self, act_type: Text, name='activation_fn'):
+
+    super(Activation_fn, self).__init__(name=name)
+
     if act_type == 'swish':
       self.act = tf.keras.layers.Lambda(lambda x: tf.nn.swish(x))
     elif act_type == 'swish_native':
       self.act = tf.keras.layers.Lambda(lambda x: x * tf.sigmoid(x))
     elif act_type == 'relu':
-      self.act = tf.keras.layers.Lambda(lambda x: tf.nn.relu(features))
+      self.act = tf.keras.layers.Lambda(lambda x: tf.nn.relu(x))
     elif act_type == 'relu6':
-      self.act = tf.keras.layers.Lambda(lambda x: tf.nn.relu6(features))
+      self.act = tf.keras.layers.Lambda(lambda x: tf.nn.relu6(x))
     else:
       raise ValueError('Unsupported act_type {}'.format(act_type))
 
@@ -253,7 +256,7 @@ class BatchNormalization(tf.keras.layers.BatchNormalization):
     return outputs
 
 
-def batch_norm_class(is_training, use_tpu=False,):
+def batch_norm_class(is_training, use_tpu=False):
   if is_training and use_tpu:
     return TpuBatchNormalization
   else:
