@@ -306,6 +306,9 @@ def _generate_detections_tf(cls_outputs,
     detections: detection results in a tensor with each row representing
       [image_id, ymin, xmin, ymax, xmax, score, class]
   """
+  if not image_size:
+    raise ValueError('image_size cannot be empty.')
+
   logging.info('Using tf version of post-processing.')
   anchor_boxes = tf.gather(anchor_boxes, indices)
 
@@ -565,7 +568,7 @@ class AnchorLabeler(object):
                           classes,
                           image_id,
                           image_scale,
-                          image_size,
+                          image_size=None,
                           min_score_thresh=MIN_SCORE_THRESH,
                           max_boxes_to_draw=MAX_DETECTIONS_PER_IMAGE,
                           disable_pyfun=None):
