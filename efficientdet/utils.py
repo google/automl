@@ -46,6 +46,23 @@ def activation_fn(features: tf.Tensor, act_type: Text):
     raise ValueError('Unsupported act_type {}'.format(act_type))
 
 
+class Activation_fn(tf.keras.layers.Layer):
+  def __init__(self, act_type: Text):
+    if act_type == 'swish':
+      self.act = tf.keras.layers.Lambda(lambda x: tf.nn.swish(x))
+    elif act_type == 'swish_native':
+      self.act = tf.keras.layers.Lambda(lambda x: x * tf.sigmoid(x))
+    elif act_type == 'relu':
+      self.act = tf.keras.layers.Lambda(lambda x: tf.nn.relu(features))
+    elif act_type == 'relu6':
+      self.act = tf.keras.layers.Lambda(lambda x: tf.nn.relu6(features))
+    else:
+      raise ValueError('Unsupported act_type {}'.format(act_type))
+
+    def call(self, features: tf.Tensor):
+      return self.act(features)
+
+
 def get_ema_vars():
   """Get all exponential moving average (ema) variables."""
   ema_vars = tf.trainable_variables() + tf.get_collection('moving_vars')
@@ -236,7 +253,7 @@ class BatchNormalization(tf.keras.layers.BatchNormalization):
     return outputs
 
 
-def batch_norm_class(is_training, use_tpu=False):
+def batch_norm_class(is_training, use_tpu=False,):
   if is_training and use_tpu:
     return TpuBatchNormalization
   else:
@@ -247,6 +264,15 @@ def tpu_batch_normalization(inputs, training=False, use_tpu=False, **kwargs):
   """A wrapper for TpuBatchNormalization."""
   layer = batch_norm_class(training, use_tpu)(**kwargs)
   return layer.apply(inputs, training=training)
+
+
+class Tpu_batch_normalization(tf.keras.layers.Layer):
+  def __init__(self, training=False, use_tpu=False, **kwargs):
+    self.training = training
+    self.layer = batch_norm_class(training, use_tpu)(**kwargs)
+
+  def call(self, inputs, **kwargs):
+    return self.layer.call(inputs, training=self.training)
 
 
 def batch_norm_act(inputs,
@@ -301,6 +327,51 @@ def batch_norm_act(inputs,
   if act_type:
     inputs = activation_fn(inputs, act_type)
   return inputs
+
+
+class Batch_norm_act(tf.keras.layers.Layer):
+  def __init__(self,
+               is_training_bn: bool,
+               act_type: Union[Text, None],
+               init_zero: bool = False,
+               data_format: Text = 'channels_last',
+               momentum: float = 0.99,
+               epsilon: float = 1e-3,
+               use_tpu: bool = False,
+               name: Text = None
+               ):
+
+    self.act_type = act_type
+
+    if init_zero:
+      self.gamma_initializer = tf.zeros_initializer()
+    else:
+      self.gamma_initializer = tf.ones_initializer()
+
+    if data_format == 'channels_first':
+      self.axis = 1
+    else:
+      self.axis = 3
+
+    self.layer = Tpu_batch_normalization(axis=self.axis,
+                                         momentum=momentum,
+                                         epsilon=epsilon,
+                                         center=True,
+                                         scale=True,
+                                         training=is_training_bn,
+                                         use_tpu=use_tpu,
+                                         gamma_initializer=self.gamma_initializer,
+                                         name=name)
+
+    if self.act_type:
+      self.act = Activation_fn(act_type)
+
+  def call(self, inputs, **kwargs):
+    x = self.layer.call(inputs)
+    if self.act_type:
+      x = self.act.call(x)
+    return x
+
 
 
 def drop_connect(inputs, is_training, survival_prob):
