@@ -683,7 +683,7 @@ def build_bifpn_layer(feats, feat_sizes, config):
   return output_feats
 
 
-def efficientdet(features, model_name=None, config=None, use_keras=False, **kwargs):
+def efficientdet(features, model_name=None, config=None, use_keras=True, **kwargs):
   """Build EfficientDet model."""
   if not config and not model_name:
     raise ValueError('please specify either model name or config')
@@ -710,7 +710,7 @@ def efficientdet(features, model_name=None, config=None, use_keras=False, **kwar
 
   # build class and box predictions.
   if use_keras:
-      class_box = BuildClassAndBoxOutputs(config)
+      class_box = BuildClassAndBoxOutputs(**config)
       class_outputs, box_outputs = class_box.call(fpn_feats)
   else:
       class_outputs, box_outputs = build_class_and_box_outputs(fpn_feats, config)
