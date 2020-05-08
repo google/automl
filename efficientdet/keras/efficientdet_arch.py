@@ -11,7 +11,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf
 
 import hparams_config
-import utils
+import keras.utils
 from backbone import backbone_factory
 from backbone import efficientnet_builder
 
@@ -74,7 +74,7 @@ class ClassNet(tf.keras.layers.Layer):
             # Level only apply here so it's maybe better inside (no need to use tf.AUTO_REUSE anymore)
             bn_act_ops_per_level = {}
             for level in range(config.min_level, config.max_level + 1):
-                bn_act_ops_per_level[level] = utils.Batch_norm_act(is_training,
+                bn_act_ops_per_level[level] = keras.utils.Batch_norm_act(is_training,
                                                                    act_type=act_type,
                                                                    init_zero=False,
                                                                    use_tpu=use_tpu,
@@ -83,7 +83,7 @@ class ClassNet(tf.keras.layers.Layer):
             self.bn_act_ops.append(bn_act_ops_per_level)
 
         if self.use_dc:
-            self.dc = utils.Drop_connect(survival_prob)
+            self.dc = keras.utils.Drop_connect(survival_prob)
 
         if separable_conv:
             self.classes = tf.keras.layers.SeparableConv2D(
@@ -180,7 +180,7 @@ class BoxNet(tf.keras.layers.Layer):
             # Level only apply here so it's maybe better inside (no need to use tf.AUTO_REUSE anymore)
             bn_act_ops_per_level = {}
             for level in range(config.min_level, config.max_level + 1):
-                bn_act_ops_per_level[level] = utils.Batch_norm_act(is_training,
+                bn_act_ops_per_level[level] = keras.utils.Batch_norm_act(is_training,
                                                                    act_type=act_type,
                                                                    init_zero=False,
                                                                    use_tpu=use_tpu,
@@ -189,7 +189,7 @@ class BoxNet(tf.keras.layers.Layer):
             self.bn_act_ops.append(bn_act_ops_per_level)
 
         if self.use_dc:
-            self.dc = utils.Drop_connect(survival_prob)
+            self.dc = keras.utils.Drop_connect(survival_prob)
 
         if separable_conv:
             self.boxes = tf.keras.layers.SeparableConv2D(
