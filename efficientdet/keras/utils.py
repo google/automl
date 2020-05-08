@@ -37,13 +37,13 @@ class Activation_fn(tf.keras.layers.Layer):
     super(Activation_fn, self).__init__(name=name)
 
     if act_type == 'swish':
-      self.act = tf.keras.layers.Lambda(lambda x: tf.nn.swish(x))
+      self.act = tf.keras.layers.Activation(tf.nn.swish)
     elif act_type == 'swish_native':
       self.act = tf.keras.layers.Lambda(lambda x: x * tf.sigmoid(x))
     elif act_type == 'relu':
-      self.act = tf.keras.layers.Lambda(lambda x: tf.nn.relu(x))
+      self.act = tf.keras.layers.Activation(tf.nn.relu)
     elif act_type == 'relu6':
-      self.act = tf.keras.layers.Lambda(lambda x: tf.nn.relu6(x))
+      self.act = tf.keras.layers.Activation(tf.nn.relu6)
     else:
       raise ValueError('Unsupported act_type {}'.format(act_type))
 
