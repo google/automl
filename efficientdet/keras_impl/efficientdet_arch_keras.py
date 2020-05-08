@@ -18,7 +18,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
                use_tpu=False,
                data_format=None,
                name='resample_feature_map'):
-    super(ResampleFeatureMap, self).__init__(name=name)
+    super(ResampleFeatureMap, self).__init__(name='resample_{}'.format(name))
     self.apply_bn = apply_bn
     self.is_training = is_training
     self.data_format = conv_utils.normalize_data_format(data_format)
