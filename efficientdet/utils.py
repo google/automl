@@ -46,26 +46,6 @@ def activation_fn(features: tf.Tensor, act_type: Text):
     raise ValueError('Unsupported act_type {}'.format(act_type))
 
 
-class Activation_fn(tf.keras.layers.Layer):
-  def __init__(self, act_type: Text, name='activation_fn'):
-
-    super(Activation_fn, self).__init__(name=name)
-
-    if act_type == 'swish':
-      self.act = tf.keras.layers.Lambda(lambda x: tf.nn.swish(x))
-    elif act_type == 'swish_native':
-      self.act = tf.keras.layers.Lambda(lambda x: x * tf.sigmoid(x))
-    elif act_type == 'relu':
-      self.act = tf.keras.layers.Lambda(lambda x: tf.nn.relu(x))
-    elif act_type == 'relu6':
-      self.act = tf.keras.layers.Lambda(lambda x: tf.nn.relu6(x))
-    else:
-      raise ValueError('Unsupported act_type {}'.format(act_type))
-
-    def call(self, features: tf.Tensor):
-      return self.act(features)
-
-
 def get_ema_vars():
   """Get all exponential moving average (ema) variables."""
   ema_vars = tf.trainable_variables() + tf.get_collection('moving_vars')
@@ -262,10 +242,12 @@ def batch_norm_class(is_training, use_tpu=False):
   else:
     return BatchNormalization
 
+
 def tpu_batch_normalization(inputs, training=False, use_tpu=False, **kwargs):
   """A wrapper for TpuBatchNormalization."""
   layer = batch_norm_class(training, use_tpu)(**kwargs)
   return layer.apply(inputs, training=training)
+
 
 def batch_norm_act(inputs,
                    is_training_bn: bool,
@@ -321,61 +303,6 @@ def batch_norm_act(inputs,
   return inputs
 
 
-class Batch_norm_act(tf.keras.layers.Layer):
-  def __init__(self,
-               is_training_bn: bool,
-               act_type: Union[Text, None],
-               init_zero: bool = False,
-               data_format: Text = 'channels_last',
-               momentum: float = 0.99,
-               epsilon: float = 1e-3,
-               use_tpu: bool = False,
-               name: Text = None
-               ):
-
-    super(Batch_norm_act, self).__init__(name='batch_norm_act')
-
-    self.act_type = act_type
-    self.training = is_training_bn
-
-    if init_zero:
-      self.gamma_initializer = tf.zeros_initializer()
-    else:
-      self.gamma_initializer = tf.ones_initializer()
-
-    if data_format == 'channels_first':
-      self.axis = 1
-    else:
-      self.axis = 3
-
-    if is_training_bn and use_tpu:
-      self.layer = TpuBatchNormalization(axis=self.axis,
-                                         momentum=momentum,
-                                         epsilon=epsilon,
-                                         center=True,
-                                         scale=True,
-                                         gamma_initializer=self.gamma_initializer,
-                                         name=name)
-    else:
-      self.layer = BatchNormalization(axis=self.axis,
-                                      momentum=momentum,
-                                      epsilon=epsilon,
-                                      center=True,
-                                      scale=True,
-                                      gamma_initializer=self.gamma_initializer,
-                                      name=name)
-
-    if self.act_type:
-      self.act = Activation_fn(act_type)
-
-  def call(self, inputs, **kwargs):
-    x = self.layer.apply(inputs, training=self.training)
-    if self.act_type:
-      x = self.act.call(x)
-    return x
-
-
-
 def drop_connect(inputs, is_training, survival_prob):
   """Drop the entire conv with given survival probability."""
   # "Deep Networks with Stochastic Depth", https://arxiv.org/pdf/1603.09382.pdf
@@ -392,25 +319,6 @@ def drop_connect(inputs, is_training, survival_prob):
   # needed at test time.
   output = tf.div(inputs, survival_prob) * binary_tensor
   return output
-
-class Drop_connect(tf.keras.layers.Layer):
-  def __init__(self, survival_prob, name='drop_connect'):
-
-    super(Drop_connect, self).__init__(name=name)
-    self.survival_prob = survival_prob
-
-
-    def call(self, inputs: tf.Tensor):
-      # Compute tensor.
-      batch_size = tf.shape(inputs)[0]
-      random_tensor = self.survival_prob
-      random_tensor += tf.random_uniform([batch_size, 1, 1, 1], dtype=inputs.dtype)
-      binary_tensor = tf.floor(random_tensor)
-      # Unlike conventional way that multiply survival_prob at test time, here we
-      # divide survival_prob at training time, such that no addition compute is
-      # needed at test time.
-      output = tf.div(inputs, self.survival_prob) * binary_tensor
-      return output
 
 
 def num_params_flops(readable_format=True):

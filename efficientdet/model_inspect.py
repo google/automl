@@ -169,8 +169,11 @@ class ModelInspector(object):
     for i in range(num_batches):
       batch_files = all_files[i * batch_size: (i + 1) * batch_size]
       height, width = self.model_config.image_size
-      raw_images = [np.array(Image.open(f).resize((width, height)))
-                    for f in batch_files]
+      images = [Image.open(f) for f in batch_files]
+      if len(set([m.size for m in images])) > 1:
+        # Resize only if images in the same batch have different sizes.
+        images = [m.resize(height, width) for f in images]
+      raw_images = [np.array(m) for m in images]
       size_before_pad = len(raw_images)
       if size_before_pad < batch_size:
         padding_size = batch_size - size_before_pad
