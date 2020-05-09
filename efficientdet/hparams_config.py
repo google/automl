@@ -196,7 +196,11 @@ def default_detection_configs():
   h.is_training_bn = True
   # optimization
   h.momentum = 0.9
+  # 'adam', 'sgd'
+  h.optimizer = 'sgd'
+  # 0.008 for adam
   h.learning_rate = 0.08
+  # 0.0008 for adam
   h.lr_warmup_init = 0.008
   h.lr_warmup_epoch = 1.0
   h.first_lr_drop_epoch = 200.0

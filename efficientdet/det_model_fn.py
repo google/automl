@@ -34,6 +34,10 @@ import utils
 
 _DEFAULT_BATCH_SIZE = 64
 
+optimizers = {
+  'adam': tf.train.AdamOptimizer,
+  'sgd': tf.train.MomentumOptimizer,
+}
 
 def update_learning_rate_schedule_parameters(params):
   """Updates params that are related to the learning rate schedule."""
@@ -502,7 +506,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     ema_vars = utils.get_ema_vars()
 
   if mode == tf.estimator.ModeKeys.TRAIN:
-    optimizer = tf.train.MomentumOptimizer(
+    optimizer = optimizers[params['optimizer'].lower()](
         learning_rate, momentum=params['momentum'])
     if params['use_tpu']:
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)

@@ -335,6 +335,10 @@ def _generate_detections_tf(cls_outputs,
     scores = detections[:, 4]
     boxes = detections[:, :4]
 
+  if isinstance(image_size, int):
+    image_size = (image_size, image_size)
+  else:
+    image_size = image_size
   detections = tf.stack([
       tf.cast(tf.tile(image_id, tf.shape(top_detection_idx)), tf.float32),
       tf.clip_by_value(boxes[:, 0], 0, image_size[0]) * image_scale,
