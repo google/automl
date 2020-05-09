@@ -249,6 +249,7 @@ def det_post_process_combined(params, cls_outputs, box_outputs, scales,
           tf.expand_dims(tf.range(batch_size), axis=1), [1, max_boxes_to_draw]),
       dtype=tf.float32)
   image_size = params['image_size']
+  image_size = utils.parse_image_size(image_size)
   ymin = tf.clip_by_value(nmsed_boxes[..., 0], 0, image_size[0]) * scales
   xmin = tf.clip_by_value(nmsed_boxes[..., 1], 0, image_size[1]) * scales
   ymax = tf.clip_by_value(nmsed_boxes[..., 2], 0, image_size[0]) * scales

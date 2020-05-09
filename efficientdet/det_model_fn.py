@@ -502,8 +502,14 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     ema_vars = utils.get_ema_vars()
 
   if mode == tf.estimator.ModeKeys.TRAIN:
-    optimizer = tf.train.MomentumOptimizer(
-        learning_rate, momentum=params['momentum'])
+    if params['optimizer'].lower() == 'sgd':
+      optimizer = tf.train.MomentumOptimizer(
+          learning_rate, momentum=params['momentum'])
+    elif params['optimizer'].lower() == 'adam':
+      optimizer = tf.train.AdamOptimizer(
+          learning_rate)
+    else:
+      raise ValueError('optimizers should be adam or sgd')
     if params['use_tpu']:
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)
 

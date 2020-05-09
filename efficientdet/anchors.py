@@ -335,6 +335,7 @@ def _generate_detections_tf(cls_outputs,
     scores = detections[:, 4]
     boxes = detections[:, :4]
 
+  image_size = utils.parse_image_size(image_size)
   detections = tf.stack([
       tf.cast(tf.tile(image_id, tf.shape(top_detection_idx)), tf.float32),
       tf.clip_by_value(boxes[:, 0], 0, image_size[0]) * image_scale,
@@ -455,10 +456,7 @@ class Anchors(object):
     self.num_scales = num_scales
     self.aspect_ratios = aspect_ratios
     self.anchor_scale = anchor_scale
-    if isinstance(image_size, int):
-      self.image_size = (image_size, image_size)
-    else:
-      self.image_size = image_size
+    self.image_size = utils.parse_image_size(image_size)
     self.feat_sizes = utils.get_feat_sizes(image_size, max_level)
     self.config = self._generate_configs()
     self.boxes = self._generate_boxes()
