@@ -658,7 +658,7 @@ def build_bifpn_layer(feats, feat_sizes, config):
             data_format=config.data_format)
         nodes.append(input_node)
 
-      new_node = fuse_features(nodes, p.fpn_weight_method)
+      new_node = fuse_features(nodes, fpn_config.weight_method)
 
       with tf.variable_scope('op_after_combine{}'.format(len(feats))):
         if not p.conv_bn_act_pattern:
