@@ -591,6 +591,43 @@ def get_fpn_config(fpn_name, min_level, max_level, weight_method):
   return name_to_config[fpn_name]
 
 
+def fuse_features(nodes, weight_method):
+  """
+  Fuse features from different resolutions and return a weighted sum.
+
+  Args:
+    nodes: a list of tensorflow features at different levels
+    weight_method: feature fusion method. One of:
+      * "attn" - Softmax weighted fusion
+      * "fastattn" - Fast normalzied feature fusion
+      * "sum" - a sum of inputs
+  """
+  dtype = nodes[0].dtype
+
+  if weight_method == 'attn':
+    edge_weights = [tf.cast(tf.Variable(1.0, name='WSM'), dtype=dtype)
+                    for _ in nodes]
+    normalized_weights = tf.nn.softmax(tf.stack(edge_weights))
+    nodes = tf.stack(nodes, axis=-1)
+    new_node = tf.reduce_sum(tf.multiply(nodes, normalized_weights), -1)
+  elif weight_method == 'fastattn':
+    edge_weights = [
+        tf.nn.relu(tf.cast(tf.Variable(1.0, name='WSM'), dtype=dtype))
+        for _ in nodes
+    ]
+    weights_sum = tf.add_n(edge_weights)
+    nodes = [nodes[i] * edge_weights[i] / (weights_sum + 0.0001)
+             for i in range(len(nodes))]
+    new_node = tf.add_n(nodes)
+  elif weight_method == 'sum':
+    new_node = tf.add_n(nodes)
+  else:
+    raise ValueError(
+        'unknown weight_method {}'.format(weight_method))
+
+  return new_node
+
+
 def build_bifpn_layer(feats, feat_sizes, config):
   """Builds a feature pyramid given previous feature pyramid and config."""
   p = config  # use p to denote the network config.
@@ -617,31 +654,11 @@ def build_bifpn_layer(feats, feat_sizes, config):
             p.conv_after_downsample,
             p.use_native_resize_op,
             p.pooling_type,
+            use_tpu=p.use_tpu,
             data_format=config.data_format)
         nodes.append(input_node)
 
-      # Combine all nodes.
-      dtype = nodes[0].dtype
-      if fpn_config.weight_method == 'attn':
-        edge_weights = [tf.cast(tf.Variable(1.0, name='WSM'), dtype=dtype)
-                        for _ in range(len(fnode['inputs_offsets']))]
-        normalized_weights = tf.nn.softmax(tf.stack(edge_weights))
-        nodes = tf.stack(nodes, axis=-1)
-        new_node = tf.reduce_sum(tf.multiply(nodes, normalized_weights), -1)
-      elif fpn_config.weight_method == 'fastattn':
-        edge_weights = [
-            tf.nn.relu(tf.cast(tf.Variable(1.0, name='WSM'), dtype=dtype))
-            for _ in range(len(fnode['inputs_offsets']))
-        ]
-        weights_sum = tf.add_n(edge_weights)
-        nodes = [nodes[i] * edge_weights[i] / (weights_sum + 0.0001)
-                 for i in range(len(nodes))]
-        new_node = tf.add_n(nodes)
-      elif fpn_config.weight_method == 'sum':
-        new_node = tf.add_n(nodes)
-      else:
-        raise ValueError(
-            'unknown weight_method {}'.format(fpn_config.weight_method))
+      new_node = fuse_features(nodes, p.fpn_weight_method)
 
       with tf.variable_scope('op_after_combine{}'.format(len(feats))):
         if not p.conv_bn_act_pattern:
