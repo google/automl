@@ -456,7 +456,7 @@ class Anchors(object):
     self.num_scales = num_scales
     self.aspect_ratios = aspect_ratios
     self.anchor_scale = anchor_scale
-    image_size = utils.parse_image_size(image_size)
+    self.image_size = utils.parse_image_size(image_size)
     self.feat_sizes = utils.get_feat_sizes(image_size, max_level)
     self.config = self._generate_configs()
     self.boxes = self._generate_boxes()
