@@ -25,6 +25,8 @@ from tensorflow.python.tpu import tpu_function  # pylint:disable=g-direct-tensor
 
 
 # pylint: disable=logging-format-interpolation
+from utils import TpuBatchNormalization, BatchNormalization
+
 
 class Activation_fn(tf.keras.layers.Layer):
     def __init__(self, act_type: Text, name='activation_fn', **kwargs):
@@ -54,80 +56,6 @@ class Activation_fn(tf.keras.layers.Layer):
             **base_config,
             'act_type' : self.act_type
         }
-
-
-class TpuBatchNormalization(tf.keras.layers.BatchNormalization):
-    """Cross replica batch normalization."""
-
-    def __init__(self, fused=False, **kwargs):
-        if not kwargs.get('name', None):
-            kwargs['name'] = 'tpu_batch_normalization'
-        if fused in (True, None):
-            raise ValueError('TpuBatchNormalization does not support fused=True.')
-        super(TpuBatchNormalization, self).__init__(fused=fused, **kwargs)
-
-    def _cross_replica_average(self, t, num_shards_per_group):
-        """Calculates the average value of input tensor across TPU replicas."""
-        num_shards = tpu_function.get_tpu_context().number_of_shards
-        group_assignment = None
-        if num_shards_per_group > 1:
-            if num_shards % num_shards_per_group != 0:
-                raise ValueError(
-                    'num_shards: %d mod shards_per_group: %d, should be 0' %
-                    (num_shards, num_shards_per_group))
-            num_groups = num_shards // num_shards_per_group
-            group_assignment = [[
-                x for x in range(num_shards) if x // num_shards_per_group == y
-            ] for y in range(num_groups)]
-        return tf.tpu.cross_replica_sum(t, group_assignment) / tf.cast(
-            num_shards_per_group, t.dtype)
-
-    def _moments(self, inputs, reduction_axes, keep_dims):
-        """Compute the mean and variance: it overrides the original _moments."""
-        shard_mean, shard_variance = super(TpuBatchNormalization, self)._moments(
-            inputs, reduction_axes, keep_dims=keep_dims)
-
-        num_shards = tpu_function.get_tpu_context().number_of_shards or 1
-        if num_shards <= 8:  # Skip cross_replica for 2x2 or smaller slices.
-            num_shards_per_group = 1
-        else:
-            num_shards_per_group = max(8, num_shards // 8)
-        logging.info('TpuBatchNormalization with num_shards_per_group {}'.format(
-            num_shards_per_group))
-        if num_shards_per_group > 1:
-            # Compute variance using: Var[X]= E[X^2] - E[X]^2.
-            shard_square_of_mean = tf.math.square(shard_mean)
-            shard_mean_of_square = shard_variance + shard_square_of_mean
-            group_mean = self._cross_replica_average(shard_mean, num_shards_per_group)
-            group_mean_of_square = self._cross_replica_average(
-                shard_mean_of_square, num_shards_per_group)
-            group_variance = group_mean_of_square - tf.math.square(group_mean)
-            return (group_mean, group_variance)
-        else:
-            return (shard_mean, shard_variance)
-
-    def call(self, *args, **kwargs):
-        outputs = super(TpuBatchNormalization, self).call(*args, **kwargs)
-        # A temporary hack for tf1 compatibility with keras batch norm.
-        for u in self.updates:
-            tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, u)
-        return outputs
-
-
-class BatchNormalization(tf.keras.layers.BatchNormalization):
-    """Fixed default name of BatchNormalization to match TpuBatchNormalization."""
-
-    def __init__(self, **kwargs):
-        if not kwargs.get('name', None):
-            kwargs['name'] = 'tpu_batch_normalization'
-        super(BatchNormalization, self).__init__(**kwargs)
-
-    def call(self, *args, **kwargs):
-        outputs = super(BatchNormalization, self).call(*args, **kwargs)
-        # A temporary hack for tf1 compatibility with keras batch norm.
-        for u in self.updates:
-            tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, u)
-        return outputs
 
 
 class BatchNormAct(tf.keras.layers.Layer):
@@ -184,9 +112,9 @@ class BatchNormAct(tf.keras.layers.Layer):
         return x
 
 
-class Drop_connect(tf.keras.layers.Layer):
+class DropConnect(tf.keras.layers.Layer):
     def __init__(self, survival_prob, name='drop_connect'):
-        super(Drop_connect, self).__init__(name=name)
+        super(DropConnect, self).__init__(name=name)
         self.survival_prob = survival_prob
 
         def call(self, inputs: tf.Tensor):

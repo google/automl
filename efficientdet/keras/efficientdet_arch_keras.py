@@ -1,8 +1,12 @@
 from __future__ import absolute_import, division, print_function
 
 import tensorflow.compat.v1 as tf
+from absl import logging
 
-import keras.utils
+import hparams_config
+import keras.utils_keras
+import utils
+from efficientdet_arch import build_backbone, build_feature_network
 
 
 class ClassNet(tf.keras.layers.Layer):
@@ -54,7 +58,7 @@ class ClassNet(tf.keras.layers.Layer):
                     activation=None,
                     bias_initializer=tf.zeros_initializer(),
                     padding='same',
-                    name='class-%d' % i))
+                    name=f'{self.name}/class-%d' % i))
             # If using Conv2d
             else:
                 self.conv_ops.append(tf.keras.layers.Conv2D(
@@ -65,21 +69,21 @@ class ClassNet(tf.keras.layers.Layer):
                     activation=None,
                     bias_initializer=tf.zeros_initializer(),
                     padding='same',
-                    name='class-%d' % i))
+                    name=f'{self.name}/class-%d' % i))
 
             # Level only apply here so it's maybe better inside (no need to use tf.AUTO_REUSE anymore)
             bn_act_ops_per_level = {}
             for level in range(self.min_level, self.max_level + 1):
-                bn_act_ops_per_level[level] = keras.utils.BatchNormAct(self.is_training,
-                                                                       act_type=self.act_type,
-                                                                       init_zero=False,
-                                                                       use_tpu=self.use_tpu,
-                                                                       data_format=self.data_format,
-                                                                       name='class-%d-bn-%d' % (i, level))
+                bn_act_ops_per_level[level] = keras.utils_keras.BatchNormAct(self.is_training,
+                                                                             act_type=self.act_type,
+                                                                             init_zero=False,
+                                                                             use_tpu=self.use_tpu,
+                                                                             data_format=self.data_format,
+                                                                             name=f'{self.name}/class-%d-bn-%d' % (i, level))
             self.bn_act_ops.append(bn_act_ops_per_level)
 
         if self.use_dc:
-            self.dc = keras.utils.Drop_connect(self.survival_prob)
+            self.dc = keras.utils_keras.DropConnect(self.survival_prob)
 
         if self.separable_conv:
             self.classes = tf.keras.layers.SeparableConv2D(
@@ -92,7 +96,7 @@ class ClassNet(tf.keras.layers.Layer):
                 activation=None,
                 bias_initializer=tf.zeros_initializer(),
                 padding='same',
-                name='class-predict')
+                name=f'{self.name}/class-predict')
 
         else:
             self.classes = tf.keras.layers.Conv2D(
@@ -103,7 +107,7 @@ class ClassNet(tf.keras.layers.Layer):
                 activation=None,
                 bias_initializer=tf.zeros_initializer(),
                 padding='same',
-                name='class-predict')
+                name=f'{self.name}/class-predict')
 
     def call(self, feats, level=None, **kwargs):
         image = feats
@@ -183,7 +187,7 @@ class BoxNet(tf.keras.layers.Layer):
                     activation=None,
                     bias_initializer=tf.zeros_initializer(),
                     padding='same',
-                    name='box-%d' % i))
+                    name=f'{self.name}/box-%d' % i))
             # If using Conv2d
             else:
                 self.conv_ops.append(tf.keras.layers.Conv2D(
@@ -194,21 +198,21 @@ class BoxNet(tf.keras.layers.Layer):
                     activation=None,
                     bias_initializer=tf.zeros_initializer(),
                     padding='same',
-                    name='box-%d' % i))
+                    name=f'{self.name}/box-%d' % i))
 
             # Level only apply here so it's maybe better inside (no need to use tf.AUTO_REUSE anymore)
             bn_act_ops_per_level = {}
             for level in range(self.min_level, self.max_level + 1):
-                bn_act_ops_per_level[level] = keras.utils.BatchNormAct(self.is_training,
-                                                                       act_type=self.act_type,
-                                                                       init_zero=False,
-                                                                       use_tpu=self.use_tpu,
-                                                                       data_format=self.data_format,
-                                                                       name='box-%d-bn-%d' % (i, level))
+                bn_act_ops_per_level[level] = keras.utils_keras.BatchNormAct(self.is_training,
+                                                                             act_type=self.act_type,
+                                                                             init_zero=False,
+                                                                             use_tpu=self.use_tpu,
+                                                                             data_format=self.data_format,
+                                                                             name=f'{self.name}/box-%d-bn-%d' % (i, level))
             self.bn_act_ops.append(bn_act_ops_per_level)
 
         if self.use_dc:
-            self.dc = keras.utils.Drop_connect(self.survival_prob)
+            self.dc = keras.utils_keras.DropConnect(self.survival_prob)
 
         if self.separable_conv:
             self.boxes = tf.keras.layers.SeparableConv2D(
@@ -221,7 +225,7 @@ class BoxNet(tf.keras.layers.Layer):
                 activation=None,
                 bias_initializer=tf.zeros_initializer(),
                 padding='same',
-                name='box-predict')
+                name=f'{self.name}/box-predict')
 
         else:
             self.boxes = tf.keras.layers.Conv2D(
@@ -232,7 +236,7 @@ class BoxNet(tf.keras.layers.Layer):
                 activation=None,
                 bias_initializer=tf.zeros_initializer(),
                 padding='same',
-                name='box-predict')
+                name=f'{self.name}/box-predict')
 
     def call(self, feats, level=None, **kwargs):
         image = feats
@@ -351,3 +355,37 @@ class BuildClassAndBoxOutputs(tf.keras.layers.Layer):
             'use_tpu': self.use_tpu,
             'data_format': self.data_format
         }
+
+
+def efficientdet(features, model_name=None, config=None, **kwargs):
+  """Build EfficientDet model."""
+  if not config and not model_name:
+    raise ValueError('please specify either model name or config')
+
+  if not config:
+    config = hparams_config.get_efficientdet_config(model_name)
+  elif isinstance(config, dict):
+    config = hparams_config.Config(config)  # wrap dict in Config object
+
+  if kwargs:
+    config.override(kwargs)
+
+  logging.info(config)
+
+  # build backbone features.
+  features = build_backbone(features, config)
+  logging.info('backbone params/flops = {:.6f}M, {:.9f}B'.format(
+      *utils.num_params_flops()))
+
+  # build feature network.
+  fpn_feats = build_feature_network(features, config)
+  logging.info('backbone+fpn params/flops = {:.6f}M, {:.9f}B'.format(
+      *utils.num_params_flops()))
+
+  # build class and box predictions.
+  class_box = BuildClassAndBoxOutputs(**config)
+  class_outputs, box_outputs = class_box.call(fpn_feats)
+  logging.info('backbone+fpn+box params/flops = {:.6f}M, {:.9f}B'.format(
+      *utils.num_params_flops()))
+
+  return class_outputs, box_outputs

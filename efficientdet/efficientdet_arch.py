@@ -35,7 +35,6 @@ import hparams_config
 import utils
 from backbone import backbone_factory
 from backbone import efficientnet_builder
-from keras.efficientdet_arch import BuildClassAndBoxOutputs
 
 
 ################################################################################
@@ -683,7 +682,7 @@ def build_bifpn_layer(feats, feat_sizes, config):
   return output_feats
 
 
-def efficientdet(features, model_name=None, config=None, use_keras=True, **kwargs):
+def efficientdet(features, model_name=None, config=None, **kwargs):
   """Build EfficientDet model."""
   if not config and not model_name:
     raise ValueError('please specify either model name or config')
@@ -708,12 +707,8 @@ def efficientdet(features, model_name=None, config=None, use_keras=True, **kwarg
   logging.info('backbone+fpn params/flops = {:.6f}M, {:.9f}B'.format(
       *utils.num_params_flops()))
 
-  # build class and box predictions.
-  if use_keras:
-      class_box = BuildClassAndBoxOutputs(**config)
-      class_outputs, box_outputs = class_box.call(fpn_feats)
-  else:
-      class_outputs, box_outputs = build_class_and_box_outputs(fpn_feats, config)
+
+  class_outputs, box_outputs = build_class_and_box_outputs(fpn_feats, config)
 
   logging.info('backbone+fpn+box params/flops = {:.6f}M, {:.9f}B'.format(
       *utils.num_params_flops()))

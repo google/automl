@@ -168,7 +168,7 @@ def default_detection_configs():
   # model name.
   h.name = 'efficientdet-d1'
 
-  # activation type: see activation_fn in utils.py.
+  # activation type: see activation_fn in utils_keras.py.
   h.act_type = 'swish'
 
   # input preprocessing parameters
