@@ -31,10 +31,12 @@ import collections
 import hashlib
 import io
 import json
-import logging
 import multiprocessing
 import os
+
+from absl import app
 from absl import flags
+from absl import logging
 import numpy as np
 import PIL.Image
 
@@ -61,6 +63,7 @@ flags.DEFINE_string('caption_annotations_file', '', 'File containing image '
                     'captions.')
 flags.DEFINE_string('output_file_prefix', '/tmp/train', 'Path to output file')
 flags.DEFINE_integer('num_shards', 32, 'Number of shards for output file.')
+flags.DEFINE_integer('num_threads', None, 'Number of threads to run.')
 FLAGS = flags.FLAGS
 
 
@@ -313,7 +316,7 @@ def _create_tf_record_from_coco_annotations(images_info_file,
     else:
       return None
 
-  pool = multiprocessing.Pool()
+  pool = multiprocessing.Pool(FLAGS.num_threads)
   total_num_annotations_skipped = 0
   for idx, (_, tf_example, num_annotations_skipped) in enumerate(
       pool.imap(_pool_create_tf_example,
@@ -336,7 +339,7 @@ def _create_tf_record_from_coco_annotations(images_info_file,
                total_num_annotations_skipped)
 
 
-def main(_):
+def main():
   assert FLAGS.image_dir, '`image_dir` missing.'
   assert (FLAGS.image_info_file or FLAGS.object_annotations_file or
           FLAGS.caption_annotations_file), ('All annotation files are '
@@ -361,4 +364,4 @@ def main(_):
 
 
 if __name__ == '__main__':
-  tf.app.run(main)
+  app.run(main)

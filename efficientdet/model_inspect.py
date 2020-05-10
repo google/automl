@@ -22,6 +22,7 @@ from __future__ import print_function
 import os
 import time
 
+from absl import app
 from absl import flags
 from absl import logging
 
@@ -33,6 +34,7 @@ from typing import Text, Tuple, List
 import hparams_config
 import inference
 import utils
+from tensorflow.python.client import timeline  # pylint: disable=g-direct-tensorflow-import
 
 
 flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model.')
@@ -125,9 +127,6 @@ class ModelInspector(object):
         is_training_bn=is_training,
         config=self.model_config)
 
-    print('backbone+fpn+box params/flops = {:.6f}M, {:.9f}B'.format(
-        *utils.num_params_flops()))
-
     # Write to tfevent for tensorboard.
     train_writer = tf.summary.FileWriter(self.logdir)
     train_writer.add_graph(tf.get_default_graph())
@@ -172,13 +171,13 @@ class ModelInspector(object):
       images = [Image.open(f) for f in batch_files]
       if len(set([m.size for m in images])) > 1:
         # Resize only if images in the same batch have different sizes.
-        images = [m.resize(height, width) for f in images]
+        images = [m.resize(height, width) for m in images]
       raw_images = [np.array(m) for m in images]
       size_before_pad = len(raw_images)
       if size_before_pad < batch_size:
         padding_size = batch_size - size_before_pad
         raw_images += [np.zeros_like(raw_images[0])] * padding_size
-      
+
       detections_bs = driver.serve_images(raw_images)
       for j in range(size_before_pad):
         img = driver.visualize(raw_images[j], detections_bs[j], **kwargs)
@@ -393,7 +392,6 @@ class ModelInspector(object):
         if not tf.io.gfile.exists(trace_dir):
           tf.io.gfile.makedirs(trace_dir)
         with tf.io.gfile.GFile(trace_filename, 'w') as trace_file:
-          from tensorflow.python.client import timeline  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
           trace = timeline.Timeline(step_stats=run_metadata.step_stats)
           trace_file.write(
               trace.generate_chrome_trace_format(show_memory=True))
@@ -446,13 +444,11 @@ class ModelInspector(object):
       self.benchmark_model(warmup_runs=5, bm_runs=kwargs.get('bm_runs', 10),
                            num_threads=kwargs.get('threads', 0),
                            trace_filename=kwargs.get('trace_filename', None))
+    else:
+      raise ValueError('Unkown runmode {}'.format(runmode))
 
 
-def main(argv):
-  assert len(argv) >= 1
-  if len(argv) > 1:  # Do not accept unknown args.
-    raise ValueError('Received unknown arguments: {}'.format(argv[1:]))
-
+def main():
   if tf.io.gfile.exists(FLAGS.logdir) and FLAGS.delete_logdir:
     logging.info('Deleting log dir ...')
     tf.io.gfile.rmtree(FLAGS.logdir)
@@ -485,4 +481,4 @@ def main(argv):
 if __name__ == '__main__':
   logging.set_verbosity(logging.WARNING)
   tf.disable_eager_execution()
-  tf.app.run(main)
+  app.run(main)

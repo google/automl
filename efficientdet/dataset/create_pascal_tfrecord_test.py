@@ -16,6 +16,7 @@
 
 import os
 
+from absl import logging
 import numpy as np
 import PIL.Image
 import six
@@ -117,4 +118,5 @@ class CreatePascalTFRecordTest(tf.test.TestCase):
 
 
 if __name__ == '__main__':
+  logging.set_verbosity(logging.WARNING)
   tf.test.main()

@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from absl import logging
 import tensorflow.compat.v1 as tf
 
 import utils
@@ -252,4 +253,5 @@ class ModelTest(tf.test.TestCase):
     self.assertNotIn('reduction_2', model.endpoints)
 
 if __name__ == '__main__':
+  logging.set_verbosity(logging.WARNING)
   tf.test.main()

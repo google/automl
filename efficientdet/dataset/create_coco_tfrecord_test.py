@@ -18,6 +18,8 @@ import io
 import json
 import os
 
+from absl import flags
+from absl import logging
 import numpy as np
 import PIL.Image
 import six
@@ -27,6 +29,10 @@ from dataset import create_coco_tfrecord
 
 
 class CreateCocoTFRecordTest(tf.test.TestCase):
+
+  def setUp(self):
+    super(CreateCocoTFRecordTest, self).setUp()
+    flags.FLAGS.num_threads = 1
 
   def _assertProtoEqual(self, proto_field, expectation):
     """Helper function to assert if a proto field equals some value.
@@ -251,4 +257,5 @@ class CreateCocoTFRecordTest(tf.test.TestCase):
 
 
 if __name__ == '__main__':
+  logging.set_verbosity(logging.WARNING)
   tf.test.main()

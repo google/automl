@@ -291,6 +291,7 @@ def _generate_detections_tf(cls_outputs,
     image_scale: a float tensor representing the scale between original image
       and input image for the detector. It is used to rescale detections for
       evaluating with the original groundtruth annotations.
+    image_size: a tuple (height, width) or an integer for image size.
     min_score_thresh: A float representing the threshold for deciding when to
       remove boxes based on score.
     max_boxes_to_draw: Max number of boxes to draw.
@@ -307,7 +308,7 @@ def _generate_detections_tf(cls_outputs,
       [image_id, ymin, xmin, ymax, xmax, score, class]
   """
   if not image_size:
-    raise ValueError('image_size cannot be empty.')
+    raise ValueError('tf version generate_detection needs non-empty image_size')
 
   logging.info('Using tf version of post-processing.')
   anchor_boxes = tf.gather(anchor_boxes, indices)

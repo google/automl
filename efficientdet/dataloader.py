@@ -277,7 +277,8 @@ class InputReader(object):
         if params.get('autoaugment_policy', None) and self._is_training:
           from aug import autoaugment  # pylint: disable=g-import-not-at-top
           image, boxes = autoaugment.distort_image_with_autoaugment(
-              image, boxes, params['autoaugment_policy'], params['use_augmix'], *params['augmix_params'])
+              image, boxes, params['autoaugment_policy'], params['use_augmix'],
+              *params['augmix_params'])
 
         input_processor = DetectionInputProcessor(
             image, params['image_size'], boxes, classes)

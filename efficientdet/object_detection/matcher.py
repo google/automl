@@ -30,9 +30,7 @@ consider this box a positive example (match) nor a negative example (no match).
 The Match class is used to store the match results and it provides simple apis
 to query the results.
 """
-from abc import ABCMeta
-from abc import abstractmethod
-
+import abc
 import tensorflow.compat.v1 as tf
 
 
@@ -199,7 +197,7 @@ class Match(object):
 class Matcher(object):
   """Abstract base class for matcher.
   """
-  __metaclass__ = ABCMeta
+  __metaclass__ = abc.ABCMeta
 
   def match(self, similarity_matrix, scope=None, **params):
     """Computes matches among row and column indices and returns the result.
@@ -220,7 +218,7 @@ class Matcher(object):
     with tf.name_scope(scope, 'Match', [similarity_matrix, params]) as scope:
       return Match(self._match(similarity_matrix, **params))
 
-  @abstractmethod
+  @abc.abstractmethod
   def _match(self, similarity_matrix, **params):
     """Method to be overridden by implementations.
 

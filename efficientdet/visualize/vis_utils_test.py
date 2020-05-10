@@ -17,9 +17,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import logging
 import os
 
+from absl import logging
 import numpy as np
 import PIL.Image as Image
 import six
@@ -465,5 +465,6 @@ class VisualizationUtilsTest(tf.test.TestCase):
 
 
 if __name__ == '__main__':
+  logging.set_verbosity(logging.WARNING)
   tf.disable_eager_execution()
   tf.test.main()

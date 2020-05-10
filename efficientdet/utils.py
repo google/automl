@@ -504,17 +504,17 @@ def float16_scope():
     yield varscope
 
 
-def set_precision_policy(policy_name: Text = 'float32'):
+def set_precision_policy(policy_name: Text = None):
   """Set precision policy according to the name.
 
   Args:
     policy_name: precision policy name, one of 'float32', 'mixed_float16',
       'mixed_bfloat16', or None.
   """
-  if not policy_name or policy_name == 'float32':
+  if not policy_name:
     return
 
-  assert policy_name in ('mixed_float16', 'mixed_bfloat16')
+  assert policy_name in ('mixed_float16', 'mixed_bfloat16', 'float32')
   logging.info('use mixed precision policy name %s', policy_name)
   # TODO(tanmingxing): use tf.keras.layers.enable_v2_dtype_behavior() when it
   # available in stable TF release.

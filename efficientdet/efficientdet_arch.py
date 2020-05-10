@@ -592,15 +592,17 @@ def get_fpn_config(fpn_name, min_level, max_level, weight_method):
 
 
 def fuse_features(nodes, weight_method):
-  """
-  Fuse features from different resolutions and return a weighted sum.
+  """Fuse features from different resolutions and return a weighted sum.
 
   Args:
     nodes: a list of tensorflow features at different levels
     weight_method: feature fusion method. One of:
-      * "attn" - Softmax weighted fusion
-      * "fastattn" - Fast normalzied feature fusion
-      * "sum" - a sum of inputs
+      - "attn" - Softmax weighted fusion
+      - "fastattn" - Fast normalzied feature fusion
+      - "sum" - a sum of inputs
+
+  Returns:
+    A tensor denoting the fused feature.
   """
   dtype = nodes[0].dtype
 

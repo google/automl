@@ -20,6 +20,8 @@ from __future__ import print_function
 
 import os
 import tempfile
+
+from absl import logging
 import tensorflow.compat.v1 as tf
 import yaml
 
@@ -71,4 +73,5 @@ class HparamsConfigTest(tf.test.TestCase):
 
 
 if __name__ == '__main__':
+  logging.set_verbosity(logging.WARNING)
   tf.test.main()

@@ -25,8 +25,11 @@ from __future__ import print_function
 import hashlib
 import io
 import json
-import logging
 import os
+
+from absl import app
+from absl import flags
+from absl import logging
 
 from lxml import etree
 import PIL.Image
@@ -35,7 +38,6 @@ import tensorflow.compat.v1 as tf
 from dataset import tfrecord_util
 
 
-flags = tf.app.flags
 flags.DEFINE_string('data_dir', '', 'Root directory to raw PASCAL VOC dataset.')
 flags.DEFINE_string('set', 'train', 'Convert training set, validation set or '
                     'merged set.')
@@ -205,7 +207,7 @@ def dict_to_tf_example(data,
   return example
 
 
-def main(_):
+def main():
   if FLAGS.set not in SETS:
     raise ValueError('set must be in : {}'.format(SETS))
   if FLAGS.year not in YEARS:
@@ -274,4 +276,4 @@ def main(_):
 
 
 if __name__ == '__main__':
-  tf.app.run()
+  app.run(main)
