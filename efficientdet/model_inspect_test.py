@@ -172,8 +172,8 @@ class ModelInspectTest(tf.test.TestCase):
     tf.reset_default_graph()
 
     # Use the frozen graph to do inference.
-    inspector.saved_model_dir = os.path.join(
-        self.params['saved_model_dir'], 'efficientdet-d0_frozen.pb')
+    inspector.saved_model_dir = os.path.join(self.params['saved_model_dir'],
+                                             'efficientdet-d0_frozen.pb')
     outdir = os.path.join(self.tempdir, 'pb_infer_imgout')
     os.mkdir(outdir)
 

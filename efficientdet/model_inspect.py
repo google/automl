@@ -36,7 +36,6 @@ import inference
 import utils
 from tensorflow.python.client import timeline  # pylint: disable=g-direct-tensorflow-import
 
-
 flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model.')
 flags.DEFINE_string('logdir', '/tmp/deff/', 'log directory.')
 flags.DEFINE_string('runmode', 'dry', 'Run mode: {freeze, bm, dry}')
@@ -117,7 +116,8 @@ class ModelInspector(object):
 
     self.model_config = model_config
 
-  def build_model(self, inputs: tf.Tensor,
+  def build_model(self,
+                  inputs: tf.Tensor,
                   is_training: bool = False) -> List[tf.Tensor]:
     """Build model with inputs and labels and print out model stats."""
     logging.info('start building model')
@@ -166,7 +166,7 @@ class ModelInspector(object):
     num_batches = (len(all_files) + batch_size - 1) // batch_size
 
     for i in range(num_batches):
-      batch_files = all_files[i * batch_size: (i + 1) * batch_size]
+      batch_files = all_files[i * batch_size:(i + 1) * batch_size]
       height, width = self.model_config.image_size
       images = [Image.open(f) for f in batch_files]
       if len(set([m.size for m in images])) > 1:
@@ -225,8 +225,9 @@ class ModelInspector(object):
     out_ptr = None
     if output_video:
       frame_width, frame_height = int(cap.get(3)), int(cap.get(4))
-      out_ptr = cv2.VideoWriter(output_video, cv2.VideoWriter_fourcc(
-          'm', 'p', '4', 'v'), 25, (frame_width, frame_height))
+      out_ptr = cv2.VideoWriter(output_video,
+                                cv2.VideoWriter_fourcc('m', 'p', '4', 'v'), 25,
+                                (frame_width, frame_height))
 
     while cap.isOpened():
       # Capture frame-by-frame
@@ -320,7 +321,10 @@ class ModelInspector(object):
 
     return graphdef
 
-  def benchmark_model(self, warmup_runs, bm_runs, num_threads,
+  def benchmark_model(self,
+                      warmup_runs,
+                      bm_runs,
+                      num_threads,
                       trace_filename=None):
     """Benchmark model."""
     if self.tensorrt:
@@ -385,16 +389,18 @@ class ModelInspector(object):
         run_options = tf.RunOptions()
         run_options.trace_level = tf.RunOptions.FULL_TRACE
         run_metadata = tf.RunMetadata()
-        sess.run(output_name, feed_dict={input_name: img},
-                 options=run_options, run_metadata=run_metadata)
+        sess.run(
+            output_name,
+            feed_dict={input_name: img},
+            options=run_options,
+            run_metadata=run_metadata)
         logging.info('Dumping trace to %s', trace_filename)
         trace_dir = os.path.dirname(trace_filename)
         if not tf.io.gfile.exists(trace_dir):
           tf.io.gfile.makedirs(trace_dir)
         with tf.io.gfile.GFile(trace_filename, 'w') as trace_file:
           trace = timeline.Timeline(step_stats=run_metadata.step_stats)
-          trace_file.write(
-              trace.generate_chrome_trace_format(show_memory=True))
+          trace_file.write(trace.generate_chrome_trace_format(show_memory=True))
 
   def convert_tr(self, graph_def, fetches):
     """Convert to TensorRT."""
@@ -432,18 +438,20 @@ class ModelInspector(object):
       if runmode == 'saved_model':
         self.export_saved_model(**config_dict)
       elif runmode == 'infer':
-        self.inference_single_image(
-            kwargs['input_image'], kwargs['output_image_dir'], **config_dict)
+        self.inference_single_image(kwargs['input_image'],
+                                    kwargs['output_image_dir'], **config_dict)
       elif runmode == 'saved_model_infer':
-        self.saved_model_inference(
-            kwargs['input_image'], kwargs['output_image_dir'], **config_dict)
+        self.saved_model_inference(kwargs['input_image'],
+                                   kwargs['output_image_dir'], **config_dict)
       elif runmode == 'saved_model_video':
-        self.saved_model_video(
-            kwargs['input_video'], kwargs['output_video'], **config_dict)
+        self.saved_model_video(kwargs['input_video'], kwargs['output_video'],
+                               **config_dict)
     elif runmode == 'bm':
-      self.benchmark_model(warmup_runs=5, bm_runs=kwargs.get('bm_runs', 10),
-                           num_threads=kwargs.get('threads', 0),
-                           trace_filename=kwargs.get('trace_filename', None))
+      self.benchmark_model(
+          warmup_runs=5,
+          bm_runs=kwargs.get('bm_runs', 10),
+          num_threads=kwargs.get('threads', 0),
+          trace_filename=kwargs.get('trace_filename', None))
     else:
       raise ValueError('Unkown runmode {}'.format(runmode))
 

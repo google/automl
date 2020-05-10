@@ -223,11 +223,9 @@ def det_post_process_combined(params, cls_outputs, box_outputs, scales,
       cls_outputs[level] = tf.transpose(cls_outputs[level], [0, 2, 3, 1])
       box_outputs[level] = tf.transpose(box_outputs[level], [0, 2, 3, 1])
 
-    cls_outputs_all.append(tf.reshape(
-        cls_outputs[level],
-        [batch_size, -1, params['num_classes']]))
-    box_outputs_all.append(tf.reshape(
-        box_outputs[level], [batch_size, -1, 4]))
+    cls_outputs_all.append(
+        tf.reshape(cls_outputs[level], [batch_size, -1, params['num_classes']]))
+    box_outputs_all.append(tf.reshape(box_outputs[level], [batch_size, -1, 4]))
   cls_outputs_all = tf.concat(cls_outputs_all, 1)
   box_outputs_all = tf.concat(box_outputs_all, 1)
 
@@ -261,11 +259,8 @@ def det_post_process_combined(params, cls_outputs, box_outputs, scales,
   ymax = tf.clip_by_value(nmsed_boxes[..., 2], 0, image_size[0]) * scales
   xmax = tf.clip_by_value(nmsed_boxes[..., 3], 0, image_size[1]) * scales
 
-  detection_list = [
-      # Format: (image_ids, ymin, xmin, ymax, xmax, score, class)
-      image_ids, ymin, xmin, ymax, xmax, nmsed_scores,
-      tf.cast(nmsed_classes + 1, tf.float32)
-  ]
+  classes = tf.cast(nmsed_classes + 1, tf.float32)
+  detection_list = [image_ids, ymin, xmin, ymax, xmax, nmsed_scores, classes]
   detections = tf.stack(detection_list, axis=2, name='detections')
   return detections
 

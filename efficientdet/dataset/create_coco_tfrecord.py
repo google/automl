@@ -45,7 +45,6 @@ import tensorflow.compat.v1 as tf
 from dataset import label_map_util
 from dataset import tfrecord_util
 
-
 flags.DEFINE_boolean(
     'include_masks', False, 'Whether to include instance segmentations masks '
     '(PNG encoded) in the result. default: False.')
@@ -288,9 +287,8 @@ def _create_tf_record_from_coco_annotations(images_info_file,
 
   logging.info('writing to output path: %s', output_path)
   writers = [
-      tf.python_io.TFRecordWriter(
-          output_path + '-%05d-of-%05d.tfrecord' % (i, num_shards))
-      for i in range(num_shards)
+      tf.python_io.TFRecordWriter(output_path + '-%05d-of-%05d.tfrecord' %
+                                  (i, num_shards)) for i in range(num_shards)
   ]
   images = _load_images_info(images_info_file)
 
@@ -319,10 +317,11 @@ def _create_tf_record_from_coco_annotations(images_info_file,
   pool = multiprocessing.Pool(FLAGS.num_threads)
   total_num_annotations_skipped = 0
   for idx, (_, tf_example, num_annotations_skipped) in enumerate(
-      pool.imap(_pool_create_tf_example,
-                [(image, image_dir, _get_object_annotation(image['id']),
-                  category_index, _get_caption_annotation(image['id']),
-                  include_masks) for image in images])):
+      pool.imap(
+          _pool_create_tf_example,
+          [(image, image_dir, _get_object_annotation(image['id']),
+            category_index, _get_caption_annotation(image['id']), include_masks)
+           for image in images])):
     if idx % 100 == 0:
       logging.info('On image %d of %d', idx, len(images))
 
