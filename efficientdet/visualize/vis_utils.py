@@ -956,7 +956,7 @@ def add_cdf_image_summary(values, name):
     ax.set_xlabel('fraction of examples')
     fig.canvas.draw()
     width, height = fig.get_size_inches() * fig.get_dpi()
-    image = np.fromstring(fig.canvas.tostring_rgb(), dtype='uint8').reshape(
+    image = np.frombuffer(fig.canvas.tostring_rgb(), dtype='uint8').reshape(
         1, int(height), int(width), 3)
     return image
   cdf_plot = tf.py_func(cdf_plot, [values], tf.uint8)
@@ -984,7 +984,7 @@ def add_hist_image_summary(values, bins, name):
     ax.set_xlabel('value')
     fig.canvas.draw()
     width, height = fig.get_size_inches() * fig.get_dpi()
-    image = np.fromstring(
+    image = np.frombuffer(
         fig.canvas.tostring_rgb(), dtype='uint8').reshape(
             1, int(height), int(width), 3)
     return image

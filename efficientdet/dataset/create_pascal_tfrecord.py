@@ -207,7 +207,7 @@ def dict_to_tf_example(data,
   return example
 
 
-def main():
+def main(_):
   if FLAGS.set not in SETS:
     raise ValueError('set must be in : {}'.format(SETS))
   if FLAGS.year not in YEARS:

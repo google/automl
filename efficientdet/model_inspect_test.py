@@ -38,7 +38,9 @@ class ModelInspectTest(tf.test.TestCase):
 
   def setUp(self):
     super(ModelInspectTest, self).setUp()
-    self.tempdir = tempfile.gettempdir()
+    sys_tempdir = tempfile.gettempdir()
+    self.tempdir = os.path.join(sys_tempdir, '_inspect_test')
+    os.mkdir(self.tempdir)
 
     np.random.seed(111)
     tf.random.set_random_seed(111)
@@ -58,6 +60,10 @@ class ModelInspectTest(tf.test.TestCase):
         saved_model_dir=self.savedmodel_dir,
         batch_size=1,
         hparams='')
+
+  def tearDown(self):
+    super(ModelInspectTest, self).tearDown()
+    shutil.rmtree(self.tempdir)
 
   def test_dry_run(self):
     inspector = model_inspect.ModelInspector(**self.params)
@@ -88,7 +94,7 @@ class ModelInspectTest(tf.test.TestCase):
     self.assertTrue(os.path.exists(os.path.join(outdir, '0.jpg')))
 
     out = np.sum(np.array(Image.open(os.path.join(outdir, '0.jpg'))))
-    self.assertEqual(out, 168044958)
+    self.assertEqual(out // 1000000, 168)
 
   def test_saved_model(self):
     inspector = model_inspect.ModelInspector(**self.params)
@@ -126,7 +132,7 @@ class ModelInspectTest(tf.test.TestCase):
     self.assertTrue(os.path.exists(os.path.join(outdir, '0.jpg')))
 
     out = np.sum(np.array(Image.open(os.path.join(outdir, '0.jpg'))))
-    self.assertEqual(out, 168044958)
+    self.assertEqual(out // 1000000, 168)
 
   def test_saved_model_infer_dynamic_batch(self):
     # Build saved model with dynamic batch size.
@@ -180,7 +186,7 @@ class ModelInspectTest(tf.test.TestCase):
     self.assertTrue(os.path.exists(os.path.join(outdir, '0.jpg')))
 
     out = np.sum(np.array(Image.open(os.path.join(outdir, '0.jpg'))))
-    self.assertEqual(out, 168044958)
+    self.assertEqual(out // 1000000, 168)
 
 
 if __name__ == '__main__':

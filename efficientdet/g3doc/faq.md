@@ -26,5 +26,5 @@ We have some internal fixes, which could potentially be available with the next 
 ### How can I run all tests?
 
     !export PYTHONPATH="`pwd`:$PYTHONPATH"
-    !find . -name "*_test.py" | parallel python &> test.log \
-      && echo "All passed" || echo "Failed! Search keyword FAILED in test.log"
+    !find . -name "*_test.py" | parallel python &> /tmp/test.log \
+      && echo "All passed" || echo "Failed! Search keyword FAILED in /tmp/test.log"

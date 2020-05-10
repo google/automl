@@ -120,7 +120,7 @@ flags.DEFINE_integer(
 FLAGS = flags.FLAGS
 
 
-def main():
+def main(_):
   if FLAGS.use_tpu:
     tpu_cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
         FLAGS.tpu,

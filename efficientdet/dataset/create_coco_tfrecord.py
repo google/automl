@@ -339,7 +339,7 @@ def _create_tf_record_from_coco_annotations(images_info_file,
                total_num_annotations_skipped)
 
 
-def main():
+def main(_):
   assert FLAGS.image_dir, '`image_dir` missing.'
   assert (FLAGS.image_info_file or FLAGS.object_annotations_file or
           FLAGS.caption_annotations_file), ('All annotation files are '

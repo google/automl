@@ -370,7 +370,7 @@ class ModelInspector(object):
       for i in range(warmup_runs):
         start_time = time.time()
         sess.run(output_name, feed_dict={input_name: img})
-        print('Warm up: {} {:.4f}s'.format(i, time.time() - start_time))
+        logging.info('Warm up: {} {:.4f}s'.format(i, time.time() - start_time))
 
       print('Start benchmark runs total={}'.format(bm_runs))
       start = time.perf_counter()
@@ -448,7 +448,7 @@ class ModelInspector(object):
       raise ValueError('Unkown runmode {}'.format(runmode))
 
 
-def main():
+def main(_):
   if tf.io.gfile.exists(FLAGS.logdir) and FLAGS.delete_logdir:
     logging.info('Deleting log dir ...')
     tf.io.gfile.rmtree(FLAGS.logdir)

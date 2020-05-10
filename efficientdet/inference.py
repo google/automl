@@ -725,7 +725,6 @@ class ServingDriver(object):
       logging.info('Free graph saved at %s', pb_path)
 
     if tflite_path:
-      print(tf.__version__)
       input_name = signitures['image_arrays'].op.name
       height, width = self.params['image_size']
       input_shapes = {input_name: [None, height, width, 3]}
