@@ -38,6 +38,12 @@ from backbone import efficientnet_builder
 
 
 ################################################################################
+
+# This constant is explained on page 5 of the Focal Loss paper
+FIANL_CONV_INITIALIZER = tf.constant_initializer(
+    -np.log((1 - 0.01) / 0.01))
+
+
 def freeze_vars(variables, pattern):
   """Removes backbone+fpn variables from the input.
 
@@ -276,7 +282,7 @@ def class_net(images,
       images,
       num_classes * num_anchors,
       kernel_size=3,
-      bias_initializer=tf.constant_initializer(-np.log((1 - 0.01) / 0.01)),
+      bias_initializer=FIANL_CONV_INITIALIZER,
       padding='same',
       name='class-predict')
   return classes

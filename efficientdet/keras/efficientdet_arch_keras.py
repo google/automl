@@ -6,7 +6,7 @@ from absl import logging
 import hparams_config
 import keras.utils_keras
 import utils
-from efficientdet_arch import build_backbone, build_feature_network
+import efficientdet_arch
 
 
 class ClassNet(tf.keras.layers.Layer):
@@ -94,7 +94,7 @@ class ClassNet(tf.keras.layers.Layer):
                 data_format=self.data_format,
                 kernel_size=3,
                 activation=None,
-                bias_initializer=tf.zeros_initializer(),
+                bias_initializer=efficientdet_arch.FIANL_CONV_INITIALIZER,
                 padding='same',
                 name=f'{self.name}/class-predict')
 
@@ -105,7 +105,7 @@ class ClassNet(tf.keras.layers.Layer):
                 data_format=self.data_format,
                 kernel_size=3,
                 activation=None,
-                bias_initializer=tf.zeros_initializer(),
+                bias_initializer=efficientdet_arch.FIANL_CONV_INITIALIZER,
                 padding='same',
                 name=f'{self.name}/class-predict')
 
@@ -373,12 +373,12 @@ def efficientdet(features, model_name=None, config=None, **kwargs):
   logging.info(config)
 
   # build backbone features.
-  features = build_backbone(features, config)
+  features = efficientdet_arch.build_backbone(features, config)
   logging.info('backbone params/flops = {:.6f}M, {:.9f}B'.format(
       *utils.num_params_flops()))
 
   # build feature network.
-  fpn_feats = build_feature_network(features, config)
+  fpn_feats = efficientdet_arch.build_feature_network(features, config)
   logging.info('backbone+fpn params/flops = {:.6f}M, {:.9f}B'.format(
       *utils.num_params_flops()))
 
