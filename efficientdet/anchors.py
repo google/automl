@@ -222,45 +222,6 @@ def _generate_anchor_boxes(image_size, anchor_scale, anchor_configs):
   anchor_boxes = np.vstack(boxes_all)
   return anchor_boxes
 
-def _generate_anchor_boxes_mannual(image_size, anchor_configs):
-  """Generates multiscale anchor boxes.
-
-  Args:
-    image_size: tuple of integer numbers of input image size.
-    anchor_configs: a dictionary with keys as the levels of anchors and
-      values as a list of anchor configuration.
-
-  Returns:
-    anchor_boxes: a numpy array with shape [N, 4], which stacks anchors on all
-      feature levels.
-  Raises:
-    ValueError: input size must be the multiple of largest feature stride.
-  """
-  boxes_all = []
-  for _, configs in anchor_configs.items():
-    boxes_level = []
-    for config in configs:
-      stride, anchor = config
-      anchor_size_x_2 = anchor[0]
-      anchor_size_y_2 = anchor[1]
-
-      x = np.arange(stride[1] / 2, image_size[1], stride[1])
-      y = np.arange(stride[0] / 2, image_size[0], stride[0])
-      xv, yv = np.meshgrid(x, y)
-      xv = xv.reshape(-1)
-      yv = yv.reshape(-1)
-
-      boxes = np.vstack((yv - anchor_size_y_2, xv - anchor_size_x_2,
-                         yv + anchor_size_y_2, xv + anchor_size_x_2))
-      boxes = np.swapaxes(boxes, 0, 1)
-      boxes_level.append(np.expand_dims(boxes, axis=1))
-    # concat anchors on the same level to the reshape NxAx4
-    boxes_level = np.concatenate(boxes_level, axis=1)
-    boxes_all.append(boxes_level.reshape([-1, 4]))
-
-  anchor_boxes = np.vstack(boxes_all)
-  return anchor_boxes
-
 
 def _generate_detections_tf(cls_outputs,
                             box_outputs,
@@ -468,6 +429,77 @@ class Anchors(object):
                                    self.config)
     boxes = tf.convert_to_tensor(boxes, dtype=tf.float32)
     return boxes
+
+  def get_anchors_per_location(self):
+    return self.num_scales * len(self.aspect_ratios)
+
+class KmeansAnchors(object):
+  """RetinaNet Kmeans Anchors class."""
+
+  def __init__(self, min_level, max_level, kmeans_ratios,
+               anchor_scale, image_size):
+    """Constructs multiscale RetinaNet anchors.
+
+    Args:
+      min_level: integer number of minimum level of the output feature pyramid.
+      max_level: integer number of maximum level of the output feature pyramid.
+      aspect_ratios: list of tuples representing the aspect ratio anchors added
+        on each level. For instances, aspect_ratios =
+        [(1, 1), (1.4, 0.7), (0.7, 1.4)] adds three anchors on each level.
+      anchor_scale: float number representing the scale of size of the base
+        anchor to the feature stride 2^level.
+      image_size: integer number or tuple of integer number of input image size.
+    """
+    self.min_level = min_level
+    self.max_level = max_level
+    self.kmeans_ratios = kmeans_ratios
+    self.anchor_scale = anchor_scale
+    self.image_size = utils.parse_image_size(image_size)
+    self.feat_sizes = utils.get_feat_sizes(image_size, max_level)
+    self.config = self._generate_configs()
+    self.boxes = self._generate_boxes()
+
+  def _generate_configs(self):
+    """Generate configurations of anchor boxes."""
+    anchor_configs = {}
+    for level in range(self.min_level, self.max_level + 1):
+      anchor_configs[level] = []
+      for kmeans_ratio in self.kmeans_ratios:
+        anchor_configs[level].append(
+            ((self.feat_sizes[0]['height'] / self.feat_sizes[level]['height'],
+              self.feat_sizes[0]['width'] / self.feat_sizes[level]['width']),
+             kmeans_ratio))
+    return anchor_configs
+
+  def _generate_boxes(self):
+    """Generates multiscale anchor boxes."""
+    boxes_all = []
+    for _, configs in self.anchor_configs.items():
+      boxes_level = []
+      for config in configs:
+        stride, kmeans_ratio = config
+        base_anchor_size_x = self.anchor_scale * stride[1] * kmeans_ratio[0]
+        base_anchor_size_y = self.anchor_scale * stride[0] * kmeans_ratio[1]
+        anchor_size_x_2 = base_anchor_size_x / 2.0
+        anchor_size_y_2 = base_anchor_size_y / 2.0
+
+        x = np.arange(stride[1] / 2, self.image_size[1], stride[1])
+        y = np.arange(stride[0] / 2, self.image_size[0], stride[0])
+        xv, yv = np.meshgrid(x, y)
+        xv = xv.reshape(-1)
+        yv = yv.reshape(-1)
+
+        boxes = np.vstack((yv - anchor_size_y_2, xv - anchor_size_x_2,
+                           yv + anchor_size_y_2, xv + anchor_size_x_2))
+        boxes = np.swapaxes(boxes, 0, 1)
+        boxes_level.append(np.expand_dims(boxes, axis=1))
+      # concat anchors on the same level to the reshape NxAx4
+      boxes_level = np.concatenate(boxes_level, axis=1)
+      boxes_all.append(boxes_level.reshape([-1, 4]))
+
+    anchor_boxes = np.vstack(boxes_all)
+    anchor_boxes = tf.convert_to_tensor(anchor_boxes, dtype=tf.float32)
+    return anchor_boxes
 
   def get_anchors_per_location(self):
     return self.num_scales * len(self.aspect_ratios)

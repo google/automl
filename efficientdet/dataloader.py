@@ -214,11 +214,18 @@ class InputReader(object):
     self._max_num_instances = MAX_NUM_INSTANCES
 
   def __call__(self, params):
-    input_anchors = anchors.Anchors(params['min_level'], params['max_level'],
-                                    params['num_scales'],
-                                    params['aspect_ratios'],
-                                    params['anchor_scale'],
-                                    params['image_size'])
+    if params['use_kmeans']:
+      input_anchors = anchors.KmeansAnchors(params['min_level'],
+                                            params['max_level'],
+                                            params['kmeans_ratios'],
+                                            params['anchor_scale'],
+                                            params['image_size'])
+    else:
+      input_anchors = anchors.Anchors(params['min_level'], params['max_level'],
+                                      params['num_scales'],
+                                      params['aspect_ratios'],
+                                      params['anchor_scale'],
+                                      params['image_size'])
     anchor_labeler = anchors.AnchorLabeler(input_anchors, params['num_classes'])
     example_decoder = tf_example_decoder.TfExampleDecoder()
 
