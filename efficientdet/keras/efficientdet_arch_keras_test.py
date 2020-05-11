@@ -122,10 +122,10 @@ class EfficientDetNamesTest(tf.test.TestCase):
                     image_size=512)
         return [n.name for n in tf.get_default_graph().as_graph_def().node]
 
-
-    def test_efficientdet_d0(self):
-        self.assertContainsSubset(self.build_model(False),
-                                 self.build_model(True))
+    def test_graph_node_name_compatibility(self):
+        legacy_names = self.build_model(False)
+        keras_names = self.build_model(True)
+        self.assertContainsSubset(keras_names, legacy_names)
 
 
 class EfficientDetArchPrecisionTest(tf.test.TestCase):
