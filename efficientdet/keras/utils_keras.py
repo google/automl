@@ -28,29 +28,29 @@ from tensorflow.python.tpu import tpu_function  # pylint:disable=g-direct-tensor
 from utils import TpuBatchNormalization, BatchNormalization
 
 
-class Activation_fn(tf.keras.layers.Layer):
+class ActivationFn(tf.keras.layers.Layer):
     def __init__(self, act_type: Text, name='activation_fn', **kwargs):
 
-        super(Activation_fn, self).__init__(name=name, **kwargs)
+        super(ActivationFn, self).__init__(name=name, **kwargs)
 
         self.act_type = act_type
 
         if act_type == 'swish':
-            self.act = tf.keras.layers.Activation(tf.nn.swish)
+            self.act = tf.nn.swish
         elif act_type == 'swish_native':
-            self.act = tf.keras.layers.Lambda(lambda x: x * tf.sigmoid(x))
+            self.act = lambda x: x * tf.sigmoid(x)
         elif act_type == 'relu':
-            self.act = tf.keras.layers.Activation(tf.nn.relu)
+            self.act = tf.nn.relu
         elif act_type == 'relu6':
-            self.act = tf.keras.layers.Activation(tf.nn.relu6)
+            self.act = tf.nn.relu6
         else:
             raise ValueError('Unsupported act_type {}'.format(act_type))
 
-        def call(self, features: tf.Tensor):
-            return self.act(features)
+    def call(self, features: tf.Tensor):
+        return self.act(features)
 
     def get_config(self):
-        base_config = super(Activation_fn, self).get_config()
+        base_config = super(ActivationFn, self).get_config()
 
         return {
             **base_config,
@@ -67,10 +67,11 @@ class BatchNormAct(tf.keras.layers.Layer):
                  momentum: float = 0.99,
                  epsilon: float = 1e-3,
                  use_tpu: bool = False,
-                 name: Text = None
+                 name: Text = None,
+                 parent_name: Text = None
                  ):
 
-        super(BatchNormAct, self).__init__(name='batch_norm_act')
+        super(BatchNormAct, self).__init__()
 
         self.act_type = act_type
         self.training = is_training_bn
@@ -92,7 +93,7 @@ class BatchNormAct(tf.keras.layers.Layer):
                                                center=True,
                                                scale=True,
                                                gamma_initializer=self.gamma_initializer,
-                                               name=name)
+                                               name=f'{parent_name}/{name}')
         else:
             self.layer = BatchNormalization(axis=self.axis,
                                             momentum=momentum,
@@ -100,15 +101,13 @@ class BatchNormAct(tf.keras.layers.Layer):
                                             center=True,
                                             scale=True,
                                             gamma_initializer=self.gamma_initializer,
-                                            name=name)
+                                            name=f'{parent_name}/{name}')
 
-        if self.act_type:
-            self.act = Activation_fn(act_type)
+        self.act = ActivationFn(act_type, name=parent_name)
 
     def call(self, inputs, **kwargs):
         x = self.layer.apply(inputs, training=self.training)
-        if self.act_type:
-            x = self.act.call(x)
+        x = self.act.call(x)
         return x
 
 

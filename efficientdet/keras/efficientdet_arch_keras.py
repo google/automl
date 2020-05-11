@@ -6,7 +6,7 @@ from absl import logging
 import hparams_config
 import keras.utils_keras
 import utils
-from efficientdet_arch import build_backbone, build_feature_network
+import efficientdet_arch
 
 
 class ClassNet(tf.keras.layers.Layer):
@@ -79,7 +79,8 @@ class ClassNet(tf.keras.layers.Layer):
                                                                              init_zero=False,
                                                                              use_tpu=self.use_tpu,
                                                                              data_format=self.data_format,
-                                                                             name=f'{self.name}/class-%d-bn-%d' % (i, level))
+                                                                             name='class-%d-bn-%d' % (i, level),
+                                                                             parent_name=self.name)
             self.bn_act_ops.append(bn_act_ops_per_level)
 
         if self.use_dc:
@@ -94,7 +95,7 @@ class ClassNet(tf.keras.layers.Layer):
                 data_format=self.data_format,
                 kernel_size=3,
                 activation=None,
-                bias_initializer=tf.zeros_initializer(),
+                bias_initializer=efficientdet_arch.FIANL_CONV_INITIALIZER,
                 padding='same',
                 name=f'{self.name}/class-predict')
 
@@ -105,7 +106,7 @@ class ClassNet(tf.keras.layers.Layer):
                 data_format=self.data_format,
                 kernel_size=3,
                 activation=None,
-                bias_initializer=tf.zeros_initializer(),
+                bias_initializer=efficientdet_arch.FIANL_CONV_INITIALIZER,
                 padding='same',
                 name=f'{self.name}/class-predict')
 
@@ -208,7 +209,8 @@ class BoxNet(tf.keras.layers.Layer):
                                                                              init_zero=False,
                                                                              use_tpu=self.use_tpu,
                                                                              data_format=self.data_format,
-                                                                             name=f'{self.name}/box-%d-bn-%d' % (i, level))
+                                                                             name='box-%d-bn-%d' % (i, level),
+                                                                             parent_name=self.name)
             self.bn_act_ops.append(bn_act_ops_per_level)
 
         if self.use_dc:
@@ -373,12 +375,12 @@ def efficientdet(features, model_name=None, config=None, **kwargs):
   logging.info(config)
 
   # build backbone features.
-  features = build_backbone(features, config)
+  features = efficientdet_arch.build_backbone(features, config)
   logging.info('backbone params/flops = {:.6f}M, {:.9f}B'.format(
       *utils.num_params_flops()))
 
   # build feature network.
-  fpn_feats = build_feature_network(features, config)
+  fpn_feats = efficientdet_arch.build_feature_network(features, config)
   logging.info('backbone+fpn params/flops = {:.6f}M, {:.9f}B'.format(
       *utils.num_params_flops()))
 
