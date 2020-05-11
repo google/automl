@@ -31,7 +31,7 @@ from utils import TpuBatchNormalization, BatchNormalization
 class ActivationFn(tf.keras.layers.Layer):
     def __init__(self, act_type: Text, name='activation_fn', **kwargs):
 
-        super(ActivationFn, self).__init__(name=name, **kwargs)
+        super(ActivationFn, self).__init__()
 
         self.act_type = act_type
 
@@ -46,8 +46,11 @@ class ActivationFn(tf.keras.layers.Layer):
         else:
             raise ValueError('Unsupported act_type {}'.format(act_type))
 
+        self.layer = tf.keras.layers.Lambda(lambda x: self.act(x), name=name)
+
     def call(self, features: tf.Tensor):
-        return self.act(features)
+        #return features
+        return self.layer(features)
 
     def get_config(self):
         base_config = super(ActivationFn, self).get_config()
@@ -71,7 +74,7 @@ class BatchNormAct(tf.keras.layers.Layer):
                  parent_name: Text = None
                  ):
 
-        super(BatchNormAct, self).__init__()
+        super(BatchNormAct, self).__init__(name=parent_name)
 
         self.act_type = act_type
         self.training = is_training_bn
@@ -107,6 +110,7 @@ class BatchNormAct(tf.keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         x = self.layer.apply(inputs, training=self.training)
+
         x = self.act.call(x)
         return x
 

@@ -23,86 +23,7 @@ import hparams_config
 import keras.efficientdet_arch_keras as keras_arch
 import utils
 
-"""
-class EfficientDetArchTest(tf.test.TestCase):
-
-    def build_model(self,
-                    model_name,
-                    isize,
-                    is_training=False,
-                    data_format='channels_last'):
-        if isinstance(isize, int):
-            isize = (isize, isize)
-        if data_format == 'channels_first':
-            inputs_shape = [1, 3, isize[0], isize[1]]
-        else:
-            inputs_shape = [1, isize[0], isize[1], 3]
-        inputs = tf.ones(shape=inputs_shape, name='input', dtype=tf.float32)
-        keras_arch.efficientdet(
-            inputs,
-            model_name=model_name,
-            is_training_bn=is_training,
-            image_size=isize,
-            data_format=data_format)
-        return utils.num_params_flops(False)
-
-    def build_model_nonkeras(self,
-                    model_name,
-                    isize,
-                    is_training=False,
-                    data_format='channels_last'):
-        if isinstance(isize, int):
-            isize = (isize, isize)
-        if data_format == 'channels_first':
-            inputs_shape = [1, 3, isize[0], isize[1]]
-        else:
-            inputs_shape = [1, isize[0], isize[1], 3]
-        inputs = tf.ones(shape=inputs_shape, name='input', dtype=tf.float32)
-        efficientdet_arch.efficientdet(
-            inputs,
-            model_name=model_name,
-            is_training_bn=is_training,
-            image_size=isize,
-            data_format=data_format)
-        return utils.num_params_flops(False)
-
-    def test_name(self,
-                    model_name='efficientdet-d0',
-                    isize=512,
-                    is_training=False,
-                    data_format='channels_last'):
-        if isinstance(isize, int):
-            isize = (isize, isize)
-        if data_format == 'channels_first':
-            inputs_shape = [1, 3, isize[0], isize[1]]
-        else:
-            inputs_shape = [1, isize[0], isize[1], 3]
-        inputs = tf.ones(shape=inputs_shape, name='input', dtype=tf.float32)
-        a, b =  keras_arch.efficientdet(
-            inputs,
-            model_name=model_name,
-            is_training_bn=is_training,
-            image_size=isize,
-            data_format=data_format)
-        self.assertEqual('class_net/class-predict/BiasAdd:0', a[3].name)
-        self.assertEqual('box_net/box-predict_2/BiasAdd:0', b[5].name)
-
-
-    def compare_all_names(self):
-        tf.compat.v1.reset_default_graph()
-        self.build_model('efficientdet-d0', 512)
-        n1 = [n.name for n in tf.get_default_graph().as_graph_def().node]
-        tf.compat.v1.reset_default_graph()
-        self.build_model_nonkeras('efficientdet-d0', 512)
-        n2 = [n.name for n in tf.get_default_graph().as_graph_def().node]
-        self.assertEqual(n1, n2)
-
-    def test_efficientdet_d0(self):
-        self.assertSequenceEqual((3880067, 2535978423),
-                                 self.build_model('efficientdet-d0', 512))
-"""
-
-class EfficientDetNamesTest(tf.test.TestCase):
+class EfficientDetVariablesNamesTest(tf.test.TestCase):
 
     def build_model(self, keras=False):
         tf.compat.v1.reset_default_graph()
@@ -120,14 +41,16 @@ class EfficientDetNamesTest(tf.test.TestCase):
                     model_name='efficientdet-d0',
                     is_training_bn=False,
                     image_size=512)
-        return [n.name for n in tf.get_default_graph().as_graph_def().node]
+        return [n.name for n in tf.global_variables()]
 
     def test_graph_node_name_compatibility(self):
         legacy_names = self.build_model(False)
         keras_names = self.build_model(True)
+
+        self.assertContainsSubset(keras_names, legacy_names)
         self.assertContainsSubset(legacy_names, keras_names)
 
-"""
+
 class EfficientDetArchPrecisionTest(tf.test.TestCase):
 
     def build_model(self, features, is_training, precision):
@@ -142,6 +65,7 @@ class EfficientDetArchPrecisionTest(tf.test.TestCase):
         return utils.build_model_with_precision(precision, _model_fn, features)
 
     def test_float16(self):
+        tf.compat.v1.reset_default_graph()
         inputs = tf.ones(shape=[1, 512, 512, 3], name='input', dtype=tf.float32)
         cls_out, _ = self.build_model(inputs, True, 'mixed_float16')
         for v in tf.global_variables():
@@ -152,6 +76,7 @@ class EfficientDetArchPrecisionTest(tf.test.TestCase):
             self.assertIs(v.dtype, tf.float16)
 
     def test_bfloat16(self):
+        tf.compat.v1.reset_default_graph()
         inputs = tf.ones(shape=[1, 512, 512, 3], name='input', dtype=tf.float32)
         cls_out, _ = self.build_model(inputs, True, 'mixed_bfloat16')
         for v in tf.global_variables():
@@ -161,6 +86,7 @@ class EfficientDetArchPrecisionTest(tf.test.TestCase):
             self.assertEqual(v.dtype, tf.bfloat16)
 
     def test_float32(self):
+        tf.compat.v1.reset_default_graph()
         inputs = tf.ones(shape=[1, 512, 512, 3], name='input', dtype=tf.float32)
         cls_out, _ = self.build_model(inputs, True, 'float32')
         for v in tf.global_variables():
@@ -168,7 +94,7 @@ class EfficientDetArchPrecisionTest(tf.test.TestCase):
             self.assertIn(v.dtype, (tf.float32, tf.dtypes.as_dtype('float32_ref')))
         for v in cls_out.values():
             self.assertEqual(v.dtype, tf.float32)
-"""
+
 
 if __name__ == '__main__':
     tf.disable_eager_execution()
