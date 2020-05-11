@@ -17,9 +17,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import logging
 import os
 
+from absl import logging
 import numpy as np
 import PIL.Image as Image
 import six
@@ -168,7 +168,7 @@ class VisualizationUtilsTest(tf.test.TestCase):
               min_score_thresh=0.2,
               keypoint_edges=keypoint_edges))
 
-      with self.test_session() as sess:
+      with self.session() as sess:
         sess.run(tf.global_variables_initializer())
 
         # Write output images for visualization.
@@ -215,7 +215,7 @@ class VisualizationUtilsTest(tf.test.TestCase):
               track_ids=track_ids,
               min_score_thresh=0.2))
 
-      with self.test_session() as sess:
+      with self.session() as sess:
         sess.run(tf.global_variables_initializer())
 
         # Write output images for visualization.
@@ -251,7 +251,7 @@ class VisualizationUtilsTest(tf.test.TestCase):
               category_index,
               min_score_thresh=0.2))
 
-      with self.test_session() as sess:
+      with self.session() as sess:
         sess.run(tf.global_variables_initializer())
 
         final_images_np = sess.run(images_with_boxes)
@@ -280,7 +280,7 @@ class VisualizationUtilsTest(tf.test.TestCase):
               true_image_shape=image_shape,
               min_score_thresh=0.2))
 
-      with self.test_session() as sess:
+      with self.session() as sess:
         sess.run(tf.global_variables_initializer())
 
         final_images_np = sess.run(images_with_boxes)
@@ -336,7 +336,7 @@ class VisualizationUtilsTest(tf.test.TestCase):
     values = [0.1, 0.2, 0.3, 0.4, 0.42, 0.44, 0.46, 0.48, 0.50]
     vis_utils.add_cdf_image_summary(values, 'PositiveAnchorLoss')
     cdf_image_summary = tf.get_collection(key=tf.GraphKeys.SUMMARIES)[0]
-    with self.test_session():
+    with self.session():
       cdf_image_summary.eval()
 
   def test_add_hist_image_summary(self):
@@ -344,7 +344,7 @@ class VisualizationUtilsTest(tf.test.TestCase):
     bins = [0.01 * i for i in range(101)]
     vis_utils.add_hist_image_summary(values, bins, 'ScoresDistribution')
     hist_image_summary = tf.get_collection(key=tf.GraphKeys.SUMMARIES)[0]
-    with self.test_session():
+    with self.session():
       hist_image_summary.eval()
 
   def test_eval_metric_ops(self):
@@ -392,7 +392,7 @@ class VisualizationUtilsTest(tf.test.TestCase):
     metric_ops = eval_metric_ops.get_estimator_eval_metric_ops(eval_dict)
     _, update_op = metric_ops[next(six.iterkeys(metric_ops))]
 
-    with self.test_session() as sess:
+    with self.session() as sess:
       sess.run(tf.global_variables_initializer())
       value_ops = {}
       for key, (value_op, _) in six.iteritems(metric_ops):
@@ -465,5 +465,6 @@ class VisualizationUtilsTest(tf.test.TestCase):
 
 
 if __name__ == '__main__':
+  logging.set_verbosity(logging.WARNING)
   tf.disable_eager_execution()
   tf.test.main()

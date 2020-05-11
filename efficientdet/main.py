@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import os
 
+from absl import app
 from absl import flags
 from absl import logging
 
@@ -119,11 +120,7 @@ flags.DEFINE_integer(
 FLAGS = flags.FLAGS
 
 
-def main(argv):
-  assert len(argv) >= 1
-  if len(argv) > 1:  # Do not accept unknown args.
-    raise ValueError('Received unknown arguments: {}'.format(argv[1:]))
-
+def main(_):
   if FLAGS.use_tpu:
     tpu_cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
         FLAGS.tpu,
@@ -290,7 +287,6 @@ def main(argv):
       utils.archive_ckpt(eval_results, eval_results['AP'], ckpt)
 
   elif FLAGS.mode == 'eval':
-    # Eval only runs on CPU or GPU host with batch_size = 1.
     # Override the default options: disable randomization in the input pipeline
     # and don't run on the TPU.
     eval_params = dict(
@@ -396,5 +392,6 @@ def main(argv):
 
 
 if __name__ == '__main__':
+  logging.set_verbosity(logging.WARNING)
   tf.disable_eager_execution()
-  tf.app.run(main)
+  app.run(main)

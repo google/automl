@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from absl import logging
 import tensorflow.compat.v1 as tf
 
 import efficientdet_arch
@@ -194,15 +195,13 @@ class FeatureFusionTest(tf.test.TestCase):
     tf.disable_eager_execution()
     nodes = tf.constant([1, 3])
     nodes2 = tf.constant([1, 3])
-    fused = efficientdet_arch.fuse_features(
-        [nodes, nodes2], "sum")
+    fused = efficientdet_arch.fuse_features([nodes, nodes2], 'sum')
     self.assertAllCloseAccordingToType(fused, [2, 6])
 
   def test_attn(self):
     nodes = tf.constant([1, 3], dtype=tf.float32)
     nodes2 = tf.constant([1, 3], dtype=tf.float32)
-    fused = efficientdet_arch.fuse_features(
-        [nodes, nodes2], "attn")
+    fused = efficientdet_arch.fuse_features([nodes, nodes2], 'attn')
 
     with self.cached_session() as sess:
       # initialize weights
@@ -213,8 +212,7 @@ class FeatureFusionTest(tf.test.TestCase):
   def test_fastattn(self):
     nodes = tf.constant([1, 3], dtype=tf.float32)
     nodes2 = tf.constant([1, 3], dtype=tf.float32)
-    fused = efficientdet_arch.fuse_features(
-        [nodes, nodes2], "fastattn")
+    fused = efficientdet_arch.fuse_features([nodes, nodes2], 'fastattn')
 
     with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
@@ -223,5 +221,6 @@ class FeatureFusionTest(tf.test.TestCase):
 
 
 if __name__ == '__main__':
+  logging.set_verbosity(logging.WARNING)
   tf.disable_eager_execution()
   tf.test.main()

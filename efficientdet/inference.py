@@ -37,6 +37,7 @@ import det_model_fn
 import hparams_config
 import utils
 from visualize import vis_utils
+from tensorflow.python.client import timeline  # pylint: disable=g-direct-tensorflow-import
 
 coco_id_mapping = {
     1: 'person', 2: 'bicycle', 3: 'car', 4: 'motorcycle', 5: 'airplane',
@@ -184,16 +185,22 @@ def restore_ckpt(sess, ckpt_path, ema_decay=0.9998, export_ckpt=None):
   if tf.io.gfile.isdir(ckpt_path):
     ckpt_path = tf.train.latest_checkpoint(ckpt_path)
   if ema_decay > 0:
-    ema = tf.train.ExponentialMovingAverage(decay=ema_decay)
+    ema = tf.train.ExponentialMovingAverage(decay=0.0)
     ema_vars = utils.get_ema_vars()
     var_dict = ema.variables_to_restore(ema_vars)
     ema_assign_op = ema.apply(ema_vars)
   else:
     var_dict = utils.get_ema_vars()
     ema_assign_op = None
+
   tf.train.get_or_create_global_step()
   sess.run(tf.global_variables_initializer())
   saver = tf.train.Saver(var_dict, max_to_keep=1)
+  if ckpt_path == '_':
+    logging.info('Running test: do not load any ckpt.')
+    return
+
+  # Restore all variables from ckpt.
   saver.restore(sess, ckpt_path)
 
   if export_ckpt:
@@ -216,11 +223,9 @@ def det_post_process_combined(params, cls_outputs, box_outputs, scales,
       cls_outputs[level] = tf.transpose(cls_outputs[level], [0, 2, 3, 1])
       box_outputs[level] = tf.transpose(box_outputs[level], [0, 2, 3, 1])
 
-    cls_outputs_all.append(tf.reshape(
-        cls_outputs[level],
-        [batch_size, -1, params['num_classes']]))
-    box_outputs_all.append(tf.reshape(
-        box_outputs[level], [batch_size, -1, 4]))
+    cls_outputs_all.append(
+        tf.reshape(cls_outputs[level], [batch_size, -1, params['num_classes']]))
+    box_outputs_all.append(tf.reshape(box_outputs[level], [batch_size, -1, 4]))
   cls_outputs_all = tf.concat(cls_outputs_all, 1)
   box_outputs_all = tf.concat(box_outputs_all, 1)
 
@@ -248,18 +253,14 @@ def det_post_process_combined(params, cls_outputs, box_outputs, scales,
       tf.tile(
           tf.expand_dims(tf.range(batch_size), axis=1), [1, max_boxes_to_draw]),
       dtype=tf.float32)
-  image_size = params['image_size']
-  image_size = utils.parse_image_size(image_size)
+  image_size = utils.parse_image_size(params['image_size'])
   ymin = tf.clip_by_value(nmsed_boxes[..., 0], 0, image_size[0]) * scales
   xmin = tf.clip_by_value(nmsed_boxes[..., 1], 0, image_size[1]) * scales
   ymax = tf.clip_by_value(nmsed_boxes[..., 2], 0, image_size[0]) * scales
   xmax = tf.clip_by_value(nmsed_boxes[..., 3], 0, image_size[1]) * scales
 
-  detection_list = [
-      # Format: (image_ids, ymin, xmin, ymax, xmax, score, class)
-      image_ids, ymin, xmin, ymax, xmax, nmsed_scores,
-      tf.cast(nmsed_classes + 1, tf.float32)
-  ]
+  classes = tf.cast(nmsed_classes + 1, tf.float32)
+  detection_list = [image_ids, ymin, xmin, ymax, xmax, nmsed_scores, classes]
   detections = tf.stack(detection_list, axis=2, name='detections')
   return detections
 
@@ -284,7 +285,7 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
 
   Returns:
     detections_batch: a batch of detection results. Each detection is a tensor
-      with each row representing [image_id, ymin, xmin, ymax, xmax, score, class].
+      with each row as [image_id, ymin, xmin, ymax, xmax, score, class].
   """
   if not params['batch_size']:
     # Use combined version for dynamic batch size.
@@ -640,7 +641,6 @@ class ServingDriver(object):
           options=run_options,
           run_metadata=run_metadata)
       with tf.io.gfile.GFile(trace_filename, 'w') as trace_file:
-        from tensorflow.python.client import timeline  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
         trace = timeline.Timeline(step_stats=run_metadata.step_stats)
         trace_file.write(trace.generate_chrome_trace_format(show_memory=True))
 
@@ -689,20 +689,6 @@ class ServingDriver(object):
         self.sess, self.sess.graph_def, output_names)
     return graphdef
 
-  def to_tflite(self, saved_model_dir):
-    """Convert to tflite."""
-    input_name = self.signitures['image_arrays'].op.name
-    input_shapes = {input_name: [None, *self.params['image_size'], 3]}
-    converter = tf.lite.TFLiteConverter.from_saved_model(
-        saved_model_dir,
-        input_arrays=[input_name],
-        input_shapes=input_shapes,
-        output_arrays=[self.signitures['prediction'].op.name])
-    converter.experimental_new_converter = True
-    supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
-    converter.target_spec.supported_ops = supported_ops
-    return converter.convert()
-
   def export(self, output_dir, frozen_pb=True, tflite_path=None):
     """Export a saved model."""
     signitures = self.signitures
@@ -734,10 +720,19 @@ class ServingDriver(object):
       logging.info('Free graph saved at %s', pb_path)
 
     if tflite_path:
-      ver = tf.__version__
-      if ver < '2.2.0-dev20200501' or ('dev' not in ver and ver < '2.2.0-rc4'):
-        raise ValueError('TFLite requires TF 2.2.0rc4 or laterr version.')
-      tflite_model = self.to_tflite(output_dir)
+      input_name = signitures['image_arrays'].op.name
+      height, width = self.params['image_size']
+      input_shapes = {input_name: [None, height, width, 3]}
+      converter = tf.lite.TFLiteConverter.from_saved_model(
+          output_dir,
+          input_arrays=[input_name],
+          input_shapes=input_shapes,
+          output_arrays=[signitures['prediction'].op.name])
+      converter.experimental_new_converter = True
+      supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
+      converter.target_spec.supported_ops = supported_ops
+      tflite_model = converter.convert()
+
       with tf.io.gfile.GFile(tflite_path, 'wb') as f:
         f.write(tflite_model)
 

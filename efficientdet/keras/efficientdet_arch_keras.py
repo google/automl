@@ -1,31 +1,35 @@
+# Lint as: python3
+# Copyright 2020 Google Research. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Keras implementation of efficientdet."""
 import functools
 import tensorflow.compat.v1 as tf
-from tensorflow.python.keras.utils import conv_utils
-from efficientdet_arch import nearest_upsampling, build_bifpn_layer
+
+import efficientdet_arch as legacy_arch
 import utils
 
 
 class BiFPNLayer(tf.keras.layers.Layer):
-  """A Keras Layer implementing Bidirectional Feature Pyramids"""
+  """A Keras Layer implementing Bidirectional Feature Pyramids."""
 
-  def __init__(self,
-               min_level: int,
-               max_level: int,
-               image_size: int,
-               fpn_weight_method: str,
-               apply_bn_for_resampling: bool,
-               is_training_bn: bool,
-               conv_after_downsample: bool,
-               use_native_resize_op: bool,
-               data_format: str,
-               pooling_type: str,
-               fpn_num_filters: int,
-               conv_bn_act_pattern: bool,
-               act_type: str,
-               separable_conv: bool,
-               use_tpu: bool,
-               fpn_name: str,
-               **kwargs):
+  def __init__(self, min_level: int, max_level: int, image_size: int,
+               fpn_weight_method: str, apply_bn_for_resampling: bool,
+               is_training_bn: bool, conv_after_downsample: bool,
+               use_native_resize_op: bool, data_format: str, pooling_type: str,
+               fpn_num_filters: int, conv_bn_act_pattern: bool, act_type: str,
+               separable_conv: bool, use_tpu: bool, fpn_name: str, **kwargs):
     self.min_level = min_level
     self.max_level = max_level
     self.image_size = image_size
@@ -51,32 +55,35 @@ class BiFPNLayer(tf.keras.layers.Layer):
 
   def call(self, feats):
     # @TODO: Implement this with keras logic
-    return build_bifpn_layer(feats, self.feat_sizes, self)
+    return legacy_arch.build_bifpn_layer(feats, self.feat_sizes, self)
 
   def get_config(self):
     base_config = super(BiFPNLayer, self).get_config()
 
     return {
-      **base_config,
-      "min_level": self.min_level,
-      "max_level": self.max_level,
-      "image_size": self.image_size,
-      "fpn_name": self.fpn_name,
-      "fpn_weight_method": self.fpn_weight_method,
-      "apply_bn_for_resampling": self.apply_bn_for_resampling,
-      "is_training_bn": self.is_training_bn,
-      "conv_after_downsample": self.conv_after_downsample,
-      "use_native_resize_op": self.use_native_resize_op,
-      "data_format": self.data_format,
-      "pooling_type": self.pooling_type,
-      "fpn_num_filters": self.fpn_num_filters,
-      "conv_bn_act_pattern": self.conv_bn_act_pattern,
-      "act_type": self.act_type,
-      "separable_conv": self.separable_conv,
-      "use_tpu": self.use_tpu,
+        **base_config,
+        'min_level': self.min_level,
+        'max_level': self.max_level,
+        'image_size': self.image_size,
+        'fpn_name': self.fpn_name,
+        'fpn_weight_method': self.fpn_weight_method,
+        'apply_bn_for_resampling': self.apply_bn_for_resampling,
+        'is_training_bn': self.is_training_bn,
+        'conv_after_downsample': self.conv_after_downsample,
+        'use_native_resize_op': self.use_native_resize_op,
+        'data_format': self.data_format,
+        'pooling_type': self.pooling_type,
+        'fpn_num_filters': self.fpn_num_filters,
+        'conv_bn_act_pattern': self.conv_bn_act_pattern,
+        'act_type': self.act_type,
+        'separable_conv': self.separable_conv,
+        'use_tpu': self.use_tpu,
     }
 
+
 class ResampleFeatureMap(tf.keras.layers.Layer):
+  """Resample feature map for downsampling or upsampling."""
+
   def __init__(self,
                target_height,
                target_width,
@@ -92,7 +99,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     super(ResampleFeatureMap, self).__init__(name='resample_{}'.format(name))
     self.apply_bn = apply_bn
     self.is_training = is_training
-    self.data_format = conv_utils.normalize_data_format(data_format)
+    self.data_format = data_format
     self.target_num_channels = target_num_channels
     self.target_height = target_height
     self.target_width = target_width
@@ -101,8 +108,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     self.use_native_resize_op = use_native_resize_op
     self.pooling_type = pooling_type
     self.conv2d = tf.keras.layers.Conv2D(
-        self.target_num_channels,
-        (1, 1),
+        self.target_num_channels, (1, 1),
         padding='same',
         data_format=self.data_format)
 
@@ -146,13 +152,13 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     if (self.use_native_resize_op or self.target_height % self.height != 0 or
         self.target_width % self.width != 0):
       self.upsample2d = tf.keras.layers.UpSampling2D(
-          (height_scale, width_scale),
-          data_format=self.data_format)
+          (height_scale, width_scale), data_format=self.data_format)
     else:
-      self.upsample2d = functools.partial(nearest_upsampling,
-                                          height_scale=height_scale,
-                                          width_scale=width_scale,
-                                          data_format=self.data_format)
+      self.upsample2d = functools.partial(
+          legacy_arch.nearest_upsampling,
+          height_scale=height_scale,
+          width_scale=width_scale,
+          data_format=self.data_format)
     super(ResampleFeatureMap, self).build(input_shape)
 
   def _maybe_apply_1x1(self, feat):

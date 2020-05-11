@@ -115,5 +115,6 @@ class UtilsTest(tf.test.TestCase):
 
 
 if __name__ == '__main__':
+  logging.set_verbosity(logging.WARNING)
   tf.disable_eager_execution()
   tf.test.main()
