@@ -14,6 +14,8 @@ Updates:
 
 **Quick start tutorial: [tutorial.ipynb](tutorial.ipynb)**
 
+**Quick install dependencies: ```pip install -r requirements.txt```
+
 ## 1. About EfficientDet Models
 
 EfficientDets are a family of object detection models, which achieve state-of-the-art 52.6mAP on COCO test-dev, yet being 4x - 9x smaller and using 13x - 42x fewer FLOPs than previous detectors. Our models also run 2x - 4x faster on GPU, and 5x - 11x faster on CPU than other detectors.
