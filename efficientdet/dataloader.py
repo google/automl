@@ -313,7 +313,7 @@ class InputReader(object):
         return (image, cls_targets, box_targets, num_positives, source_id,
                 image_scale, boxes, is_crowds, areas, classes)
 
-    batch_size = params['batch_size']
+    batch_size = params.get('batch_size', params.get('default_batch_size'))
     dataset = tf.data.Dataset.list_files(
         self._file_pattern, shuffle=self._is_training)
     if self._is_training:

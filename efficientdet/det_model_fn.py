@@ -34,12 +34,11 @@ import utils
 
 _DEFAULT_BATCH_SIZE = 64
 
-
 def update_learning_rate_schedule_parameters(params):
   """Updates params that are related to the learning rate schedule."""
-  # params['batch_size'] is per-shard within model_fn if use_tpu=true.
-  batch_size = (params['batch_size'] * params['num_shards'] if params['use_tpu']
-                else params['batch_size'])
+  # params.get('batch_size', params.get('default_batch_size')) is per-shard within model_fn if use_tpu=true.
+  batch_size = (params.get('batch_size', params.get('default_batch_size')) * params['num_shards'] if params['use_tpu']
+                else params.get('batch_size', params.get('default_batch_size')))
   # Learning rate is proportional to the batch size
   params['adjusted_learning_rate'] = (params['learning_rate'] * batch_size /
                                       _DEFAULT_BATCH_SIZE)
@@ -342,7 +341,7 @@ def add_metric_fn_inputs(params,
     max_detection_points: an integer specifing the maximum detection points to
       keep before NMS. Keep all anchors if max_detection_points <= 0.
   """
-  batch_size = params['batch_size']
+  batch_size = params.get('batch_size', params.get('default_batch_size'))
   num_classes = params['num_classes']
   cls_outputs_all = []
   box_outputs_all = []
@@ -548,9 +547,10 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   if mode == tf.estimator.ModeKeys.EVAL:
     def metric_fn(**kwargs):
       """Returns a dictionary that has the evaluation metrics."""
-      batch_size = params['batch_size']
+      batch_size = params.get('batch_size', params.get('default_batch_size'))
       if params['use_tpu']:
-        batch_size = params['batch_size'] * params['num_shards']
+        batch_size = batch_size * params['num_shards']
+
       eval_anchors = anchors.Anchors(params['min_level'],
                                      params['max_level'],
                                      params['num_scales'],
@@ -585,11 +585,11 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
       return output_metrics
 
     cls_loss_repeat = tf.reshape(
-        tf.tile(tf.expand_dims(cls_loss, 0), [params['batch_size'],]),
-        [params['batch_size'], 1])
+        tf.tile(tf.expand_dims(cls_loss, 0), [params.get('batch_size', params.get('default_batch_size')),]),
+        [params.get('batch_size', params.get('default_batch_size')), 1])
     box_loss_repeat = tf.reshape(
-        tf.tile(tf.expand_dims(box_loss, 0), [params['batch_size'],]),
-        [params['batch_size'], 1])
+        tf.tile(tf.expand_dims(box_loss, 0), [params.get('batch_size', params.get('default_batch_size')),]),
+        [params.get('batch_size', params.get('default_batch_size')), 1])
     metric_fn_inputs = {
         'cls_loss_repeat': cls_loss_repeat,
         'box_loss_repeat': box_loss_repeat,

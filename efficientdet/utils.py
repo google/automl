@@ -95,6 +95,8 @@ def get_ckpt_var_map(ckpt_path, ckpt_scope, var_scope, var_exclude_expr=None):
       logging.info('skip {} -- does not match scope {}'.format(
           v.op.name, var_scope))
     ckpt_var = ckpt_scope + v.op.name[len(var_scope):]
+    if ckpt_var.find('replica') > -1:
+      ckpt_var = '/'.join(ckpt_var.split('/')[:-1])
     if ckpt_var not in ckpt_var_names:
       if v.op.name.endswith('/ExponentialMovingAverage'):
         ckpt_var = ckpt_scope + v.op.name[:-len('/ExponentialMovingAverage')]

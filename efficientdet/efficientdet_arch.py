@@ -700,7 +700,7 @@ def build_bifpn_layer(feats, feat_sizes, config):
         break
   return output_feats
 
-
+@tf.autograph.experimental.do_not_convert
 def efficientdet(features, model_name=None, config=None, **kwargs):
   """Build EfficientDet model."""
   if not config and not model_name:

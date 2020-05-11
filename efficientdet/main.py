@@ -234,6 +234,12 @@ def main(_):
       per_host_input_for_training=tf.estimator.tpu.InputPipelineConfig
       .PER_HOST_V2)
 
+  params['default_batch_size'] = FLAGS.train_batch_size
+  if len(tf.config.experimental.list_physical_devices('GPU')) > 1:
+    strategy = tf.distribute.MirroredStrategy()
+  else:
+    strategy = None
+
   run_config = tf.estimator.tpu.RunConfig(
       cluster=tpu_cluster_resolver,
       evaluation_master=FLAGS.eval_master,
@@ -242,6 +248,7 @@ def main(_):
       session_config=config_proto,
       tpu_config=tpu_config,
       tf_random_seed=FLAGS.tf_random_seed,
+      train_distribute=strategy
   )
 
   model_fn_instance = det_model_fn.get_model_fn(FLAGS.model_name)
