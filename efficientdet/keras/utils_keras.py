@@ -20,12 +20,9 @@ from __future__ import absolute_import, division, print_function
 from typing import Text, Union
 
 import tensorflow.compat.v1 as tf
-from absl import logging
-from tensorflow.python.tpu import tpu_function  # pylint:disable=g-direct-tensorflow-import
-
 
 # pylint: disable=logging-format-interpolation
-from utils import TpuBatchNormalization, BatchNormalization
+from utils import BatchNormalization, TpuBatchNormalization
 
 
 class ActivationFn(tf.keras.layers.Layer):
@@ -49,7 +46,7 @@ class ActivationFn(tf.keras.layers.Layer):
         self.layer = tf.keras.layers.Lambda(lambda x: self.act(x), name=name)
 
     def call(self, features: tf.Tensor):
-        #return features
+        # return features
         return self.layer(features)
 
     def get_config(self):
@@ -57,7 +54,7 @@ class ActivationFn(tf.keras.layers.Layer):
 
         return {
             **base_config,
-            'act_type' : self.act_type
+            'act_type': self.act_type
         }
 
 
@@ -110,7 +107,6 @@ class BatchNormAct(tf.keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         x = self.layer.apply(inputs, training=self.training)
-
         x = self.act.call(x)
         return x
 

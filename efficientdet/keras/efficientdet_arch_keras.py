@@ -3,10 +3,10 @@ from __future__ import absolute_import, division, print_function
 import tensorflow.compat.v1 as tf
 from absl import logging
 
+import efficientdet_arch
 import hparams_config
 import keras.utils_keras
 import utils
-import efficientdet_arch
 
 
 class ClassNet(tf.keras.layers.Layer):
@@ -40,7 +40,6 @@ class ClassNet(tf.keras.layers.Layer):
         self.use_tpu = use_tpu
         self.data_format = data_format
         self.use_dc = survival_prob and is_training
-
 
         self.conv_ops = []
         self.bn_act_ops = []
@@ -127,7 +126,7 @@ class ClassNet(tf.keras.layers.Layer):
 
         return {
             **base_config,
-            'num_classes' : self.num_classes,
+            'num_classes': self.num_classes,
             'num_anchors': self.num_anchors,
             'num_filters': self.num_filters,
             'min_level': self.min_level,
@@ -271,7 +270,6 @@ class BoxNet(tf.keras.layers.Layer):
         }
 
 
-
 class BuildClassAndBoxOutputs(tf.keras.layers.Layer):
     """Builds box net and class net.
 
@@ -283,7 +281,8 @@ class BuildClassAndBoxOutputs(tf.keras.layers.Layer):
     A tuple (class_outputs, box_outputs) for class/box predictions.
     """
 
-    def __init__(self, aspect_ratios, num_scales, num_classes, fpn_num_filters, min_level,  max_level, is_training_bn, act_type,
+    def __init__(self, aspect_ratios, num_scales, num_classes, fpn_num_filters, min_level, max_level, is_training_bn,
+                 act_type,
                  box_class_repeats, separable_conv, survival_prob, use_tpu, data_format, **kwargs):
 
         self.aspect_ratios = aspect_ratios
@@ -301,17 +300,17 @@ class BuildClassAndBoxOutputs(tf.keras.layers.Layer):
         self.data_format = data_format
 
         options = {
-            'num_anchors' : len(aspect_ratios) * num_scales,
-            'num_filters' : fpn_num_filters,
+            'num_anchors': len(aspect_ratios) * num_scales,
+            'num_filters': fpn_num_filters,
             'min_level': min_level,
             'max_level': max_level,
-            'is_training' : is_training_bn,
-            'act_type' : act_type,
-            'repeats' : box_class_repeats,
-            'separable_conv' : separable_conv,
-            'survival_prob' : survival_prob,
-            'use_tpu' : use_tpu,
-            'data_format' : data_format
+            'is_training': is_training_bn,
+            'act_type': act_type,
+            'repeats': box_class_repeats,
+            'separable_conv': separable_conv,
+            'survival_prob': survival_prob,
+            'use_tpu': use_tpu,
+            'data_format': data_format
         }
 
         super(BuildClassAndBoxOutputs, self).__init__()
@@ -321,7 +320,6 @@ class BuildClassAndBoxOutputs(tf.keras.layers.Layer):
         options['num_classes'] = num_classes
 
         self.class_net = ClassNet(**options)
-
 
     def call(self, feats):
 
@@ -360,34 +358,34 @@ class BuildClassAndBoxOutputs(tf.keras.layers.Layer):
 
 
 def efficientdet(features, model_name=None, config=None, **kwargs):
-  """Build EfficientDet model."""
-  if not config and not model_name:
-    raise ValueError('please specify either model name or config')
+    """Build EfficientDet model."""
+    if not config and not model_name:
+        raise ValueError('please specify either model name or config')
 
-  if not config:
-    config = hparams_config.get_efficientdet_config(model_name)
-  elif isinstance(config, dict):
-    config = hparams_config.Config(config)  # wrap dict in Config object
+    if not config:
+        config = hparams_config.get_efficientdet_config(model_name)
+    elif isinstance(config, dict):
+        config = hparams_config.Config(config)  # wrap dict in Config object
 
-  if kwargs:
-    config.override(kwargs)
+    if kwargs:
+        config.override(kwargs)
 
-  logging.info(config)
+    logging.info(config)
 
-  # build backbone features.
-  features = efficientdet_arch.build_backbone(features, config)
-  logging.info('backbone params/flops = {:.6f}M, {:.9f}B'.format(
-      *utils.num_params_flops()))
+    # build backbone features.
+    features = efficientdet_arch.build_backbone(features, config)
+    logging.info('backbone params/flops = {:.6f}M, {:.9f}B'.format(
+        *utils.num_params_flops()))
 
-  # build feature network.
-  fpn_feats = efficientdet_arch.build_feature_network(features, config)
-  logging.info('backbone+fpn params/flops = {:.6f}M, {:.9f}B'.format(
-      *utils.num_params_flops()))
+    # build feature network.
+    fpn_feats = efficientdet_arch.build_feature_network(features, config)
+    logging.info('backbone+fpn params/flops = {:.6f}M, {:.9f}B'.format(
+        *utils.num_params_flops()))
 
-  # build class and box predictions.
-  class_box = BuildClassAndBoxOutputs(**config)
-  class_outputs, box_outputs = class_box.call(fpn_feats)
-  logging.info('backbone+fpn+box params/flops = {:.6f}M, {:.9f}B'.format(
-      *utils.num_params_flops()))
+    # build class and box predictions.
+    class_box = BuildClassAndBoxOutputs(**config)
+    class_outputs, box_outputs = class_box.call(fpn_feats)
+    logging.info('backbone+fpn+box params/flops = {:.6f}M, {:.9f}B'.format(
+        *utils.num_params_flops()))
 
-  return class_outputs, box_outputs
+    return class_outputs, box_outputs

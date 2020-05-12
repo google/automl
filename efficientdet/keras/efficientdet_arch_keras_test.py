@@ -19,9 +19,9 @@ from __future__ import absolute_import, division, print_function
 import tensorflow.compat.v1 as tf
 
 import efficientdet_arch
-import hparams_config
 import keras.efficientdet_arch_keras as keras_arch
 import utils
+
 
 class EfficientDetVariablesNamesTest(tf.test.TestCase):
 
@@ -31,16 +31,16 @@ class EfficientDetVariablesNamesTest(tf.test.TestCase):
         inputs = tf.ones(shape=inputs_shape, name='input', dtype=tf.float32)
         if not keras:
             efficientdet_arch.efficientdet(
-                    inputs,
-                    model_name='efficientdet-d0',
-                    is_training_bn=False,
-                    image_size=512)
+                inputs,
+                model_name='efficientdet-d0',
+                is_training_bn=False,
+                image_size=512)
         else:
             keras_arch.efficientdet(
-                    inputs,
-                    model_name='efficientdet-d0',
-                    is_training_bn=False,
-                    image_size=512)
+                inputs,
+                model_name='efficientdet-d0',
+                is_training_bn=False,
+                image_size=512)
         return [n.name for n in tf.global_variables()]
 
     def test_graph_node_name_compatibility(self):
