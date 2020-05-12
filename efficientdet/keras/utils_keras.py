@@ -19,16 +19,17 @@ from __future__ import absolute_import, division, print_function
 
 from typing import Text, Union
 
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 
 # pylint: disable=logging-format-interpolation
 from utils import BatchNormalization, TpuBatchNormalization
 
 
 class ActivationFn(tf.keras.layers.Layer):
+  """Customized non-linear activation type."""
   def __init__(self, act_type: Text, name='activation_fn', **kwargs):
 
-    super(ActivationFn, self).__init__()
+    super(ActivationFn, self).__init__(name=name, **kwargs)
 
     self.act_type = act_type
 
@@ -43,22 +44,21 @@ class ActivationFn(tf.keras.layers.Layer):
     else:
       raise ValueError('Unsupported act_type {}'.format(act_type))
 
-    self.layer = tf.keras.layers.Lambda(lambda x: self.act(x), name=name)
-
-  def call(self, features: tf.Tensor):
+  def call(self, inputs, **kwargs):
     # return features
-    return self.layer(features)
+    return self.act(inputs)
 
   def get_config(self):
     base_config = super(ActivationFn, self).get_config()
 
     return {
-      **base_config,
-      'act_type': self.act_type
+        **base_config,
+        'act_type': self.act_type
     }
 
 
 class BatchNormAct(tf.keras.layers.Layer):
+  """Performs a batch normalization followed by a non-linear activation."""
   def __init__(self,
                is_training_bn: bool,
                act_type: Union[Text, None],
@@ -69,7 +69,7 @@ class BatchNormAct(tf.keras.layers.Layer):
                use_tpu: bool = False,
                name: Text = None,
                parent_name: Text = None
-               ):
+              ):
 
     super(BatchNormAct, self).__init__(name=parent_name)
 
@@ -87,21 +87,23 @@ class BatchNormAct(tf.keras.layers.Layer):
       self.axis = 3
 
     if is_training_bn and use_tpu:
-      self.layer = TpuBatchNormalization(axis=self.axis,
-                                         momentum=momentum,
-                                         epsilon=epsilon,
-                                         center=True,
-                                         scale=True,
-                                         gamma_initializer=self.gamma_initializer,
-                                         name=f'{parent_name}/{name}')
+      self.layer = TpuBatchNormalization(
+          axis=self.axis,
+          momentum=momentum,
+          epsilon=epsilon,
+          center=True,
+          scale=True,
+          gamma_initializer=self.gamma_initializer,
+          name=f'{parent_name}/{name}')
     else:
-      self.layer = BatchNormalization(axis=self.axis,
-                                      momentum=momentum,
-                                      epsilon=epsilon,
-                                      center=True,
-                                      scale=True,
-                                      gamma_initializer=self.gamma_initializer,
-                                      name=f'{parent_name}/{name}')
+      self.layer = BatchNormalization(
+          axis=self.axis,
+          momentum=momentum,
+          epsilon=epsilon,
+          center=True,
+          scale=True,
+          gamma_initializer=self.gamma_initializer,
+          name=f'{parent_name}/{name}')
 
     self.act = ActivationFn(act_type, name=parent_name)
 
@@ -112,18 +114,21 @@ class BatchNormAct(tf.keras.layers.Layer):
 
 
 class DropConnect(tf.keras.layers.Layer):
+  """Drop the entire conv with given survival probability."""
   def __init__(self, survival_prob, name='drop_connect'):
     super(DropConnect, self).__init__(name=name)
     self.survival_prob = survival_prob
 
-    def call(self, inputs: tf.Tensor):
-      # Compute tensor.
-      batch_size = tf.shape(inputs)[0]
-      random_tensor = self.survival_prob
-      random_tensor += tf.random_uniform([batch_size, 1, 1, 1], dtype=inputs.dtype)
-      binary_tensor = tf.floor(random_tensor)
-      # Unlike conventional way that multiply survival_prob at test time, here we
-      # divide survival_prob at training time, such that no addition compute is
-      # needed at test time.
-      output = tf.div(inputs, self.survival_prob) * binary_tensor
-      return output
+
+  def call(self, inputs, **kwargs):
+    # Compute tensor.
+    batch_size = tf.shape(inputs)[0]
+    random_tensor = self.survival_prob
+    random_tensor += tf.random.uniform([batch_size, 1, 1, 1],
+                                       dtype=inputs.dtype)
+    binary_tensor = tf.floor(random_tensor)
+    # Unlike conventional way that multiply survival_prob at test time,
+    # here we divide survival_prob at training time, such that no addition
+    # compute is needed at test time.
+    output = tf.math.divide(inputs, self.survival_prob) * binary_tensor
+    return output
