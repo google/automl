@@ -88,7 +88,6 @@ class KerasTest(tf.test.TestCase):
       result = resample_layer(feat)
       self.assertEqual('resample_p0/max_pooling2d/MaxPool:0', result.name)
 
-
 class EfficientDetVariablesNamesTest(tf.test.TestCase):
 
   def build_model(self, keras=False):
@@ -118,4 +117,5 @@ class EfficientDetVariablesNamesTest(tf.test.TestCase):
 
 
 if __name__ == '__main__':
+  tf.disable_eager_execution()
   tf.test.main()

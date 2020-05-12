@@ -15,7 +15,10 @@
 # ==============================================================================
 """Keras implementation of efficientdet."""
 import functools
-import tensorflow.compat.v1 as tf
+import tensorflow.compat.v1 as tfv1
+import tensorflow as tf
+import numpy as np
+
 from absl import logging
 
 import efficientdet_arch as legacy_arch
@@ -25,7 +28,7 @@ import keras.utils_keras
 import utils
 
 
-class BiFPNLayer(tf.keras.layers.Layer):
+class BiFPNLayer(tfv1.keras.layers.Layer):
   """A Keras Layer implementing Bidirectional Feature Pyramids."""
 
   def __init__(self, min_level: int, max_level: int, image_size: int,
@@ -85,7 +88,7 @@ class BiFPNLayer(tf.keras.layers.Layer):
     }
 
 
-class ResampleFeatureMap(tf.keras.layers.Layer):
+class ResampleFeatureMap(tfv1.keras.layers.Layer):
   """Resample feature map for downsampling or upsampling."""
 
   def __init__(self,
@@ -111,7 +114,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     self.conv_after_downsample = conv_after_downsample
     self.use_native_resize_op = use_native_resize_op
     self.pooling_type = pooling_type
-    self.conv2d = tf.keras.layers.Conv2D(
+    self.conv2d = tfv1.keras.layers.Conv2D(
         self.target_num_channels, (1, 1),
         padding='same',
         data_format=self.data_format)
@@ -137,13 +140,13 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
 
     if self.pooling_type == 'max' or self.pooling_type is None:
       # Use max pooling in default.
-      self.pool2d = tf.keras.layers.MaxPooling2D(
+      self.pool2d = tfv1.keras.layers.MaxPooling2D(
           pool_size=[height_stride_size + 1, width_stride_size + 1],
           strides=[height_stride_size, width_stride_size],
           padding='SAME',
           data_format=self.data_format)
     elif self.pooling_type == 'avg':
-      self.pool2d = tf.keras.layers.AveragePooling2D(
+      self.pool2d = tfv1.keras.layers.AveragePooling2D(
           pool_size=[height_stride_size + 1, width_stride_size + 1],
           strides=[height_stride_size, width_stride_size],
           padding='SAME',
@@ -155,7 +158,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     width_scale = self.target_width // self.width
     if (self.use_native_resize_op or self.target_height % self.height != 0 or
         self.target_width % self.width != 0):
-      self.upsample2d = tf.keras.layers.UpSampling2D(
+      self.upsample2d = tfv1.keras.layers.UpSampling2D(
           (height_scale, width_scale), data_format=self.data_format)
     else:
       self.upsample2d = functools.partial(
@@ -304,7 +307,7 @@ class ClassNet(tf.keras.layers.Layer):
           kernel_size=3,
           activation=None,
           bias_initializer=tf.constant_initializer(
-              -tf.math.log((1 - 0.01) / 0.01)),
+              -np.math.log((1 - 0.01) / 0.01)),
           padding='same',
           name=f'{self.name}/class-predict')
 
@@ -316,7 +319,7 @@ class ClassNet(tf.keras.layers.Layer):
           kernel_size=3,
           activation=None,
           bias_initializer=tf.constant_initializer(
-              -tf.math.log((1 - 0.01) / 0.01)),
+              -np.math.log((1 - 0.01) / 0.01)),
           padding='same',
           name=f'{self.name}/class-predict')
 
