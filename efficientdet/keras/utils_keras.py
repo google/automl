@@ -43,11 +43,9 @@ class ActivationFn(tf.keras.layers.Layer):
     else:
       raise ValueError('Unsupported act_type {}'.format(act_type))
 
-    self.layer = tf.keras.layers.Lambda(lambda x: self.act(x), name=name)
-
   def call(self, inputs, **kwargs):
     # return features
-    return self.layer(inputs)
+    return self.act(inputs)
 
   def get_config(self):
     base_config = super(ActivationFn, self).get_config()
