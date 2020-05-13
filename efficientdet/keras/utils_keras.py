@@ -19,7 +19,7 @@ from __future__ import absolute_import, division, print_function
 
 from typing import Text, Union
 
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 
 # pylint: disable=logging-format-interpolation
 from utils import BatchNormalization, TpuBatchNormalization
@@ -45,9 +45,9 @@ class ActivationFn(tf.keras.layers.Layer):
 
     self.layer = tf.keras.layers.Lambda(lambda x: self.act(x), name=name)
 
-  def call(self, features: tf.Tensor):
+  def call(self, inputs, **kwargs):
     # return features
-    return self.layer(features)
+    return self.layer(inputs)
 
   def get_config(self):
     base_config = super(ActivationFn, self).get_config()
@@ -116,14 +116,14 @@ class DropConnect(tf.keras.layers.Layer):
     super(DropConnect, self).__init__(name=name)
     self.survival_prob = survival_prob
 
-    def call(self, inputs: tf.Tensor):
-      # Compute tensor.
-      batch_size = tf.shape(inputs)[0]
-      random_tensor = self.survival_prob
-      random_tensor += tf.random_uniform([batch_size, 1, 1, 1], dtype=inputs.dtype)
-      binary_tensor = tf.floor(random_tensor)
-      # Unlike conventional way that multiply survival_prob at test time, here we
-      # divide survival_prob at training time, such that no addition compute is
-      # needed at test time.
-      output = tf.div(inputs, self.survival_prob) * binary_tensor
-      return output
+  def call(self, inputs, **kwargs):
+    # Compute tensor.
+    batch_size = tf.shape(inputs)[0]
+    random_tensor = self.survival_prob
+    random_tensor += tf.random.uniform([batch_size, 1, 1, 1], dtype=inputs.dtype)
+    binary_tensor = tf.floor(random_tensor)
+    # Unlike conventional way that multiply survival_prob at test time, here we
+    # divide survival_prob at training time, such that no addition compute is
+    # needed at test time.
+    output = tf.math.divide(inputs, self.survival_prob) * binary_tensor
+    return output

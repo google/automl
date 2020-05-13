@@ -220,7 +220,23 @@ class ResampleFeatureMap(tfv1.keras.layers.Layer):
 
 
 class ClassNet(tf.keras.layers.Layer):
-  """Class prediction network."""
+  """Class prediction network.
+
+  Args:
+  num_classes: number of classes
+  num_anchors: number of anchors (usually 9)
+  num_filters: number of filters for "intermediate" layers
+  min_level: minimum level for features (usually 3)
+  max_level: maximum level for features (usually 7)
+  is_training_bn: True if we train the BatchNorm
+  act_type: String of the activation used
+  data_format: channel_first if [B, C, W, H] format, 'channels_last' if [B, W, H, C]
+  box_class_repeats: number of "intermediate" layers
+  separable_conv: True to use separable_conv instead of conv2D
+  survival_prob: if a value is set then drop connect will be used with this probability
+  use_tpu: True to use TPU compatible functions
+
+  """
   def __init__(self,
                num_classes=80,
                num_anchors=9,
@@ -362,7 +378,23 @@ class ClassNet(tf.keras.layers.Layer):
 
 
 class BoxNet(tf.keras.layers.Layer):
-  """Box regression network."""
+  """Box regression network.
+
+  Args:
+  num_anchors: number of  anchors used (usually 9)
+  num_filters: number of filters for "intermediate" layers
+  min_level: minimum level for features (usually 3)
+  max_level: maximum level for features (usually 7)
+  is_training: True if we train the BatchNorm
+  act_type: String of the activation used
+  repeats: number of "intermediate" layers
+  separable_conv: True to use separable_conv instead of conv2D
+  survival_prob: if a value is set then drop connect will be used with this probability
+  use_tpu: True to use TPU compatible functions
+  data_format: channel_first if [B, C, W, H] format, 'channels_last' if [B, W, H, C]
+  name: Name of the layer
+
+  """
   def __init__(self,
                num_anchors=9,
                num_filters=32,
@@ -502,13 +534,21 @@ class BuildClassAndBoxOutputs(tf.keras.layers.Layer):
   """Builds box net and class net.
 
   Args:
-  feats: input tensor.
-  config: a dict-like config, including all parameters.
+  aspect_ratios: number of aspect ratio for anchors (usually 3)
+  num_scales: number of scales for anchors (usually 3)
+  num_classes: number of classes
+  fpn_num_filters: number of filters for "intermediate" layers
+  min_level: minimum level for features (usually 3)
+  max_level: maximum level for features (usually 7)
+  is_training_bn: True if we train the BatchNorm
+  act_type: String of the activation used
+  data_format: channel_first if [B, C, W, H] format, 'channels_last' if [B, W, H, C]
+  box_class_repeats: number of "intermediate" layers
+  separable_conv: True to use separable_conv instead of conv2D
+  survival_prob: if a value is set then drop connect will be used with this probability
+  use_tpu: True to use TPU compatible functions
 
-  Returns:
-  A tuple (class_outputs, box_outputs) for class/box predictions.
   """
-
   def __init__(self, aspect_ratios, num_scales, num_classes, fpn_num_filters,
                min_level, max_level, is_training_bn, act_type, data_format,
                box_class_repeats, separable_conv, survival_prob, use_tpu,
@@ -553,9 +593,13 @@ class BuildClassAndBoxOutputs(tf.keras.layers.Layer):
 
   def call(self, inputs, **kwargs):
     """
+    Run BoxNet/ClassNet
 
-    :param inputs: feats from fpn
-    :return: class_outputs, box_outputs
+    Args:
+    feats: input tensor.
+
+    Returns:
+    A tuple (class_outputs, box_outputs) for class/box predictions.
     """
     class_outputs = {}
     box_outputs = {}
@@ -593,7 +637,16 @@ class BuildClassAndBoxOutputs(tf.keras.layers.Layer):
 
 
 def efficientdet(features, model_name=None, config=None, **kwargs):
-  """Build EfficientDet model."""
+  """Build EfficientDet model.
+
+    Args:
+    features: input tensor.
+    model_name: String of the model (eg. efficientdet-d0)
+    config: Dict of parameters for the network
+
+    Returns:
+    A tuple (class_outputs, box_outputs) wich are predictions.
+  """
   if not config and not model_name:
     raise ValueError('please specify either model name or config')
 
