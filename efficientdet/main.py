@@ -208,7 +208,6 @@ def main(_):
   params = dict(
       config.as_dict(),
       model_name=FLAGS.model_name,
-
       iterations_per_loop=FLAGS.iterations_per_loop,
       model_dir=FLAGS.model_dir,
       num_shards=num_shards,
@@ -236,6 +235,7 @@ def main(_):
 
   params['default_batch_size'] = FLAGS.train_batch_size
   if len(tf.config.experimental.list_physical_devices('GPU')) > 1:
+    params['moving_average_decay'] = 0.0
     strategy = tf.distribute.MirroredStrategy()
   else:
     strategy = None
