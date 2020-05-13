@@ -284,7 +284,7 @@ class ClassNet(tf.keras.layers.Layer):
             activation=None,
             bias_initializer=tf.zeros_initializer(),
             padding='same',
-            name=f'{self.name}/class-%d' % i))
+            name=f'class-%d' % i))
       # If using Conv2d
       else:
         self.conv_ops.append(tf.keras.layers.Conv2D(
@@ -295,7 +295,7 @@ class ClassNet(tf.keras.layers.Layer):
             activation=None,
             bias_initializer=tf.zeros_initializer(),
             padding='same',
-            name=f'{self.name}/class-%d' % i))
+            name=f'class-%d' % i))
 
       # Level only apply here so it's maybe better inside (no need to use tf.AUTO_REUSE anymore)
       bn_act_ops_per_level = {}
@@ -306,8 +306,7 @@ class ClassNet(tf.keras.layers.Layer):
             init_zero=False,
             use_tpu=self.use_tpu,
             data_format=self.data_format,
-            name='class-%d-bn-%d' % (i, level),
-            parent_name=self.name)
+            name='class-%d-bn-%d' % (i, level))
       self.bn_act_ops.append(bn_act_ops_per_level)
 
     if self.use_dc:
@@ -325,7 +324,7 @@ class ClassNet(tf.keras.layers.Layer):
           bias_initializer=tf.constant_initializer(
               -np.math.log((1 - 0.01) / 0.01)),
           padding='same',
-          name=f'{self.name}/class-predict')
+          name=f'class-predict')
 
     else:
       self.classes = tf.keras.layers.Conv2D(
@@ -337,7 +336,7 @@ class ClassNet(tf.keras.layers.Layer):
           bias_initializer=tf.constant_initializer(
               -np.math.log((1 - 0.01) / 0.01)),
           padding='same',
-          name=f'{self.name}/class-predict')
+          name=f'class-predict')
 
   def call(self, inputs, **kwargs):
     """
@@ -345,17 +344,23 @@ class ClassNet(tf.keras.layers.Layer):
     :param inputs: features for the given level
     :param level: current level
     """
-    image = inputs
-    level = kwargs['level']
-    for i in range(self.repeats):
-      original_image = image
-      image = self.conv_ops[i](image)
-      image = self.bn_act_ops[i][level].call(image)
-      if i > 0 and self.use_dc:
-        image = self.dc.call(image)
-        image = image + original_image
 
-    return self.classes(image)
+    class_outputs = {}
+
+    for level in range(self.min_level,
+                       self.max_level + 1):
+      image = inputs[level]
+      for i in range(self.repeats):
+        original_image = image
+        image = self.conv_ops[i](image)
+        image = self.bn_act_ops[i][level].call(image)
+        if i > 0 and self.use_dc:
+          image = self.dc(image)
+          image = image + original_image
+
+      class_outputs[level] = self.classes(image)
+
+    return class_outputs
 
   def get_config(self):
     base_config = super(ClassNet, self).get_config()
@@ -440,7 +445,7 @@ class BoxNet(tf.keras.layers.Layer):
             activation=None,
             bias_initializer=tf.zeros_initializer(),
             padding='same',
-            name=f'{self.name}/box-%d' % i))
+            name=f'box-%d' % i))
       # If using Conv2d
       else:
         self.conv_ops.append(tf.keras.layers.Conv2D(
@@ -451,7 +456,7 @@ class BoxNet(tf.keras.layers.Layer):
             activation=None,
             bias_initializer=tf.zeros_initializer(),
             padding='same',
-            name=f'{self.name}/box-%d' % i))
+            name=f'box-%d' % i))
 
       # Level only apply here so it's maybe better inside (no need to use tf.AUTO_REUSE anymore)
       bn_act_ops_per_level = {}
@@ -462,8 +467,7 @@ class BoxNet(tf.keras.layers.Layer):
             init_zero=False,
             use_tpu=self.use_tpu,
             data_format=self.data_format,
-            name='box-%d-bn-%d' % (i, level),
-            parent_name=self.name)
+            name='box-%d-bn-%d' % (i, level))
       self.bn_act_ops.append(bn_act_ops_per_level)
 
     if self.use_dc:
@@ -480,7 +484,7 @@ class BoxNet(tf.keras.layers.Layer):
           activation=None,
           bias_initializer=tf.zeros_initializer(),
           padding='same',
-          name=f'{self.name}/box-predict')
+          name=f'box-predict')
 
     else:
       self.boxes = tf.keras.layers.Conv2D(
@@ -491,7 +495,7 @@ class BoxNet(tf.keras.layers.Layer):
           activation=None,
           bias_initializer=tf.zeros_initializer(),
           padding='same',
-          name=f'{self.name}/box-predict')
+          name=f'box-predict')
 
   def call(self, inputs, **kwargs):
     """
@@ -499,17 +503,24 @@ class BoxNet(tf.keras.layers.Layer):
      :param inputs: features for the given level
      :param level: current level
      """
-    image = inputs
-    level = kwargs['level']
-    for i in range(self.repeats):
-      original_image = image
-      image = self.conv_ops[i](image)
-      image = self.bn_act_ops[i][level].call(image)
-      if i > 0 and self.use_dc:
-        image = self.dc.call(image)
-        image = image + original_image
 
-    return self.boxes(image)
+    box_outputs = {}
+
+    for level in range(self.min_level,
+                       self.max_level + 1):
+
+      image = inputs[level]
+      for i in range(self.repeats):
+        original_image = image
+        image = self.conv_ops[i](image)
+        image = self.bn_act_ops[i][level].call(image)
+        if i > 0 and self.use_dc:
+          image = self.dc.call(image)
+          image = image + original_image
+
+      box_outputs[level] = self.boxes(image)
+
+    return box_outputs
 
   def get_config(self):
     base_config = super(BoxNet, self).get_config()
@@ -601,16 +612,10 @@ class BuildClassAndBoxOutputs(tf.keras.layers.Layer):
     Returns:
     A tuple (class_outputs, box_outputs) for class/box predictions.
     """
-    class_outputs = {}
-    box_outputs = {}
 
-    for level in range(self.min_level,
-                       self.max_level + 1):
-      class_outputs[level] = self.class_net.call(inputs[level], level=level)
+    class_outputs = self.class_net(inputs, min_level=self.min_level, max_level=self.max_level)
 
-    for level in range(self.min_level,
-                       self.max_level + 1):
-      box_outputs[level] = self.box_net.call(inputs[level], level=level)
+    box_outputs = self.box_net(inputs, min_level=self.min_level, max_level=self.max_level)
 
     return class_outputs, box_outputs
 

@@ -65,11 +65,10 @@ class BatchNormAct(tf.keras.layers.Layer):
                momentum: float = 0.99,
                epsilon: float = 1e-3,
                use_tpu: bool = False,
-               name: Text = None,
-               parent_name: Text = None
+               name: Text = None
                ):
 
-    super(BatchNormAct, self).__init__(name=parent_name)
+    super(BatchNormAct, self).__init__()
 
     self.act_type = act_type
     self.training = is_training_bn
@@ -91,7 +90,7 @@ class BatchNormAct(tf.keras.layers.Layer):
                                          center=True,
                                          scale=True,
                                          gamma_initializer=self.gamma_initializer,
-                                         name=f'{parent_name}/{name}')
+                                         name=f'{name}')
     else:
       self.layer = BatchNormalization(axis=self.axis,
                                       momentum=momentum,
@@ -99,13 +98,13 @@ class BatchNormAct(tf.keras.layers.Layer):
                                       center=True,
                                       scale=True,
                                       gamma_initializer=self.gamma_initializer,
-                                      name=f'{parent_name}/{name}')
+                                      name=f'{name}')
 
-    self.act = ActivationFn(act_type, name=parent_name)
+    self.act = ActivationFn(act_type)
 
   def call(self, inputs, **kwargs):
-    x = self.layer.apply(inputs, training=self.training)
-    x = self.act.call(x)
+    x = self.layer(inputs, training=self.training)
+    x = self.act(x)
     return x
 
 
