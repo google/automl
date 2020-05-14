@@ -1563,6 +1563,10 @@ def select_and_apply_random_policy_augmix(policies,
   ws = tfp.distributions.Dirichlet([alpha] * mixture_width).sample()
   m = tfp.distributions.Beta(alpha, alpha).sample()
   mix = tf.zeros_like(image, dtype=tf.float32)
+  mixed_bboxes_arr = tf.TensorArray(tf.float32,
+                                    0,
+                                    dynamic_size=True,
+                                    element_shape=[None, 4])
   for j in range(mixture_width):
     aug_image = image
     aug_bboxes = bboxes
@@ -1571,11 +1575,21 @@ def select_and_apply_random_policy_augmix(policies,
       for (i, policy) in enumerate(policies):
         aug_image, aug_bboxes = tf.cond(
             tf.equal(i, policy_to_select),
-            lambda policy_fn=policy, img=aug_image, bboxes=aug_bboxes: policy_fn(img, bboxes),
-            lambda img=aug_image, bboxes=aug_bboxes: (img, bboxes))
+            lambda policy_fn=policy, image=aug_image, bboxes=aug_bboxes: policy_fn(image, bboxes),
+            lambda image=aug_image, bboxes=aug_bboxes: (image, bboxes))
     mix += ws[j] * tf.cast(aug_image, tf.float32)
+    mixed_bboxes_arr = tf.cond(m * ws[j] <= 0.2,
+                               lambda: mixed_bboxes_arr,
+                               lambda: mixed_bboxes_arr.write(mixed_bboxes_arr.size(), aug_bboxes))
+
   mixed = tf.cast((1 - m) * tf.cast(image, tf.float32) + m * mix, tf.uint8)
-  bboxes = tf.cond(m <= 0.5, lambda: bboxes, lambda: aug_bboxes)
+  mixed_bboxes_arr = tf.cond(m > 0.8,
+                             lambda: mixed_bboxes_arr,
+                             lambda: mixed_bboxes_arr.write(mixed_bboxes_arr.size(), bboxes))
+  bboxes = mixed_bboxes_arr.concat()
+  means = tf.reduce_mean(bboxes, axis=-1)
+  unique_means, _ = tf.unique(means)
+  bboxes = tf.gather(bboxes, tf.where(means == unique_means)[0])
   return (mixed, bboxes)
 
 
