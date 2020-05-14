@@ -325,3 +325,54 @@ def build_model_base(images, model_name, training, override_params=None):
   model = efficientnet_model.Model(blocks_args, global_params, model_name)
   features = model(images, training=training, features_only=True)
   return features, model.endpoints
+
+
+def get_model(model_name,
+              training,
+              override_params=None,
+              model_dir=None,
+              fine_tuning=False):
+  """A helper function to create and return model
+
+  Args:
+    model_name: string, the predefined model name.
+    training: boolean, whether the model is constructed for training.
+    override_params: A dictionary of params for overriding. Fields must exist in
+      efficientnet_model.GlobalParams.
+    model_dir: string, optional model dir for saving configs.
+    fine_tuning: boolean, whether the model is used for finetuning.
+
+  Returns:
+    created model
+
+  Raises:
+    When model_name specified an undefined model, raises NotImplementedError.
+    When override_params has invalid fields, raises ValueError.
+  """
+
+  # For backward compatibility.
+  if override_params and override_params.get('drop_connect_rate', None):
+    override_params['survival_prob'] = 1 - override_params['drop_connect_rate']
+
+  if not training or fine_tuning:
+    if not override_params:
+      override_params = {}
+    override_params['batch_norm'] = utils.BatchNormalization
+    if fine_tuning:
+      override_params['relu_fn'] = functools.partial(swish, use_native=False)
+  blocks_args, global_params = get_model_params(model_name, override_params)
+
+  if model_dir:
+    param_file = os.path.join(model_dir, 'model_params.txt')
+    if not tf.gfile.Exists(param_file):
+      if not tf.gfile.Exists(model_dir):
+        tf.gfile.MakeDirs(model_dir)
+      with tf.gfile.GFile(param_file, 'w') as f:
+        logging.info('writing to %s', param_file)
+        f.write('model_name= %s\n\n' % model_name)
+        f.write('global_params= %s\n\n' % str(global_params))
+        f.write('blocks_args= %s\n\n' % str(blocks_args))
+
+  model = efficientnet_model.Model(blocks_args, global_params, model_name)
+
+  return model
