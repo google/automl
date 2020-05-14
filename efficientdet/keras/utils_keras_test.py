@@ -33,6 +33,7 @@ class EfficientDetKerasActivationTest(tf.test.TestCase):
         i = float(i)
         self.assertEqual(utils.activation_fn(i, act_type).numpy(), act.call(i).numpy())
 
+
 class EfficientDetKerasBatchNormTest(tf.test.TestCase):
 
   def test_batchnorm_compatibility(self):

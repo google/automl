@@ -238,7 +238,7 @@ class ClassNet(tf.keras.layers.Layer):
 
   """
   def __init__(self,
-               num_classes=80,
+               num_classes=90,
                num_anchors=9,
                num_filters=32,
                min_level=3,
@@ -297,7 +297,6 @@ class ClassNet(tf.keras.layers.Layer):
             padding='same',
             name=f'class-%d' % i))
 
-      # Level only apply here so it's maybe better inside (no need to use tf.AUTO_REUSE anymore)
       bn_act_ops_per_level = {}
       for level in range(self.min_level, self.max_level + 1):
         bn_act_ops_per_level[level] = keras.utils_keras.BatchNormAct(
@@ -340,9 +339,13 @@ class ClassNet(tf.keras.layers.Layer):
 
   def call(self, inputs, **kwargs):
     """
+    Run ClassNet
 
-    :param inputs: features for the given level
-    :param level: current level
+    Args:
+    inputs: input tensor.
+
+    Returns:
+    class predictions.
     """
 
     class_outputs = {}
@@ -458,7 +461,6 @@ class BoxNet(tf.keras.layers.Layer):
             padding='same',
             name=f'box-%d' % i))
 
-      # Level only apply here so it's maybe better inside (no need to use tf.AUTO_REUSE anymore)
       bn_act_ops_per_level = {}
       for level in range(self.min_level, self.max_level + 1):
         bn_act_ops_per_level[level] = keras.utils_keras.BatchNormAct(
@@ -499,10 +501,14 @@ class BoxNet(tf.keras.layers.Layer):
 
   def call(self, inputs, **kwargs):
     """
+    Run BoxNet
 
-     :param inputs: features for the given level
-     :param level: current level
-     """
+    Args:
+    inputs: input tensor.
+
+    Returns:
+    box predictions.
+    """
 
     box_outputs = {}
 
