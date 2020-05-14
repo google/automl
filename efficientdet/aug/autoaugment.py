@@ -1565,15 +1565,17 @@ def select_and_apply_random_policy_augmix(policies,
   mix = tf.zeros_like(image, dtype=tf.float32)
   for j in range(mixture_width):
     aug_image = image
+    aug_bboxes = bboxes
     depth = mixture_depth if mixture_depth > 0 else np.random.randint(1, 4)
     for _ in range(depth):
       for (i, policy) in enumerate(policies):
-        aug_image, bboxes = tf.cond(
+        aug_image, aug_bboxes = tf.cond(
             tf.equal(i, policy_to_select),
-            lambda policy_fn=policy, img=aug_image: policy_fn(img, bboxes),
-            lambda img=aug_image: (img, bboxes))
+            lambda policy_fn=policy, img=aug_image, bboxes=aug_bboxes: policy_fn(img, bboxes),
+            lambda img=aug_image, bboxes=aug_bboxes: (img, bboxes))
     mix += ws[j] * tf.cast(aug_image, tf.float32)
   mixed = tf.cast((1 - m) * tf.cast(image, tf.float32) + m * mix, tf.uint8)
+  bboxes = tf.cond(m <= 0.5, lambda: bboxes, lambda: aug_bboxes)
   return (mixed, bboxes)
 
 
