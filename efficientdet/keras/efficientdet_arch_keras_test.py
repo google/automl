@@ -88,6 +88,34 @@ class KerasTest(tf.test.TestCase):
       result = resample_layer(feat)
       self.assertEqual('resample_p0/max_pooling2d/MaxPool:0', result.name)
 
+class EfficientDetVariablesNamesTest(tf.test.TestCase):
+
+  def build_model(self, keras=False):
+    tf.compat.v1.reset_default_graph()
+    inputs_shape = [1, 512, 512, 3]
+    inputs = tf.ones(shape=inputs_shape, name='input', dtype=tf.float32)
+    if not keras:
+      legacy_arch.efficientdet(
+        inputs,
+        model_name='efficientdet-d0',
+        is_training_bn=False,
+        image_size=512)
+    else:
+      efficientdet_arch_keras.efficientdet(
+        inputs,
+        model_name='efficientdet-d0',
+        is_training_bn=False,
+        image_size=512)
+    return [n.name for n in tf.global_variables()]
+
+  def test_graph_variables_name_compatibility(self):
+    legacy_names = self.build_model(False)
+    keras_names = self.build_model(True)
+
+    self.assertContainsSubset(keras_names, legacy_names)
+    self.assertContainsSubset(legacy_names, keras_names)
+
 
 if __name__ == '__main__':
+  tf.disable_eager_execution()
   tf.test.main()
