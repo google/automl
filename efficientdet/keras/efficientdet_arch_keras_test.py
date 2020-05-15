@@ -81,12 +81,22 @@ class KerasTest(tf.test.TestCase):
             self.assertAllCloseAccordingToType(expect_result, actual_result)
 
   def test_op_name(self):
+    vars1 = []
+    vars2 = []
     with tf.Graph().as_default():
       feat = tf.random.uniform([1, 16, 16, 320])
       resample_layer = efficientdet_arch_keras.ResampleFeatureMap(
           name='p0', target_height=8, target_width=8, target_num_channels=64)
       result = resample_layer(feat)
-      self.assertEqual('resample_p0/max_pooling2d/MaxPool:0', result.name)
+      vars1 = [var.name for var in tf.trainable_variables()]
+    tf.reset_default_graph()
+    with tf.Graph().as_default():
+      feat = tf.random.uniform([1, 16, 16, 320])
+      result = legacy_arch.resample_feature_map(feat,
+          name='p0', target_height=8, target_width=8, target_num_channels=64)
+      vars2 = [var.name for var in tf.trainable_variables()]
+
+    self.assertEqual(vars1, vars2)
 
 class EfficientDetVariablesNamesTest(tf.test.TestCase):
 
