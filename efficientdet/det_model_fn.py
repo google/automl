@@ -375,7 +375,8 @@ def add_metric_fn_inputs(params,
   else:
     # Keep all anchors, but for each anchor, just keep the max probablity for
     # each class.
-    cls_outputs_idx = tf.math.argmax(cls_outputs_all, axis=-1)
+    cls_outputs_idx = tf.math.argmax(
+        cls_outputs_all, axis=-1, output_type=tf.int32)
     num_anchors = cls_outputs_all.shape[1]
 
     classes = cls_outputs_idx

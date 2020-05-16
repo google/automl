@@ -71,10 +71,10 @@ class FasterRcnnBoxCoder(box_coder.BoxCoder):
     ycenter_a, xcenter_a, ha, wa = anchors.get_center_coordinates_and_sizes()
     ycenter, xcenter, h, w = boxes.get_center_coordinates_and_sizes()
     # Avoid NaN in division and log below.
-    ha += EPSILON
-    wa += EPSILON
-    h += EPSILON
-    w += EPSILON
+    ha = tf.maximum(EPSILON, ha)
+    wa = tf.maximum(EPSILON, wa)
+    h = tf.maximum(EPSILON, h)
+    w = tf.maximum(EPSILON, w)
 
     tx = (xcenter - xcenter_a) / wa
     ty = (ycenter - ycenter_a) / ha

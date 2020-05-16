@@ -182,8 +182,10 @@ def resample_feature_map(feat,
             target_width % width != 0):
           if data_format == 'channels_first':
             feat = tf.transpose(feat, [0, 2, 3, 1])
-          feat = tf.image.resize_nearest_neighbor(feat,
-                                                  [target_height, target_width])
+          feat = tf.cast(
+              tf.image.resize_nearest_neighbor(
+                  tf.cast(feat, tf.float32), [target_height, target_width]),
+              dtype=feat.dtype)
           if data_format == 'channels_first':
             feat = tf.transpose(feat, [0, 3, 1, 2])
         else:
@@ -411,7 +413,10 @@ def build_backbone(features, config):
   is_training_bn = config.is_training_bn
   if 'efficientnet' in backbone_name:
     override_params = {
-        'batch_norm': utils.batch_norm_class(is_training_bn, config.use_tpu),
+        'batch_norm':
+            utils.batch_norm_class(is_training_bn, config.use_tpu),
+        'relu_fn':
+            functools.partial(utils.activation_fn, act_type=config.act_type),
     }
     if 'b0' in backbone_name:
       override_params['survival_prob'] = 0.0
@@ -611,7 +616,7 @@ def fuse_features(nodes, weight_method):
                     for _ in nodes]
     normalized_weights = tf.nn.softmax(tf.stack(edge_weights))
     nodes = tf.stack(nodes, axis=-1)
-    new_node = tf.reduce_sum(tf.multiply(nodes, normalized_weights), -1)
+    new_node = tf.reduce_sum(nodes * normalized_weights, -1)
   elif weight_method == 'fastattn':
     edge_weights = [
         tf.nn.relu(tf.cast(tf.Variable(1.0, name='WSM'), dtype=dtype))

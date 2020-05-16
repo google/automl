@@ -14,34 +14,37 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for utils_keras."""
-
 import tensorflow as tf
 
-import efficientdet_arch as legacy_arch
 import utils
-import hparams_config
 from keras import utils_keras
-from keras import efficientdet_arch_keras
+
 
 class EfficientDetKerasActivationTest(tf.test.TestCase):
 
   def test_activation_compatibility(self):
-    
+
     for act_type in ['swish', 'swish_native', 'relu', 'relu6']:
       act = utils_keras.ActivationFn(act_type)
       for i in range(-2, 2):
         i = float(i)
-        self.assertEqual(utils.activation_fn(i, act_type).numpy(), act.call(i).numpy())
+        self.assertEqual(
+            utils.activation_fn(i, act_type).numpy(),
+            act.call(i).numpy())
 
 
 class EfficientDetKerasBatchNormTest(tf.test.TestCase):
 
   def test_batchnorm_compatibility(self):
-    x = tf.Variable(tf.ones((4, 1, 1, 1))*[[1.0], [2.0], [4.0], [8.0]])
+    x = tf.Variable(tf.ones((4, 1, 1, 1)) * [[1.0], [2.0], [4.0], [8.0]])
     for act_type in ['swish', 'swish_native', 'relu', 'relu6']:
       bna = utils_keras.BatchNormAct(is_training_bn=False, act_type=act_type)
-      self.assertEquals(tf.reduce_sum(utils.batch_norm_act(x, is_training_bn=False, act_type=act_type).numpy()),
-                        tf.reduce_sum(bna.call(x).numpy()))
+      self.assertEqual(
+          tf.reduce_sum(
+              utils.batch_norm_act(x, is_training_bn=False,
+                                   act_type=act_type).numpy()),
+          tf.reduce_sum(bna.call(x).numpy()))
+
 
 if __name__ == '__main__':
   tf.test.main()

@@ -169,8 +169,8 @@ def iou_loss(pred_boxes: FloatType,
 
   iou_loss_list = []
   for i in range(0, len(pred_boxes_list), 4):
-    pred_boxes = pred_boxes_list[i:i + 4]
-    target_boxes = target_boxes_list[i:i + 4]
+    pred_boxes = pred_boxes_list[i: i + 4]
+    target_boxes = target_boxes_list[i: i + 4]
 
     # Compute mask.
     t_ymin, t_xmin, t_ymax, t_xmax = target_boxes
@@ -183,3 +183,4 @@ def iou_loss(pred_boxes: FloatType,
   if len(iou_loss_list) == 1:
     return iou_loss_list[0]
   return tf.reduce_sum(tf.stack(iou_loss_list), 0)
+

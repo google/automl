@@ -194,10 +194,7 @@ class TpuBatchNormalization(tf.keras.layers.BatchNormalization):
         inputs, reduction_axes, keep_dims=keep_dims)
 
     num_shards = tpu_function.get_tpu_context().number_of_shards or 1
-    if num_shards <= 8:  # Skip cross_replica for 2x2 or smaller slices.
-      num_shards_per_group = 1
-    else:
-      num_shards_per_group = max(8, num_shards // 8)
+    num_shards_per_group = min(32, num_shards)  # aggregate up to 32 cores.
     logging.info('TpuBatchNormalization with num_shards_per_group {}'.format(
         num_shards_per_group))
     if num_shards_per_group > 1:
@@ -243,10 +240,10 @@ def batch_norm_class(is_training, use_tpu=False):
     return BatchNormalization
 
 
-def tpu_batch_normalization(inputs, training=False, use_tpu=False, **kwargs):
+def batch_normalization(inputs, training=False, use_tpu=False, **kwargs):
   """A wrapper for TpuBatchNormalization."""
-  layer = batch_norm_class(training, use_tpu)(**kwargs)
-  return layer.apply(inputs, training=training)
+  bn_layer = batch_norm_class(training, use_tpu)(**kwargs)
+  return bn_layer(inputs, training=training)
 
 
 def batch_norm_act(inputs,
@@ -286,7 +283,7 @@ def batch_norm_act(inputs,
   else:
     axis = 3
 
-  inputs = tpu_batch_normalization(
+  inputs = batch_normalization(
       inputs=inputs,
       axis=axis,
       momentum=momentum,

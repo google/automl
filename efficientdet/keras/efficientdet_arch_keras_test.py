@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for efficientdet_arch_keras."""
-
+from absl import logging
 import tensorflow.compat.v1 as tf
 
 import efficientdet_arch as legacy_arch
@@ -87,16 +87,21 @@ class KerasTest(tf.test.TestCase):
       feat = tf.random.uniform([1, 16, 16, 320])
       resample_layer = efficientdet_arch_keras.ResampleFeatureMap(
           name='p0', target_height=8, target_width=8, target_num_channels=64)
-      result = resample_layer(feat)
+      resample_layer(feat)
       vars1 = [var.name for var in tf.trainable_variables()]
-    tf.reset_default_graph()
+
     with tf.Graph().as_default():
       feat = tf.random.uniform([1, 16, 16, 320])
-      result = legacy_arch.resample_feature_map(feat,
-          name='p0', target_height=8, target_width=8, target_num_channels=64)
+      legacy_arch.resample_feature_map(
+          feat,
+          name='p0',
+          target_height=8,
+          target_width=8,
+          target_num_channels=64)
       vars2 = [var.name for var in tf.trainable_variables()]
 
     self.assertEqual(vars1, vars2)
+
 
 class EfficientDetVariablesNamesTest(tf.test.TestCase):
 
@@ -106,16 +111,16 @@ class EfficientDetVariablesNamesTest(tf.test.TestCase):
     inputs = tf.ones(shape=inputs_shape, name='input', dtype=tf.float32)
     if not keras:
       legacy_arch.efficientdet(
-        inputs,
-        model_name='efficientdet-d0',
-        is_training_bn=False,
-        image_size=512)
+          inputs,
+          model_name='efficientdet-d0',
+          is_training_bn=False,
+          image_size=512)
     else:
       efficientdet_arch_keras.efficientdet(
-        inputs,
-        model_name='efficientdet-d0',
-        is_training_bn=False,
-        image_size=512)
+          inputs,
+          model_name='efficientdet-d0',
+          is_training_bn=False,
+          image_size=512)
     return [n.name for n in tf.global_variables()]
 
   def test_graph_variables_name_compatibility(self):
@@ -127,5 +132,5 @@ class EfficientDetVariablesNamesTest(tf.test.TestCase):
 
 
 if __name__ == '__main__':
-  tf.disable_eager_execution()
+  logging.set_verbosity(logging.WARNING)
   tf.test.main()

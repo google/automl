@@ -515,7 +515,8 @@ class Model(tf.keras.Model):
 
     # Stem part.
     self._conv_stem = self.conv_cls(
-        filters=round_filters(32, self._global_params, self._fix_head_stem),
+        filters=round_filters(self._blocks_args[0].input_filters,
+                              self._global_params, self._fix_head_stem),
         kernel_size=[3, 3],
         strides=[2, 2],
         kernel_initializer=conv_kernel_initializer,

@@ -13,15 +13,13 @@
 # limitations under the License.
 # ==============================================================================
 """Backbone network factory."""
-import functools
 import os
-import tensorflow as tf
 from absl import logging
+import tensorflow as tf
 
-import utils
-from backbone import efficientnet_builder, efficientnet_model
+from backbone import efficientnet_builder
 from backbone import efficientnet_lite_builder
-from backbone.efficientnet_builder import swish
+from backbone import efficientnet_model
 
 
 def get_model_builder(model_name):
@@ -34,20 +32,14 @@ def get_model_builder(model_name):
     raise ValueError('Unknown model name {}'.format(model_name))
 
 
-def get_model(model_name,
-              training,
-              override_params=None,
-              model_dir=None,
-              fine_tuning=False):
-  """A helper function to create and return model
+def get_model(model_name, override_params=None, model_dir=None):
+  """A helper function to create and return model.
 
   Args:
     model_name: string, the predefined model name.
-    training: boolean, whether the model is constructed for training.
     override_params: A dictionary of params for overriding. Fields must exist in
       efficientnet_model.GlobalParams.
     model_dir: string, optional model dir for saving configs.
-    fine_tuning: boolean, whether the model is used for finetuning.
 
   Returns:
     created model
@@ -64,19 +56,15 @@ def get_model(model_name,
     if not override_params:
       override_params = {}
 
-    if not training or fine_tuning:
-      override_params['batch_norm'] = utils.BatchNormalization
-
     if model_name.startswith('efficientnet-lite'):
       builder = efficientnet_lite_builder
     elif model_name.startswith('efficientnet-b'):
       builder = efficientnet_builder
-      if fine_tuning:
-        override_params['relu_fn'] = functools.partial(swish, use_native=False)
     else:
       raise ValueError('Unknown model name {}'.format(model_name))
 
-  blocks_args, global_params = builder.get_model_params(model_name, override_params)
+  blocks_args, global_params = builder.get_model_params(model_name,
+                                                        override_params)
 
   if model_dir:
     param_file = os.path.join(model_dir, 'model_params.txt')
@@ -89,7 +77,4 @@ def get_model(model_name,
         f.write('global_params= %s\n\n' % str(global_params))
         f.write('blocks_args= %s\n\n' % str(blocks_args))
 
-  model = efficientnet_model.Model(blocks_args, global_params, model_name)
-
-  return model
-
+  return efficientnet_model.Model(blocks_args, global_params, model_name)
