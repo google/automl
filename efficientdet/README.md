@@ -263,7 +263,6 @@ You can also run eval on test-dev set with the following command:
     !python main.py --mode=train_and_eval \
         --training_file_pattern=tfrecord/pascal*.tfrecord \
         --validation_file_pattern=tfrecord/pascal*.tfrecord \
-        --val_json_file=tfrecord/json_pascal.json \
         --model_name=efficientdet-d0 \
         --model_dir=/tmp/efficientdet-d0-scratch  \
         --backbone_ckpt=efficientnet-b0  \
@@ -289,7 +288,6 @@ Finetune needs to use --ckpt rather than --backbone_ckpt.
     !python main.py --mode=train_and_eval \
         --training_file_pattern=tfrecord/pascal*.tfrecord \
         --validation_file_pattern=tfrecord/pascal*.tfrecord \
-        --val_json_file=tfrecord/json_pascal.json \
         --model_name=efficientdet-d0 \
         --model_dir=/tmp/efficientdet-d0-finetune  \
         --ckpt=efficientdet-d0  \
