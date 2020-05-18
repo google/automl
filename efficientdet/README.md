@@ -13,8 +13,7 @@ Updates:
   - Mar 13: Released the initial code and models.
 
 **Quick start tutorial: [tutorial.ipynb](tutorial.ipynb)**
-
-**Quick install dependencies: ```pip install -r requirements.txt```
+**Quick install dependencies: ```pip install -r requirements.txt```**
 
 ## 1. About EfficientDet Models
 

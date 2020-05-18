@@ -93,10 +93,31 @@ class EfficientDetArchTest(tf.test.TestCase):
     self.assertSequenceEqual((51871782, 324815496167),
                              self.build_model('efficientdet-d7', 1536))
 
+  def test_efficientdet_lite0(self):
+    self.assertSequenceEqual((3243527.0, 2504524987),
+                             self.build_model('efficientdet-lite0', 512))
+
+  def test_efficientdet_lite1(self):
+    self.assertSequenceEqual((4248394.0, 3515526105),
+                             self.build_model('efficientdet-lite1', 512))
+
+  def test_efficientdet_lite2(self):
+    self.assertSequenceEqual((5252429.0, 4428869862),
+                             self.build_model('efficientdet-lite2', 512))
+
+  def test_efficientdet_lite3(self):
+    self.assertSequenceEqual((8350976.0, 7523573252),
+                             self.build_model('efficientdet-lite3', 512))
+
+  def test_efficientdet_lite4(self):
+    self.assertSequenceEqual((15131027.0, 12977398945),
+                             self.build_model('efficientdet-lite4', 512))
+
 
 class EfficientDetArchPrecisionTest(tf.test.TestCase):
 
   def build_model(self, features, is_training, precision):
+
     def _model_fn(inputs):
       return efficientdet_arch.efficientdet(
           inputs,
@@ -150,9 +171,11 @@ class BackboneTest(tf.test.TestCase):
 class FreezeTest(tf.test.TestCase):
 
   def test_freeze(self):
-    var_list = [tf.Variable(0., name='efficientnet'),
-                tf.Variable(0., name='fpn_cells'),
-                tf.Variable(0., name='class_net')]
+    var_list = [
+        tf.Variable(0., name='efficientnet'),
+        tf.Variable(0., name='fpn_cells'),
+        tf.Variable(0., name='class_net')
+    ]
     freeze_var_list = efficientdet_arch.freeze_vars(var_list, None)
     self.assertEqual(len(freeze_var_list), 3)
     freeze_var_list = efficientdet_arch.freeze_vars(var_list, 'efficientnet')
@@ -173,6 +196,7 @@ class BiFPNTest(tf.test.TestCase):
   def test_bifpn_dynamic_l2l7(self):
     p = efficientdet_arch.bifpn_dynamic_config(2, 7, None)
 
+    # pyformat: disable
     self.assertEqual(
         p.nodes,
         [
@@ -187,6 +211,7 @@ class BiFPNTest(tf.test.TestCase):
             {'feat_level': 6, 'inputs_offsets': [4, 6, 13]},
             {'feat_level': 7, 'inputs_offsets': [5, 14]},
         ])
+    # pyformat: enable
 
 
 class FeatureFusionTest(tf.test.TestCase):

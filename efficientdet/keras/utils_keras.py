@@ -1,3 +1,4 @@
+# Lint as: python3
 # Copyright 2020 Google Research. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,20 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Common utils."""
-
+"""Common keras utils."""
 # gtype import
-from __future__ import absolute_import, division, print_function
 
 from typing import Text, Union
-
 import tensorflow as tf
 
-# pylint: disable=logging-format-interpolation
-from utils import BatchNormalization, TpuBatchNormalization
+import utils
 
 
 class ActivationFn(tf.keras.layers.Layer):
+  """Activation function."""
+
   def __init__(self, act_type: Text, name='activation_fn', **kwargs):
 
     super(ActivationFn, self).__init__()
@@ -50,13 +49,12 @@ class ActivationFn(tf.keras.layers.Layer):
   def get_config(self):
     base_config = super(ActivationFn, self).get_config()
 
-    return {
-      **base_config,
-      'act_type': self.act_type
-    }
+    return {**base_config, 'act_type': self.act_type}
 
 
 class BatchNormAct(tf.keras.layers.Layer):
+  """A layer for batch norm and activation."""
+
   def __init__(self,
                is_training_bn: bool,
                act_type: Union[Text, None],
@@ -65,8 +63,7 @@ class BatchNormAct(tf.keras.layers.Layer):
                momentum: float = 0.99,
                epsilon: float = 1e-3,
                use_tpu: bool = False,
-               name: Text = None
-               ):
+               name: Text = None):
 
     super(BatchNormAct, self).__init__()
 
@@ -84,21 +81,23 @@ class BatchNormAct(tf.keras.layers.Layer):
       self.axis = 3
 
     if is_training_bn and use_tpu:
-      self.layer = TpuBatchNormalization(axis=self.axis,
-                                         momentum=momentum,
-                                         epsilon=epsilon,
-                                         center=True,
-                                         scale=True,
-                                         gamma_initializer=self.gamma_initializer,
-                                         name=f'{name}')
+      self.layer = utils.TpuBatchNormalization(
+          axis=self.axis,
+          momentum=momentum,
+          epsilon=epsilon,
+          center=True,
+          scale=True,
+          gamma_initializer=self.gamma_initializer,
+          name=f'{name}')
     else:
-      self.layer = BatchNormalization(axis=self.axis,
-                                      momentum=momentum,
-                                      epsilon=epsilon,
-                                      center=True,
-                                      scale=True,
-                                      gamma_initializer=self.gamma_initializer,
-                                      name=f'{name}')
+      self.layer = utils.BatchNormalization(
+          axis=self.axis,
+          momentum=momentum,
+          epsilon=epsilon,
+          center=True,
+          scale=True,
+          gamma_initializer=self.gamma_initializer,
+          name=f'{name}')
 
     self.act = ActivationFn(act_type)
 
@@ -109,6 +108,8 @@ class BatchNormAct(tf.keras.layers.Layer):
 
 
 class DropConnect(tf.keras.layers.Layer):
+  """Drop connect for stocastic depth."""
+
   def __init__(self, survival_prob, name='drop_connect'):
     super(DropConnect, self).__init__(name=name)
     self.survival_prob = survival_prob
@@ -117,7 +118,8 @@ class DropConnect(tf.keras.layers.Layer):
     # Compute tensor.
     batch_size = tf.shape(inputs)[0]
     random_tensor = self.survival_prob
-    random_tensor += tf.random.uniform([batch_size, 1, 1, 1], dtype=inputs.dtype)
+    random_tensor += tf.random.uniform([batch_size, 1, 1, 1],
+                                       dtype=inputs.dtype)
     binary_tensor = tf.floor(random_tensor)
     # Unlike conventional way that multiply survival_prob at test time, here we
     # divide survival_prob at training time, such that no addition compute is

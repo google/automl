@@ -195,4 +195,4 @@ class ArgMaxMatcher(matcher.Matcher):
       modified tensor.
     """
     indicator = tf.cast(indicator, x.dtype)
-    return tf.add(tf.multiply(x, 1 - indicator), val * indicator)
+    return x * (1 - indicator) + val * indicator

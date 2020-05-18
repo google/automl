@@ -172,7 +172,7 @@ def default_detection_configs():
   h.act_type = 'swish'
 
   # input preprocessing parameters
-  h.image_size = 640   # An integer or a string WxH such as 640x320.
+  h.image_size = 640  # An integer or a string WxH such as 640x320.
   h.input_rand_hflip = True
   h.train_scale_min = 0.1
   h.train_scale_max = 2.0
@@ -197,7 +197,7 @@ def default_detection_configs():
   # optimization
   h.momentum = 0.9
   h.optimizer = 'sgd'  # can be 'adam' or 'sgd'.
-  h.learning_rate = 0.08   # 0.008 for adam.
+  h.learning_rate = 0.08  # 0.008 for adam.
   h.lr_warmup_init = 0.008  # 0.0008 for adam.
   h.lr_warmup_epoch = 1.0
   h.first_lr_drop_epoch = 200.0
@@ -220,7 +220,7 @@ def default_detection_configs():
   # enable bfloat
   h.use_tpu = True
   # precision: one of 'float32', 'mixed_float16', 'mixed_bfloat16'.
-  h.precision = None   # If None, use float32.
+  h.precision = None  # If None, use float32.
 
   # For detection.
   h.box_class_repeats = 3
@@ -334,11 +334,76 @@ efficientdet_model_param_dict = {
         ),
 }
 
+efficientdet_lite_param_dict = {
+    # lite models are in progress and subject to changes.
+    'efficientdet-lite0':
+        dict(
+            name='efficientdet-lite0',
+            backbone_name='efficientnet-lite0',
+            image_size=512,
+            fpn_num_filters=64,
+            fpn_cell_repeats=3,
+            box_class_repeats=3,
+            act_type='relu',
+            use_native_resize_op=True,
+        ),
+    'efficientdet-lite1':
+        dict(
+            name='efficientdet-lite1',
+            backbone_name='efficientnet-lite1',
+            image_size=640,
+            fpn_num_filters=88,
+            fpn_cell_repeats=4,
+            box_class_repeats=3,
+            act_type='relu',
+            use_native_resize_op=True,
+        ),
+    'efficientdet-lite2':
+        dict(
+            name='efficientdet-lite2',
+            backbone_name='efficientnet-lite2',
+            image_size=768,
+            fpn_num_filters=112,
+            fpn_cell_repeats=5,
+            box_class_repeats=3,
+            act_type='relu',
+            use_native_resize_op=True,
+        ),
+    'efficientdet-lite3':
+        dict(
+            name='efficientdet-lite3',
+            backbone_name='efficientnet-lite3',
+            image_size=896,
+            fpn_num_filters=160,
+            fpn_cell_repeats=6,
+            box_class_repeats=4,
+            act_type='relu',
+            use_native_resize_op=True,
+        ),
+    'efficientdet-lite4':
+        dict(
+            name='efficientdet-lite4',
+            backbone_name='efficientnet-lite4',
+            image_size=1024,
+            fpn_num_filters=224,
+            fpn_cell_repeats=7,
+            box_class_repeats=4,
+            act_type='relu',
+            use_native_resize_op=True,
+        ),
+}
+
 
 def get_efficientdet_config(model_name='efficientdet-d1'):
   """Get the default config for EfficientDet based on model name."""
   h = default_detection_configs()
-  h.override(efficientdet_model_param_dict[model_name])
+  if model_name in efficientdet_model_param_dict:
+    h.override(efficientdet_model_param_dict[model_name])
+  elif model_name in efficientdet_lite_param_dict:
+    h.override(efficientdet_lite_param_dict[model_name])
+  else:
+    raise ValueError('Unknown model name: {}'.format(model_name))
+
   return h
 
 
@@ -353,11 +418,10 @@ retinanet_model_param_dict = {
 def get_retinanet_config(model_name='retinanet-50'):
   """Get the default config for EfficientDet based on model name."""
   h = default_detection_configs()
-  h.override(
-      dict(
-          retinanet_model_param_dict[model_name],
-          ckpt_var_scope='',
-      ))
+  h.override(dict(
+      retinanet_model_param_dict[model_name],
+      ckpt_var_scope='',
+  ))
   # cosine + ema often cause NaN for RetinaNet, so we use the default
   # stepwise without ema used in the original RetinaNet implementation.
   h.lr_decay_method = 'stepwise'
