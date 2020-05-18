@@ -501,10 +501,11 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     ema = tf.train.ExponentialMovingAverage(
         decay=moving_average_decay, num_updates=global_step)
     ema_vars = utils.get_ema_vars()
-  if params['use_horovod']:
+  if params.get('use_horovod', None):
     import horovod.tensorflow as hvd
     learning_rate = learning_rate * hvd.size()
   if mode == tf.estimator.ModeKeys.TRAIN:
+    training_hooks = None
     if params['optimizer'].lower() == 'sgd':
       optimizer = tf.train.MomentumOptimizer(
           learning_rate, momentum=params['momentum'])
@@ -515,11 +516,10 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
       raise ValueError('optimizers should be adam or sgd')
     if params['use_tpu']:
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)
-    if params['use_horovod']:
+    elif params.get('use_horovod', None):
       optimizer = hvd.DistributedOptimizer(optimizer)
       training_hooks = [hvd.BroadcastGlobalVariablesHook(0)]
-    else:
-      training_hooks = None
+
     # Batch norm requires update_ops to be added as a train_op dependency.
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     var_list = tf.trainable_variables()
