@@ -24,6 +24,16 @@ from absl import app
 from absl import flags
 from absl import logging
 
+try:
+  import horovod.tensorflow as hvd
+
+  logging.info("Use horovod with multi gpus")
+  hvd.init()
+  os.environ['CUDA_VISIBLE_DEVICES'] = str(hvd.local_rank())
+  use_horovod = True
+except:
+  use_horovod = False
+
 import numpy as np
 import tensorflow.compat.v1 as tf
 
@@ -205,10 +215,15 @@ def main(_):
     input_partition_dims = None
     num_shards = FLAGS.num_cores
 
+  def get_model_dir():
+    if use_horovod:
+      return FLAGS.model_dir if hvd.rank() == 0 else None
+    else:
+      return FLAGS.model_dir
+
   params = dict(
       config.as_dict(),
       model_name=FLAGS.model_name,
-
       iterations_per_loop=FLAGS.iterations_per_loop,
       model_dir=FLAGS.model_dir,
       num_shards=num_shards,
@@ -219,6 +234,7 @@ def main(_):
       val_json_file=FLAGS.val_json_file,
       testdev_dir=FLAGS.testdev_dir,
       mode=FLAGS.mode,
+      use_horovod=use_horovod
   )
   config_proto = tf.ConfigProto(
       allow_soft_placement=True, log_device_placement=False)
@@ -237,7 +253,7 @@ def main(_):
   run_config = tf.estimator.tpu.RunConfig(
       cluster=tpu_cluster_resolver,
       evaluation_master=FLAGS.eval_master,
-      model_dir=FLAGS.model_dir,
+      model_dir=get_model_dir(),
       log_step_count_steps=FLAGS.iterations_per_loop,
       session_config=config_proto,
       tpu_config=tpu_config,

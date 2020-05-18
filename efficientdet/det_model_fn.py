@@ -501,7 +501,9 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     ema = tf.train.ExponentialMovingAverage(
         decay=moving_average_decay, num_updates=global_step)
     ema_vars = utils.get_ema_vars()
-
+  if params['use_horovod']:
+    import horovod.tensorflow as hvd
+    learning_rate = learning_rate * hvd.size()
   if mode == tf.estimator.ModeKeys.TRAIN:
     if params['optimizer'].lower() == 'sgd':
       optimizer = tf.train.MomentumOptimizer(
@@ -513,7 +515,11 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
       raise ValueError('optimizers should be adam or sgd')
     if params['use_tpu']:
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)
-
+    if params['use_horovod']:
+      optimizer = hvd.DistributedOptimizer(optimizer)
+      training_hooks = [hvd.BroadcastGlobalVariablesHook(0)]
+    else:
+      training_hooks = None
     # Batch norm requires update_ops to be added as a train_op dependency.
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     var_list = tf.trainable_variables()
@@ -649,7 +655,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
       train_op=train_op,
       eval_metrics=eval_metrics,
       host_call=utils.get_tpu_host_call(global_step, params),
-      scaffold_fn=scaffold_fn)
+      scaffold_fn=scaffold_fn,
+      training_hooks=training_hooks)
 
 
 def retinanet_model_fn(features, labels, mode, params):
