@@ -219,6 +219,7 @@ def default_detection_configs():
   h.weight_decay = 4e-5
   # enable bfloat
   h.use_tpu = True
+  h.use_horovod = False
   # precision: one of 'float32', 'mixed_float16', 'mixed_bfloat16'.
   h.precision = None  # If None, use float32.
 
