@@ -307,7 +307,44 @@ If you want to do inference for custom data, you can run
 
 You should check more details of runmode which is written in caption-4.
 
-## 10. Training EfficientDets on TPUs.
+## 10. Train on multi GPUs.
+Install [horovod](https://github.com/horovod/horovod#id6).
+
+Create a config file for the PASCAL VOC dataset called voc_config.yaml and put this in it.
+
+      num_classes: 20
+      moving_average_decay: 0
+
+Download efficientdet coco checkpoint.
+
+    !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz
+    !tar xf efficientdet-d0.tar.gz
+
+Finetune needs to use --ckpt rather than --backbone_ckpt.
+
+    !horovodrun -np <num_gpus> -H localhost:<num_gpus> python main.py --mode=train_and_eval \
+        --training_file_pattern=tfrecord/pascal*.tfrecord \
+        --validation_file_pattern=tfrecord/pascal*.tfrecord \
+        --model_name=efficientdet-d0 \
+        --model_dir=/tmp/efficientdet-d0-finetune  \
+        --ckpt=efficientdet-d0  \
+        --train_batch_size=8 \
+        --eval_batch_size=8 --eval_samples=1024 \
+        --num_examples_per_epoch=5717 --num_epochs=1  \
+        --hparams=voc_config.yaml \
+        --use_tpu=False
+
+If you want to do inference for custom data, you can run
+
+    # Setting hparams-flag is needed sometimes.
+    !python model_inspect.py --runmode=infer \
+      --model_name=efficientdet-d0   --ckpt_path=efficientdet-d0 \
+      --hparams=voc_config.yaml  \
+      --input_image=img.png --output_image_dir=/tmp/
+
+You should check more details of runmode which is written in caption-4.
+
+## 11. Training EfficientDets on TPUs.
 
 To train this model on Cloud TPU, you will need:
 
