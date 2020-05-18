@@ -5,7 +5,7 @@ Arxiv link: https://arxiv.org/abs/1911.09070
 
 Updates:
 
-  - **Apr22: Speed up end-to-end latency: D0 has up to 182 FPS throughput on Tesla V100.**
+  - **Apr22: Speed up end-to-end latency: D0 has up to >200 FPS throughput on Tesla V100.**
     * A great collaboration with [@fsx950223](https://github.com/fsx950223).
   - Apr1: Updated results for test-dev and added EfficientDet-D7.
   - Mar26: Fixed a few bugs and updated all checkpoints/results.
@@ -13,6 +13,7 @@ Updates:
   - Mar 13: Released the initial code and models.
 
 **Quick start tutorial: [tutorial.ipynb](tutorial.ipynb)**
+
 **Quick install dependencies: ```pip install -r requirements.txt```**
 
 ## 1. About EfficientDet Models
@@ -145,7 +146,7 @@ latency and throughput are:
 
     # Step 2: do inference with saved model.
     !python model_inspect.py --runmode=saved_model_infer \
-      --model_name=efficientdet-d0   --ckpt_path=efficientdet-d0 \
+      --model_name=efficientdet-d0  \
       --hparams="image_size=1920x1280"  \
       --saved_model_dir=/tmp/saved_model  \
       --input_image=img.png --output_image_dir=/tmp/
@@ -157,7 +158,7 @@ Alternatively, if you want to do inference using frozen graph instead of saved m
     # Step 0 and 1 is the same as before.
     # Step 2: do inference with frozen graph.
     !python model_inspect.py --runmode=saved_model_infer \
-      --model_name=efficientdet-d0   --ckpt_path=efficientdet-d0 \
+      --model_name=efficientdet-d0  \
       --hparams="image_size=1920x1280"  \
       --saved_model_dir=/tmp/saved_model/efficientdet-d0_frozen.pb  \
       --input_image=img.png --output_image_dir=/tmp/
@@ -190,12 +191,12 @@ You can run inference for a video and show the results online:
 
     # step 2: inference video using saved_model_video.
     !python model_inspect.py --runmode=saved_model_video \
-      --model_name=efficientdet-d0   --ckpt_path=efficientdet-d0 \
+      --model_name=efficientdet-d0 \
       --saved_model_dir=/tmp/savedmodel --input_video=input.mov
 
     # alternative step 2: inference video and save the result.
     !python model_inspect.py --runmode=saved_model_video \
-      --model_name=efficientdet-d0   --ckpt_path=efficientdet-d0 \
+      --model_name=efficientdet-d0   \
       --saved_model_dir=/tmp/savedmodel --input_video=input.mov  \
       --output_video=output.mov
 
