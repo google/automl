@@ -783,6 +783,9 @@ class InferenceDriver(object):
       Annotated image.
     """
     params = copy.deepcopy(self.params)
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    start_time = time.time()
     with tf.Session() as sess:
       # Buid inputs and preprocessing.
       raw_images, images, scales = build_inputs(image_path_pattern,
@@ -813,6 +816,10 @@ class InferenceDriver(object):
           max_boxes_to_draw=kwargs.get('max_boxes_to_draw',
                                        anchors.MAX_DETECTIONS_PER_IMAGE))
       predictions = sess.run(detections_batch)
+
+      end_time = time.time()
+      print("\nTime for inference", end_time - start_time)
+
       # Visualize results.
       for i, prediction in enumerate(predictions):
         img = visualize_image_prediction(
