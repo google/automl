@@ -502,8 +502,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     ema = tf.train.ExponentialMovingAverage(
         decay=moving_average_decay, num_updates=global_step)
     ema_vars = utils.get_ema_vars()
-  if params['use_horovod']:
-    import horovod.tensorflow as hvd
+  if params.get('use_horovod', None):
+    import horovod.tensorflow as hvd   # pylint: disable=g-import-not-at-top
     learning_rate = learning_rate * hvd.size()
   if mode == tf.estimator.ModeKeys.TRAIN:
     if params['optimizer'].lower() == 'sgd':
@@ -516,7 +516,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
       raise ValueError('optimizers should be adam or sgd')
     if params['use_tpu']:
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)
-    elif params['use_horovod']:
+    elif params.get('use_horovod', None):
       optimizer = hvd.DistributedOptimizer(optimizer)
       training_hooks = [hvd.BroadcastGlobalVariablesHook(0)]
 

@@ -24,18 +24,7 @@ from absl import app
 from absl import flags
 from absl import logging
 
-try:
-  import horovod.tensorflow as hvd
-
-  logging.info("Use horovod with multi gpus")
-  hvd.init()
-  os.environ['CUDA_VISIBLE_DEVICES'] = str(hvd.local_rank())
-  use_horovod = True
-except:
-  use_horovod = False
-
 import numpy as np
-import tensorflow.compat.v1 as tf
 
 import dataloader
 import det_model_fn
@@ -119,6 +108,7 @@ flags.DEFINE_bool('eval_after_training', False, 'Run one eval after the '
 flags.DEFINE_integer(
     'tf_random_seed', None, 'Sets the TF graph seed for deterministic execution'
     ' across runs (for debugging).')
+flags.DEFINE_bool('use_horovod', None, 'Use horovod for multi-gpu training')
 
 # For Eval mode
 flags.DEFINE_integer('min_eval_interval', 180,
@@ -131,6 +121,15 @@ FLAGS = flags.FLAGS
 
 
 def main(_):
+
+  if FLAGS.use_horovod:
+    import horovod.tensorflow as hvd  # pylint: disable=g-import-not-at-top
+    logging.info('Use horovod with multi gpus')
+    hvd.init()
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(hvd.local_rank())
+  import tensorflow.compat.v1 as tf  # pylint: disable=g-import-not-at-top
+  tf.disable_eager_execution()
+
   if FLAGS.use_tpu:
     tpu_cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
         FLAGS.tpu,
@@ -215,15 +214,10 @@ def main(_):
     input_partition_dims = None
     num_shards = FLAGS.num_cores
 
-  def get_model_dir():
-    if use_horovod:
-      return FLAGS.model_dir if hvd.rank() == 0 else None
-    else:
-      return FLAGS.model_dir
-
   params = dict(
       config.as_dict(),
       model_name=FLAGS.model_name,
+
       iterations_per_loop=FLAGS.iterations_per_loop,
       model_dir=FLAGS.model_dir,
       num_shards=num_shards,
@@ -234,7 +228,7 @@ def main(_):
       val_json_file=FLAGS.val_json_file,
       testdev_dir=FLAGS.testdev_dir,
       mode=FLAGS.mode,
-      use_horovod=use_horovod
+      use_horovod=FLAGS.use_horovod
   )
   config_proto = tf.ConfigProto(
       allow_soft_placement=True, log_device_placement=False)
@@ -250,10 +244,15 @@ def main(_):
       per_host_input_for_training=tf.estimator.tpu.InputPipelineConfig
       .PER_HOST_V2)
 
+  if FLAGS.use_horovod:
+    model_dir = FLAGS.model_dir if hvd.rank() == 0 else None
+  else:
+    model_dir = FLAGS.model_dir
+
   run_config = tf.estimator.tpu.RunConfig(
       cluster=tpu_cluster_resolver,
       evaluation_master=FLAGS.eval_master,
-      model_dir=get_model_dir(),
+      model_dir=model_dir,
       log_step_count_steps=FLAGS.iterations_per_loop,
       session_config=config_proto,
       tpu_config=tpu_config,
@@ -409,5 +408,4 @@ def main(_):
 
 if __name__ == '__main__':
   logging.set_verbosity(logging.WARNING)
-  tf.disable_eager_execution()
   app.run(main)
