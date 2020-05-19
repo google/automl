@@ -22,36 +22,6 @@ import tensorflow as tf
 import utils
 
 
-class ActivationFn(tf.keras.layers.Layer):
-  """Activation function."""
-
-  def __init__(self, act_type: Text, name='activation_fn', **kwargs):
-
-    super(ActivationFn, self).__init__()
-
-    self.act_type = act_type
-
-    if act_type == 'swish':
-      self.act = tf.nn.swish
-    elif act_type == 'swish_native':
-      self.act = lambda x: x * tf.sigmoid(x)
-    elif act_type == 'relu':
-      self.act = tf.nn.relu
-    elif act_type == 'relu6':
-      self.act = tf.nn.relu6
-    else:
-      raise ValueError('Unsupported act_type {}'.format(act_type))
-
-  def call(self, inputs, **kwargs):
-    # return features
-    return self.act(inputs)
-
-  def get_config(self):
-    base_config = super(ActivationFn, self).get_config()
-
-    return {**base_config, 'act_type': self.act_type}
-
-
 class BatchNormAct(tf.keras.layers.Layer):
   """A layer for batch norm and activation."""
 
@@ -65,64 +35,48 @@ class BatchNormAct(tf.keras.layers.Layer):
                use_tpu: bool = False,
                name: Text = None):
 
-    super(BatchNormAct, self).__init__()
+    super(BatchNormAct, self).__init__(name=None)
 
     self.act_type = act_type
     self.training = is_training_bn
 
-    if init_zero:
-      self.gamma_initializer = tf.zeros_initializer()
+    self.init_zero = init_zero
+    if self.init_zero:
+      gamma_initializer = tf.zeros_initializer()
     else:
-      self.gamma_initializer = tf.ones_initializer()
+      gamma_initializer = tf.ones_initializer()
 
-    if data_format == 'channels_first':
-      self.axis = 1
+    self.data_format = data_format
+    if self.data_format == 'channels_first':
+      axis = 1
     else:
-      self.axis = 3
+      axis = 3
 
-    if is_training_bn and use_tpu:
-      self.layer = utils.TpuBatchNormalization(
-          axis=self.axis,
-          momentum=momentum,
-          epsilon=epsilon,
-          center=True,
-          scale=True,
-          gamma_initializer=self.gamma_initializer,
-          name=f'{name}')
-    else:
-      self.layer = utils.BatchNormalization(
-          axis=self.axis,
-          momentum=momentum,
-          epsilon=epsilon,
-          center=True,
-          scale=True,
-          gamma_initializer=self.gamma_initializer,
-          name=f'{name}')
+    self.use_tpu = use_tpu
 
-    self.act = ActivationFn(act_type)
+    self.layer = utils.batch_norm_class(self.training, self.use_tpu)(
+        axis=axis,
+        momentum=momentum,
+        epsilon=epsilon,
+        center=True,
+        scale=True,
+        gamma_initializer=gamma_initializer,
+        name=f'{name}')
 
   def call(self, inputs, **kwargs):
     x = self.layer(inputs, training=self.training)
-    x = self.act(x)
+    if self.act_type:
+      x = utils.activation_fn(x, self.act_type)
     return x
 
+  def get_config(self):
+    base_config = super(BatchNormAct, self).get_config()
 
-class DropConnect(tf.keras.layers.Layer):
-  """Drop connect for stocastic depth."""
-
-  def __init__(self, survival_prob, name='drop_connect'):
-    super(DropConnect, self).__init__(name=name)
-    self.survival_prob = survival_prob
-
-  def call(self, inputs, **kwargs):
-    # Compute tensor.
-    batch_size = tf.shape(inputs)[0]
-    random_tensor = self.survival_prob
-    random_tensor += tf.random.uniform([batch_size, 1, 1, 1],
-                                       dtype=inputs.dtype)
-    binary_tensor = tf.floor(random_tensor)
-    # Unlike conventional way that multiply survival_prob at test time, here we
-    # divide survival_prob at training time, such that no addition compute is
-    # needed at test time.
-    output = tf.math.divide(inputs, self.survival_prob) * binary_tensor
-    return output
+    return {
+        **base_config,
+        'act_type': self.act_type,
+        'init_zero': self.init_zero,
+        'data_format': self.data_format,
+        'is_training_bn': self.training,
+        'use_tpu': self.use_tpu,
+    }
