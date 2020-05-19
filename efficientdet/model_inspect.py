@@ -335,9 +335,12 @@ class ModelInspector(object):
       print('num_threads for benchmarking: {}'.format(num_threads))
       sess_config = tf.ConfigProto(
           intra_op_parallelism_threads=num_threads,
-          inter_op_parallelism_threads=1)
+          inter_op_parallelism_threads=1,
+          log_device_placement=True)
     else:
       sess_config = tf.ConfigProto()
+
+    sess_config.gpu_options.allow_growth = True
 
     # rewriter_config_pb2.RewriterConfig.OFF
     sess_config.graph_options.rewrite_options.dependency_optimization = 2
