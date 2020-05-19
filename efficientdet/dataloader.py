@@ -24,7 +24,7 @@ import anchors
 from object_detection import preprocessor
 from object_detection import tf_example_decoder
 
-MAX_NUM_INSTANCES = 100
+MAX_NUM_INSTANCES = 400
 
 
 class InputProcessor(object):
