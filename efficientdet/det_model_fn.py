@@ -453,6 +453,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     RuntimeError: if both ckpt and backbone_ckpt are set.
   """
   # Convert params (dict) to Config for easier access.
+  training_hooks = None
   if params['data_format'] == 'channels_first':
     features = tf.transpose(features, [0, 3, 1, 2])
   def _model_outputs(inputs):
@@ -505,7 +506,6 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     import horovod.tensorflow as hvd
     learning_rate = learning_rate * hvd.size()
   if mode == tf.estimator.ModeKeys.TRAIN:
-    training_hooks = None
     if params['optimizer'].lower() == 'sgd':
       optimizer = tf.train.MomentumOptimizer(
           learning_rate, momentum=params['momentum'])
