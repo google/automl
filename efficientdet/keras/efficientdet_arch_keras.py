@@ -114,14 +114,12 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     self.conv2d = tf.keras.layers.Conv2D(self.target_num_channels, (1, 1),
                                          padding='same',
                                          data_format=self.data_format)
-    self.batch_norm_act = functools.partial(
-      utils.batch_norm_act,
-      is_training_bn=self.is_training,
-      act_type=None,
-      data_format=self.data_format,
-      use_tpu=self.use_tpu,
-      name='bn'
-    )
+    self.batch_norm_act = functools.partial(utils.batch_norm_act,
+                                            is_training_bn=self.is_training,
+                                            act_type=None,
+                                            data_format=self.data_format,
+                                            use_tpu=self.use_tpu,
+                                            name='bn')
 
   def build(self, input_shape):
     """Resample input feature map to have target number of channels and size."""
@@ -254,7 +252,7 @@ class ClassNet(tf.keras.layers.Layer):
     """
 
     super(ClassNet, self).__init__(name=name, **kwargs)
-    self.num_classes=num_classes
+    self.num_classes = num_classes
     self.num_anchors = num_anchors
     self.num_filters = num_filters
     self.min_level = min_level
@@ -302,13 +300,13 @@ class ClassNet(tf.keras.layers.Layer):
       bn_act_ops_per_level = {}
       for level in range(self.min_level, self.max_level + 1):
         bn_act_ops_per_level[level] = functools.partial(
-          utils.batch_norm_act,
-          is_training_bn=self.is_training,
-          act_type=self.act_type,
-          init_zero=False,
-          use_tpu=self.use_tpu,
-          data_format=self.data_format,
-          name='class-%d-bn-%d' % (i, level),
+            utils.batch_norm_act,
+            is_training_bn=self.is_training,
+            act_type=self.act_type,
+            init_zero=False,
+            use_tpu=self.use_tpu,
+            data_format=self.data_format,
+            name='class-%d-bn-%d' % (i, level),
         )
       self.bn_act_ops.append(bn_act_ops_per_level)
 
@@ -461,14 +459,13 @@ class BoxNet(tf.keras.layers.Layer):
       bn_act_ops_per_level = {}
       for level in range(self.min_level, self.max_level + 1):
         bn_act_ops_per_level[level] = functools.partial(
-          utils.batch_norm_act,
-          is_training_bn=self.is_training,
-          act_type=self.act_type,
-          init_zero=False,
-          use_tpu=self.use_tpu,
-          data_format=self.data_format,
-          name='box-%d-bn-%d' % (i, level)
-        )
+            utils.batch_norm_act,
+            is_training_bn=self.is_training,
+            act_type=self.act_type,
+            init_zero=False,
+            use_tpu=self.use_tpu,
+            data_format=self.data_format,
+            name='box-%d-bn-%d' % (i, level))
       self.bn_act_ops.append(bn_act_ops_per_level)
 
     if self.separable_conv:
@@ -545,31 +542,32 @@ def build_class_and_box_outputs(feats, config):
   num_anchors = len(config.aspect_ratios) * config.num_scales
   num_filters = config.fpn_num_filters
   class_outputs = ClassNet(num_classes=config.num_classes,
-                            num_anchors=num_anchors,
-                            num_filters=num_filters,
-                            min_level=config.min_level,
-                            max_level=config.max_level,
-                            is_training=config.is_training_bn,
-                            act_type=config.act_type,
-                            repeats=config.box_class_repeats,
-                            separable_conv=config.separable_conv,
-                            survival_prob=config.survival_prob,
-                            use_tpu=config.use_tpu,
-                            data_format=config.data_format)(feats)
+                           num_anchors=num_anchors,
+                           num_filters=num_filters,
+                           min_level=config.min_level,
+                           max_level=config.max_level,
+                           is_training=config.is_training_bn,
+                           act_type=config.act_type,
+                           repeats=config.box_class_repeats,
+                           separable_conv=config.separable_conv,
+                           survival_prob=config.survival_prob,
+                           use_tpu=config.use_tpu,
+                           data_format=config.data_format)(feats)
 
   box_outputs = BoxNet(num_anchors=num_anchors,
-                        num_filters=num_filters,
-                        min_level=config.min_level,
-                        max_level=config.max_level,
-                        is_training=config.is_training_bn,
-                        act_type=config.act_type,
-                        repeats=config.box_class_repeats,
-                        separable_conv=config.separable_conv,
-                        survival_prob=config.survival_prob,
-                        use_tpu=config.use_tpu,
-                        data_format=config.data_format)(feats)
+                       num_filters=num_filters,
+                       min_level=config.min_level,
+                       max_level=config.max_level,
+                       is_training=config.is_training_bn,
+                       act_type=config.act_type,
+                       repeats=config.box_class_repeats,
+                       separable_conv=config.separable_conv,
+                       survival_prob=config.survival_prob,
+                       use_tpu=config.use_tpu,
+                       data_format=config.data_format)(feats)
 
   return class_outputs, box_outputs
+
 
 def efficientdet(features, model_name=None, config=None, **kwargs):
   """Build EfficientDet model.

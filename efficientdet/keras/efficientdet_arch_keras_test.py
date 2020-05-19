@@ -21,6 +21,7 @@ import efficientdet_arch as legacy_arch
 import hparams_config
 from keras import efficientdet_arch_keras
 
+
 class KerasBiFPNTest(tf.test.TestCase):
 
   def test_BiFPNLayer_get_config(self):
@@ -55,8 +56,9 @@ class KerasTest(tf.test.TestCase):
     for apply_fn in [True, False]:
       for is_training in [True, False]:
         for use_tpu in [True, False]:
-          with self.subTest(
-              apply_fn=apply_fn, is_training=is_training, use_tpu=use_tpu):
+          with self.subTest(apply_fn=apply_fn,
+                            is_training=is_training,
+                            use_tpu=use_tpu):
             tf.random.set_random_seed(111111)
             expect_result = legacy_arch.resample_feature_map(
                 feat,
@@ -91,12 +93,11 @@ class KerasTest(tf.test.TestCase):
 
     with tf.Graph().as_default():
       feat = tf.random.uniform([1, 16, 16, 320])
-      legacy_arch.resample_feature_map(
-          feat,
-          name='p0',
-          target_height=8,
-          target_width=8,
-          target_num_channels=64)
+      legacy_arch.resample_feature_map(feat,
+                                       name='p0',
+                                       target_height=8,
+                                       target_width=8,
+                                       target_num_channels=64)
       vars2 = [var.name for var in tf.global_variables()]
 
     self.assertEqual(vars1, vars2)
@@ -109,7 +110,7 @@ class EfficientDetVariablesNamesTest(tf.test.TestCase):
       config = hparams_config.get_efficientdet_config()
       inputs_shape = [1, 512, 512, 3]
       inputs = dict()
-      for i in range(config.min_level, config.max_level+1):
+      for i in range(config.min_level, config.max_level + 1):
         inputs[i] = tf.ones(shape=inputs_shape, name='input', dtype=tf.float32)
 
       if not keras:
