@@ -1589,7 +1589,7 @@ def select_and_apply_random_policy_augmix(policies,
   bboxes = mixed_bboxes_arr.concat()
   means = tf.reduce_mean(bboxes, axis=-1)
   unique_means, _ = tf.unique(means)
-  bboxes = tf.gather(bboxes, tf.where(tf.equal(means, unique_means))[0])
+  bboxes = tf.boolean_mask(bboxes, tf.equal(means, unique_means))
   return (mixed, bboxes)
 
 
