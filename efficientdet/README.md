@@ -147,7 +147,6 @@ latency and throughput are:
     # Step 2: do inference with saved model.
     !python model_inspect.py --runmode=saved_model_infer \
       --model_name=efficientdet-d0  \
-      --hparams="image_size=1920x1280"  \
       --saved_model_dir=/tmp/saved_model  \
       --input_image=img.png --output_image_dir=/tmp/
     # you can visualize the output /tmp/0.jpg
@@ -159,7 +158,6 @@ Alternatively, if you want to do inference using frozen graph instead of saved m
     # Step 2: do inference with frozen graph.
     !python model_inspect.py --runmode=saved_model_infer \
       --model_name=efficientdet-d0  \
-      --hparams="image_size=1920x1280"  \
       --saved_model_dir=/tmp/saved_model/efficientdet-d0_frozen.pb  \
       --input_image=img.png --output_image_dir=/tmp/
 
