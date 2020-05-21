@@ -99,7 +99,10 @@ def get_ckpt_var_map(ckpt_path, ckpt_scope, var_scope, var_exclude_expr=None):
       if v.op.name.endswith('/ExponentialMovingAverage'):
         ckpt_var = ckpt_scope + v.op.name[:-len('/ExponentialMovingAverage')]
       if ckpt_var not in ckpt_var_names:
-        logging.info('skip {} ({}) -- not in ckpt'.format(v.op.name, ckpt_var))
+        if 'Momentum' not in ckpt_var and 'RMSProp' not in ckpt_var:
+          # Only show vars not from optimizer to avoid false alarm.
+          logging.info('skip {} ({}) -- not in ckpt'.format(
+              v.op.name, ckpt_var))
         continue
 
     logging.info('Init {} from ckpt var {}'.format(v.op.name, ckpt_var))
