@@ -2,13 +2,14 @@ import tensorflow as tf
 from utils import batch_norm_class
 from typing import Text
 
+
 def batch_normalization(is_training_bn: bool,
-                   init_zero: bool = False,
-                   data_format: Text = 'channels_last',
-                   momentum: float = 0.99,
-                   epsilon: float = 1e-3,
-                   use_tpu: bool = False,
-                   name: Text = None):
+                        init_zero: bool = False,
+                        data_format: Text = 'channels_last',
+                        momentum: float = 0.99,
+                        epsilon: float = 1e-3,
+                        use_tpu: bool = False,
+                        name: Text = None):
   """Performs a batch normalization followed by a non-linear activation.
 
   Args:

@@ -115,9 +115,9 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
                                          padding='same',
                                          data_format=self.data_format)
     self.bn = utils_keras.batch_normalization(is_training_bn=self.is_training,
-                                               data_format=self.data_format,
-                                               use_tpu=self.use_tpu,
-                                               name='bn')
+                                              data_format=self.data_format,
+                                              use_tpu=self.use_tpu,
+                                              name='bn')
 
   def build(self, input_shape):
     """Resample input feature map to have target number of channels and size."""
@@ -500,7 +500,8 @@ class BoxNet(tf.keras.layers.Layer):
         if self.act_type:
           image = utils.activation_fn(image, self.act_type)
         if i > 0 and self.use_dc:
-          image = utils.drop_connect(image, self.is_training, self.survival_prob)
+          image = utils.drop_connect(image, self.is_training,
+                                     self.survival_prob)
           image = image + original_image
 
       box_outputs[level] = self.boxes(image)
