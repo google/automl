@@ -52,7 +52,7 @@ flags.DEFINE_string(
     'eval_master', default='',
     help='GRPC URL of the eval master. Set to an appropriate value when running'
     ' on CPU/GPU')
-flags.DEFINE_bool('strategy', 'tpu', 'Use TPUs rather than CPUs/GPUs')
+flags.DEFINE_string('strategy', 'tpu', 'Use TPUs rather than CPUs/GPUs')
 flags.DEFINE_bool('use_fake_data', False, 'Use fake input.')
 flags.DEFINE_bool(
     'use_xla', False,
@@ -109,7 +109,6 @@ flags.DEFINE_bool('eval_after_training', False, 'Run one eval after the '
 flags.DEFINE_integer(
     'tf_random_seed', None, 'Sets the TF graph seed for deterministic execution'
     ' across runs (for debugging).')
-flags.DEFINE_bool('use_horovod', None, 'Use horovod for multi-gpu training')
 
 # For Eval mode
 flags.DEFINE_integer('min_eval_interval', 180,
@@ -123,7 +122,7 @@ FLAGS = flags.FLAGS
 
 def main(_):
 
-  if FLAGS.use_horovod:
+  if FLAGS.strategy == 'gpus':
     import horovod.tensorflow as hvd  # pylint: disable=g-import-not-at-top
     logging.info('Use horovod with multi gpus')
     hvd.init()
@@ -228,8 +227,7 @@ def main(_):
       ckpt=FLAGS.ckpt,
       val_json_file=FLAGS.val_json_file,
       testdev_dir=FLAGS.testdev_dir,
-      mode=FLAGS.mode,
-      use_horovod=FLAGS.use_horovod
+      mode=FLAGS.mode
   )
   config_proto = tf.ConfigProto(
       allow_soft_placement=True, log_device_placement=False)
@@ -245,7 +243,7 @@ def main(_):
       per_host_input_for_training=tf.estimator.tpu.InputPipelineConfig
       .PER_HOST_V2)
 
-  if FLAGS.use_horovod:
+  if FLAGS.strategy == 'gpus':
     model_dir = FLAGS.model_dir if hvd.rank() == 0 else None
   else:
     model_dir = FLAGS.model_dir

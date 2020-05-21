@@ -275,7 +275,7 @@ class BatchNormalization(tf.keras.layers.BatchNormalization):
 def batch_norm_class(is_training, strategy='gpu'):
   if is_training and strategy == 'tpu':
     return TpuBatchNormalization
-  elif is_training and strategy == 'gpu':
+  elif is_training and strategy == 'gpus':
     return SyncBatchNormalization
   else:
     return BatchNormalization

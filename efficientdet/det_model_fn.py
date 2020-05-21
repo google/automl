@@ -502,7 +502,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     ema = tf.train.ExponentialMovingAverage(
         decay=moving_average_decay, num_updates=global_step)
     ema_vars = utils.get_ema_vars()
-  if params.get('use_horovod', None):
+  if params['strategy'] == 'gpus':
     import horovod.tensorflow as hvd   # pylint: disable=g-import-not-at-top
     learning_rate = learning_rate * hvd.size()
   if mode == tf.estimator.ModeKeys.TRAIN:
@@ -516,7 +516,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
       raise ValueError('optimizers should be adam or sgd')
     if params['strategy'] == 'tpu':
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)
-    elif params.get('use_horovod', None):
+    elif params['strategy'] == 'gpus':
       optimizer = hvd.DistributedOptimizer(optimizer)
       training_hooks = [hvd.BroadcastGlobalVariablesHook(0)]
 
