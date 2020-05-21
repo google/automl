@@ -697,10 +697,6 @@ class ServingDriver(object):
             tf.saved_model.predict_signature_def(
                 {signitures['image_arrays'].name: signitures['image_arrays']},
                 {signitures['prediction'].name: signitures['prediction']}),
-        'serving_base64':
-            tf.saved_model.predict_signature_def(
-                {signitures['image_files'].name: signitures['image_files']},
-                {signitures['prediction'].name: signitures['prediction']}),
     }
     b = tf.saved_model.Builder(output_dir)
     b.add_meta_graph_and_variables(
