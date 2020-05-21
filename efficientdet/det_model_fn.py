@@ -486,7 +486,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   det_loss, cls_loss, box_loss, box_iou_loss = detection_loss(
       cls_outputs, box_outputs, labels, params)
   reg_l2loss = reg_l2_loss(params['weight_decay'])
-  total_loss = det_loss + l2loss
+  total_loss = det_loss + reg_l2loss
 
   if mode == tf.estimator.ModeKeys.TRAIN:
     utils.scalar('lrn_rate', learning_rate)
