@@ -70,6 +70,7 @@ class KerasTest(tf.test.TestCase):
                 is_training=is_training,
                 use_tpu=use_tpu)
             tf.random.set_random_seed(111111)
+            tf.keras.backend.set_learning_phase(int(is_training))
             resample_layer = efficientdet_arch_keras.ResampleFeatureMap(
                 name='resample_p0',
                 target_height=8,

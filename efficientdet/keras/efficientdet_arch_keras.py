@@ -114,12 +114,10 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     self.conv2d = tf.keras.layers.Conv2D(self.target_num_channels, (1, 1),
                                          padding='same',
                                          data_format=self.data_format)
-    self.batch_norm_act = functools.partial(utils.batch_norm_act,
-                                            is_training_bn=self.is_training,
-                                            act_type=None,
-                                            data_format=self.data_format,
-                                            use_tpu=self.use_tpu,
-                                            name='bn')
+    self.bn = utils_keras.batch_normalization(is_training_bn=self.is_training,
+                                               data_format=self.data_format,
+                                               use_tpu=self.use_tpu,
+                                               name='bn')
 
   def build(self, input_shape):
     """Resample input feature map to have target number of channels and size."""
@@ -174,7 +172,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     if self.num_channels != self.target_num_channels:
       feat = self.conv2d(feat)
       if self.apply_bn:
-        feat = self.batch_norm_act(feat)
+        feat = self.bn(feat)
     return feat
 
   def call(self, feat):
@@ -267,7 +265,7 @@ class ClassNet(tf.keras.layers.Layer):
     self.use_dc = survival_prob and is_training
 
     self.conv_ops = []
-    self.bn_act_ops = []
+    self.bns = []
 
     for i in range(self.repeats):
       # If using SeparableConv2D
@@ -297,18 +295,16 @@ class ClassNet(tf.keras.layers.Layer):
                 padding='same',
                 name='class-%d' % i))
 
-      bn_act_ops_per_level = {}
+      bn_per_level = {}
       for level in range(self.min_level, self.max_level + 1):
-        bn_act_ops_per_level[level] = functools.partial(
-            utils.batch_norm_act,
+        bn_per_level[level] = utils_keras.batch_normalization(
             is_training_bn=self.is_training,
-            act_type=self.act_type,
             init_zero=False,
             use_tpu=self.use_tpu,
             data_format=self.data_format,
             name='class-%d-bn-%d' % (i, level),
         )
-      self.bn_act_ops.append(bn_act_ops_per_level)
+      self.bns.append(bn_per_level)
 
     if self.separable_conv:
       self.classes = tf.keras.layers.SeparableConv2D(
@@ -345,7 +341,9 @@ class ClassNet(tf.keras.layers.Layer):
       for i in range(self.repeats):
         original_image = image
         image = self.conv_ops[i](image)
-        image = self.bn_act_ops[i][level](image)
+        image = self.bns[i][level](image)
+        if self.act_type:
+          image = utils.activation_fn(image, self.act_type)
         if i > 0 and self.use_dc:
           image = utils.drop_connect(image, self.is_training,
                                      self.survival_prob)
@@ -426,7 +424,7 @@ class BoxNet(tf.keras.layers.Layer):
     self.use_dc = survival_prob and is_training
 
     self.conv_ops = []
-    self.bn_act_ops = []
+    self.bns = []
 
     for i in range(self.repeats):
       # If using SeparableConv2D
@@ -456,17 +454,15 @@ class BoxNet(tf.keras.layers.Layer):
                 padding='same',
                 name='box-%d' % i))
 
-      bn_act_ops_per_level = {}
+      bn_per_level = {}
       for level in range(self.min_level, self.max_level + 1):
-        bn_act_ops_per_level[level] = functools.partial(
-            utils.batch_norm_act,
+        bn_per_level[level] = utils_keras.batch_normalization(
             is_training_bn=self.is_training,
-            act_type=self.act_type,
             init_zero=False,
             use_tpu=self.use_tpu,
             data_format=self.data_format,
             name='box-%d-bn-%d' % (i, level))
-      self.bn_act_ops.append(bn_act_ops_per_level)
+      self.bns.append(bn_per_level)
 
     if self.separable_conv:
       self.boxes = tf.keras.layers.SeparableConv2D(
@@ -500,10 +496,11 @@ class BoxNet(tf.keras.layers.Layer):
       for i in range(self.repeats):
         original_image = image
         image = self.conv_ops[i](image)
-        image = self.bn_act_ops[i][level](image)
+        image = self.bns[i][level](image)
+        if self.act_type:
+          image = utils.activation_fn(image, self.act_type)
         if i > 0 and self.use_dc:
-          image = image = utils.drop_connect(image, self.is_training,
-                                             self.survival_prob)
+          image = utils.drop_connect(image, self.is_training, self.survival_prob)
           image = image + original_image
 
       box_outputs[level] = self.boxes(image)
