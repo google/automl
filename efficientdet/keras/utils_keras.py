@@ -13,7 +13,6 @@ def batch_normalization(is_training_bn: bool,
   """Performs a batch normalization followed by a non-linear activation.
 
   Args:
-    inputs: `Tensor` of shape `[batch, channels, ...]`.
     is_training_bn: `bool` for whether the model is training.
     init_zero: `bool` if True, initializes scale parameter of batch
       normalization with 0 instead of 1 (default).
