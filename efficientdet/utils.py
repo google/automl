@@ -220,6 +220,42 @@ class TpuBatchNormalization(tf.keras.layers.BatchNormalization):
     return outputs
 
 
+class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
+  """Cross replica batch normalization."""
+
+  def __init__(self, fused=False, **kwargs):
+    if fused in (True, None):
+      raise ValueError('SyncBatchNormalization does not support fused=True.')
+    if not kwargs.get('name', None):
+      kwargs['name'] = 'tpu_batch_normalization'
+    super(SyncBatchNormalization, self).__init__(fused=fused, **kwargs)
+
+  def _moments(self, inputs, reduction_axes, keep_dims):
+    """Compute the mean and variance: it overrides the original _moments."""
+    import horovod.tensorflow as hvd
+    shard_mean, shard_variance = super(SyncBatchNormalization, self)._moments(
+        inputs, reduction_axes, keep_dims=keep_dims)
+
+    num_shards = hvd.size()
+    if num_shards > 1:
+      # Compute variance using: Var[X]= E[X^2] - E[X]^2.
+      shard_square_of_mean = tf.math.square(shard_mean)
+      shard_mean_of_square = shard_variance + shard_square_of_mean
+      group_mean = hvd.allreduce(shard_mean)
+      group_mean_of_square = hvd.allreduce(shard_mean_of_square)
+      group_variance = group_mean_of_square - tf.math.square(group_mean)
+      return (group_mean, group_variance)
+    else:
+      return (shard_mean, shard_variance)
+
+  def call(self, *args, **kwargs):
+    outputs = super(SyncBatchNormalization, self).call(*args, **kwargs)
+    # A temporary hack for tf1 compatibility with keras batch norm.
+    for u in self.updates:
+      tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, u)
+    return outputs
+
+
 class BatchNormalization(tf.keras.layers.BatchNormalization):
   """Fixed default name of BatchNormalization to match TpuBatchNormalization."""
 
@@ -256,7 +292,7 @@ def batch_norm_act(inputs,
                    data_format: Text = 'channels_last',
                    momentum: float = 0.99,
                    epsilon: float = 1e-3,
-                   use_tpu: bool = False,
+                   strategy: Text = 'gpu',
                    name: Text = None):
   """Performs a batch normalization followed by a non-linear activation.
 
@@ -270,7 +306,7 @@ def batch_norm_act(inputs,
       width]` or "channels_last for `[batch, height, width, channels]`.
     momentum: `float`, momentume of batch norm.
     epsilon: `float`, small value for numerical stability.
-    use_tpu: `bool`, whether to use tpu version of batch norm.
+    strategy: `str`, whether to use tpu version of batch norm.
     name: the name of the batch normalization layer
 
   Returns:
@@ -294,7 +330,7 @@ def batch_norm_act(inputs,
       center=True,
       scale=True,
       training=is_training_bn,
-      use_tpu=use_tpu,
+      strategy=strategy,
       gamma_initializer=gamma_initializer,
       name=name)
 
@@ -377,7 +413,7 @@ def get_tpu_host_call(global_step, params):
     with tf2.summary.create_file_writer(
         model_dir, max_queue=iterations_per_loop).as_default():
       with tf2.summary.record_if(True):
-        for i in range(len(summaries)):
+        for i, _ in enumerate(summaries):
           name = summaries[i][0]
           tensor = args[i][0]
           tf2.summary.scalar(name, tensor, step=gs)

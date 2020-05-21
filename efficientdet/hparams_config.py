@@ -219,7 +219,7 @@ def default_detection_configs():
   # regularization l2 loss.
   h.weight_decay = 4e-5
   # enable bfloat
-  h.use_tpu = True
+  h.strategy = 'tpu'  # 'tpu', 'gpu', 'cpu'
   # precision: one of 'float32', 'mixed_float16', 'mixed_bfloat16'.
   h.precision = None  # If None, use float32.
 
