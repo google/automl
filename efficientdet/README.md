@@ -330,8 +330,7 @@ Finetune needs to use --ckpt rather than --backbone_ckpt.
         --eval_batch_size=8 --eval_samples=1024 \
         --num_examples_per_epoch=5717 --num_epochs=1  \
         --hparams=voc_config.yaml \
-        --use_horovod=True \
-        --use_tpu=False
+        --strategy=gpus
 
 If you want to do inference for custom data, you can run
 

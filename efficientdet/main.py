@@ -265,7 +265,7 @@ def main(_):
   if FLAGS.mode == 'train':
     train_estimator = tf.estimator.tpu.TPUEstimator(
         model_fn=model_fn_instance,
-        strategy=FLAGS.strategy,
+        use_tpu=FLAGS.strategy == 'tpu',
         train_batch_size=FLAGS.train_batch_size,
         config=run_config,
         params=params)
@@ -287,7 +287,7 @@ def main(_):
       )
       eval_estimator = tf.estimator.tpu.TPUEstimator(
           model_fn=model_fn_instance,
-          strategy=FLAGS.strategy,
+          use_tpu=FLAGS.strategy == 'tpu',
           train_batch_size=FLAGS.train_batch_size,
           eval_batch_size=FLAGS.eval_batch_size,
           config=run_config,
@@ -313,7 +313,7 @@ def main(_):
 
     eval_estimator = tf.estimator.tpu.TPUEstimator(
         model_fn=model_fn_instance,
-        strategy=FLAGS.strategy,
+        use_tpu=FLAGS.strategy == 'tpu',
         train_batch_size=FLAGS.train_batch_size,
         eval_batch_size=FLAGS.eval_batch_size,
         config=run_config,
@@ -367,7 +367,7 @@ def main(_):
       logging.info('Starting training cycle, epoch: %d.', cycle)
       train_estimator = tf.estimator.tpu.TPUEstimator(
           model_fn=model_fn_instance,
-          strategy=FLAGS.strategy,
+          use_tpu=FLAGS.strategy == 'tpu',
           train_batch_size=FLAGS.train_batch_size,
           config=run_config,
           params=params)
@@ -388,7 +388,7 @@ def main(_):
 
       eval_estimator = tf.estimator.tpu.TPUEstimator(
           model_fn=model_fn_instance,
-          strategy=FLAGS.strategy,
+          use_tpu=FLAGS.strategy == 'tpu',
           train_batch_size=FLAGS.train_batch_size,
           eval_batch_size=FLAGS.eval_batch_size,
           config=run_config,
