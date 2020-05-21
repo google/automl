@@ -1,7 +1,5 @@
 # EfficientDet FQA
 
-go/g3doc-canonical-go-links
-
 <!--*
 # Document freshness: For more information, see go/fresh-source.
 freshness: { owner: 'tanmingxing' reviewed: '2020-05-09' }
@@ -9,17 +7,43 @@ freshness: { owner: 'tanmingxing' reviewed: '2020-05-09' }
 
 [TOC]
 
-## For Users
+## 1. For Users
 
-### How can I convert the saved model to tflite?
+### 1.1 How can I convert the saved model to tflite?
 
 Unfortunately, there is no way to do that with the current public tensorflow
 release due to some issues in tf converter. We have some internal fixes, which
 could potentially be available with the next TensorFlow release.
 
-## For Developers
+### 1.2 Why I see NaN during my training and how to debug it?
 
-### How can I format my code for PRs?
+Because we use batch norm, which needs reasonable batch size. If your batch size
+is too small, it may causes NaN. (We may add group norm to deal with this in
+futurre)
+
+If you see NaN, you can check the followings:
+
+  - Is my batch size too small? It usually needs to be >=8.
+  - Should I clip my gradient? How about h.clip_gradients_norm=5.0?
+  - Should I use smaller jitter? How about train_scale_min=0.8 and train_scale_max=1.2?
+  
+If you want to debug it, you can use these tools:
+
+```
+tf.compat.v1.add_check_numerics_ops() # for Tensorflow 1.x
+tf.debugging.disable_check_numerics() # for TensorFlow 2.x
+```
+
+### 1.3 Why my last class eval AP is always zero?
+
+The current code assume class 0 is always reserved for background, so you if you K classes, then you should set num_classes=K+1.
+
+See #391 and #398 for more discussion.
+
+
+## 2. For Developers
+
+### 2.1 How can I format my code for PRs?
 
 Please use [yapf](https://github.com/google/yapf) with option
 --style='{based_on_style: google, indent_width: 2}'. You can also save the
@@ -33,7 +57,7 @@ If you want to check the format with lint, please run:
 
     !pylint --rcfile=../.pylintrc your_file.py
 
-### How can I run all tests?
+### 2.2 How can I run all tests?
 
     !export PYTHONPATH="`pwd`:$PYTHONPATH"
     !find . -name "*_test.py" | parallel python &> /tmp/test.log \
