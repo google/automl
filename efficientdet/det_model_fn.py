@@ -485,7 +485,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   # cls_loss and box_loss are for logging. only total_loss is optimized.
   det_loss, cls_loss, box_loss, box_iou_loss = detection_loss(
       cls_outputs, box_outputs, labels, params)
-  l2loss = reg_l2_loss(params['weight_decay'])
+  reg_l2loss = reg_l2_loss(params['weight_decay'])
   total_loss = det_loss + l2loss
 
   if mode == tf.estimator.ModeKeys.TRAIN:
@@ -494,7 +494,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     utils.scalar('trainloss/box_loss', box_loss)
     utils.scalar('trainloss/box_iou_loss', box_iou_loss)
     utils.scalar('trainloss/det_loss', det_loss)
-    utils.scalar('trainloss/l2_loss', l2loss)
+    utils.scalar('trainloss/reg_l2_loss', reg_l2loss)
     utils.scalar('trainloss/loss', total_loss)
 
   moving_average_decay = params['moving_average_decay']
