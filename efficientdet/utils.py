@@ -312,7 +312,7 @@ def drop_connect(inputs, is_training, survival_prob):
   # Compute tensor.
   batch_size = tf.shape(inputs)[0]
   random_tensor = survival_prob
-  random_tensor += tf.random_uniform([batch_size, 1, 1, 1], dtype=inputs.dtype)
+  random_tensor += tf.random.uniform([batch_size, 1, 1, 1], dtype=inputs.dtype)
   binary_tensor = tf.floor(random_tensor)
   # Unlike conventional way that multiply survival_prob at test time, here we
   # divide survival_prob at training time, such that no addition compute is
