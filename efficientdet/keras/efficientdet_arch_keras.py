@@ -33,7 +33,7 @@ class BiFPNLayer(tf.keras.layers.Layer):
                is_training_bn: bool, conv_after_downsample: bool,
                use_native_resize_op: bool, data_format: str, pooling_type: str,
                fpn_num_filters: int, conv_bn_act_pattern: bool, act_type: str,
-               separable_conv: bool, use_tpu: bool, fpn_name: str, **kwargs):
+               separable_conv: bool, strategy: bool, fpn_name: str, **kwargs):
     self.min_level = min_level
     self.max_level = max_level
     self.image_size = image_size
@@ -49,7 +49,7 @@ class BiFPNLayer(tf.keras.layers.Layer):
     self.pooling_type = pooling_type
     self.conv_bn_act_pattern = conv_bn_act_pattern
     self.act_type = act_type
-    self.use_tpu = use_tpu
+    self.strategy = strategy
     self.separable_conv = separable_conv
 
     self.fpn_config = None
@@ -81,7 +81,7 @@ class BiFPNLayer(tf.keras.layers.Layer):
         'conv_bn_act_pattern': self.conv_bn_act_pattern,
         'act_type': self.act_type,
         'separable_conv': self.separable_conv,
-        'use_tpu': self.use_tpu,
+        'strategy': self.strategy,
     }
 
 
@@ -97,7 +97,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
                conv_after_downsample=False,
                use_native_resize_op=False,
                pooling_type=None,
-               use_tpu=False,
+               strategy=None,
                data_format=None,
                name='resample_feature_map'):
     super(ResampleFeatureMap, self).__init__(name='resample_{}'.format(name))
@@ -107,7 +107,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     self.target_num_channels = target_num_channels
     self.target_height = target_height
     self.target_width = target_width
-    self.use_tpu = use_tpu
+    self.strategy = strategy
     self.conv_after_downsample = conv_after_downsample
     self.use_native_resize_op = use_native_resize_op
     self.pooling_type = pooling_type
@@ -116,7 +116,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
                                          data_format=self.data_format)
     self.bn = utils_keras.batch_normalization(is_training_bn=self.is_training,
                                               data_format=self.data_format,
-                                              use_tpu=self.use_tpu,
+                                              strategy=self.strategy,
                                               name='bn')
 
   def build(self, input_shape):
@@ -203,7 +203,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
         'target_num_channels': self.target_num_channels,
         'target_height': self.target_height,
         'target_width': self.target_width,
-        'use_tpu': self.use_tpu,
+        'strategy': self.strategy,
         'conv_after_downsample': self.conv_after_downsample,
         'use_native_resize_op': self.use_native_resize_op,
         'pooling_type': self.pooling_type,
@@ -226,7 +226,7 @@ class ClassNet(tf.keras.layers.Layer):
                repeats=4,
                separable_conv=True,
                survival_prob=None,
-               use_tpu=False,
+               strategy=None,
                data_format='channels_last',
                name='class_net',
                **kwargs):
@@ -243,7 +243,7 @@ class ClassNet(tf.keras.layers.Layer):
       repeats: number of intermediate layers.
       separable_conv: True to use separable_conv instead of conv2D.
       survival_prob: if a value is set then drop connect will be used.
-      use_tpu: True to use TPU compatible functions
+      strategy: True to use TPU compatible functions
       data_format: string of 'channel_first' or 'channels_last'.
       name: the name of this layerl.
       **kwargs: other parameters.
@@ -260,7 +260,7 @@ class ClassNet(tf.keras.layers.Layer):
     self.is_training = is_training
     self.survival_prob = survival_prob
     self.act_type = act_type
-    self.use_tpu = use_tpu
+    self.strategy = strategy
     self.data_format = data_format
     self.use_dc = survival_prob and is_training
 
@@ -300,7 +300,7 @@ class ClassNet(tf.keras.layers.Layer):
         bn_per_level[level] = utils_keras.batch_normalization(
             is_training_bn=self.is_training,
             init_zero=False,
-            use_tpu=self.use_tpu,
+            strategy=self.strategy,
             data_format=self.data_format,
             name='class-%d-bn-%d' % (i, level),
         )
@@ -368,7 +368,7 @@ class ClassNet(tf.keras.layers.Layer):
         'repeats': self.repeats,
         'separable_conv': self.separable_conv,
         'survival_prob': self.survival_prob,
-        'use_tpu': self.use_tpu,
+        'strategy': self.strategy,
         'data_format': self.data_format,
     }
 
@@ -386,7 +386,7 @@ class BoxNet(tf.keras.layers.Layer):
                repeats=4,
                separable_conv=True,
                survival_prob=None,
-               use_tpu=False,
+               strategy=None,
                data_format='channels_last',
                name='box_net',
                **kwargs):
@@ -402,7 +402,7 @@ class BoxNet(tf.keras.layers.Layer):
       repeats: number of "intermediate" layers.
       separable_conv: True to use separable_conv instead of conv2D.
       survival_prob: if a value is set then drop connect will be used.
-      use_tpu: True to use TPU compatible functions
+      strategy: True to use TPU compatible functions
       data_format: string of 'channel_first' or 'channels_last'.
       name: Name of the layer.
       **kwargs: other parameters.
@@ -419,7 +419,7 @@ class BoxNet(tf.keras.layers.Layer):
     self.is_training = is_training
     self.survival_prob = survival_prob
     self.act_type = act_type
-    self.use_tpu = use_tpu
+    self.strategy = strategy
     self.data_format = data_format
     self.use_dc = survival_prob and is_training
 
@@ -459,7 +459,7 @@ class BoxNet(tf.keras.layers.Layer):
         bn_per_level[level] = utils_keras.batch_normalization(
             is_training_bn=self.is_training,
             init_zero=False,
-            use_tpu=self.use_tpu,
+            strategy=self.strategy,
             data_format=self.data_format,
             name='box-%d-bn-%d' % (i, level))
       self.bns.append(bn_per_level)
@@ -522,7 +522,7 @@ class BoxNet(tf.keras.layers.Layer):
         'repeats': self.repeats,
         'separable_conv': self.separable_conv,
         'survival_prob': self.survival_prob,
-        'use_tpu': self.use_tpu,
+        'strategy': self.strategy,
         'data_format': self.data_format,
     }
 
@@ -549,7 +549,7 @@ def build_class_and_box_outputs(feats, config):
                            repeats=config.box_class_repeats,
                            separable_conv=config.separable_conv,
                            survival_prob=config.survival_prob,
-                           use_tpu=config.use_tpu,
+                           strategy=config.strategy,
                            data_format=config.data_format)(feats)
 
   box_outputs = BoxNet(num_anchors=num_anchors,
@@ -561,7 +561,7 @@ def build_class_and_box_outputs(feats, config):
                        repeats=config.box_class_repeats,
                        separable_conv=config.separable_conv,
                        survival_prob=config.survival_prob,
-                       use_tpu=config.use_tpu,
+                       strategy=config.strategy,
                        data_format=config.data_format)(feats)
 
   return class_outputs, box_outputs
