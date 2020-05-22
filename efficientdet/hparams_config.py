@@ -190,6 +190,7 @@ def default_detection_configs():
   h.min_level = 3
   h.max_level = 7
   h.num_scales = 3
+  # aspect ratio is in the format of (h, w).
   h.aspect_ratios = [(1.0, 1.0), (1.4, 0.7), (0.7, 1.4)]
   h.anchor_scale = 4.0
   # is batchnorm training mode

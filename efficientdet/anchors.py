@@ -237,8 +237,8 @@ def _generate_anchor_boxes(image_size, anchor_scale, anchor_configs):
       stride, octave_scale, aspect = config
       base_anchor_size_x = anchor_scale * stride[1] * 2**octave_scale
       base_anchor_size_y = anchor_scale * stride[0] * 2**octave_scale
-      anchor_size_x_2 = base_anchor_size_x * aspect[0] / 2.0
-      anchor_size_y_2 = base_anchor_size_y * aspect[1] / 2.0
+      anchor_size_x_2 = base_anchor_size_x * aspect[1] / 2.0
+      anchor_size_y_2 = base_anchor_size_y * aspect[0] / 2.0
 
       x = np.arange(stride[1] / 2, image_size[1], stride[1])
       y = np.arange(stride[0] / 2, image_size[0], stride[0])
