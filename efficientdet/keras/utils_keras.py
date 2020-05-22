@@ -8,7 +8,7 @@ def batch_normalization(is_training_bn: bool,
                         momentum: float = 0.99,
                         epsilon: float = 1e-3,
                         strategy: Text = None,
-                        name: Text = None):
+                        name: Text = 'tpu_batch_normalization'):
   """Performs a batch normalization followed by a non-linear activation.
 
   Args:
