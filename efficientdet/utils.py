@@ -272,16 +272,16 @@ class BatchNormalization(tf.keras.layers.BatchNormalization):
     return outputs
 
 
-def batch_norm_class(is_training, strategy='gpu'):
+def batch_norm_class(is_training, strategy=None):
   if is_training and strategy == 'tpu':
     return TpuBatchNormalization
-  elif is_training and strategy == 'gpus':
+  elif is_training and strategy == 'horovod':
     return SyncBatchNormalization
   else:
     return BatchNormalization
 
 
-def batch_normalization(inputs, training=False, strategy='gpu', **kwargs):
+def batch_normalization(inputs, training=False, strategy=None, **kwargs):
   """A wrapper for TpuBatchNormalization."""
   bn_layer = batch_norm_class(training, strategy)(**kwargs)
   return bn_layer(inputs, training=training)
@@ -294,7 +294,7 @@ def batch_norm_act(inputs,
                    data_format: Text = 'channels_last',
                    momentum: float = 0.99,
                    epsilon: float = 1e-3,
-                   strategy: Text = 'gpu',
+                   strategy: Text = None,
                    name: Text = None):
   """Performs a batch normalization followed by a non-linear activation.
 

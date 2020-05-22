@@ -112,7 +112,7 @@ def resample_feature_map(feat,
                          conv_after_downsample=False,
                          use_native_resize_op=False,
                          pooling_type=None,
-                         strategy='gpu',
+                         strategy=None,
                          data_format='channels_last'):
   """Resample input feature map to have target number of channels and size."""
   if data_format == 'channels_first':
@@ -236,7 +236,7 @@ def class_net(images,
               separable_conv=True,
               repeats=4,
               survival_prob=None,
-              strategy='gpu',
+              strategy=None,
               data_format='channels_last'):
   """Class prediction network."""
   if separable_conv:
@@ -293,7 +293,7 @@ def box_net(images,
             repeats=4,
             separable_conv=True,
             survival_prob=None,
-            strategy='gpu',
+            strategy=None,
             data_format='channels_last'):
   """Box regression network."""
   if separable_conv:
