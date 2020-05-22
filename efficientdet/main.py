@@ -122,7 +122,7 @@ FLAGS = flags.FLAGS
 
 def main(_):
 
-  if FLAGS.strategy == 'gpus':
+  if FLAGS.strategy == 'horovod':
     import horovod.tensorflow as hvd  # pylint: disable=g-import-not-at-top
     logging.info('Use horovod with multi gpus')
     hvd.init()
@@ -243,7 +243,7 @@ def main(_):
       per_host_input_for_training=tf.estimator.tpu.InputPipelineConfig
       .PER_HOST_V2)
 
-  if FLAGS.strategy == 'gpus':
+  if FLAGS.strategy == 'horovod':
     model_dir = FLAGS.model_dir if hvd.rank() == 0 else None
   else:
     model_dir = FLAGS.model_dir
