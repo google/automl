@@ -42,7 +42,7 @@ class KerasBiFPNTest(tf.test.TestCase):
         act_type=config.act_type,
         pooling_type=config.pooling_type,
         separable_conv=config.separable_conv,
-        use_tpu=config.use_tpu)
+        strategy=config.strategy)
 
     layer_config = keras_bifpn.get_config()
     new_layer = efficientdet_arch_keras.BiFPNLayer(**layer_config)
@@ -53,12 +53,11 @@ class KerasTest(tf.test.TestCase):
 
   def test_resample_feature_map(self):
     feat = tf.random.uniform([1, 16, 16, 320])
-    for apply_fn in [True, False]:
+    for apply_bn in [True, False]:
       for is_training in [True, False]:
-        for use_tpu in [True, False]:
-          with self.subTest(apply_fn=apply_fn,
-                            is_training=is_training,
-                            use_tpu=use_tpu):
+        for strategy in ['tpu', '']:
+          with self.subTest(
+              apply_bn=apply_bn, is_training=is_training, strategy=strategy):
             tf.random.set_random_seed(111111)
             expect_result = legacy_arch.resample_feature_map(
                 feat,
@@ -66,19 +65,18 @@ class KerasTest(tf.test.TestCase):
                 target_height=8,
                 target_width=8,
                 target_num_channels=64,
-                apply_bn=apply_fn,
+                apply_bn=apply_bn,
                 is_training=is_training,
-                use_tpu=use_tpu)
+                strategy=strategy)
             tf.random.set_random_seed(111111)
-            tf.keras.backend.set_learning_phase(int(is_training))
             resample_layer = efficientdet_arch_keras.ResampleFeatureMap(
                 name='resample_p0',
                 target_height=8,
                 target_width=8,
                 target_num_channels=64,
-                apply_bn=apply_fn,
+                apply_bn=apply_bn,
                 is_training=is_training,
-                use_tpu=use_tpu)
+                strategy=strategy)
             actual_result = resample_layer(feat)
             self.assertAllCloseAccordingToType(expect_result, actual_result)
 
@@ -90,16 +88,17 @@ class KerasTest(tf.test.TestCase):
       resample_layer = efficientdet_arch_keras.ResampleFeatureMap(
           name='p0', target_height=8, target_width=8, target_num_channels=64)
       resample_layer(feat)
-      vars1 = [var.name for var in tf.global_variables()]
+      vars1 = [var.name for var in tf.trainable_variables()]
 
     with tf.Graph().as_default():
       feat = tf.random.uniform([1, 16, 16, 320])
-      legacy_arch.resample_feature_map(feat,
-                                       name='p0',
-                                       target_height=8,
-                                       target_width=8,
-                                       target_num_channels=64)
-      vars2 = [var.name for var in tf.global_variables()]
+      legacy_arch.resample_feature_map(
+          feat,
+          name='p0',
+          target_height=8,
+          target_width=8,
+          target_num_channels=64)
+      vars2 = [var.name for var in tf.trainable_variables()]
 
     self.assertEqual(vars1, vars2)
 

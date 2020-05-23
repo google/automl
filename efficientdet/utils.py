@@ -22,11 +22,11 @@ from __future__ import print_function
 import contextlib
 import os
 import re
+from typing import Text, Tuple, Union
 from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
 import tensorflow.compat.v2 as tf2
-from typing import Text, Tuple, Union
 
 from tensorflow.python.tpu import tpu_function  # pylint:disable=g-direct-tensorflow-import
 # pylint: disable=logging-format-interpolation
@@ -232,7 +232,7 @@ class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
 
   def _moments(self, inputs, reduction_axes, keep_dims):
     """Compute the mean and variance: it overrides the original _moments."""
-    import horovod.tensorflow as hvd
+    import horovod.tensorflow as hvd  # pylint: disable=g-import-not-at-top
     shard_mean, shard_variance = super(SyncBatchNormalization, self)._moments(
         inputs, reduction_axes, keep_dims=keep_dims)
 

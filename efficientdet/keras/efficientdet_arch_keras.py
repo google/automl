@@ -114,10 +114,10 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     self.conv2d = tf.keras.layers.Conv2D(self.target_num_channels, (1, 1),
                                          padding='same',
                                          data_format=self.data_format)
-    self.bn = utils_keras.batch_normalization(is_training_bn=self.is_training,
-                                              data_format=self.data_format,
-                                              strategy=self.strategy,
-                                              name='bn')
+    self.bn = utils_keras.build_batch_norm(is_training_bn=self.is_training,
+                                           data_format=self.data_format,
+                                           strategy=self.strategy,
+                                           name='bn')
 
   def build(self, input_shape):
     """Resample input feature map to have target number of channels and size."""
@@ -172,7 +172,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     if self.num_channels != self.target_num_channels:
       feat = self.conv2d(feat)
       if self.apply_bn:
-        feat = self.bn(feat)
+        feat = self.bn(feat, training=self.is_training)
     return feat
 
   def call(self, feat):
@@ -297,7 +297,7 @@ class ClassNet(tf.keras.layers.Layer):
 
       bn_per_level = {}
       for level in range(self.min_level, self.max_level + 1):
-        bn_per_level[level] = utils_keras.batch_normalization(
+        bn_per_level[level] = utils_keras.build_batch_norm(
             is_training_bn=self.is_training,
             init_zero=False,
             strategy=self.strategy,
@@ -341,7 +341,7 @@ class ClassNet(tf.keras.layers.Layer):
       for i in range(self.repeats):
         original_image = image
         image = self.conv_ops[i](image)
-        image = self.bns[i][level](image)
+        image = self.bns[i][level](image, training=self.is_training)
         if self.act_type:
           image = utils.activation_fn(image, self.act_type)
         if i > 0 and self.use_dc:
@@ -456,7 +456,7 @@ class BoxNet(tf.keras.layers.Layer):
 
       bn_per_level = {}
       for level in range(self.min_level, self.max_level + 1):
-        bn_per_level[level] = utils_keras.batch_normalization(
+        bn_per_level[level] = utils_keras.build_batch_norm(
             is_training_bn=self.is_training,
             init_zero=False,
             strategy=self.strategy,
@@ -496,7 +496,7 @@ class BoxNet(tf.keras.layers.Layer):
       for i in range(self.repeats):
         original_image = image
         image = self.conv_ops[i](image)
-        image = self.bns[i][level](image)
+        image = self.bns[i][level](image, training=self.is_training)
         if self.act_type:
           image = utils.activation_fn(image, self.act_type)
         if i > 0 and self.use_dc:
