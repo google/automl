@@ -218,8 +218,7 @@ You can run inference for a video and show the results online:
     !python main.py --mode=eval  \
         --model_name=${MODEL}  --model_dir=${CKPT_PATH}  \
         --validation_file_pattern=tfrecord/val*  \
-        --val_json_file=annotations/instances_val2017.json  \
-        --use_tpu=False
+        --val_json_file=annotations/instances_val2017.json
 
 You can also run eval on test-dev set with the following command:
 
@@ -240,8 +239,7 @@ You can also run eval on test-dev set with the following command:
     !python main.py --mode=eval  \
         --model_name=${MODEL}  --model_dir=${CKPT_PATH}  \
         --validation_file_pattern=tfrecord/testdev*  \
-        --testdev_dir='testdev_output' --eval_samples=20288 \
-        --use_tpu=False
+        --testdev_dir='testdev_output' --eval_samples=20288
     # Now you can submit testdev_output/detections_test-dev2017_test_results.json to
     # coco server: https://competitions.codalab.org/competitions/20794#participate
 
@@ -267,8 +265,7 @@ You can also run eval on test-dev set with the following command:
         --train_batch_size=8 \
         --eval_batch_size=8 --eval_samples=512 \
         --num_examples_per_epoch=5717 --num_epochs=1  \
-        --hparams="num_classes=20,moving_average_decay=0" \
-        --use_tpu=False
+        --hparams="num_classes=20,moving_average_decay=0"
 
 ## 9. Finetune on PASCAL VOC 2012 with detector COCO ckpt.
 Create a config file for the PASCAL VOC dataset called voc_config.yaml and put this in it.
@@ -292,8 +289,7 @@ Finetune needs to use --ckpt rather than --backbone_ckpt.
         --train_batch_size=8 \
         --eval_batch_size=8 --eval_samples=1024 \
         --num_examples_per_epoch=5717 --num_epochs=1  \
-        --hparams=voc_config.yaml \
-        --use_tpu=False
+        --hparams=voc_config.yaml
 
 If you want to do inference for custom data, you can run
 
@@ -329,9 +325,8 @@ Finetune needs to use --ckpt rather than --backbone_ckpt.
         --train_batch_size=8 \
         --eval_batch_size=8 --eval_samples=1024 \
         --num_examples_per_epoch=5717 --num_epochs=1  \
-        --hparams=voc_config.yaml \
-        --use_horovod=True \
-        --use_tpu=False
+        --hparams=voc_config.yaml
+        --strategy=horovod
 
 If you want to do inference for custom data, you can run
 
@@ -354,7 +349,7 @@ To train this model on Cloud TPU, you will need:
 Then train the model:
 
     !export PYTHONPATH="$PYTHONPATH:/path/to/models"
-    !python main.py --tpu=TPU_NAME --training_file_pattern=DATA_DIR/*.tfrecord --model_dir=MODEL_DIR
+    !python main.py --tpu=TPU_NAME --training_file_pattern=DATA_DIR/*.tfrecord --model_dir=MODEL_DIR --strategy=tpu
 
     # TPU_NAME is the name of the TPU node, the same name that appears when you run gcloud compute tpus list, or ctpu ls.
     # MODEL_DIR is a GCS location (a URL starting with gs:// where both the GCE VM and the associated Cloud TPU have write access.

@@ -37,9 +37,9 @@ _DEFAULT_BATCH_SIZE = 64
 
 def update_learning_rate_schedule_parameters(params):
   """Updates params that are related to the learning rate schedule."""
-  # params['batch_size'] is per-shard within model_fn if use_tpu=true.
-  batch_size = (params['batch_size'] * params['num_shards'] if params['use_tpu']
-                else params['batch_size'])
+  # params['batch_size'] is per-shard within model_fn if strategy=tpu.
+  batch_size = (params['batch_size'] * params['num_shards']
+                if params['strategy'] == 'tpu' else params['batch_size'])
   # Learning rate is proportional to the batch size
   params['adjusted_learning_rate'] = (params['learning_rate'] * batch_size /
                                       _DEFAULT_BATCH_SIZE)
@@ -502,7 +502,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     ema = tf.train.ExponentialMovingAverage(
         decay=moving_average_decay, num_updates=global_step)
     ema_vars = utils.get_ema_vars()
-  if params.get('use_horovod', None):
+  if params['strategy'] == 'horovod':
     import horovod.tensorflow as hvd   # pylint: disable=g-import-not-at-top
     learning_rate = learning_rate * hvd.size()
   if mode == tf.estimator.ModeKeys.TRAIN:
@@ -514,9 +514,9 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
           learning_rate)
     else:
       raise ValueError('optimizers should be adam or sgd')
-    if params['use_tpu']:
+    if params['strategy'] == 'tpu':
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)
-    elif params.get('use_horovod', None):
+    elif params['strategy'] == 'horovod':
       optimizer = hvd.DistributedOptimizer(optimizer)
       training_hooks = [hvd.BroadcastGlobalVariablesHook(0)]
 
@@ -556,7 +556,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     def metric_fn(**kwargs):
       """Returns a dictionary that has the evaluation metrics."""
       batch_size = params['batch_size']
-      if params['use_tpu']:
+      if params['strategy'] == 'tpu':
         batch_size = params['batch_size'] * params['num_shards']
       eval_anchors = anchors.Anchors(params['min_level'],
                                      params['max_level'],
