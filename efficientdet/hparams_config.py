@@ -21,10 +21,9 @@ from __future__ import print_function
 
 import ast
 import copy
+from typing import Any, Dict, Text
 import six
 import tensorflow.compat.v1 as tf
-
-from typing import Any, Dict, Text
 import yaml
 
 
@@ -218,7 +217,7 @@ def default_detection_configs():
   h.iou_loss_weight = 1.0
   # regularization l2 loss.
   h.weight_decay = 4e-5
-  # enable bfloat
+  # use horovod for multi-gpu training. If None, use TF default.
   h.strategy = None  # 'tpu', 'horovod', None
   # precision: one of 'float32', 'mixed_float16', 'mixed_bfloat16'.
   h.precision = None  # If None, use float32.
@@ -231,7 +230,7 @@ def default_detection_configs():
   h.apply_bn_for_resampling = True
   h.conv_after_downsample = False
   h.conv_bn_act_pattern = False
-  h.use_native_resize_op = False
+  h.use_native_resize_op = True
   h.pooling_type = None
 
   # version.

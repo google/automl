@@ -67,12 +67,27 @@ class InputProcessor(object):
     scale = tf.expand_dims(scale, axis=0)
     self._image /= scale
 
-  def set_training_random_scale_factors(self, scale_min, scale_max):
-    """Set the parameters for multiscale training."""
+  def set_training_random_scale_factors(self,
+                                        scale_min,
+                                        scale_max,
+                                        target_size=None):
+    """Set the parameters for multiscale training.
+
+    Notably, if train and eval use different sizes, then target_size should be
+    set as eval size to avoid the discrency between train and eval.
+
+    Args:
+      scale_min: minimal scale factor.
+      scale_max: maximum scale factor.
+      target_size: targeted size, usually same as eval. If None, use train size.
+    """
+    if not target_size:
+      target_size = self._output_size
+
     # Select a random scale factor.
     random_scale_factor = tf.random_uniform([], scale_min, scale_max)
-    scaled_y = tf.cast(random_scale_factor * self._output_size[0], tf.int32)
-    scaled_x = tf.cast(random_scale_factor * self._output_size[1], tf.int32)
+    scaled_y = tf.cast(random_scale_factor * target_size[0], tf.int32)
+    scaled_x = tf.cast(random_scale_factor * target_size[1], tf.int32)
 
     # Recompute the accurate scale_factor using rounded scaled image size.
     height = tf.cast(tf.shape(self._image)[0], tf.float32)

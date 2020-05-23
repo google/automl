@@ -97,6 +97,8 @@ class ModelInspectTest(tf.test.TestCase):
     self.assertEqual(out // 1000000, 168)
 
   def test_saved_model(self):
+    if tf.__version__ >= '2.3.0-dev20200521':
+      self.params['tflite_path'] = os.path.join(self.savedmodel_dir, 'x.tflite')
     inspector = model_inspect.ModelInspector(**self.params)
     self.assertFalse(
         os.path.exists(os.path.join(self.savedmodel_dir, 'saved_model.pb')))
@@ -106,6 +108,9 @@ class ModelInspectTest(tf.test.TestCase):
     self.assertTrue(
         os.path.exists(
             os.path.join(self.savedmodel_dir, 'efficientdet-d0_frozen.pb')))
+    if self.params.get('tflite_path', None):
+      self.assertTrue(
+          os.path.exists(os.path.join(self.savedmodel_dir, 'x.tflite')))
 
   def test_saved_model_fp16(self):
     self.params['hparams'] = 'precision=mixed_float16'

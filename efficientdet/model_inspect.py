@@ -21,6 +21,7 @@ from __future__ import print_function
 
 import os
 import time
+from typing import Text, Tuple, List
 
 from absl import app
 from absl import flags
@@ -29,7 +30,6 @@ from absl import logging
 import numpy as np
 from PIL import Image
 import tensorflow.compat.v1 as tf
-from typing import Text, Tuple, List
 
 import hparams_config
 import inference
@@ -102,6 +102,7 @@ class ModelInspector(object):
 
     model_config = hparams_config.get_detection_config(model_name)
     model_config.override(hparams)  # Add custom overrides
+    model_config.is_training_bn = False
     model_config.image_size = utils.parse_image_size(model_config.image_size)
 
     # If batch size is 0, then build a graph with dynamic batch size.
@@ -116,16 +117,13 @@ class ModelInspector(object):
 
     self.model_config = model_config
 
-  def build_model(self,
-                  inputs: tf.Tensor,
-                  is_training: bool = False) -> List[tf.Tensor]:
+  def build_model(self, inputs: tf.Tensor) -> List[tf.Tensor]:
     """Build model with inputs and labels and print out model stats."""
     logging.info('start building model')
     cls_outputs, box_outputs = inference.build_model(
         self.model_name,
         inputs,
-        is_training_bn=is_training,
-        config=self.model_config)
+        **self.model_config)
 
     # Write to tfevent for tensorboard.
     train_writer = tf.summary.FileWriter(self.logdir)
@@ -259,7 +257,7 @@ class ModelInspector(object):
     with tf.Graph().as_default(), tf.Session() as sess:
       # Build model with inputs and labels.
       inputs = tf.placeholder(tf.float32, name='input', shape=self.inputs_shape)
-      outputs = self.build_model(inputs, is_training=False)
+      outputs = self.build_model(inputs)
 
       # Run the model
       inputs_val = np.random.rand(*self.inputs_shape).astype(float)
@@ -288,7 +286,7 @@ class ModelInspector(object):
     with tf.Graph().as_default(), tf.Session() as sess:
       # Build model with inputs and labels.
       inputs = tf.placeholder(tf.float32, name='input', shape=self.inputs_shape)
-      self.build_model(inputs, is_training=False)
+      self.build_model(inputs)
       inference.restore_ckpt(sess, self.ckpt_path,
                              self.model_config.moving_average_decay,
                              self.export_ckpt)
@@ -297,7 +295,7 @@ class ModelInspector(object):
     """Freeze model and convert them into tflite and tf graph."""
     with tf.Graph().as_default(), tf.Session() as sess:
       inputs = tf.placeholder(tf.float32, name='input', shape=self.inputs_shape)
-      outputs = self.build_model(inputs, is_training=False)
+      outputs = self.build_model(inputs)
 
       if self.ckpt_path:
         # Load the true weights if available.
@@ -347,7 +345,7 @@ class ModelInspector(object):
 
     with tf.Graph().as_default(), tf.Session(config=sess_config) as sess:
       inputs = tf.placeholder(tf.float32, name='input', shape=self.inputs_shape)
-      output = self.build_model(inputs, is_training=False)
+      output = self.build_model(inputs)
 
       img = np.random.uniform(size=self.inputs_shape)
 
