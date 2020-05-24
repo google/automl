@@ -52,12 +52,13 @@ flags.DEFINE_string(
     'eval_master', default='',
     help='GRPC URL of the eval master. Set to an appropriate value when running'
     ' on CPU/GPU')
-flags.DEFINE_string('strategy', 'tpu', 'Use TPUs rather than CPUs/GPUs')
+flags.DEFINE_enum('strategy', None, ['tpu', 'horovod', ''],
+                  'Training: horovod for multi-gpu, if None, use TF default.')
+
 flags.DEFINE_bool('use_fake_data', False, 'Use fake input.')
 flags.DEFINE_bool(
     'use_xla', False,
-    'Use XLA even if strategy is not tpu. '
-    'If strategy is tpu, we always use XLA, '
+    'Use XLA even if strategy is not tpu. If strategy is tpu, always use XLA, '
     'and this flag has no effect.')
 flags.DEFINE_string('model_dir', None, 'Location of model_dir')
 flags.DEFINE_string('backbone_ckpt', '',
@@ -259,13 +260,14 @@ def main(_):
   )
 
   model_fn_instance = det_model_fn.get_model_fn(FLAGS.model_name)
+  use_tpu = (FLAGS.strategy == 'tpu')
 
   # TPU Estimator
   logging.info(params)
   if FLAGS.mode == 'train':
     train_estimator = tf.estimator.tpu.TPUEstimator(
         model_fn=model_fn_instance,
-        use_tpu=FLAGS.strategy == 'tpu',
+        use_tpu=use_tpu,
         train_batch_size=FLAGS.train_batch_size,
         config=run_config,
         params=params)
@@ -287,7 +289,7 @@ def main(_):
       )
       eval_estimator = tf.estimator.tpu.TPUEstimator(
           model_fn=model_fn_instance,
-          use_tpu=FLAGS.strategy == 'tpu',
+          use_tpu=use_tpu,
           train_batch_size=FLAGS.train_batch_size,
           eval_batch_size=FLAGS.eval_batch_size,
           config=run_config,
@@ -313,7 +315,7 @@ def main(_):
 
     eval_estimator = tf.estimator.tpu.TPUEstimator(
         model_fn=model_fn_instance,
-        use_tpu=FLAGS.strategy == 'tpu',
+        use_tpu=use_tpu,
         train_batch_size=FLAGS.train_batch_size,
         eval_batch_size=FLAGS.eval_batch_size,
         config=run_config,
@@ -367,7 +369,7 @@ def main(_):
       logging.info('Starting training cycle, epoch: %d.', cycle)
       train_estimator = tf.estimator.tpu.TPUEstimator(
           model_fn=model_fn_instance,
-          use_tpu=FLAGS.strategy == 'tpu',
+          use_tpu=use_tpu,
           train_batch_size=FLAGS.train_batch_size,
           config=run_config,
           params=params)
@@ -388,7 +390,7 @@ def main(_):
 
       eval_estimator = tf.estimator.tpu.TPUEstimator(
           model_fn=model_fn_instance,
-          use_tpu=FLAGS.strategy == 'tpu',
+          use_tpu=use_tpu,
           train_batch_size=FLAGS.train_batch_size,
           eval_batch_size=FLAGS.eval_batch_size,
           config=run_config,
@@ -406,5 +408,4 @@ def main(_):
 
 
 if __name__ == '__main__':
-  logging.set_verbosity(logging.WARNING)
   app.run(main)

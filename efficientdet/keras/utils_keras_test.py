@@ -13,27 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-
+from absl import logging
+from absl.testing import parameterized
 import tensorflow as tf
+
 import utils
 from keras import utils_keras
-from absl.testing import parameterized
 
 
 class KerasUtilTest(tf.test.TestCase, parameterized.TestCase):
 
-  @parameterized.parameters(
-      (True),
-      (False),
-  )
-  def test_batch_normalization(self, is_training_bn):
+  @parameterized.named_parameters(
+      ('train_local', True, ''), ('eval_local', False, ''),
+      ('train_tpu', True, 'tpu'), ('eval_tpu', False, 'tpu'))
+  def test_batch_norm(self, is_training, strategy):
     inputs = tf.random.uniform([8, 40, 40, 3])
-    with self.subTest(is_training_bn=is_training_bn):
-      expect_results = utils.batch_norm_act(inputs, is_training_bn, None)
-      tf.keras.backend.set_learning_phase(int(is_training_bn))
-      actual_results = utils_keras.batch_normalization(is_training_bn)(inputs)
-      self.assertAllEqual(expect_results, actual_results)
+    expect_results = utils.batch_norm_act(inputs, is_training, None)
+
+    # Call batch norm layer with is_training parameter.
+    bn_layer = utils_keras.build_batch_norm(is_training, strategy=strategy)
+    self.assertAllClose(expect_results, bn_layer(inputs, is_training))
 
 
 if __name__ == '__main__':
+  logging.set_verbosity(logging.WARNING)
   tf.test.main()
