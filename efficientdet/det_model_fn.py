@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
 import re
 from absl import logging
 import numpy as np
@@ -28,7 +27,6 @@ import anchors
 import coco_metric
 import efficientdet_arch
 import hparams_config
-import iou_utils
 import retinanet_arch
 import utils
 
@@ -231,14 +229,6 @@ def _box_loss(box_outputs, box_targets, num_positives, delta=0.1):
   return box_loss
 
 
-def _box_iou_loss(box_outputs, box_targets, num_positives, iou_loss_type):
-  """Computes box iou loss."""
-  normalizer = num_positives * 4.0
-  box_iou_loss = iou_utils.iou_loss(box_outputs, box_targets, iou_loss_type)
-  box_iou_loss = tf.reduce_sum(box_iou_loss) / normalizer
-  return box_iou_loss
-
-
 def detection_loss(cls_outputs, box_outputs, labels, params):
   """Computes total detection loss.
 
@@ -258,7 +248,6 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
       class and box losses from all levels.
     cls_loss: an integer tensor representing total class loss.
     box_loss: an integer tensor representing total box regression loss.
-    box_iou_loss: an integer tensor representing total box iou loss.
   """
   # Sum all positives in a batch for normalization and avoid zero
   # num_positives_sum, which would lead to inf loss during training
@@ -267,7 +256,6 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
 
   cls_losses = []
   box_losses = []
-  box_iou_losses = []
   for level in levels:
     if params['data_format'] == 'channels_first':
       labels['cls_targets_%d' % level] = tf.transpose(
@@ -308,19 +296,12 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
             box_targets_at_level,
             num_positives_sum,
             delta=params['delta']))
-    if params['iou_loss_type']:
-      box_iou_losses.append(
-          _box_iou_loss(box_outputs[level], box_targets_at_level,
-                        num_positives_sum, params['iou_loss_type']))
 
   # Sum per level losses to total loss.
   cls_loss = tf.add_n(cls_losses)
   box_loss = tf.add_n(box_losses)
-  box_iou_loss = tf.add_n(box_iou_losses) if box_iou_losses else 0.0
-  total_loss = (
-      cls_loss + params['box_loss_weight'] * box_loss +
-      params['iou_loss_weight'] * box_iou_loss)
-  return total_loss, cls_loss, box_loss, box_iou_loss
+  total_loss = cls_loss + params['box_loss_weight'] * box_loss
+  return total_loss, cls_loss, box_loss
 
 
 def add_metric_fn_inputs(params,
@@ -342,7 +323,6 @@ def add_metric_fn_inputs(params,
     max_detection_points: an integer specifing the maximum detection points to
       keep before NMS. Keep all anchors if max_detection_points <= 0.
   """
-  batch_size = params['batch_size']
   num_classes = params['num_classes']
   cls_outputs_all = []
   box_outputs_all = []
@@ -353,17 +333,20 @@ def add_metric_fn_inputs(params,
       box_outputs[level] = tf.transpose(box_outputs[level], [0, 2, 3, 1])
 
     cls_outputs_all.append(tf.reshape(
-        cls_outputs[level], [batch_size, -1, num_classes]))
-    box_outputs_all.append(tf.reshape(box_outputs[level], [batch_size, -1, 4]))
+        cls_outputs[level],
+        [params['batch_size'], -1, num_classes]))
+    box_outputs_all.append(tf.reshape(
+        box_outputs[level], [params['batch_size'], -1, 4]))
   cls_outputs_all = tf.concat(cls_outputs_all, 1)
   box_outputs_all = tf.concat(box_outputs_all, 1)
 
   if max_detection_points > 0:
     # Prune anchors and detections to only keep max_detection_points.
     # Due to some issues, top_k is currently slow in graph model.
-    cls_outputs_all_reshape = tf.reshape(cls_outputs_all, [batch_size, -1])
+    cls_outputs_all_reshape = tf.reshape(cls_outputs_all,
+                                         [params['batch_size'], -1])
     _, cls_topk_indices = tf.math.top_k(cls_outputs_all_reshape,
-                                        k=max_detection_points,
+                                        k=anchors.MAX_DETECTION_POINTS,
                                         sorted=False)
     indices = cls_topk_indices // num_classes
     classes = cls_topk_indices % num_classes
@@ -379,8 +362,9 @@ def add_metric_fn_inputs(params,
     num_anchors = cls_outputs_all.shape[1]
 
     classes = cls_outputs_idx
-    indices = tf.tile(tf.expand_dims(tf.range(num_anchors), axis=0),
-                      [batch_size, 1])
+    indices = tf.reshape(
+        tf.tile(tf.range(num_anchors), [params['batch_size']]),
+        [-1, num_anchors])
     cls_outputs_all_after_topk = tf.reduce_max(cls_outputs_all, -1)
     box_outputs_all_after_topk = box_outputs_all
 
@@ -454,16 +438,19 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   # Convert params (dict) to Config for easier access.
   if params['data_format'] == 'channels_first':
     features = tf.transpose(features, [0, 3, 1, 2])
-  def _model_outputs(inputs):
-    return model(inputs, config=hparams_config.Config(params))
+  def _model_outputs():
+    return model(features, config=hparams_config.Config(params))
 
-  cls_outputs, box_outputs = utils.build_model_with_precision(
-      params['precision'], _model_outputs, features)
-
-  levels = cls_outputs.keys()
-  for level in levels:
-    cls_outputs[level] = tf.cast(cls_outputs[level], tf.float32)
-    box_outputs[level] = tf.cast(box_outputs[level], tf.float32)
+  if params['use_bfloat16']:
+    with tf.tpu.bfloat16_scope():
+      cls_outputs, box_outputs = _model_outputs()
+      levels = cls_outputs.keys()
+      for level in levels:
+        cls_outputs[level] = tf.cast(cls_outputs[level], tf.float32)
+        box_outputs[level] = tf.cast(box_outputs[level], tf.float32)
+  else:
+    cls_outputs, box_outputs = _model_outputs()
+    levels = cls_outputs.keys()
 
   # First check if it is in PREDICT mode.
   if mode == tf.estimator.ModeKeys.PREDICT:
@@ -481,8 +468,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   learning_rate = learning_rate_schedule(params, global_step)
 
   # cls_loss and box_loss are for logging. only total_loss is optimized.
-  det_loss, cls_loss, box_loss, box_iou_loss = detection_loss(
-      cls_outputs, box_outputs, labels, params)
+  det_loss, cls_loss, box_loss = detection_loss(cls_outputs, box_outputs,
+                                                labels, params)
   l2loss = reg_l2_loss(params['weight_decay'])
   total_loss = det_loss + l2loss
 
@@ -490,7 +477,6 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     utils.scalar('lrn_rate', learning_rate)
     utils.scalar('trainloss/cls_loss', cls_loss)
     utils.scalar('trainloss/box_loss', box_loss)
-    utils.scalar('trainloss/box_iou_loss', box_iou_loss)
     utils.scalar('trainloss/det_loss', det_loss)
     utils.scalar('trainloss/l2_loss', l2loss)
     utils.scalar('trainloss/loss', total_loss)
@@ -502,14 +488,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     ema_vars = utils.get_ema_vars()
 
   if mode == tf.estimator.ModeKeys.TRAIN:
-    if params['optimizer'].lower() == 'sgd':
-      optimizer = tf.train.MomentumOptimizer(
-          learning_rate, momentum=params['momentum'])
-    elif params['optimizer'].lower() == 'adam':
-      optimizer = tf.train.AdamOptimizer(
-          learning_rate)
-    else:
-      raise ValueError('optimizers should be adam or sgd')
+    optimizer = tf.train.MomentumOptimizer(
+        learning_rate, momentum=params['momentum'])
     if params['use_tpu']:
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)
 
@@ -517,7 +497,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     var_list = tf.trainable_variables()
     if variable_filter_fn:
-      var_list = variable_filter_fn(var_list)
+      var_list = variable_filter_fn(var_list, params['resnet_depth'])
 
     if params.get('clip_gradients_norm', 0) > 0:
       logging.info('clip gradients norm by %f', params['clip_gradients_norm'])
@@ -549,8 +529,6 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     def metric_fn(**kwargs):
       """Returns a dictionary that has the evaluation metrics."""
       batch_size = params['batch_size']
-      if params['use_tpu']:
-        batch_size = params['batch_size'] * params['num_shards']
       eval_anchors = anchors.Anchors(params['min_level'],
                                      params['max_level'],
                                      params['num_scales'],
@@ -653,28 +631,23 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
 def retinanet_model_fn(features, labels, mode, params):
   """RetinaNet model."""
-  variable_filter_fn = functools.partial(retinanet_arch.remove_variables,
-                                         resnet_depth=params['resnet_depth'])
   return _model_fn(
       features,
       labels,
       mode,
       params,
       model=retinanet_arch.retinanet,
-      variable_filter_fn=variable_filter_fn)
+      variable_filter_fn=retinanet_arch.remove_variables)
 
 
 def efficientdet_model_fn(features, labels, mode, params):
   """EfficientDet model."""
-  variable_filter_fn = functools.partial(efficientdet_arch.freeze_vars,
-                                         pattern=params['var_freeze_expr'])
   return _model_fn(
       features,
       labels,
       mode,
       params,
-      model=efficientdet_arch.efficientdet,
-      variable_filter_fn=variable_filter_fn)
+      model=efficientdet_arch.efficientdet)
 
 
 def get_model_arch(model_name='efficientdet-d0'):
