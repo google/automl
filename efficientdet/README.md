@@ -1,90 +1,31 @@
-# EfficientDet
+# VFPN 
+
+This work is heavily based on EfficientDet. We appreciate and thank them for their work. This repository serves merely as a VFPN Demo based on EfficientDet.
+
 
 [1] Mingxing Tan, Ruoming Pang, Quoc V. Le. EfficientDet: Scalable and Efficient Object Detection. CVPR 2020.
 Arxiv link: https://arxiv.org/abs/1911.09070
 
-Updates:
+# Architecture
 
-  - **Apr22: Speed up end-to-end latency: D0 has up to 182 FPS throughput on Tesla V100.**
-    * A great collaboration with [@fsx950223](https://github.com/fsx950223).
-  - Apr1: Updated results for test-dev and added EfficientDet-D7.
-  - Mar26: Fixed a few bugs and updated all checkpoints/results.
-  - Mar24: Added tutorial with visualization and coco eval.
-  - Mar 13: Released the initial code and models.
-
-**Quick start tutorial: [tutorial.ipynb](tutorial.ipynb)**
-
-## 1. About EfficientDet Models
-
-EfficientDets are a family of object detection models, which achieve state-of-the-art 52.6mAP on COCO test-dev, yet being 4x - 9x smaller and using 13x - 42x fewer FLOPs than previous detectors. Our models also run 2x - 4x faster on GPU, and 5x - 11x faster on CPU than other detectors.
+<img src="image.png" />
 
 
-EfficientDets are developed based on the advanced backbone, a new BiFPN, and a new scaling technique:
+## 2. Pretrained EfficientDet Checkpoints with VFPN
 
-<p align="center">
-<img src="./g3doc/network.png" width="800" />
-</p>
-
-  * **Backbone**: we employ [EfficientNets](https://arxiv.org/abs/1905.11946) as our backbone networks.
-  * **BiFPN**: we propose BiFPN, a bi-directional feature network enhanced with fast normalization, which enables easy and fast feature fusion.
-  * **Scaling**: we use a single compound scaling factor to govern the depth, width, and resolution for all backbone, feature & prediction networks.
-
-Our model family starts from EfficientDet-D0, which has comparable accuracy as [YOLOv3](https://arxiv.org/abs/1804.02767). Then we scale up this baseline model using our compound scaling method to obtain a list of detection models EfficientDet-D1 to D6, with different trade-offs between accuracy and model complexity.
-
-
-<table border="0">
-<tr>
-    <td>
-    <img src="./g3doc/flops.png" width="100%" />
-    </td>
-    <td>
-    <img src="./g3doc/params.png", width="100%" />
-    </td>
-</tr>
-</table>
-
-** For simplicity, we compare the whole detectors here. For more comparison on FPN/NAS-FPN/BiFPN, please see Table 4 of our [paper](https://arxiv.org/abs/1911.09070).
-
-
-
-## 2. Pretrained EfficientDet Checkpoints
-
-We have provided a list of EfficientDet checkpoints and results as follows:
+We have provided a list of checkpoints and results as follows:
 
 |       Model    |  AP<sup>val</sup> | AP<sup>test</sup>    |  AP<sub>50</sub> | AP<sub>75</sub> |AP<sub>S</sub>   |  AP<sub>M</sub>    |  AP<sub>L</sub>   | | #params | #FLOPs |
 |----------     |------ |------ |------ | -------- | ------| ------| ------ |------ |------ |  :------: |
-|     EfficientDet-D0 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d0_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d0_coco_test-dev2017.txt))    | 33.5 | 33.8 | 52.2 | 35.8 | 12.0 | 38.3 | 51.2 |  | 3.9M | 2.54B  |
-|     EfficientDet-D1 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d1.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d1_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d1_coco_test-dev2017.txt))    | 39.1  | 39.6 | 58.6 | 42.3 | 17.9 | 44.3 | 56.0 | | 6.6M | 6.10B |
-|     EfficientDet-D2 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d2.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d2_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d2_coco_test-dev2017.txt))    | 42.5 | 43.0 | 62.3 | 46.2 | 22.5 | 47.0 | 58.4 | | 8.1M | 11.0B |
-|     EfficientDet-D3 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d3.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d3_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d3_coco_test-dev2017.txt))    | 45.9 | 45.8 | 65.0 | 49.3 | 26.6 | 49.4 | 59.8 | | 12.0M | 24.9B |
-|     EfficientDet-D4 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d4.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d4_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d4_coco_test-dev2017.txt))    | 49.0 | 49.4 | 69.0 | 53.4 | 30.3 | 53.2 | 63.2 |  | 20.7M | 55.2B |
-|     EfficientDet-D5 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d5.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d5_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d5_coco_test-dev2017.txt))    | 50.5 | 50.7 | 70.2 | 54.7 | 33.2 | 53.9 | 63.2 |  | 33.7M | 135.4B |
-|     EfficientDet-D6 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d6.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d6_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d6_coco_test-dev2017.txt))    | 51.3 | 51.7 | 71.2 | 56.0 | 34.1 | 55.2 | 64.1 | | 51.9M  |  225.6B  |
-|     EfficientDet-D7 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d7.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d7_coco_val.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d7_coco_test-dev2017.txt))    | 52.1 | 52.6 | 71.6 | 56.9 | 35.3 | 55.9 | 65.0 | | 51.9M  |  324.8B  |
+|     EfficientDet-D0 ([ckpt](https://drive.google.com/open?id=1gZwKHMiLKC87pft9HIrjDiXF8heVjRgr) | 34.44 | 34.8 | 53.3 | 36.9 | 12.9 | 39.4 | 52.6 |  | 4.5M | 2.98B  |
+|     EfficientDet-D1 ([ckpt](https://drive.google.com/open?id=1Uv4cCERDwPdMj_oArX1AIL2Q0fShsjzU) | 39.74  | 40.1 | 59.4 | 43.0 | 18.8 | 44.7 | 56.6 | | 7.8M | 7.45B |
+
 
 ** <em>val</em> denotes validation results, <em>test-dev</em> denotes test-dev2017 results. AP<sup>val</sup> is for validation accuracy, all other AP results in the table are for COCO test-dev2017. All accuracy numbers are for single-model single-scale without ensemble or test-time augmentation. All checkpoints are trained with baseline preprocessing (no autoaugmentation).
-** EfficientNet-D0 to D6 are trained with 300 epochs, EfficientNet-D7 is trained with 500 epochs.
 
 
-## 3. Export SavedModel, frozen graph, or tflite.
 
-Run the following command line to export models:
-
-    !rm  -rf savedmodeldir
-    !python model_inspect.py --runmode=saved_model --model_name=efficientdet-d0 \
-      --ckpt_path=efficientdet-d0 --saved_model_dir=savedmodeldir \
-      --tflite_path=efficientdet-d0.tflite
-
-Then you will get:
-
- - saved model under savedmodeldir/
- - frozen graph with name savedmodeldir/efficientdet-d0_frozen.pb
- - tflite file with name efficientdet-d0.tflite
-
-Notably, --tflite_path is optional, and it only works with tensorflow >= 2.2.0-rc4.
-
-
-## 4. Benchmark model latency.
+## 3. Benchmark model latency.
 
 
 There are two types of latency: network latency and end-to-end latency.
@@ -96,8 +37,6 @@ prediction output), use the following command:
 
 ** add --hparams="precision=mixed-float16" if running on V100.
 
-On single Tesla V100 without TensorRT, our D0 network (no pre/post-processing)
-has 134 FPS (frame per second) for batch size 1, and 238 FPS for batch size 8.
 
 (2) To measure the end-to-end latency (from the input image to the final rendered
 new image, including: image preprocessing, network, postprocessing and NMS),
@@ -112,29 +51,10 @@ use the following command:
       --model_name=efficientdet-d0  --input_image=testdata/img1.jpg  \
       --output_image_dir=/tmp/  \
 
-On single Tesla V100 without using TensorRT, our end-to-end
-latency and throughput are:
 
+## 4. Inference for images.
 
-|       Model    |   mAP | batch1 latency |  batch1 throughput |  batch8 throughput |
-| ------ | ------ | ------  | ------ | ------ |
-| EfficientDet-D0 |  33.8 | 10.2ms | 97 fps | 209 fps |
-| EfficientDet-D1 |  39.6 | 13.5ms | 74 fps | 140 fps |
-| EfficientDet-D2 |  43.0 | 17.7ms | 57 fps | 97 fps  |
-| EfficientDet-D3 |  45.8 | 29.0ms | 35 fps | 58 fps  |
-| EfficientDet-D4 |  49.4 | 42.8ms | 23 fps | 35 fps  |
-| EfficientDet-D5 |  50.7 | 72.5ms | 14 fps | 18 fps  |
-
-** FPS means frames per second (or images/second).
-
-## 5. Inference for images.
-
-    # Step0: download model and testing image.
-    !export MODEL=efficientdet-d0
-    !export CKPT_PATH=efficientdet-d0
-    !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/${MODEL}.tar.gz
-    !wget https://user-images.githubusercontent.com/11736571/77320690-099af300-6d37-11ea-9d86-24f14dc2d540.png -O img.png
-    !tar xf ${MODEL}.tar.gz
+    # Step0: download model 
 
     # Step 1: export saved model.
     !python model_inspect.py --runmode=saved_model \
@@ -151,31 +71,14 @@ latency and throughput are:
     # you can visualize the output /tmp/0.jpg
 
 
-Alternatively, if you want to do inference using frozen graph instead of saved model, you can run
 
-    # Step 0 and 1 is the same as before.
-    # Step 2: do inference with frozen graph.
-    !python model_inspect.py --runmode=saved_model_infer \
-      --model_name=efficientdet-d0   --ckpt_path=efficientdet-d0 \
-      --hparams="image_size=1920x1280"  \
-      --saved_model_dir=/tmp/saved_model/efficientdet-d0_frozen.pb  \
-      --input_image=img.png --output_image_dir=/tmp/
-
-Lastly, if you only have one image and just want to run a quick test, you can also run the following command (it is slow because it needs to construct the graph from scratch):
-
-    # Run inference for a single image.
-    !python model_inspect.py --runmode=infer --model_name=$MODEL \
-      --hparams="image_size=1920x1280"  --max_boxes_to_draw=100   --min_score_thresh=0.4 \
-      --ckpt_path=$CKPT_PATH --input_image=img.png --output_image_dir=/tmp
-    # you can visualize the output /tmp/0.jpg
-
-Here is an example of EfficientDet-D0 visualization: more on [tutorial](tutorial.ipynb)
+Here is an example of EfficientDet-D0 with VFPN visualization: 
 
 <p align="center">
-<img src="./g3doc/street.jpg" width="800" />
+<img src="people-demo.jpg" width="800" />
 </p>
 
-## 6. Inference for videos.
+## 5. Inference for videos.
 
 You can run inference for a video and show the results online:
 
@@ -198,7 +101,7 @@ You can run inference for a video and show the results online:
       --saved_model_dir=/tmp/savedmodel --input_video=input.mov  \
       --output_video=output.mov
 
-## 7. Eval on COCO 2017 val or test-dev.
+## 6. Eval on COCO 2017 val or test-dev.
 
     // Download coco data.
     !wget http://images.cocodataset.org/zips/val2017.zip
@@ -245,7 +148,7 @@ You can also run eval on test-dev set with the following command:
     # Now you can submit testdev_output/detections_test-dev2017_test_results.json to
     # coco server: https://competitions.codalab.org/competitions/20794#participate
 
-## 8. Train on PASCAL VOC 2012 with backbone ImageNet ckpt.
+## 7. Train on PASCAL VOC 2012 with backbone ImageNet ckpt.
 
     # Download and convert pascal data.
     !wget http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar
@@ -271,7 +174,7 @@ You can also run eval on test-dev set with the following command:
         --hparams="num_classes=20,moving_average_decay=0" \
         --use_tpu=False
 
-## 9. Finetune on PASCAL VOC 2012 with detector COCO ckpt.
+## 8. Finetune on PASCAL VOC 2012 with detector COCO ckpt.
 Create a config file for the PASCAL VOC dataset called voc_config.yaml and put this in it.
 
       num_classes: 20
@@ -307,7 +210,7 @@ If you want to do inference for custom data, you can run
   
 You should check more details of runmode which is written in caption-4.
 
-## 10. Training EfficientDets on TPUs.
+## 9. Training EfficientDets on TPUs.
 
 To train this model on Cloud TPU, you will need:
 
