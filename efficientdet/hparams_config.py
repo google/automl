@@ -234,7 +234,7 @@ efficientdet_model_param_dict = {
             fpn_cell_repeats=12,
             box_class_repeats=3,
         ),
-    'efficientdet-d3'e
+    'efficientdet-d3':
         dict(
             name='efficientdet-d3',
             backbone_name='efficientnet-b3',
