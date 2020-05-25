@@ -231,7 +231,7 @@ efficientdet_model_param_dict = {
             backbone_name='efficientnet-b2',
             image_size=768,
             fpn_num_filters=112,
-            fpn_cell_repeats=12,
+            fpn_cell_repeats=14,
             box_class_repeats=3,
         ),
     'efficientdet-d3':
