@@ -83,7 +83,7 @@ Then you will get:
  - frozen graph with name savedmodeldir/efficientdet-d0_frozen.pb
  - tflite file with name efficientdet-d0.tflite
 
-Notably, --tflite_path does not work for now. It requires some extra fixes in future TensorFlow rerlease (> 2.2.0-rc4).
+Notably, --tflite_path only works after 2.3.0-dev20200521.
 
 
 ## 4. Benchmark model latency.

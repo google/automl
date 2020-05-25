@@ -223,11 +223,12 @@ class TpuBatchNormalization(tf.keras.layers.BatchNormalization):
 class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
   """Cross replica batch normalization."""
 
-  def __init__(self, fused=False, **kwargs):
+  def __init__(self, fused=False, sync=False, **kwargs):
     if fused in (True, None):
       raise ValueError('SyncBatchNormalization does not support fused=True.')
     if not kwargs.get('name', None):
       kwargs['name'] = 'tpu_batch_normalization'
+    self._sync = sync
     super(SyncBatchNormalization, self).__init__(fused=fused, **kwargs)
 
   def _moments(self, inputs, reduction_axes, keep_dims):
@@ -237,12 +238,12 @@ class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
         inputs, reduction_axes, keep_dims=keep_dims)
 
     num_shards = hvd.size()
-    if num_shards > 1:
+    if num_shards > 1 and self._sync:  # sync bn is 4x slower than non-sync.
       # Compute variance using: Var[X]= E[X^2] - E[X]^2.
       shard_square_of_mean = tf.math.square(shard_mean)
       shard_mean_of_square = shard_variance + shard_square_of_mean
-      group_mean = hvd.allreduce(shard_mean)
-      group_mean_of_square = hvd.allreduce(shard_mean_of_square)
+      shard_stack = tf.stack([shard_mean, shard_mean_of_square])
+      group_mean, group_mean_of_square = tf.unstack(hvd.allreduce(shard_stack))
       group_variance = group_mean_of_square - tf.math.square(group_mean)
       return (group_mean, group_variance)
     else:
