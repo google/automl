@@ -514,6 +514,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
           learning_rate)
     else:
       raise ValueError('optimizers should be adam or sgd')
+
     if params['strategy'] == 'tpu':
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)
     elif params['strategy'] == 'horovod':

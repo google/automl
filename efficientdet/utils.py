@@ -309,7 +309,7 @@ def batch_norm_act(inputs,
       width]` or "channels_last for `[batch, height, width, channels]`.
     momentum: `float`, momentume of batch norm.
     epsilon: `float`, small value for numerical stability.
-    strategy: `str`, whether to use tpu version of batch norm.
+    strategy: string to specify training strategy for TPU/GPU/CPU.
     name: the name of the batch normalization layer
 
   Returns:
@@ -521,6 +521,29 @@ def get_feat_sizes(image_size: Union[Text, int, Tuple[int, int]],
     feat_size = ((feat_size[0] - 1) // 2 + 1, (feat_size[1] - 1) // 2 + 1)
     feat_sizes.append({'height': feat_size[0], 'width': feat_size[1]})
   return feat_sizes
+
+
+def verify_feats_size(feats,
+                      feat_sizes,
+                      min_level,
+                      max_level,
+                      data_format='channels_last'):
+  """Verify the feature map sizes."""
+  expected_output_size = feat_sizes[min_level:max_level + 1]
+  for cnt, size in enumerate(expected_output_size):
+    h_id, w_id = (2, 3) if data_format == 'channels_first' else (1, 2)
+    if feats[cnt].shape[h_id] != size['height']:
+      raise ValueError(
+          'feats[{}] has shape {} but its height should be {}.'
+          '(input_height: {}, min_level: {}, max_level: {}.)'.format(
+              cnt, feats[cnt].shape, size['height'], feat_sizes[0]['height'],
+              min_level, max_level))
+    if feats[cnt].shape[w_id] != size['width']:
+      raise ValueError(
+          'feats[{}] has shape {} but its width should be {}.'
+          '(input_width: {}, min_level: {}, max_level: {}.)'.format(
+              cnt, feats[cnt].shape, size['width'], feat_sizes[0]['width'],
+              min_level, max_level))
 
 
 @contextlib.contextmanager

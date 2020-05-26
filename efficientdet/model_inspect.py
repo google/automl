@@ -144,7 +144,7 @@ class ModelInspector(object):
         model_params=self.model_config.as_dict(),
         **kwargs)
     driver.build()
-    driver.export(self.saved_model_dir, tflite_path=self.tflite_path)
+    driver.export(self.saved_model_dir, self.tflite_path, self.tensorrt)
 
   def saved_model_inference(self, image_path_pattern, output_dir, **kwargs):
     """Perform inference for the given saved model."""

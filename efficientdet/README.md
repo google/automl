@@ -68,22 +68,23 @@ We have provided a list of EfficientDet checkpoints and results as follows:
 ** EfficientNet-D0 to D6 are trained with 300 epochs, EfficientNet-D7 is trained with 500 epochs.
 
 
-## 3. Export SavedModel, frozen graph, or tflite.
+## 3. Export SavedModel, frozen graph, tensort models, or tflite.
 
 Run the following command line to export models:
 
     !rm  -rf savedmodeldir
     !python model_inspect.py --runmode=saved_model --model_name=efficientdet-d0 \
       --ckpt_path=efficientdet-d0 --saved_model_dir=savedmodeldir \
-      --tflite_path=efficientdet-d0.tflite
+      --tensorrt=FP16  --tflite_path=efficientdet-d0.tflite
 
 Then you will get:
 
- - saved model under savedmodeldir/
- - frozen graph with name savedmodeldir/efficientdet-d0_frozen.pb
- - tflite file with name efficientdet-d0.tflite
+ - saved model under `savedmodeldir/`
+ - frozen graph with name `savedmodeldir/efficientdet-d0_frozen.pb`
+ - TensorRT saved model under `savedmodeldir/tensorrt_fp32/`
+ - tflite file with name `efficientdet-d0.tflite`
 
-Notably, --tflite_path only works after 2.3.0-dev20200521.
+Notably, --tflite_path only works after 2.3.0-dev20200521
 
 
 ## 4. Benchmark model latency.
