@@ -202,29 +202,6 @@ def resample_feature_map(feat,
   return feat
 
 
-def _verify_feats_size(feats,
-                       feat_sizes,
-                       min_level,
-                       max_level,
-                       data_format='channels_last'):
-  """Verify the feature map sizes."""
-  expected_output_size = feat_sizes[min_level:max_level + 1]
-  for cnt, size in enumerate(expected_output_size):
-    h_id, w_id = (2, 3) if data_format == 'channels_first' else (1, 2)
-    if feats[cnt].shape[h_id] != size['height']:
-      raise ValueError(
-          'feats[{}] has shape {} but its height should be {}.'
-          '(input_height: {}, min_level: {}, max_level: {}.)'.format(
-              cnt, feats[cnt].shape, size['height'], feat_sizes[0]['height'],
-              min_level, max_level))
-    if feats[cnt].shape[w_id] != size['width']:
-      raise ValueError(
-          'feats[{}] has shape {} but its width should be {}.'
-          '(input_width: {}, min_level: {}, max_level: {}.)'.format(
-              cnt, feats[cnt].shape, size['width'], feat_sizes[0]['width'],
-              min_level, max_level))
-
-
 ###############################################################################
 def class_net(images,
               level,
@@ -481,7 +458,7 @@ def build_feature_network(features, config):
               data_format=config.data_format
           ))
 
-  _verify_feats_size(
+  utils.verify_feats_size(
       feats,
       feat_sizes=feat_sizes,
       min_level=config.min_level,
@@ -500,7 +477,7 @@ def build_feature_network(features, config):
                 config.min_level, config.max_level + 1)
         ]
 
-        _verify_feats_size(
+        utils.verify_feats_size(
             feats,
             feat_sizes=feat_sizes,
             min_level=config.min_level,

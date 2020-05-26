@@ -243,7 +243,7 @@ class ClassNet(tf.keras.layers.Layer):
       repeats: number of intermediate layers.
       separable_conv: True to use separable_conv instead of conv2D.
       survival_prob: if a value is set then drop connect will be used.
-      strategy: True to use TPU compatible functions
+      strategy: string to specify training strategy for TPU/GPU/CPU.
       data_format: string of 'channel_first' or 'channels_last'.
       name: the name of this layerl.
       **kwargs: other parameters.
@@ -402,7 +402,7 @@ class BoxNet(tf.keras.layers.Layer):
       repeats: number of "intermediate" layers.
       separable_conv: True to use separable_conv instead of conv2D.
       survival_prob: if a value is set then drop connect will be used.
-      strategy: True to use TPU compatible functions
+      strategy: string to specify training strategy for TPU/GPU/CPU.
       data_format: string of 'channel_first' or 'channels_last'.
       name: Name of the layer.
       **kwargs: other parameters.
