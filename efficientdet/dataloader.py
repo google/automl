@@ -12,19 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Data loader and processing.
-
-This module is borrowed from TPU RetinaNet implementation:
-https://github.com/tensorflow/tpu/blob/master/models/official/retinanet/anchors.py
-"""
+"""Data loader and processing."""
 
 import tensorflow.compat.v1 as tf
 
 import anchors
+import utils
 from object_detection import preprocessor
 from object_detection import tf_example_decoder
-
-MAX_NUM_INSTANCES = 100
 
 
 class InputProcessor(object):
@@ -83,6 +78,7 @@ class InputProcessor(object):
     """
     if not target_size:
       target_size = self._output_size
+    target_size = utils.parse_image_size(target_size)
 
     # Select a random scale factor.
     random_scale_factor = tf.random_uniform([], scale_min, scale_max)
@@ -154,10 +150,10 @@ class DetectionInputProcessor(InputProcessor):
   def clip_boxes(self, boxes):
     """Clip boxes to fit in an image."""
     ymin, xmin, ymax, xmax = tf.unstack(boxes, axis=1)
-    ymin = tf.clip_by_value(ymin, 0, self._output_size[0]-1)
-    xmin = tf.clip_by_value(xmin, 0, self._output_size[1]-1)
-    ymax = tf.clip_by_value(ymax, 0, self._output_size[0]-1)
-    xmax = tf.clip_by_value(xmax, 0, self._output_size[1]-1)
+    ymin = tf.clip_by_value(ymin, 0, self._output_size[0] - 1)
+    xmin = tf.clip_by_value(xmin, 0, self._output_size[1] - 1)
+    ymax = tf.clip_by_value(ymax, 0, self._output_size[0] - 1)
+    xmax = tf.clip_by_value(xmax, 0, self._output_size[1] - 1)
     boxes = tf.stack([ymin, xmin, ymax, xmax], axis=1)
     return boxes
 
@@ -206,16 +202,16 @@ def pad_to_fixed_size(data, pad_value, output_shape):
     output_shape: The output shape of a 2D tensor.
 
   Returns:
-    The Padded tensor with output_shape [max_num_instances, dimension].
+    The Padded tensor with output_shape [max_instances_per_image, dimension].
   """
-  max_num_instances = output_shape[0]
+  max_instances_per_image = output_shape[0]
   dimension = output_shape[1]
   data = tf.reshape(data, [-1, dimension])
   num_instances = tf.shape(data)[0]
-  assert_length = tf.Assert(
-      tf.less_equal(num_instances, max_num_instances), [num_instances])
-  with tf.control_dependencies([assert_length]):
-    pad_length = max_num_instances - num_instances
+  msg = 'ERROR: please increase config.max_instances_per_image'
+  with tf.control_dependencies(
+      [tf.assert_less(num_instances, max_instances_per_image, message=msg)]):
+    pad_length = max_instances_per_image - num_instances
   paddings = pad_value * tf.ones([pad_length, dimension])
   padded_data = tf.concat([data, paddings], axis=0)
   padded_data = tf.reshape(padded_data, output_shape)
@@ -225,11 +221,16 @@ def pad_to_fixed_size(data, pad_value, output_shape):
 class InputReader(object):
   """Input reader for dataset."""
 
-  def __init__(self, file_pattern, is_training, use_fake_data=False):
+  def __init__(self,
+               file_pattern,
+               is_training,
+               use_fake_data=False,
+               max_instances_per_image=None):
     self._file_pattern = file_pattern
     self._is_training = is_training
     self._use_fake_data = use_fake_data
-    self._max_num_instances = MAX_NUM_INSTANCES
+    # COCO has 100 limit, but users may set different values for custom dataset.
+    self._max_instances_per_image = max_instances_per_image or 100
 
   def __call__(self, params):
     input_anchors = anchors.Anchors(params['min_level'], params['max_level'],
@@ -240,7 +241,6 @@ class InputReader(object):
     anchor_labeler = anchors.AnchorLabeler(input_anchors, params['num_classes'])
     example_decoder = tf_example_decoder.TfExampleDecoder()
 
-    @tf.autograph.experimental.do_not_convert
     def _dataset_parser(value):
       """Parse data to a fixed dimension input image and learning targets.
 
@@ -265,14 +265,14 @@ class InputReader(object):
         image_scale: Scale of the processed image to the original image.
         boxes: Groundtruth bounding box annotations. The box is represented in
           [y1, x1, y2, x2] format. The tensor is padded with -1 to the fixed
-          dimension [self._max_num_instances, 4].
+          dimension [self._max_instances_per_image, 4].
         is_crowds: Groundtruth annotations to indicate if an annotation
           represents a group of instances by value {0, 1}. The tensor is
-          padded with 0 to the fixed dimension [self._max_num_instances].
+          padded with 0 to the fixed dimension [self._max_instances_per_image].
         areas: Groundtruth areas annotations. The tensor is padded with -1
-          to the fixed dimension [self._max_num_instances].
+          to the fixed dimension [self._max_instances_per_image].
         classes: Groundtruth classes annotations. The tensor is padded with -1
-          to the fixed dimension [self._max_num_instances].
+          to the fixed dimension [self._max_instances_per_image].
       """
       with tf.name_scope('parser'):
         data = example_decoder.decode(value)
@@ -306,7 +306,8 @@ class InputReader(object):
           input_processor.random_horizontal_flip()
         if self._is_training:
           input_processor.set_training_random_scale_factors(
-              params['train_scale_min'], params['train_scale_max'])
+              params['train_scale_min'], params['train_scale_max'],
+              params.get('target_size', None))
         else:
           input_processor.set_scale_factors_to_output_size()
         image = input_processor.resize_and_crop_image()
@@ -324,11 +325,12 @@ class InputReader(object):
         image_scale = input_processor.image_scale_to_original
         boxes *= image_scale
         is_crowds = tf.cast(is_crowds, dtype=tf.float32)
-        boxes = pad_to_fixed_size(boxes, -1, [self._max_num_instances, 4])
+        boxes = pad_to_fixed_size(boxes, -1, [self._max_instances_per_image, 4])
         is_crowds = pad_to_fixed_size(is_crowds, 0,
-                                      [self._max_num_instances, 1])
-        areas = pad_to_fixed_size(areas, -1, [self._max_num_instances, 1])
-        classes = pad_to_fixed_size(classes, -1, [self._max_num_instances, 1])
+                                      [self._max_instances_per_image, 1])
+        areas = pad_to_fixed_size(areas, -1, [self._max_instances_per_image, 1])
+        classes = pad_to_fixed_size(classes, -1,
+                                    [self._max_instances_per_image, 1])
         return (image, cls_targets, box_targets, num_positives, source_id,
                 image_scale, boxes, is_crowds, areas, classes)
 

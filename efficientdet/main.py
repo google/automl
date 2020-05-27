@@ -255,6 +255,7 @@ def main(_):
   )
 
   model_fn_instance = det_model_fn.get_model_fn(FLAGS.model_name)
+  max_instances_per_image = config.max_instances_per_image
   use_tpu = (FLAGS.strategy == 'tpu')
 
   # TPU Estimator
@@ -270,7 +271,8 @@ def main(_):
         input_fn=dataloader.InputReader(
             FLAGS.training_file_pattern,
             is_training=True,
-            use_fake_data=FLAGS.use_fake_data),
+            use_fake_data=FLAGS.use_fake_data,
+            max_instances_per_image=max_instances_per_image),
         max_steps=int((config.num_epochs * FLAGS.num_examples_per_epoch) /
                       FLAGS.train_batch_size))
 
@@ -292,7 +294,9 @@ def main(_):
           params=eval_params)
       eval_results = eval_estimator.evaluate(
           input_fn=dataloader.InputReader(
-              FLAGS.validation_file_pattern, is_training=False),
+              FLAGS.validation_file_pattern,
+              is_training=False,
+              max_instances_per_image=max_instances_per_image),
           steps=FLAGS.eval_samples // FLAGS.eval_batch_size,
           name=FLAGS.eval_name)
       logging.info('Eval results: %s', eval_results)
@@ -334,7 +338,9 @@ def main(_):
       try:
         eval_results = eval_estimator.evaluate(
             input_fn=dataloader.InputReader(
-                FLAGS.validation_file_pattern, is_training=False),
+                FLAGS.validation_file_pattern,
+                is_training=False,
+                max_instances_per_image=max_instances_per_image),
             steps=FLAGS.eval_samples // FLAGS.eval_batch_size,
             name=FLAGS.eval_name)
         logging.info('Eval results: %s', eval_results)
@@ -375,7 +381,8 @@ def main(_):
           input_fn=dataloader.InputReader(
               FLAGS.training_file_pattern,
               is_training=True,
-              use_fake_data=FLAGS.use_fake_data),
+              use_fake_data=FLAGS.use_fake_data,
+              max_instances_per_image=max_instances_per_image),
           steps=int(FLAGS.num_examples_per_epoch / FLAGS.train_batch_size))
 
       logging.info('Starting evaluation cycle, epoch: %d.', cycle)
@@ -396,7 +403,9 @@ def main(_):
           params=eval_params)
       eval_results = eval_estimator.evaluate(
           input_fn=dataloader.InputReader(
-              FLAGS.validation_file_pattern, is_training=False),
+              FLAGS.validation_file_pattern,
+              is_training=False,
+              max_instances_per_image=max_instances_per_image),
           steps=FLAGS.eval_samples // FLAGS.eval_batch_size,
           name=FLAGS.eval_name)
       logging.info('Evaluation results: %s', eval_results)

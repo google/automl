@@ -26,7 +26,7 @@ If you see NaN, you can check the followings:
   - Is my batch size too small? It usually needs to be >=8.
   - Should I clip my gradient? How about h.clip_gradients_norm=5.0?
   - Should I use smaller jitter? How about train_scale_min=0.8 and train_scale_max=1.2?
-  
+
 If you want to debug it, you can use these tools:
 
 ```
@@ -39,6 +39,13 @@ tf.debugging.disable_check_numerics() # for TensorFlow 2.x
 The current code assume class 0 is always reserved for background, so you if you K classes, then you should set num_classes=K+1.
 
 See #391 and #398 for more discussion.
+
+### 1.4 Why my input pipeline has assert failure?
+
+This is most likely that your dataset has some images with many objects (more
+than the 100 limit for COCO), you should set --hparams="max_instances_per_image=200" or larger.
+
+See https://github.com/google/automl/issues/93 for more discussion.
 
 
 ## 2. For Developers
