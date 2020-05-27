@@ -153,9 +153,12 @@ class DetectionInputProcessor(InputProcessor):
 
   def clip_boxes(self, boxes):
     """Clip boxes to fit in an image."""
-    boxes = tf.where(tf.less(boxes, 0), tf.zeros_like(boxes), boxes)
-    boxes = tf.where(tf.greater(boxes, self._output_size[0] - 1),
-                     (self._output_size[1] - 1) * tf.ones_like(boxes), boxes)
+    ymin, xmin, ymax, xmax = tf.unstack(boxes, axis=1)
+    ymin = tf.clip_by_value(ymin, 0, self._output_size[0]-1)
+    xmin = tf.clip_by_value(xmin, 0, self._output_size[1]-1)
+    ymax = tf.clip_by_value(ymax, 0, self._output_size[0]-1)
+    xmax = tf.clip_by_value(xmax, 0, self._output_size[1]-1)
+    boxes = tf.stack([ymin, xmin, ymax, xmax], axis=1)
     return boxes
 
   def resize_and_crop_boxes(self):
@@ -237,6 +240,7 @@ class InputReader(object):
     anchor_labeler = anchors.AnchorLabeler(input_anchors, params['num_classes'])
     example_decoder = tf_example_decoder.TfExampleDecoder()
 
+    @tf.autograph.experimental.do_not_convert
     def _dataset_parser(value):
       """Parse data to a fixed dimension input image and learning targets.
 
