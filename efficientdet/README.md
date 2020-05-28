@@ -75,7 +75,7 @@ Run the following command line to export models:
     !rm  -rf savedmodeldir
     !python model_inspect.py --runmode=saved_model --model_name=efficientdet-d0 \
       --ckpt_path=efficientdet-d0 --saved_model_dir=savedmodeldir \
-      --tensorrt=FP16  --tflite_path=efficientdet-d0.tflite
+      --tensorrt=FP32  --tflite_path=efficientdet-d0.tflite
 
 Then you will get:
 
