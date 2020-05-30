@@ -126,11 +126,13 @@ class InputProcessor(object):
     """Resize input image and crop it to the self._output dimension."""
     scaled_image = tf.image.resize_images(
         self._image, [self._scaled_height, self._scaled_width], method=method)
-    scaled_image = scaled_image[
-        self._crop_offset_y:self._crop_offset_y + self._output_size[0],
-        self._crop_offset_x:self._crop_offset_x + self._output_size[1], :]
-    output_image = tf.image.pad_to_bounding_box(
-        scaled_image, 0, 0, self._output_size[0], self._output_size[1])
+    scaled_image = scaled_image[self._crop_offset_y:self._crop_offset_y +
+                                self._output_size[0],
+                                self._crop_offset_x:self._crop_offset_x +
+                                self._output_size[1], :]
+    output_image = tf.image.pad_to_bounding_box(scaled_image, 0, 0,
+                                                self._output_size[0],
+                                                self._output_size[1])
     return output_image
 
 
@@ -160,16 +162,22 @@ class DetectionInputProcessor(InputProcessor):
   def resize_and_crop_boxes(self):
     """Resize boxes and crop it to the self._output dimension."""
     boxlist = preprocessor.box_list.BoxList(self._boxes)
-    boxes = preprocessor.box_list_scale(
-        boxlist, self._scaled_height, self._scaled_width).get()
+    boxes = preprocessor.box_list_scale(boxlist, self._scaled_height,
+                                        self._scaled_width).get()
     # Adjust box coordinates based on the offset.
-    box_offset = tf.stack([self._crop_offset_y, self._crop_offset_x,
-                           self._crop_offset_y, self._crop_offset_x,])
+    box_offset = tf.stack([
+        self._crop_offset_y,
+        self._crop_offset_x,
+        self._crop_offset_y,
+        self._crop_offset_x,
+    ])
     boxes -= tf.cast(tf.reshape(box_offset, [1, 4]), tf.float32)
     # Clip the boxes.
     boxes = self.clip_boxes(boxes)
-    # Filter out ground truth boxes that are all zeros.
-    indices = tf.where(tf.not_equal(tf.reduce_sum(boxes, axis=1), 0))
+    # Filter out ground truth boxes that are illegal.
+    indices = tf.where(
+        tf.not_equal((boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1]),
+                     0))
     boxes = tf.gather_nd(boxes, indices)
     classes = tf.gather_nd(self._classes, indices)
     return boxes, classes
@@ -241,6 +249,7 @@ class InputReader(object):
     anchor_labeler = anchors.AnchorLabeler(input_anchors, params['num_classes'])
     example_decoder = tf_example_decoder.TfExampleDecoder()
 
+    @tf.autograph.experimental.do_not_convert
     def _dataset_parser(value):
       """Parse data to a fixed dimension input image and learning targets.
 
@@ -299,8 +308,8 @@ class InputReader(object):
               image, boxes, params['autoaugment_policy'], params['use_augmix'],
               *params['augmix_params'])
 
-        input_processor = DetectionInputProcessor(
-            image, params['image_size'], boxes, classes)
+        input_processor = DetectionInputProcessor(image, params['image_size'],
+                                                  boxes, classes)
         input_processor.normalize_image()
         if self._is_training and params['input_rand_hflip']:
           input_processor.random_horizontal_flip()
@@ -317,8 +326,8 @@ class InputReader(object):
         (cls_targets, box_targets,
          num_positives) = anchor_labeler.label_anchors(boxes, classes)
 
-        source_id = tf.where(tf.equal(source_id, tf.constant('')), '-1',
-                             source_id)
+        source_id = tf.where(
+            tf.equal(source_id, tf.constant('')), '-1', source_id)
         source_id = tf.string_to_number(source_id)
 
         # Pad groundtruth data for evaluation.

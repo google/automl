@@ -603,6 +603,27 @@ def fuse_features(nodes, weight_method):
     nodes = [nodes[i] * edge_weights[i] / (weights_sum + 0.0001)
              for i in range(len(nodes))]
     new_node = tf.add_n(nodes)
+  elif weight_method == 'channel_attn':
+    num_filters = int(nodes[0].shape[-1])
+    edge_weights = [
+        tf.cast(
+            tf.Variable(lambda: tf.ones([num_filters]), name='WSM'),
+            dtype=dtype) for _ in nodes
+    ]
+    normalized_weights = tf.nn.softmax(tf.stack(edge_weights, -1), axis=-1)
+    nodes = tf.stack(nodes, axis=-1)
+    new_node = tf.reduce_sum(nodes * normalized_weights, -1)
+  elif weight_method == 'channel_fastattn':
+    num_filters = int(nodes[0].shape[-1])
+    edge_weights = [
+        tf.nn.relu(tf.cast(
+            tf.Variable(lambda: tf.ones([num_filters]), name='WSM'),
+            dtype=dtype)) for _ in nodes
+    ]
+    weights_sum = tf.add_n(edge_weights)
+    nodes = [nodes[i] * edge_weights[i] / (weights_sum + 0.0001)
+             for i in range(len(nodes))]
+    new_node = tf.add_n(nodes)
   elif weight_method == 'sum':
     new_node = tf.add_n(nodes)
   else:

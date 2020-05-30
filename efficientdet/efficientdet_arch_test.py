@@ -244,6 +244,27 @@ class FeatureFusionTest(tf.test.TestCase):
 
     self.assertAllCloseAccordingToType(fused, [0.99995, 2.99985])
 
+  def test_channel_attn(self):
+    nodes = tf.constant([1, 3], dtype=tf.float32)
+    nodes2 = tf.constant([1, 3], dtype=tf.float32)
+    fused = efficientdet_arch.fuse_features([nodes, nodes2], 'channel_attn')
+
+    with self.cached_session() as sess:
+      # initialize weights
+      sess.run(tf.global_variables_initializer())
+
+    self.assertAllCloseAccordingToType(fused, [1.0, 3.0])
+
+  def test_channel_fastattn(self):
+    nodes = tf.constant([1, 3], dtype=tf.float32)
+    nodes2 = tf.constant([1, 3], dtype=tf.float32)
+    fused = efficientdet_arch.fuse_features([nodes, nodes2], 'channel_fastattn')
+
+    with self.cached_session() as sess:
+      sess.run(tf.global_variables_initializer())
+
+    self.assertAllCloseAccordingToType(fused, [0.99995, 2.99985])
+
 
 if __name__ == '__main__':
   logging.set_verbosity(logging.WARNING)
