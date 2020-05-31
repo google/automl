@@ -566,12 +566,13 @@ def float16_scope():
     yield varscope
 
 
-def set_precision_policy(policy_name: Text = None):
+def set_precision_policy(policy_name: Text = None, loss_scale: bool = False):
   """Set precision policy according to the name.
 
   Args:
     policy_name: precision policy name, one of 'float32', 'mixed_float16',
       'mixed_bfloat16', or None.
+    loss_scale: whether to use loss scale (only for training).
   """
   if not policy_name:
     return
@@ -584,12 +585,15 @@ def set_precision_policy(policy_name: Text = None):
   base_layer_utils.enable_v2_dtype_behavior()
   # mixed_float16 training is not supported for now, so disable loss_scale.
   # float32 and mixed_bfloat16 do not need loss scale for training.
-  policy = tf2.keras.mixed_precision.experimental.Policy(
-      policy_name, loss_scale=None)
+  if loss_scale:
+    policy = tf2.keras.mixed_precision.experimental.Policy(policy_name)
+  else:
+    policy = tf2.keras.mixed_precision.experimental.Policy(
+        policy_name, loss_scale=None)
   tf2.keras.mixed_precision.experimental.set_policy(policy)
 
 
-def build_model_with_precision(pp, mm, ii, *args, **kwargs):
+def build_model_with_precision(pp, mm, ii, tt, *args, **kwargs):
   """Build model with its inputs/params for a specified precision context.
 
   This is highly specific to this codebase, and not intended to be general API.
@@ -600,6 +604,7 @@ def build_model_with_precision(pp, mm, ii, *args, **kwargs):
     pp: A string, precision policy name, such as "mixed_float16".
     mm: A function, for rmodel builder.
     ii: A tensor, for model inputs.
+    tt: A bool, If true, it is for training; otherwise, it is for eval.
     *args: A list of model arguments.
     **kwargs: A dict, extra model parameters.
 
@@ -613,7 +618,7 @@ def build_model_with_precision(pp, mm, ii, *args, **kwargs):
       outputs = mm(inputs, *args, **kwargs)
     set_precision_policy('float32')
   elif pp == 'mixed_float16':
-    set_precision_policy(pp)
+    set_precision_policy(pp, loss_scale=tt)
     inputs = tf.cast(ii, tf.float16)
     with float16_scope():
       outputs = mm(inputs, *args, **kwargs)
