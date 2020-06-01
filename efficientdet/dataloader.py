@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """Data loader and processing."""
-
+from absl import logging
 import tensorflow.compat.v1 as tf
 
 import anchors
@@ -79,6 +79,8 @@ class InputProcessor(object):
     if not target_size:
       target_size = self._output_size
     target_size = utils.parse_image_size(target_size)
+    logging.info('target_size = %s, output_size = %s', target_size,
+                 self._output_size)
 
     # Select a random scale factor.
     random_scale_factor = tf.random_uniform([], scale_min, scale_max)
@@ -162,6 +164,8 @@ class DetectionInputProcessor(InputProcessor):
   def resize_and_crop_boxes(self):
     """Resize boxes and crop it to the self._output dimension."""
     boxlist = preprocessor.box_list.BoxList(self._boxes)
+    # boxlist is in range of [0, 1], so here we pass the scale_height/width
+    # instead of just scale.
     boxes = preprocessor.box_list_scale(boxlist, self._scaled_height,
                                         self._scaled_width).get()
     # Adjust box coordinates based on the offset.

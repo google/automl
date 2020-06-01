@@ -242,6 +242,7 @@ def default_detection_configs():
 
   # No stochastic depth in default.
   h.survival_prob = None
+  h.img_summary_steps = None
 
   h.lr_decay_method = 'cosine'
   h.moving_average_decay = 0.9998

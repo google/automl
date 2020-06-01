@@ -391,38 +391,52 @@ class Pair(tuple):
 
 def scalar(name, tensor):
   """Stores a (name, Tensor) tuple in a custom collection."""
-  logging.info('Adding summary {}'.format(Pair(name, tensor)))
-  tf.add_to_collection('edsummaries', Pair(name, tf.reduce_mean(tensor)))
+  logging.info('Adding scale summary {}'.format(Pair(name, tensor)))
+  tf.add_to_collection('scalar_summaries', Pair(name, tf.reduce_mean(tensor)))
 
 
-def get_scalar_summaries():
-  """Returns the list of (name, Tensor) summaries recorded by scalar()."""
-  return tf.get_collection('edsummaries')
+def image(name, tensor):
+  logging.info('Adding image summary {}'.format(Pair(name, tensor)))
+  tf.add_to_collection('image_summaries', Pair(name, tensor))
 
 
 def get_tpu_host_call(global_step, params):
   """Get TPU host call for summaries."""
-  summaries = get_scalar_summaries()
-  if not summaries:
-    # No summaries to write.
-    return None
+  scalar_summaries = tf.get_collection('scalar_summaries')
+  if params['img_summary_steps']:
+    image_summaries = tf.get_collection('image_summaries')
+  else:
+    image_summaries = []
+  if not scalar_summaries and not image_summaries:
+    return None  # No summaries to write.
 
   model_dir = params['model_dir']
   iterations_per_loop = params.get('iterations_per_loop', 100)
+  img_steps = params['img_summary_steps']
 
   def host_call_fn(global_step, *args):
-    """Training host call. Creates scalar summaries for training metrics."""
+    """Training host call. Creates summaries for training metrics."""
     gs = global_step[0]
     with tf2.summary.create_file_writer(
         model_dir, max_queue=iterations_per_loop).as_default():
       with tf2.summary.record_if(True):
-        for i, _ in enumerate(summaries):
-          name = summaries[i][0]
+        for i, _ in enumerate(scalar_summaries):
+          name = scalar_summaries[i][0]
           tensor = args[i][0]
           tf2.summary.scalar(name, tensor, step=gs)
-        return tf.summary.all_v2_summary_ops()
 
-  reshaped_tensors = [tf.reshape(t, [1]) for _, t in summaries]
+      if img_steps:
+        with tf2.summary.record_if(lambda: tf.math.equal(gs % img_steps, 0)):
+          # Log images every 1k steps.
+          for i, _ in enumerate(image_summaries):
+            name = image_summaries[i][0]
+            tensor = args[i + len(scalar_summaries)]
+            tf2.summary.image(name, tensor, step=gs)
+
+      return tf.summary.all_v2_summary_ops()
+
+  reshaped_tensors = [tf.reshape(t, [1]) for _, t in scalar_summaries]
+  reshaped_tensors += [t for _, t in image_summaries]
   global_step_t = tf.reshape(global_step, [1])
   return host_call_fn, [global_step_t] + reshaped_tensors
 
