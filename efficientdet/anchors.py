@@ -13,11 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Anchor definition.
-
-This module is borrowed from TPU RetinaNet implementation:
-https://github.com/tensorflow/tpu/blob/master/models/official/retinanet/anchors.py
-"""
+"""Anchor definition."""
 
 from __future__ import absolute_import
 from __future__ import division

@@ -164,7 +164,8 @@ def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
   """
   model_arch = det_model_fn.get_model_arch(model_name)
   cls_outputs, box_outputs = utils.build_model_with_precision(
-      kwargs.get('precision', None), model_arch, inputs, model_name, **kwargs)
+      kwargs.get('precision', None), model_arch, inputs, False, model_name,
+      **kwargs)
   if kwargs.get('precision', None):
     # Post-processing has multiple places with hard-coded float32.
     # TODO(tanmingxing): Remove them once post-process can adpat to dtypes.

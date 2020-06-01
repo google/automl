@@ -316,7 +316,7 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
   # Sum per level losses to total loss.
   cls_loss = tf.add_n(cls_losses)
   box_loss = tf.add_n(box_losses)
-  box_iou_loss = tf.add_n(box_iou_losses) if box_iou_losses else 0.0
+  box_iou_loss = tf.add_n(box_iou_losses) if box_iou_losses else 0
   total_loss = (
       cls_loss + params['box_loss_weight'] * box_loss +
       params['iou_loss_weight'] * box_iou_loss)
@@ -452,15 +452,20 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   Raises:
     RuntimeError: if both ckpt and backbone_ckpt are set.
   """
-  # Convert params (dict) to Config for easier access.
+  if params.get('img_summary_steps', None):
+    utils.image('input_image', features)
   training_hooks = None
   if params['data_format'] == 'channels_first':
     features = tf.transpose(features, [0, 3, 1, 2])
   def _model_outputs(inputs):
+    # Convert params (dict) to Config for easier access.
     return model(inputs, config=hparams_config.Config(params))
 
   cls_outputs, box_outputs = utils.build_model_with_precision(
-      params['precision'], _model_outputs, features)
+      params['precision'],
+      _model_outputs,
+      features,
+      params['is_training_bn'])
 
   levels = cls_outputs.keys()
   for level in levels:
@@ -492,10 +497,11 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     utils.scalar('lrn_rate', learning_rate)
     utils.scalar('trainloss/cls_loss', cls_loss)
     utils.scalar('trainloss/box_loss', box_loss)
-    utils.scalar('trainloss/box_iou_loss', box_iou_loss)
     utils.scalar('trainloss/det_loss', det_loss)
     utils.scalar('trainloss/reg_l2_loss', reg_l2loss)
     utils.scalar('trainloss/loss', total_loss)
+    if box_iou_loss:
+      utils.scalar('trainloss/box_iou_loss', box_iou_loss)
 
   moving_average_decay = params['moving_average_decay']
   if moving_average_decay:

@@ -172,6 +172,7 @@ def default_detection_configs():
 
   # input preprocessing parameters
   h.image_size = 640  # An integer or a string WxH such as 640x320.
+  h.target_size = None
   h.input_rand_hflip = True
   h.train_scale_min = 0.1
   h.train_scale_max = 2.0
@@ -241,6 +242,7 @@ def default_detection_configs():
 
   # No stochastic depth in default.
   h.survival_prob = None
+  h.img_summary_steps = None
 
   h.lr_decay_method = 'cosine'
   h.moving_average_decay = 0.9998
