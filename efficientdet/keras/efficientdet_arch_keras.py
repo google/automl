@@ -20,6 +20,7 @@ import numpy as np
 import tensorflow as tf
 
 import efficientdet_arch as legacy_arch
+from backbone import backbone_factory, efficientnet_builder
 import hparams_config
 import utils
 from keras import utils_keras
@@ -125,6 +126,14 @@ class FNode(tf.keras.layers.Layer):
 
     return new_node
 
+  def _add_wsm(self, initializer, nodes_shape):
+    for i, _ in enumerate(nodes_shape):
+      if i == 0:
+        name = 'WSM'
+      else:
+        name = 'WSM_{}'.format(i)
+      self.vars.append(self.add_weight(initializer=initializer, name=name, trainable=True))
+
   def build(self, feats_shape):
     nodes_shape = []
     for idx, input_offset in enumerate(self.inputs_offsets):
@@ -141,25 +150,19 @@ class FNode(tf.keras.layers.Layer):
                                                 name='resample_{}_{}_{}'.format(
                                                     idx, input_offset,
                                                     len(feats_shape)))
-      fake_feat = tf.random.uniform([-1, *feats_shape[input_offset][1:]])
-      self.resample_feature_maps.insert(idx, resample_feature_map)
+      fake_feat = tf.ones([1, *feats_shape[input_offset][1:]])
       nodes_shape.append(resample_feature_map(fake_feat).shape)
+      self.resample_feature_maps.insert(idx, resample_feature_map)
     if self.weight_method == 'attn':
-      for _ in nodes_shape:
-        self.vars.append(tf.Variable(1.0, name='WSM'))
+      self._add_wsm('ones', nodes_shape)
     elif self.weight_method == 'fastattn':
-      for _ in nodes_shape:
-        self.vars.append(tf.Variable(1.0, name='WSM'))
+      self._add_wsm('ones', nodes_shape)
     elif self.weight_method == 'channel_attn':
       num_filters = int(nodes_shape[0][-1])
-      for _ in nodes_shape:
-        self.vars.append(tf.Variable(lambda: tf.ones([num_filters]),
-                                     name='WSM'))
+      self._add_wsm(lambda: tf.ones([num_filters]), nodes_shape)
     elif self.weight_method == 'channel_fastattn':
       num_filters = int(nodes_shape[0][-1])
-      for _ in nodes_shape:
-        self.vars.append(tf.Variable(lambda: tf.ones([num_filters]),
-                                     name='WSM'))
+      self._add_wsm(lambda: tf.ones([num_filters]), nodes_shape)
     self.op_after_combine = OpAfterCombine(self.is_training_bn,
                                            self.conv_bn_act_pattern,
                                            self.separable_conv,
@@ -228,43 +231,6 @@ class OpAfterCombine(tf.keras.layers.Layer):
     if act_type:
       new_node = utils.activation_fn(new_node, act_type)
     return new_node
-
-
-def build_bifpn_layer(feats, feat_sizes, config):
-  """Builds a feature pyramid given previous feature pyramid and config."""
-  p = config  # use p to denote the network config.
-  if p.fpn_config:
-    fpn_config = p.fpn_config
-  else:
-    fpn_config = legacy_arch.get_fpn_config(p.fpn_name, p.min_level,
-                                            p.max_level, p.fpn_weight_method)
-
-  for i, fnode in enumerate(fpn_config.nodes):
-    logging.info('fnode %d : %s', i, fnode)
-    feats = FNode(feat_sizes[fnode['feat_level']]['height'],
-                  feat_sizes[fnode['feat_level']]['width'],
-                  fnode['inputs_offsets'],
-                  p.fpn_num_filters,
-                  p.apply_bn_for_resampling,
-                  p.is_training_bn,
-                  p.conv_after_downsample,
-                  p.use_native_resize_op,
-                  p.pooling_type,
-                  p.conv_bn_act_pattern,
-                  p.separable_conv,
-                  p.act_type,
-                  strategy=p.strategy,
-                  weight_method=fpn_config.weight_method,
-                  data_format=config.data_format,
-                  name='fnode{}'.format(i))(feats)
-
-  output_feats = {}
-  for l in range(p.min_level, p.max_level + 1):
-    for i, fnode in enumerate(reversed(fpn_config.nodes)):
-      if fnode['feat_level'] == l:
-        output_feats[l] = feats[-1 - i]
-        break
-  return output_feats
 
 
 class ResampleFeatureMap(tf.keras.layers.Layer):
@@ -709,6 +675,18 @@ class BoxNet(tf.keras.layers.Layer):
         'data_format': self.data_format,
     }
 
+class FPNCells(tf.keras.layers.Layer):
+  def __init__(self, feat_sizes, config, name='fpn_cells'):
+    super(FPNCells, self).__init__(name=name)
+    self.feat_sizes=feat_sizes
+    self.config=config
+    self.cells = [FPNCell(self.feat_sizes, self.config, name='cell_{}'.format(rep)) for rep in range(self.config.fpn_cell_repeats)]
+
+  def call(self, feats):
+    for cell in self.cells:
+      new_feats, feats = cell(feats)
+
+    return new_feats
 
 class FPNCell(tf.keras.layers.Layer):
 
@@ -758,7 +736,7 @@ class FPNCell(tf.keras.layers.Layer):
         new_feats[level]
         for level in range(self.config.min_level, self.config.max_level + 1)
     ]
-    #
+
     utils.verify_feats_size(feats,
                             feat_sizes=self.feat_sizes,
                             min_level=self.config.min_level,
@@ -811,10 +789,7 @@ def build_feature_network(features, config):
                           max_level=config.max_level,
                           data_format=config.data_format)
 
-  with tf.name_scope('fpn_cells'):
-    for rep in range(config.fpn_cell_repeats):
-      new_feats, feats = FPNCell(feat_sizes, config,
-                                 name='cell_{}'.format(rep))(feats)
+  new_feats = FPNCells(feat_sizes, config)(feats)
   return new_feats
 
 
@@ -857,6 +832,52 @@ def build_class_and_box_outputs(feats, config):
 
   return class_outputs, box_outputs
 
+def build_backbone(features, config):
+  """Builds backbone model.
+
+  Args:
+   features: input tensor.
+   config: config for backbone, such as is_training_bn and backbone name.
+
+  Returns:
+    A dict from levels to the feature maps from the output of the backbone model
+    with strides of 8, 16 and 32.
+
+  Raises:
+    ValueError: if backbone_name is not supported.
+  """
+  backbone_name = config.backbone_name
+  is_training_bn = config.is_training_bn
+  if 'efficientnet' in backbone_name:
+    override_params = {
+        'batch_norm':
+            utils.batch_norm_class(is_training_bn, config.strategy),
+        'relu_fn':
+            functools.partial(utils.activation_fn, act_type=config.act_type),
+    }
+    if 'b0' in backbone_name:
+      override_params['survival_prob'] = 0.0
+    if config.backbone_config is not None:
+      override_params['blocks_args'] = (
+          efficientnet_builder.BlockDecoder().encode(
+              config.backbone_config.blocks))
+    override_params['data_format'] = config.data_format
+    model_builder = backbone_factory.get_model_builder(backbone_name)
+    outputs, endpoints = model_builder.build_model_base(
+        features,
+        backbone_name,
+        training=is_training_bn,
+        override_params=override_params)
+    u1 = endpoints['reduction_1']
+    u2 = endpoints['reduction_2']
+    u3 = endpoints['reduction_3']
+    u4 = endpoints['reduction_4']
+    u5 = endpoints['reduction_5']
+  else:
+    raise ValueError(
+        'backbone model {} is not supported.'.format(backbone_name))
+  return {0: features, 1: u1, 2: u2, 3: u3, 4: u4, 5: u5}, outputs
+
 
 def efficientdet(model_name=None, config=None, **kwargs):
   """Build EfficientDet model.
@@ -885,7 +906,7 @@ def efficientdet(model_name=None, config=None, **kwargs):
   inputs = tf.keras.layers.Input(
       [*utils.parse_image_size(config.image_size), 3])
   # build backbone features.
-  features = legacy_arch.build_backbone(inputs, config)
+  features, backbone_outputs = build_backbone(inputs, config)
   logging.info('backbone params/flops = {:.6f}M, {:.9f}B'.format(
       *utils.num_params_flops()))
 
@@ -899,4 +920,4 @@ def efficientdet(model_name=None, config=None, **kwargs):
   logging.info('backbone+fpn+box params/flops = {:.6f}M, {:.9f}B'.format(
       *utils.num_params_flops()))
 
-  return tf.keras.Model(inputs=inputs, outputs=[class_outputs, box_outputs])
+  return tf.keras.Model(inputs=inputs, outputs=[backbone_outputs, class_outputs, box_outputs])

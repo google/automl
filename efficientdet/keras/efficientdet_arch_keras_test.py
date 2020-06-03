@@ -19,52 +19,22 @@ import tensorflow.compat.v1 as tf
 
 import efficientdet_arch as legacy_arch
 import hparams_config
-import utils
 from keras import efficientdet_arch_keras
-
-class KerasBiFPNTest(tf.test.TestCase):
-
-  def test_variables(self):
-    config = hparams_config.get_efficientdet_config()
-    feat_sizes = utils.get_feat_sizes(config.image_size, config.max_level)
-    with tf.Graph().as_default():
-      feats = [
-          tf.random.uniform([1, 64, 64, 40]),
-          tf.random.uniform([1, 32, 32, 112]),
-          tf.random.uniform([1, 16, 16, 320]),
-          tf.random.uniform([1, 8, 8, 64]),
-          tf.random.uniform([1, 4, 4, 64])
-      ]
-      efficientdet_arch_keras.build_bifpn_layer(feats, feat_sizes, config)
-      vars1 = [var.name for var in tf.global_variables()]
-
-    with tf.Graph().as_default():
-      feats = [
-          tf.random.uniform([1, 64, 64, 40]),
-          tf.random.uniform([1, 32, 32, 112]),
-          tf.random.uniform([1, 16, 16, 320]),
-          tf.random.uniform([1, 8, 8, 64]),
-          tf.random.uniform([1, 4, 4, 64])
-      ]
-      legacy_arch.build_bifpn_layer(feats, feat_sizes, config)
-      vars2 = [var.name for var in tf.global_variables()]
-
-    self.assertEqual(vars1, vars2)
 
 
 class KerasTest(tf.test.TestCase):
 
   def test_model_variables(self):
-    with tf.Graph().as_default():
-      feats = tf.random.uniform([1, 512, 512, 3])
-      efficientdet_arch_keras.efficientdet('efficientdet-d0')(feats)
-      vars1 = [var.name for var in tf.global_variables()]
-
+    feats = tf.random.uniform([1, 512, 512, 3])
+    model = efficientdet_arch_keras.efficientdet('efficientdet-d0')
+    model(feats)
+    vars1 = [var.name for var in model.trainable_variables]
     with tf.Graph().as_default():
       feats = tf.random.uniform([1, 512, 512, 3])
       legacy_arch.efficientdet(feats, 'efficientdet-d0')
-      vars2 = [var.name for var in tf.global_variables()]
-
+      vars2 = [var.name for var in tf.trainable_variables()]
+    vars1.sort()
+    vars2.sort()
     self.assertEqual(vars1, vars2)
 
   def test_resample_feature_map(self):
