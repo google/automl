@@ -251,7 +251,8 @@ class InputReader(object):
                                     params['anchor_scale'],
                                     params['image_size'])
     anchor_labeler = anchors.AnchorLabeler(input_anchors, params['num_classes'])
-    example_decoder = tf_example_decoder.TfExampleDecoder()
+    example_decoder = tf_example_decoder.TfExampleDecoder(
+        regenerate_source_id=params['regenerate_source_id'])
 
     @tf.autograph.experimental.do_not_convert
     def _dataset_parser(value):

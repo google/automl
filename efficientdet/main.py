@@ -230,6 +230,7 @@ def main(_):
   if FLAGS.use_xla and FLAGS.strategy != 'tpu':
     config_proto.graph_options.optimizer_options.global_jit_level = (
         tf.OptimizerOptions.ON_1)
+    config_proto.gpu_options.allow_growth = True
 
   tpu_config = tf.estimator.tpu.TPUConfig(
       FLAGS.iterations_per_loop,

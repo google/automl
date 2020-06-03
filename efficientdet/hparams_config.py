@@ -186,6 +186,7 @@ def default_detection_configs():
   h.skip_crowd_during_training = True
   h.label_id_mapping = None
   h.max_instances_per_image = 100  # Default to 100 for COCO.
+  h.regenerate_source_id = False
 
   # model architecture
   h.min_level = 3
