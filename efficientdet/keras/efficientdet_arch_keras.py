@@ -81,9 +81,7 @@ class FNode(tf.keras.layers.Layer):
 
     if self.weight_method == 'attn':
       edge_weights = []
-      for _ in nodes:
-        var = tf.Variable(1.0, name='WSM')
-        self.vars.append(var)
+      for var in self.vars:
         var = tf.cast(var, dtype=dtype)
         edge_weights.append(var)
       normalized_weights = tf.nn.softmax(tf.stack(edge_weights))
@@ -91,9 +89,7 @@ class FNode(tf.keras.layers.Layer):
       new_node = tf.reduce_sum(nodes * normalized_weights, -1)
     elif self.weight_method == 'fastattn':
       edge_weights = []
-      for _ in nodes:
-        var = tf.Variable(1.0, name='WSM')
-        self.vars.append(var)
+      for var in self.vars:
         var = tf.cast(var, dtype=dtype)
         edge_weights.append(var)
       weights_sum = tf.add_n(edge_weights)
@@ -103,22 +99,16 @@ class FNode(tf.keras.layers.Layer):
       ]
       new_node = tf.add_n(nodes)
     elif self.weight_method == 'channel_attn':
-      num_filters = int(nodes[0].shape[-1])
       edge_weights = []
-      for _ in nodes:
-        var = tf.Variable(lambda: tf.ones([num_filters]), name='WSM')
-        self.vars.append(var)
+      for var in self.vars:
         var = tf.cast(var, dtype=dtype)
         edge_weights.append(var)
       normalized_weights = tf.nn.softmax(tf.stack(edge_weights, -1), axis=-1)
       nodes = tf.stack(nodes, axis=-1)
       new_node = tf.reduce_sum(nodes * normalized_weights, -1)
     elif self.weight_method == 'channel_fastattn':
-      num_filters = int(nodes[0].shape[-1])
       edge_weights = []
-      for _ in nodes:
-        var = tf.Variable(lambda: tf.ones([num_filters]), name='WSM')
-        self.vars.append(var)
+      for var in self.vars:
         var = tf.cast(var, dtype=dtype)
         edge_weights.append(var)
 
@@ -135,12 +125,9 @@ class FNode(tf.keras.layers.Layer):
 
     return new_node
 
-  def call(self, feats):
-    # num_output_connections = [0 for _ in feats]
-    nodes = []
+  def build(self, feats_shape):
+    nodes_shape = []
     for idx, input_offset in enumerate(self.inputs_offsets):
-      input_node = feats[input_offset]
-      # num_output_connections[input_offset] += 1
       resample_feature_map = ResampleFeatureMap(self.new_node_height,
                                                 self.new_node_width,
                                                 self.fpn_num_filters,
@@ -153,25 +140,47 @@ class FNode(tf.keras.layers.Layer):
                                                 data_format=self.data_format,
                                                 name='resample_{}_{}_{}'.format(
                                                     idx, input_offset,
-                                                    len(feats)))
-      self.resample_feature_maps.append(resample_feature_map)
-      input_node = resample_feature_map(input_node)
+                                                    len(feats_shape)))
+      fake_feat = tf.random.uniform([-1, *feats_shape[input_offset][1:]])
+      self.resample_feature_maps.insert(idx, resample_feature_map)
+      nodes_shape.append(resample_feature_map(fake_feat).shape)
+    if self.weight_method == 'attn':
+      for _ in nodes_shape:
+        self.vars.append(tf.Variable(1.0, name='WSM'))
+    elif self.weight_method == 'fastattn':
+      for _ in nodes_shape:
+        self.vars.append(tf.Variable(1.0, name='WSM'))
+    elif self.weight_method == 'channel_attn':
+      num_filters = int(nodes_shape[0][-1])
+      for _ in nodes_shape:
+        self.vars.append(tf.Variable(lambda: tf.ones([num_filters]),
+                                     name='WSM'))
+    elif self.weight_method == 'channel_fastattn':
+      num_filters = int(nodes_shape[0][-1])
+      for _ in nodes_shape:
+        self.vars.append(tf.Variable(lambda: tf.ones([num_filters]),
+                                     name='WSM'))
+    self.op_after_combine = OpAfterCombine(self.is_training_bn,
+                                           self.conv_bn_act_pattern,
+                                           self.separable_conv,
+                                           self.fpn_num_filters,
+                                           self.act_type,
+                                           self.data_format,
+                                           self.strategy,
+                                           name='op_after_combine{}'.format(
+                                               len(feats_shape)))
+    self.built = True
+
+  def call(self, feats):
+    nodes = []
+    for idx, input_offset in enumerate(self.inputs_offsets):
+      input_node = feats[input_offset]
+      input_node = self.resample_feature_maps[idx](input_node)
       nodes.append(input_node)
     new_node = self.fuse_features(nodes)
-    op_after_combine = OpAfterCombine(self.is_training_bn,
-                                      self.conv_bn_act_pattern,
-                                      self.separable_conv,
-                                      self.fpn_num_filters,
-                                      self.act_type,
-                                      self.data_format,
-                                      self.strategy,
-                                      name='op_after_combine{}'.format(
-                                          len(feats)))
-    self.op_after_combines.append(op_after_combine)
-    new_node = op_after_combine(new_node)
+    new_node = self.op_after_combine(new_node)
     feats.append(new_node)
     return feats
-    # num_output_connections.append(0)
 
 
 class OpAfterCombine(tf.keras.layers.Layer):
@@ -205,12 +214,10 @@ class OpAfterCombine(tf.keras.layers.Layer):
                           use_bias=not self.conv_bn_act_pattern,
                           data_format=self.data_format,
                           name='conv')
-    self.bn = utils_keras.build_batch_norm(
-        is_training_bn=self.is_training_bn,
-        data_format=self.data_format,
-        strategy=self.strategy,
-        name='bn'
-    )
+    self.bn = utils_keras.build_batch_norm(is_training_bn=self.is_training_bn,
+                                           data_format=self.data_format,
+                                           strategy=self.strategy,
+                                           name='bn')
 
   def call(self, new_node):
     if not self.conv_bn_act_pattern:
@@ -703,6 +710,63 @@ class BoxNet(tf.keras.layers.Layer):
     }
 
 
+class FPNCell(tf.keras.layers.Layer):
+
+  def __init__(self, feat_sizes, config, name='fpn_cell'):
+    super(FPNCell, self).__init__(name=name)
+    self.feat_sizes = feat_sizes
+    self.config = config
+    if config.fpn_config:
+      fpn_config = config.fpn_config
+    else:
+      fpn_config = legacy_arch.get_fpn_config(config.fpn_name, config.min_level,
+                                              config.max_level,
+                                              config.fpn_weight_method)
+    self.fpn_config = fpn_config
+    self.fnodes = []
+    for i, fnode_cfg in enumerate(fpn_config.nodes):
+      logging.info('fnode %d : %s', i, fnode_cfg)
+      fnode = FNode(feat_sizes[fnode_cfg['feat_level']]['height'],
+                    feat_sizes[fnode_cfg['feat_level']]['width'],
+                    fnode_cfg['inputs_offsets'],
+                    config.fpn_num_filters,
+                    config.apply_bn_for_resampling,
+                    config.is_training_bn,
+                    config.conv_after_downsample,
+                    config.use_native_resize_op,
+                    config.pooling_type,
+                    config.conv_bn_act_pattern,
+                    config.separable_conv,
+                    config.act_type,
+                    strategy=config.strategy,
+                    weight_method=fpn_config.weight_method,
+                    data_format=config.data_format,
+                    name='fnode{}'.format(i))
+      self.fnodes.append(fnode)
+
+  def call(self, feats):
+    for fnode in self.fnodes:
+      feats = fnode(feats)
+
+    new_feats = {}
+    for l in range(self.config.min_level, self.config.max_level + 1):
+      for i, fnode in enumerate(reversed(self.fpn_config.nodes)):
+        if fnode['feat_level'] == l:
+          new_feats[l] = feats[-1 - i]
+          break
+    feats = [
+        new_feats[level]
+        for level in range(self.config.min_level, self.config.max_level + 1)
+    ]
+    #
+    utils.verify_feats_size(feats,
+                            feat_sizes=self.feat_sizes,
+                            min_level=self.config.min_level,
+                            max_level=self.config.max_level,
+                            data_format=self.config.data_format)
+    return new_feats, feats
+
+
 def build_feature_network(features, config):
   """Build FPN input features.
 
@@ -749,21 +813,8 @@ def build_feature_network(features, config):
 
   with tf.name_scope('fpn_cells'):
     for rep in range(config.fpn_cell_repeats):
-      with tf.name_scope('cell_{}'.format(rep)):
-        logging.info('building cell %d', rep)
-        new_feats = build_bifpn_layer(feats, feat_sizes, config)
-
-        feats = [
-            new_feats[level]
-            for level in range(config.min_level, config.max_level + 1)
-        ]
-
-        utils.verify_feats_size(feats,
-                                feat_sizes=feat_sizes,
-                                min_level=config.min_level,
-                                max_level=config.max_level,
-                                data_format=config.data_format)
-
+      new_feats, feats = FPNCell(feat_sizes, config,
+                                 name='cell_{}'.format(rep))(feats)
   return new_feats
 
 
@@ -831,9 +882,10 @@ def efficientdet(model_name=None, config=None, **kwargs):
     config.override(kwargs)
 
   logging.info(config)
-  features = tf.keras.layers.Input([*utils.parse_image_size(config.image_size), 3])
+  inputs = tf.keras.layers.Input(
+      [*utils.parse_image_size(config.image_size), 3])
   # build backbone features.
-  features = legacy_arch.build_backbone(features, config)
+  features = legacy_arch.build_backbone(inputs, config)
   logging.info('backbone params/flops = {:.6f}M, {:.9f}B'.format(
       *utils.num_params_flops()))
 
@@ -847,4 +899,4 @@ def efficientdet(model_name=None, config=None, **kwargs):
   logging.info('backbone+fpn+box params/flops = {:.6f}M, {:.9f}B'.format(
       *utils.num_params_flops()))
 
-  return tf.keras.Model(inputs=features, outputs=[class_outputs, box_outputs])
+  return tf.keras.Model(inputs=inputs, outputs=[class_outputs, box_outputs])

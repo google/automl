@@ -20,9 +20,7 @@ import tensorflow.compat.v1 as tf
 import efficientdet_arch as legacy_arch
 import hparams_config
 import utils
-import numpy as np
 from keras import efficientdet_arch_keras
-
 
 class KerasBiFPNTest(tf.test.TestCase):
 
@@ -55,6 +53,7 @@ class KerasBiFPNTest(tf.test.TestCase):
 
 
 class KerasTest(tf.test.TestCase):
+
   def test_model_variables(self):
     with tf.Graph().as_default():
       feats = tf.random.uniform([1, 512, 512, 3])
