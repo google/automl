@@ -19,45 +19,63 @@ import tensorflow.compat.v1 as tf
 
 import efficientdet_arch as legacy_arch
 import hparams_config
+import utils
+import numpy as np
 from keras import efficientdet_arch_keras
 
 
 class KerasBiFPNTest(tf.test.TestCase):
 
-  def test_BiFPNLayer_get_config(self):
+  def test_variables(self):
     config = hparams_config.get_efficientdet_config()
-    keras_bifpn = efficientdet_arch_keras.BiFPNLayer(
-        fpn_name=config.fpn_name,
-        min_level=config.min_level,
-        max_level=config.max_level,
-        fpn_weight_method=config.fpn_weight_method,
-        apply_bn_for_resampling=config.apply_bn_for_resampling,
-        is_training_bn=config.is_training_bn,
-        conv_after_downsample=config.conv_after_downsample,
-        use_native_resize_op=config.use_native_resize_op,
-        data_format=config.data_format,
-        image_size=config.image_size,
-        fpn_num_filters=config.fpn_num_filters,
-        conv_bn_act_pattern=config.conv_bn_act_pattern,
-        act_type=config.act_type,
-        pooling_type=config.pooling_type,
-        separable_conv=config.separable_conv,
-        strategy=config.strategy)
+    feat_sizes = utils.get_feat_sizes(config.image_size, config.max_level)
+    with tf.Graph().as_default():
+      feats = [
+          tf.random.uniform([1, 64, 64, 40]),
+          tf.random.uniform([1, 32, 32, 112]),
+          tf.random.uniform([1, 16, 16, 320]),
+          tf.random.uniform([1, 8, 8, 64]),
+          tf.random.uniform([1, 4, 4, 64])
+      ]
+      efficientdet_arch_keras.build_bifpn_layer(feats, feat_sizes, config)
+      vars1 = [var.name for var in tf.global_variables()]
 
-    layer_config = keras_bifpn.get_config()
-    new_layer = efficientdet_arch_keras.BiFPNLayer(**layer_config)
-    self.assertDictEqual(new_layer.get_config(), layer_config)
+    with tf.Graph().as_default():
+      feats = [
+          tf.random.uniform([1, 64, 64, 40]),
+          tf.random.uniform([1, 32, 32, 112]),
+          tf.random.uniform([1, 16, 16, 320]),
+          tf.random.uniform([1, 8, 8, 64]),
+          tf.random.uniform([1, 4, 4, 64])
+      ]
+      legacy_arch.build_bifpn_layer(feats, feat_sizes, config)
+      vars2 = [var.name for var in tf.global_variables()]
+
+    self.assertEqual(vars1, vars2)
 
 
 class KerasTest(tf.test.TestCase):
+  def test_model_variables(self):
+    with tf.Graph().as_default():
+      feats = tf.random.uniform([1, 512, 512, 3])
+      efficientdet_arch_keras.efficientdet('efficientdet-d0')(feats)
+      vars1 = [var.name for var in tf.global_variables()]
+
+    with tf.Graph().as_default():
+      feats = tf.random.uniform([1, 512, 512, 3])
+      legacy_arch.efficientdet(feats, 'efficientdet-d0')
+      vars2 = [var.name for var in tf.global_variables()]
+
+    self.assertEqual(vars1, vars2)
 
   def test_resample_feature_map(self):
     feat = tf.random.uniform([1, 16, 16, 320])
     for apply_bn in [True, False]:
       for is_training in [True, False]:
         for strategy in ['tpu', '']:
-          with self.subTest(
-              apply_bn=apply_bn, is_training=is_training, strategy=strategy):
+          with self.subTest(apply_bn=apply_bn,
+                            is_training=is_training,
+                            strategy=strategy):
             tf.random.set_random_seed(111111)
             expect_result = legacy_arch.resample_feature_map(
                 feat,
@@ -81,23 +99,23 @@ class KerasTest(tf.test.TestCase):
             self.assertAllCloseAccordingToType(expect_result, actual_result)
 
   def test_op_name(self):
-    vars1 = []
-    vars2 = []
     with tf.Graph().as_default():
       feat = tf.random.uniform([1, 16, 16, 320])
       resample_layer = efficientdet_arch_keras.ResampleFeatureMap(
-          name='p0', target_height=8, target_width=8, target_num_channels=64)
+          name='resample_p0',
+          target_height=8,
+          target_width=8,
+          target_num_channels=64)
       resample_layer(feat)
       vars1 = [var.name for var in tf.trainable_variables()]
 
     with tf.Graph().as_default():
       feat = tf.random.uniform([1, 16, 16, 320])
-      legacy_arch.resample_feature_map(
-          feat,
-          name='p0',
-          target_height=8,
-          target_width=8,
-          target_num_channels=64)
+      legacy_arch.resample_feature_map(feat,
+                                       name='p0',
+                                       target_height=8,
+                                       target_width=8,
+                                       target_num_channels=64)
       vars2 = [var.name for var in tf.trainable_variables()]
 
     self.assertEqual(vars1, vars2)
