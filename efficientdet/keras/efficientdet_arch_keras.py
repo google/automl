@@ -136,7 +136,6 @@ class FNode(tf.keras.layers.Layer):
           self.add_weight(initializer=initializer, name=name, trainable=True))
 
   def build(self, feats_shape):
-    nodes_shape = []
     for idx, input_offset in enumerate(self.inputs_offsets):
       resample_feature_map = ResampleFeatureMap(self.new_node_height,
                                                 self.new_node_width,
