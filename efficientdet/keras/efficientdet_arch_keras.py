@@ -20,13 +20,15 @@ import numpy as np
 import tensorflow as tf
 
 import efficientdet_arch as legacy_arch
-from backbone import backbone_factory, efficientnet_builder
 import hparams_config
 import utils
+from backbone import backbone_factory
+from backbone import efficientnet_builder
 from keras import utils_keras
 
 
 class FNode(tf.keras.layers.Layer):
+  """A Keras Layer implementing BiFPN Node."""
 
   def __init__(self,
                new_node_height,
@@ -70,10 +72,6 @@ class FNode(tf.keras.layers.Layer):
 
     Args:
       nodes: a list of tensorflow features at different levels
-      weight_method: feature fusion method. One of:
-        - "attn" - Softmax weighted fusion
-        - "fastattn" - Fast normalzied feature fusion
-        - "sum" - a sum of inputs
 
     Returns:
       A tensor denoting the fused feature.
@@ -185,6 +183,7 @@ class FNode(tf.keras.layers.Layer):
 
 
 class OpAfterCombine(tf.keras.layers.Layer):
+  """Operation after combining input features during feature fusiong."""
 
   def __init__(self,
                is_training_bn,
@@ -204,17 +203,17 @@ class OpAfterCombine(tf.keras.layers.Layer):
     self.strategy = strategy
     self.is_training_bn = is_training_bn
     if self.separable_conv:
-      Conv2D = functools.partial(tf.keras.layers.SeparableConv2D,
-                                 depth_multiplier=1)
+      conv2d_layer = functools.partial(tf.keras.layers.SeparableConv2D,
+                                       depth_multiplier=1)
     else:
-      Conv2D = tf.keras.layers.Conv2D
+      conv2d_layer = tf.keras.layers.Conv2D
 
-    self.conv_op = Conv2D(filters=fpn_num_filters,
-                          kernel_size=(3, 3),
-                          padding='same',
-                          use_bias=not self.conv_bn_act_pattern,
-                          data_format=self.data_format,
-                          name='conv')
+    self.conv_op = conv2d_layer(filters=fpn_num_filters,
+                                kernel_size=(3, 3),
+                                padding='same',
+                                use_bias=not self.conv_bn_act_pattern,
+                                data_format=self.data_format,
+                                name='conv')
     self.bn = utils_keras.build_batch_norm(is_training_bn=self.is_training_bn,
                                            data_format=self.data_format,
                                            strategy=self.strategy,
@@ -412,26 +411,26 @@ class ClassNet(tf.keras.layers.Layer):
     self.conv_ops = []
     self.bns = []
     if separable_conv:
-      Conv2D = functools.partial(
+      conv2d_layer = functools.partial(
           tf.keras.layers.SeparableConv2D,
           depth_multiplier=1,
           data_format=data_format,
           pointwise_initializer=tf.initializers.VarianceScaling(),
           depthwise_initializer=tf.initializers.VarianceScaling())
     else:
-      Conv2D = functools.partial(
+      conv2d_layer = functools.partial(
           tf.keras.layers.Conv2D,
           data_format=data_format,
           kernel_initializer=tf.random_normal_initializer(stddev=0.01))
     for i in range(self.repeats):
       # If using SeparableConv2D
       self.conv_ops.append(
-          Conv2D(self.num_filters,
-                 kernel_size=3,
-                 bias_initializer=tf.zeros_initializer(),
-                 activation=None,
-                 padding='same',
-                 name='class-%d' % i))
+          conv2d_layer(self.num_filters,
+                       kernel_size=3,
+                       bias_initializer=tf.zeros_initializer(),
+                       activation=None,
+                       padding='same',
+                       name='class-%d' % i))
 
       bn_per_level = {}
       for level in range(self.min_level, self.max_level + 1):
@@ -444,7 +443,7 @@ class ClassNet(tf.keras.layers.Layer):
         )
       self.bns.append(bn_per_level)
 
-    self.classes = Conv2D(
+    self.classes = conv2d_layer(
         num_classes * num_anchors,
         kernel_size=3,
         bias_initializer=tf.constant_initializer(-np.log((1 - 0.01) / 0.01)),
@@ -646,6 +645,7 @@ class BoxNet(tf.keras.layers.Layer):
 
 
 class FPNCells(tf.keras.layers.Layer):
+  """FPN cells."""
 
   def __init__(self, feat_sizes, config, name='fpn_cells'):
     super(FPNCells, self).__init__(name=name)
@@ -664,6 +664,7 @@ class FPNCells(tf.keras.layers.Layer):
 
 
 class FPNCell(tf.keras.layers.Layer):
+  """A single FPN cell."""
 
   def __init__(self, feat_sizes, config, name='fpn_cell'):
     super(FPNCell, self).__init__(name=name)
@@ -859,7 +860,6 @@ def efficientdet(model_name=None, config=None, **kwargs):
   """Build EfficientDet model.
 
   Args:
-    features: input tensor.
     model_name: String of the model (eg. efficientdet-d0)
     config: Dict of parameters for the network
     **kwargs: other parameters.
