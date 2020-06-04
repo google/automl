@@ -38,7 +38,6 @@ import hparams_config
 import utils
 from visualize import vis_utils
 from tensorflow.python.client import timeline  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.compiler.tensorrt import trt  # pylint: disable=g-direct-tensorflow-import
 
 coco_id_mapping = {
     1: 'person', 2: 'bicycle', 3: 'car', 4: 'motorcycle', 5: 'airplane',
@@ -742,6 +741,7 @@ class ServingDriver(object):
       logging.info('TFLite is saved at %s', tflite_path)
 
     if tensorrt:
+      from tensorflow.python.compiler.tensorrt import trt  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
       sess_config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))
       trt_path = os.path.join(output_dir, 'tensorrt_' + tensorrt.lower())
       trt.create_inference_graph(
