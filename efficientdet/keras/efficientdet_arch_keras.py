@@ -126,8 +126,8 @@ class FNode(tf.keras.layers.Layer):
 
     return new_node
 
-  def _add_wsm(self, initializer, nodes_shape):
-    for i, _ in enumerate(nodes_shape):
+  def _add_wsm(self, initializer):
+    for i, _ in enumerate(self.inputs_offsets):
       if i == 0:
         name = 'WSM'
       else:
@@ -151,19 +151,17 @@ class FNode(tf.keras.layers.Layer):
                                                 name='resample_{}_{}_{}'.format(
                                                     idx, input_offset,
                                                     len(feats_shape)))
-      fake_feat = tf.ones([1, *feats_shape[input_offset][1:]])
-      nodes_shape.append(resample_feature_map(fake_feat).shape)
       self.resample_feature_maps.insert(idx, resample_feature_map)
     if self.weight_method == 'attn':
-      self._add_wsm('ones', nodes_shape)
+      self._add_wsm('ones')
     elif self.weight_method == 'fastattn':
-      self._add_wsm('ones', nodes_shape)
+      self._add_wsm('ones')
     elif self.weight_method == 'channel_attn':
-      num_filters = int(nodes_shape[0][-1])
-      self._add_wsm(lambda: tf.ones([num_filters]), nodes_shape)
+      num_filters = int(self.fpn_num_filters)
+      self._add_wsm(lambda: tf.ones([num_filters]))
     elif self.weight_method == 'channel_fastattn':
-      num_filters = int(nodes_shape[0][-1])
-      self._add_wsm(lambda: tf.ones([num_filters]), nodes_shape)
+      num_filters = int(self.fpn_num_filters)
+      self._add_wsm(lambda: tf.ones([num_filters]))
     self.op_after_combine = OpAfterCombine(self.is_training_bn,
                                            self.conv_bn_act_pattern,
                                            self.separable_conv,

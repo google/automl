@@ -27,6 +27,7 @@ SEED = 111111
 class KerasTest(tf.test.TestCase):
 
   def test_model_output(self):
+    # TODO: Fix the test case
     inputs_shape = [1, 512, 512, 3]
     with tf.Session(graph=tf.Graph()) as sess:
       feats = tf.ones(inputs_shape)
@@ -48,6 +49,7 @@ class KerasTest(tf.test.TestCase):
       self.assertAllEqual(box_output1[i], box_output2[i])
 
   def test_build_feature_network(self):
+    # TODO: Fix the test case
     config = hparams_config.get_efficientdet_config('efficientdet-d0')
     with tf.Session(graph=tf.Graph()) as sess:
       inputs = {
