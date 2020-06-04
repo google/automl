@@ -132,7 +132,8 @@ class FNode(tf.keras.layers.Layer):
         name = 'WSM'
       else:
         name = 'WSM_{}'.format(i)
-      self.vars.append(self.add_weight(initializer=initializer, name=name, trainable=True))
+      self.vars.append(
+          self.add_weight(initializer=initializer, name=name, trainable=True))
 
   def build(self, feats_shape):
     nodes_shape = []
@@ -411,38 +412,29 @@ class ClassNet(tf.keras.layers.Layer):
     self.act_type = act_type
     self.strategy = strategy
     self.data_format = data_format
-    self.use_dc = survival_prob and is_training
-
     self.conv_ops = []
     self.bns = []
-
+    if separable_conv:
+      Conv2D = functools.partial(
+          tf.keras.layers.SeparableConv2D,
+          depth_multiplier=1,
+          data_format=data_format,
+          pointwise_initializer=tf.initializers.VarianceScaling(),
+          depthwise_initializer=tf.initializers.VarianceScaling())
+    else:
+      Conv2D = functools.partial(
+          tf.keras.layers.Conv2D,
+          data_format=data_format,
+          kernel_initializer=tf.random_normal_initializer(stddev=0.01))
     for i in range(self.repeats):
       # If using SeparableConv2D
-      if self.separable_conv:
-        self.conv_ops.append(
-            tf.keras.layers.SeparableConv2D(
-                filters=self.num_filters,
-                depth_multiplier=1,
-                pointwise_initializer=tf.initializers.VarianceScaling(),
-                depthwise_initializer=tf.initializers.VarianceScaling(),
-                data_format=self.data_format,
-                kernel_size=3,
-                activation=None,
-                bias_initializer=tf.zeros_initializer(),
-                padding='same',
-                name='class-%d' % i))
-      # If using Conv2d
-      else:
-        self.conv_ops.append(
-            tf.keras.layers.Conv2D(
-                filters=self.num_filters,
-                kernel_initializer=tf.random_normal_initializer(stddev=0.01),
-                data_format=self.data_format,
-                kernel_size=3,
-                activation=None,
-                bias_initializer=tf.zeros_initializer(),
-                padding='same',
-                name='class-%d' % i))
+      self.conv_ops.append(
+          Conv2D(self.num_filters,
+                 kernel_size=3,
+                 bias_initializer=tf.zeros_initializer(),
+                 activation=None,
+                 padding='same',
+                 name='class-%d' % i))
 
       bn_per_level = {}
       for level in range(self.min_level, self.max_level + 1):
@@ -455,31 +447,12 @@ class ClassNet(tf.keras.layers.Layer):
         )
       self.bns.append(bn_per_level)
 
-    if self.separable_conv:
-      self.classes = tf.keras.layers.SeparableConv2D(
-          filters=self.num_classes * self.num_anchors,
-          depth_multiplier=1,
-          pointwise_initializer=tf.initializers.VarianceScaling(),
-          depthwise_initializer=tf.initializers.VarianceScaling(),
-          data_format=self.data_format,
-          kernel_size=3,
-          activation=None,
-          bias_initializer=tf.constant_initializer(-np.math.log((1 - 0.01) /
-                                                                0.01)),
-          padding='same',
-          name='class-predict')
-
-    else:
-      self.classes = tf.keras.layers.Conv2D(
-          filters=self.num_classes * self.num_anchors,
-          kernel_initializer=tf.random_normal_initializer(stddev=0.01),
-          data_format=self.data_format,
-          kernel_size=3,
-          activation=None,
-          bias_initializer=tf.constant_initializer(-np.math.log((1 - 0.01) /
-                                                                0.01)),
-          padding='same',
-          name='class-predict')
+    self.classes = Conv2D(
+        num_classes * num_anchors,
+        kernel_size=3,
+        bias_initializer=tf.constant_initializer(-np.log((1 - 0.01) / 0.01)),
+        padding='same',
+        name='class-predict')
 
   def call(self, inputs, **kwargs):
     """Call ClassNet."""
@@ -493,7 +466,7 @@ class ClassNet(tf.keras.layers.Layer):
         image = self.bns[i][level](image, training=self.is_training)
         if self.act_type:
           image = utils.activation_fn(image, self.act_type)
-        if i > 0 and self.use_dc:
+        if i > 0 and self.survival_prob:
           image = utils.drop_connect(image, self.is_training,
                                      self.survival_prob)
           image = image + original_image
@@ -570,7 +543,6 @@ class BoxNet(tf.keras.layers.Layer):
     self.act_type = act_type
     self.strategy = strategy
     self.data_format = data_format
-    self.use_dc = survival_prob and is_training
 
     self.conv_ops = []
     self.bns = []
@@ -648,7 +620,7 @@ class BoxNet(tf.keras.layers.Layer):
         image = self.bns[i][level](image, training=self.is_training)
         if self.act_type:
           image = utils.activation_fn(image, self.act_type)
-        if i > 0 and self.use_dc:
+        if i > 0 and self.survival_prob:
           image = utils.drop_connect(image, self.is_training,
                                      self.survival_prob)
           image = image + original_image
@@ -675,18 +647,24 @@ class BoxNet(tf.keras.layers.Layer):
         'data_format': self.data_format,
     }
 
+
 class FPNCells(tf.keras.layers.Layer):
+
   def __init__(self, feat_sizes, config, name='fpn_cells'):
     super(FPNCells, self).__init__(name=name)
-    self.feat_sizes=feat_sizes
-    self.config=config
-    self.cells = [FPNCell(self.feat_sizes, self.config, name='cell_{}'.format(rep)) for rep in range(self.config.fpn_cell_repeats)]
+    self.feat_sizes = feat_sizes
+    self.config = config
+    self.cells = [
+        FPNCell(self.feat_sizes, self.config, name='cell_{}'.format(rep))
+        for rep in range(self.config.fpn_cell_repeats)
+    ]
 
   def call(self, feats):
     for cell in self.cells:
       new_feats, feats = cell(feats)
 
     return new_feats
+
 
 class FPNCell(tf.keras.layers.Layer):
 
@@ -832,6 +810,7 @@ def build_class_and_box_outputs(feats, config):
 
   return class_outputs, box_outputs
 
+
 def build_backbone(features, config):
   """Builds backbone model.
 
@@ -920,4 +899,5 @@ def efficientdet(model_name=None, config=None, **kwargs):
   logging.info('backbone+fpn+box params/flops = {:.6f}M, {:.9f}B'.format(
       *utils.num_params_flops()))
 
-  return tf.keras.Model(inputs=inputs, outputs=[backbone_outputs, class_outputs, box_outputs])
+  return tf.keras.Model(inputs=inputs,
+                        outputs=[backbone_outputs, class_outputs, box_outputs])
