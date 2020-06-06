@@ -263,8 +263,9 @@ Download data and checkpoints.
 
 Create a config file for the PASCAL VOC dataset called voc_config.yaml and put this in it.
 
-      num_classes: 20
+      num_classes: 21
       moving_average_decay: 0
+      label_id_mapping: {0: background, 1: aeroplane, 2: bicycle, 3: bird, 4: boat, 5: bottle, 6: bus, 7: car, 8: cat, 9: chair, 10: cow, 11: diningtable, 12: dog, 13: horse, 14: motorbike, 15: person, 16: pottedplant, 17: sheep, 18: sofa, 19: train, 20: tvmonitor}
 
 Finetune needs to use --ckpt rather than --backbone_ckpt.
 
@@ -295,8 +296,9 @@ Install [horovod](https://github.com/horovod/horovod#id6).
 
 Create a config file for the PASCAL VOC dataset called voc_config.yaml and put this in it.
 
-      num_classes: 20
+      num_classes: 21
       moving_average_decay: 0
+      label_id_mapping: {0: background, 1: aeroplane, 2: bicycle, 3: bird, 4: boat, 5: bottle, 6: bus, 7: car, 8: cat, 9: chair, 10: cow, 11: diningtable, 12: dog, 13: horse, 14: motorbike, 15: person, 16: pottedplant, 17: sheep, 18: sofa, 19: train, 20: tvmonitor}
 
 Download efficientdet coco checkpoint.
 
