@@ -225,8 +225,6 @@ def main(_):
       val_json_file=FLAGS.val_json_file,
       testdev_dir=FLAGS.testdev_dir,
       mode=FLAGS.mode)
-      
-  params = utils.rw_params(params)
 
   config_proto = tf.ConfigProto(
       allow_soft_placement=True, log_device_placement=False)
@@ -263,6 +261,7 @@ def main(_):
   use_tpu = (FLAGS.strategy == 'tpu')
 
   # TPU Estimator
+  params = utils.rw_params(params)
   logging.info(params)
   if FLAGS.mode == 'train':
     train_estimator = tf.estimator.tpu.TPUEstimator(

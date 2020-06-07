@@ -99,7 +99,7 @@ class ModelInspector(object):
     self.export_ckpt = export_ckpt
     self.saved_model_dir = saved_model_dir
     self.tflite_path = tflite_path
-
+    
     model_config = hparams_config.get_detection_config(model_name)
     model_config.override(hparams)  # Add custom overrides
     model_config.is_training_bn = False
@@ -115,6 +115,8 @@ class ModelInspector(object):
     else:
       self.inputs_shape = [batch_size, height, width, 3]
 
+    model_params = utils.rw_params({'model_dir': ckpt_path})
+    model_config.override(model_params)
     self.model_config = model_config
 
   def build_model(self, inputs: tf.Tensor) -> List[tf.Tensor]:

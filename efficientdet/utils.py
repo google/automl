@@ -33,6 +33,7 @@ from tensorflow.python.tpu import tpu_function  # pylint:disable=g-direct-tensor
 # pylint: disable=logging-format-interpolation
 
 def rw_params(params):
+  os.makedirs(params['model_dir'], exist_ok=True)
   params_path = os.path.join(params['model_dir'], 'model.params')
   if os.path.exists(params_path):
     content = open(params_path,'rb').read()

@@ -22,6 +22,7 @@ from __future__ import print_function
 import ast
 import copy
 from typing import Any, Dict, Text
+from absl import logging
 import six
 import tensorflow.compat.v1 as tf
 import yaml
@@ -71,7 +72,7 @@ class Config(object):
         if allow_new_keys:
           self.__setattr__(k, v)
         else:
-          raise KeyError('Key `{}` does not exist for overriding. '.format(k))
+          logging.warning('Key `{}` does not exist for overriding. '.format(k))
       else:
         if isinstance(self.__dict__[k], dict):
           self.__dict__[k]._update(v, allow_new_keys)
