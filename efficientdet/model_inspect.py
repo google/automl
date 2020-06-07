@@ -284,7 +284,7 @@ class ModelInspector(object):
         f.write(sess.graph_def.SerializeToString())
 
   def eval_ckpt(self):
-    """build and save the model into self.logdir."""
+    """evaluate checkpoint"""
     with tf.Graph().as_default(), tf.Session() as sess:
       # Build model with inputs and labels.
       inputs = tf.placeholder(tf.float32, name='input', shape=self.inputs_shape)
