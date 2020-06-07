@@ -241,10 +241,16 @@ def main(_):
       per_host_input_for_training=tf.estimator.tpu.InputPipelineConfig
       .PER_HOST_V2)
 
+  if FLAGS.model_dir is None:
+    import time
+    #get time stamp
+    now = int(time.time())
+    time_arr = time.localtime(now)
+    time_stamp = time.strftime("%Y-%m-%d-%H-%M-%S", time_arr)
+    model_dir = os.path.join(FLAGS.model_name, time_stamp)
+  
   if FLAGS.strategy == 'horovod':
-    model_dir = FLAGS.model_dir if hvd.rank() == 0 else None
-  else:
-    model_dir = FLAGS.model_dir
+    model_dir = model_dir if hvd.rank() == 0 else None
 
   run_config = tf.estimator.tpu.RunConfig(
       cluster=tpu_cluster_resolver,
