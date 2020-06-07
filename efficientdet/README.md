@@ -18,7 +18,7 @@ Updates:
 
 ## 1. About EfficientDet Models
 
-EfficientDets are a family of object detection models, which achieve state-of-the-art 52.6mAP on COCO test-dev, yet being 4x - 9x smaller and using 13x - 42x fewer FLOPs than previous detectors. Our models also run 2x - 4x faster on GPU, and 5x - 11x faster on CPU than other detectors.
+EfficientDets are a family of object detection models, which achieve state-of-the-art 53.4mAP on COCO test-dev, yet being 4x - 9x smaller and using 13x - 42x fewer FLOPs than previous detectors. Our models also run 2x - 4x faster on GPU, and 5x - 11x faster on CPU than other detectors.
 
 
 EfficientDets are developed based on the advanced backbone, a new BiFPN, and a new scaling technique:
@@ -128,7 +128,7 @@ latency and throughput are:
 | EfficientDet-D4 |  49.4 | 42.8ms | 23 fps | 35 fps  |
 | EfficientDet-D5 |  50.7 | 72.5ms | 14 fps | 18 fps  |
 | EfficientDet-D6 |  51.7 | 92.8ms | 11 fps | - fps  |
-| EfficientDet-D7 |  52.6 | 122ms  | 8.2 fps | - fps  |
+| EfficientDet-D7 |  53.4 | 122ms  | 8.2 fps | - fps  |
 
 ** FPS means frames per second (or images/second).
 
