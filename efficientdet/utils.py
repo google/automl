@@ -21,6 +21,7 @@ from __future__ import print_function
 
 import contextlib
 import os
+import json
 import re
 from typing import Text, Tuple, Union
 from absl import logging
@@ -31,6 +32,15 @@ import tensorflow.compat.v2 as tf2
 from tensorflow.python.tpu import tpu_function  # pylint:disable=g-direct-tensorflow-import
 # pylint: disable=logging-format-interpolation
 
+def rw_params(params):
+  params_path = os.path.join(params['model_dir'], 'model.params')
+  if os.path.exists(params_path):
+    content = open(params_path,'rb').read()
+    params = json.loads(content.decode(encoding="utf-8"))
+  else:
+    file = open(params_path,'wb')
+    file.write(json.dumps(params).encode(encoding="utf-8"))
+  return params
 
 def activation_fn(features: tf.Tensor, act_type: Text):
   """Customized non-linear activation type."""

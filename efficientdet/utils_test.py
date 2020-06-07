@@ -27,6 +27,10 @@ import utils
 
 
 class UtilsTest(tf.test.TestCase):
+  def test_rw_params(self):
+    test_params=dict({'model_dir': '/tmp'})
+    params = utils.rw_params(test_params)
+    self.assertEqual(test_params, params)
 
   def setUp(self):
     super(UtilsTest, self).setUp()
