@@ -261,14 +261,14 @@ def det_post_process_combined(params, cls_outputs, box_outputs, scales,
   image_ids = tf.cast(
       tf.tile(
           tf.expand_dims(tf.range(batch_size), axis=1), [1, max_boxes_to_draw]),
-      dtype=tf.float32)
+      dtype=scales.dtype)
   image_size = utils.parse_image_size(params['image_size'])
   ymin = tf.clip_by_value(nmsed_boxes[..., 0], 0, image_size[0]) * scales
   xmin = tf.clip_by_value(nmsed_boxes[..., 1], 0, image_size[1]) * scales
   ymax = tf.clip_by_value(nmsed_boxes[..., 2], 0, image_size[0]) * scales
   xmax = tf.clip_by_value(nmsed_boxes[..., 3], 0, image_size[1]) * scales
 
-  classes = tf.cast(nmsed_classes + 1, tf.float32)
+  classes = tf.cast(nmsed_classes + 1, scales.dtype)
   detection_list = [image_ids, ymin, xmin, ymax, xmax, nmsed_scores, classes]
   detections = tf.stack(detection_list, axis=2, name='detections')
   return detections
