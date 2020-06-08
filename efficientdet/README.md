@@ -97,7 +97,7 @@ prediction output), use the following command:
 
     !python model_inspect.py --runmode=bm --model_name=efficientdet-d0
 
-** add --hparams="precision=mixed-float16" if running on V100.
+** add --hparams="mixed_precision=True" if running on V100.
 
 On single Tesla V100 without TensorRT, our D0 network (no pre/post-processing)
 has 134 FPS (frame per second) for batch size 1, and 238 FPS for batch size 8.
