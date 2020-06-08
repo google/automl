@@ -28,7 +28,6 @@ import math
 from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
-import tensorflow_probability as tfp
 
 import hparams_config
 
@@ -38,6 +37,10 @@ try:
 except ImportError:
   from tensorflow.contrib import image as image_ops  # pylint: disable=g-import-not-at-top
 
+try:
+  import tensorflow_probability as tfp
+except ImportError:
+  import tensorflow.distributions as tfp
 
 # This signifies the max integer that the controller RNN could predict for the
 # augmentation scheme.
