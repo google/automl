@@ -28,8 +28,10 @@ import utils
 
 class UtilsTest(tf.test.TestCase):
   def test_rw_params(self):
-    test_params=dict({'model_dir': '/tmp'})
+    test_params = dict({'model_dir': '/tmp'})
+    test_params = utils.rw_params(test_params)
     params = utils.rw_params(test_params)
+    tf.io.gfile.remove('/tmp/model.params')
     self.assertEqual(test_params, params)
 
   def setUp(self):
