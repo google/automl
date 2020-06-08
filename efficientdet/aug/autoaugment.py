@@ -38,6 +38,7 @@ except ImportError:
   from tensorflow.contrib import image as image_ops  # pylint: disable=g-import-not-at-top
 
 try:
+  # tensorflow_probability are recommended, but they only support tf2.
   import tensorflow_probability as tfp
 except ImportError:
   import tensorflow.distributions as tfp
