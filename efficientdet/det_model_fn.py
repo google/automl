@@ -468,8 +468,14 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     # Convert params (dict) to Config for easier access.
     return model(inputs, config=hparams_config.Config(params))
 
+  if params['mixed_precision'] and params['strategy'] == 'tpu':
+    pp = 'mixed_bfloat16'
+  elif params['mixed_precision'] and params['strategy'] != 'tpu':
+    pp = 'mixed_float16'
+  else:
+    pp = 'float32'
   cls_outputs, box_outputs = utils.build_model_with_precision(
-      params['precision'], _model_outputs, features, params['is_training_bn'])
+      pp, _model_outputs, features, params['is_training_bn'])
 
   levels = cls_outputs.keys()
   for level in levels:

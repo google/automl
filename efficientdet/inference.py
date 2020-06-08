@@ -162,10 +162,18 @@ def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
     Each is a dictionary with key as feature level and value as predictions.
   """
   model_arch = det_model_fn.get_model_arch(model_name)
+  mixed_precision = kwargs.get('mixed_precision', None)
+  strategy = kwargs.get('strategy', None)
+  if mixed_precision and strategy == 'tpu':
+    pp = 'mixed_bfloat16'
+  elif mixed_precision and strategy != 'tpu':
+    pp = 'mixed_float16'
+  else:
+    pp = 'float32'
   cls_outputs, box_outputs = utils.build_model_with_precision(
-      kwargs.get('precision', None), model_arch, inputs, False, model_name,
+      pp, model_arch, inputs, False, model_name,
       **kwargs)
-  if kwargs.get('precision', None):
+  if mixed_precision:
     # Post-processing has multiple places with hard-coded float32.
     # TODO(tanmingxing): Remove them once post-process can adpat to dtypes.
     cls_outputs = {k: tf.cast(v, tf.float32) for k, v in cls_outputs.items()}
