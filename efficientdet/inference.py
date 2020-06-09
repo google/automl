@@ -528,7 +528,8 @@ class ServingDriver(object):
     self.disable_pyfun = True
     self.use_xla = use_xla
 
-    self.min_score_thresh = min_score_thresh or anchors.MIN_SCORE_THRESH
+    self.min_score_thresh = (min_score_thresh if min_score_thresh is not None
+                             else anchors.MIN_SCORE_THRESH)
     self.max_boxes_to_draw = (
         max_boxes_to_draw or anchors.MAX_DETECTIONS_PER_IMAGE)
     self.line_thickness = line_thickness
