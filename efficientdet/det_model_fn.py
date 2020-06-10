@@ -204,18 +204,6 @@ def focal_loss(logits, targets, alpha, gamma, normalizer):
   return weighted_loss
 
 
-def _classification_loss(cls_outputs,
-                         cls_targets,
-                         num_positives,
-                         alpha=0.25,
-                         gamma=2.0):
-  """Computes classification loss."""
-  normalizer = num_positives
-  classification_loss = focal_loss(cls_outputs, cls_targets, alpha, gamma,
-                                   normalizer)
-  return classification_loss
-
-
 def _box_loss(box_outputs, box_targets, num_positives, delta=0.1):
   """Computes box regression loss."""
   # delta is typically around the mean value of regression target.
@@ -280,6 +268,15 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
     # Onehot encoding for classification labels.
     cls_targets_at_level = tf.one_hot(labels['cls_targets_%d' % level],
                                       params['num_classes'])
+
+    if params['label_smoothing'] > 0:
+      # see https://arxiv.org/pdf/1512.00567.pdf p7 for a discussion of label_smoothing
+      assert 1 > params['label_smoothing'] > 0
+      smooth_positives = tf.cast(1.0 - params['label_smoothing'], tf.float32)
+      smooth_negatives = tf.cast(params['label_smoothing'] / params['num_classes'],
+        tf.float32)
+      cls_targets_at_level = cls_targets_at_level * smooth_positives + smooth_negatives
+
     if params['data_format'] == 'channels_first':
       bs, _, width, height, _ = cls_targets_at_level.get_shape().as_list()
       cls_targets_at_level = tf.reshape(cls_targets_at_level,
@@ -289,12 +286,14 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
       cls_targets_at_level = tf.reshape(cls_targets_at_level,
                                         [bs, width, height, -1])
     box_targets_at_level = labels['box_targets_%d' % level]
-    cls_loss = _classification_loss(
-        cls_outputs[level],
-        cls_targets_at_level,
-        num_positives_sum,
-        alpha=params['alpha'],
-        gamma=params['gamma'])
+
+    cls_loss = focal_loss(
+      cls_outputs[level],
+      cls_targets_at_level,
+      params['alpha'],
+      params['gamma'],
+      num_positives_sum)
+
     if params['data_format'] == 'channels_first':
       cls_loss = tf.reshape(cls_loss,
                             [bs, -1, width, height, params['num_classes']])

@@ -213,6 +213,7 @@ def default_detection_configs():
   # classification loss
   h.alpha = 0.25
   h.gamma = 1.5
+  h.label_smoothing = 0.0 # 0.1 is a good default
   # localization loss
   h.delta = 0.1
   h.box_loss_weight = 50.0
