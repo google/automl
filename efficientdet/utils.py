@@ -38,6 +38,8 @@ def activation_fn(features: tf.Tensor, act_type: Text):
     return tf.nn.swish(features)
   elif act_type == 'swish_native':
     return features * tf.sigmoid(features)
+  elif act_type == 'hard_swish':
+    return features * tf.nn.relu6(features + 3) / 6
   elif act_type == 'relu':
     return tf.nn.relu(features)
   elif act_type == 'relu6':

@@ -126,6 +126,11 @@ class ActivationTest(tf.test.TestCase):
     result = utils.activation_fn(features, "swish_native")
     self.assertAllClose(result, expected)
 
+  def test_hard_swish(self):
+    features = tf.constant([.5, 10])
+    result = utils.activation_fn(features, "hard_swish")
+    self.assertAllClose(result, [0.2916666666666667, 10.0])
+
   def test_relu(self):
     features = tf.constant([.5, 10])
     result = utils.activation_fn(features, "relu")
