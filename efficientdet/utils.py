@@ -42,6 +42,8 @@ def activation_fn(features: tf.Tensor, act_type: Text):
     return tf.nn.relu(features)
   elif act_type == 'relu6':
     return tf.nn.relu6(features)
+  elif act_type == 'mish':
+    return features * tf.math.tanh(tf.math.softplus(features))
   else:
     raise ValueError('Unsupported act_type {}'.format(act_type))
 
