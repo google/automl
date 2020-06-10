@@ -162,10 +162,18 @@ def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
     Each is a dictionary with key as feature level and value as predictions.
   """
   model_arch = det_model_fn.get_model_arch(model_name)
+  mixed_precision = kwargs.get('mixed_precision', None)
+  strategy = kwargs.get('strategy', None)
+  if mixed_precision and strategy == 'tpu':
+    pp = 'mixed_bfloat16'
+  elif mixed_precision and strategy != 'tpu':
+    pp = 'mixed_float16'
+  else:
+    pp = 'float32'
   cls_outputs, box_outputs = utils.build_model_with_precision(
-      kwargs.get('precision', None), model_arch, inputs, False, model_name,
+      pp, model_arch, inputs, False, model_name,
       **kwargs)
-  if kwargs.get('precision', None):
+  if mixed_precision:
     # Post-processing has multiple places with hard-coded float32.
     # TODO(tanmingxing): Remove them once post-process can adpat to dtypes.
     cls_outputs = {k: tf.cast(v, tf.float32) for k, v in cls_outputs.items()}
@@ -253,14 +261,14 @@ def det_post_process_combined(params, cls_outputs, box_outputs, scales,
   image_ids = tf.cast(
       tf.tile(
           tf.expand_dims(tf.range(batch_size), axis=1), [1, max_boxes_to_draw]),
-      dtype=tf.float32)
+      dtype=scales.dtype)
   image_size = utils.parse_image_size(params['image_size'])
   ymin = tf.clip_by_value(nmsed_boxes[..., 0], 0, image_size[0]) * scales
   xmin = tf.clip_by_value(nmsed_boxes[..., 1], 0, image_size[1]) * scales
   ymax = tf.clip_by_value(nmsed_boxes[..., 2], 0, image_size[0]) * scales
   xmax = tf.clip_by_value(nmsed_boxes[..., 3], 0, image_size[1]) * scales
 
-  classes = tf.cast(nmsed_classes + 1, tf.float32)
+  classes = tf.cast(nmsed_classes + 1, scales.dtype)
   detection_list = [image_ids, ymin, xmin, ymax, xmax, nmsed_scores, classes]
   detections = tf.stack(detection_list, axis=2, name='detections')
   return detections

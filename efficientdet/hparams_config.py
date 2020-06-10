@@ -222,8 +222,7 @@ def default_detection_configs():
   h.weight_decay = 4e-5
   # use horovod for multi-gpu training. If None, use TF default.
   h.strategy = None  # 'tpu', 'horovod', None
-  # precision: one of 'float32', 'mixed_float16', 'mixed_bfloat16'.
-  h.precision = None  # If None, use float32.
+  h.mixed_precision = False  # If False, use float32.
 
   # For detection.
   h.box_class_repeats = 3

@@ -6,4 +6,5 @@ PyYAML>=5.1
 six>=1.12.0
 tensorflow>=1.15.0
 tensorflow-addons>=0.9.1
+tensorflow-probability>=0.9.0
 git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI
