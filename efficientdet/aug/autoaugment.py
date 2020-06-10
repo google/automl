@@ -39,9 +39,9 @@ except ImportError:
 
 try:
   # tensorflow_probability are recommended, but they only support tf2.
-  import tensorflow_probability as tfp
+  import tensorflow_probability as tfp  # pylint: disable=g-import-not-at-top
 except ImportError:
-  import tensorflow.distributions as tfp
+  import tensorflow.distributions as tfp  # pylint: disable=g-import-not-at-top
 
 # This signifies the max integer that the controller RNN could predict for the
 # augmentation scheme.

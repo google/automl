@@ -113,7 +113,7 @@ class ModelInspectTest(tf.test.TestCase):
           os.path.exists(os.path.join(self.savedmodel_dir, 'x.tflite')))
 
   def test_saved_model_fp16(self):
-    self.params['hparams'] = 'precision=mixed_float16'
+    self.params['hparams'] = 'mixed_precision=true'
     inspector = model_inspect.ModelInspector(**self.params)
     inspector.run_model('saved_model')
     self.assertTrue(

@@ -560,6 +560,13 @@ def verify_feats_size(feats,
               min_level, max_level))
 
 
+def get_precision(strategy: str, mixed_precision: bool = False):
+  """Get the precision policy for a given strategy."""
+  if mixed_precision:
+    return 'mixed_bfloat16' if strategy == 'tpu' else 'mixed_float16'
+  return 'float32'
+
+
 @contextlib.contextmanager
 def float16_scope():
   """Scope class for float16."""
