@@ -123,7 +123,6 @@ class EfficientDetArchPrecisionTest(tf.test.TestCase):
           inputs,
           model_name='efficientdet-d0',
           is_training_bn=is_training,
-          precision=precision,
           image_size=512)
 
     return utils.build_model_with_precision(precision, _model_fn, features,

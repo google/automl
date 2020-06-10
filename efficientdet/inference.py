@@ -163,16 +163,9 @@ def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
   """
   model_arch = det_model_fn.get_model_arch(model_name)
   mixed_precision = kwargs.get('mixed_precision', None)
-  strategy = kwargs.get('strategy', None)
-  if mixed_precision and strategy == 'tpu':
-    pp = 'mixed_bfloat16'
-  elif mixed_precision and strategy != 'tpu':
-    pp = 'mixed_float16'
-  else:
-    pp = 'float32'
+  precision = utils.get_precision(kwargs.get('strategy', None), mixed_precision)
   cls_outputs, box_outputs = utils.build_model_with_precision(
-      pp, model_arch, inputs, False, model_name,
-      **kwargs)
+      precision, model_arch, inputs, False, model_name, **kwargs)
   if mixed_precision:
     # Post-processing has multiple places with hard-coded float32.
     # TODO(tanmingxing): Remove them once post-process can adpat to dtypes.
