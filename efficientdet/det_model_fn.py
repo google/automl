@@ -505,7 +505,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     utils.scalar('trainloss/det_loss', det_loss)
     utils.scalar('trainloss/reg_l2_loss', reg_l2loss)
     utils.scalar('trainloss/loss', total_loss)
-    if box_iou_loss == 0:
+    if params['iou_loss_type']:
       utils.scalar('trainloss/box_iou_loss', box_iou_loss)
 
   moving_average_decay = params['moving_average_decay']
