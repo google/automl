@@ -65,7 +65,7 @@ We have provided a list of EfficientDet checkpoints and results as follows:
 |     EfficientDet-D7 ([ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d7.tar.gz), [val](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/val/d7_coco_val_softnms.txt), [test-dev](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/testdev/d7_coco_test-dev2017_softnms.txt))    | 53.7 | 72.4 | 58.4 | 35.8 | 57.0 | 66.3 | 53.4 | | 51.9M  |  324.8B  |
 
 ** <em>val</em> denotes validation results, <em>test-dev</em> denotes test-dev2017 results. AP<sup>val</sup> is for validation accuracy, all other AP results in the table are for COCO test-dev2017. All accuracy numbers are for single-model single-scale without ensemble or test-time augmentation.
-** EfficientNet-D0 to D6 are trained with 300 epochs and tested with normal NMS, EfficientNet-D7 is trained with 600 epochs and tested with soft-NMS.
+** EfficientDet-D0 to D6 are trained with 300 epochs and tested with normal NMS, EfficientDet-D7 is trained with 600 epochs and tested with soft-NMS.
 
 
 ## 3. Export SavedModel, frozen graph, tensort models, or tflite.
