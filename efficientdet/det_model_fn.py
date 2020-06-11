@@ -414,6 +414,7 @@ def coco_metric_fn(batch_size,
         tf.slice(kwargs['source_ids'], [index], [1]),
         tf.slice(kwargs['image_scales'], [index], [1]),
         disable_pyfun=kwargs.get('disable_pyfun', None),
+        nms_configs=kwargs.get('nms_configs', {}),
     )
     detections_bs.append(detections)
 

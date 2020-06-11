@@ -126,7 +126,8 @@ class EvaluationMetric(object):
         logging.info('Writing output json file to: %s', output_path)
         with tf.io.gfile.GFile(output_path, 'w') as fid:
           json.dump(box_result_list, fid)
-        with zipfile.ZipFile(fname + '.zip', 'w') as zf:
+        zip_path = os.path.join(self.testdev_dir, fname + '.zip')
+        with zipfile.ZipFile(zip_path, 'w') as zf:
           zf.writestr(fname + '.json', json.dumps(box_result_list))
 
         self._reset()
