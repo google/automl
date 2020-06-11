@@ -259,7 +259,7 @@ Download data and checkpoints.
 
     # Download backbone checkopints.
     !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz
-    !tar xf efficientnet-d0.tar.gz 
+    !tar xf efficientdet-d0.tar.gz 
 
 Create a config file for the PASCAL VOC dataset called voc_config.yaml and put this in it.
 
