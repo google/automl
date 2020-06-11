@@ -155,15 +155,16 @@ def softnms(dets, nms_configs):
     nms_configs: a dict config that may contain the following members
       * method: one of {`linear`, `gaussian` or 'greedy'}. Use `greedy` if None.
       * sigma: Gaussian parameter, only for method 'gaussian'.
-      * iou_thresh (float): IOU threshold, only for `linear` or 'greedy'.
+      * iou_thresh (float): IOU threshold, only for `linear`.
       * score_thresh (float): Box score threshold for final boxes.
 
   Returns:
     numpy.array: Retained boxes.
   """
   method = nms_configs.get('method', 'greedy')
+  # Default sigma and iou_thresh are from the original soft-nms paper.
   sigma = nms_configs.get('sigma', 0.5)
-  iou_thresh = nms_configs.get('iou_thresh', 0.5)
+  iou_thresh = nms_configs.get('iou_thresh', 0.3)
   score_thresh = nms_configs.get('score_thresh', 0.001)
 
   if method not in ('linear', 'gaussian', 'greedy'):
@@ -172,7 +173,7 @@ def softnms(dets, nms_configs):
 
   if method == 'greedy' or not method:
     # the default nms has the same output as greedy method, but runs faster.
-    return nms(dets, iou_thresh)
+    return nms(dets)
 
   x1 = dets[:, 0]
   y1 = dets[:, 1]
@@ -609,6 +610,7 @@ class AnchorLabeler(object):
           min_score_thresh=min_score_thresh,
           max_boxes_to_draw=max_boxes_to_draw)
     else:
+      logging.info('nms_configs=%s', nms_configs)
       return tf.py_func(
           functools.partial(_generate_detections, nms_configs=nms_configs), [
               cls_outputs,
