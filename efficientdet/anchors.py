@@ -161,6 +161,7 @@ def softnms(dets, nms_configs):
   Returns:
     numpy.array: Retained boxes.
   """
+  nms_configs = nms_configs or {}
   method = nms_configs.get('method', 'greedy')
   # Default sigma and iou_thresh are from the original soft-nms paper.
   sigma = nms_configs.get('sigma', 0.5)
