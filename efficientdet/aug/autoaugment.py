@@ -1132,7 +1132,8 @@ def sharpness(image, factor):
   # Tile across channel dimension.
   kernel = tf.tile(kernel, [1, 1, 3, 1])
   strides = [1, 1, 1, 1]
-  degenerate = tf.nn.depthwise_conv2d(
+  with tf.device('/cpu:0'):
+    degenerate = tf.nn.depthwise_conv2d(
       image, kernel, strides, padding='VALID', rate=[1, 1])
   degenerate = tf.clip_by_value(degenerate, 0.0, 255.0)
   degenerate = tf.squeeze(tf.cast(degenerate, tf.uint8), [0])
