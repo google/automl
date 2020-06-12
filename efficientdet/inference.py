@@ -171,6 +171,7 @@ def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
     # TODO(tanmingxing): Remove them once post-process can adpat to dtypes.
     cls_outputs = {k: tf.cast(v, tf.float32) for k, v in cls_outputs.items()}
     box_outputs = {k: tf.cast(v, tf.float32) for k, v in box_outputs.items()}
+
   return cls_outputs, box_outputs
 
 
@@ -254,14 +255,14 @@ def det_post_process_combined(params, cls_outputs, box_outputs, scales,
   image_ids = tf.cast(
       tf.tile(
           tf.expand_dims(tf.range(batch_size), axis=1), [1, max_boxes_to_draw]),
-      dtype=scales.dtype)
+      dtype=tf.float32)
   image_size = utils.parse_image_size(params['image_size'])
   ymin = tf.clip_by_value(nmsed_boxes[..., 0], 0, image_size[0]) * scales
   xmin = tf.clip_by_value(nmsed_boxes[..., 1], 0, image_size[1]) * scales
   ymax = tf.clip_by_value(nmsed_boxes[..., 2], 0, image_size[0]) * scales
   xmax = tf.clip_by_value(nmsed_boxes[..., 3], 0, image_size[1]) * scales
 
-  classes = tf.cast(nmsed_classes + 1, scales.dtype)
+  classes = tf.cast(nmsed_classes + 1, tf.float32)
   detection_list = [image_ids, ymin, xmin, ymax, xmax, nmsed_scores, classes]
   detections = tf.stack(detection_list, axis=2, name='detections')
   return detections
@@ -816,7 +817,6 @@ class InferenceDriver(object):
           self.ckpt_path,
           ema_decay=self.params['moving_average_decay'],
           export_ckpt=None)
-
       # for postprocessing.
       params.update(
           dict(batch_size=len(raw_images), disable_pyfun=self.disable_pyfun))
