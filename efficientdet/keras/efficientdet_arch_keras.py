@@ -223,7 +223,7 @@ class OpAfterCombine(tf.keras.layers.Layer):
     if not self.conv_bn_act_pattern:
       new_node = utils.activation_fn(new_node, self.act_type)
     new_node = self.conv_op(new_node)
-    new_node = self.bn(new_node)
+    new_node = self.bn(new_node, self.is_training_bn)
     act_type = None if not self.conv_bn_act_pattern else self.act_type
     if act_type:
       new_node = utils.activation_fn(new_node, act_type)
@@ -651,6 +651,15 @@ class FPNCells(tf.keras.layers.Layer):
     super(FPNCells, self).__init__(name=name)
     self.feat_sizes = feat_sizes
     self.config = config
+
+    if config.fpn_config:
+      fpn_config = config.fpn_config
+    else:
+      fpn_config = legacy_arch.get_fpn_config(config.fpn_name, config.min_level,
+                                              config.max_level,
+                                              config.fpn_weight_method)
+    self.fpn_config = fpn_config
+
     self.cells = [
         FPNCell(self.feat_sizes, self.config, name='cell_{}'.format(rep))
         for rep in range(self.config.fpn_cell_repeats)
@@ -658,8 +667,26 @@ class FPNCells(tf.keras.layers.Layer):
 
   def call(self, feats):
     for cell in self.cells:
-      new_feats, feats = cell(feats)
-
+      cell_feats = cell(feats)
+   
+      new_feats = {}
+      for l in range(self.config.min_level, self.config.max_level + 1):
+        for i, fnode in enumerate(reversed(self.fpn_config.nodes)):
+          if fnode['feat_level'] == l:
+            new_feats[l] = cell_feats[-1 - i]
+            break
+   
+      feats = [
+          new_feats[level]
+          for level in range(self.config.min_level, self.config.max_level + 1)
+      ]
+      
+      utils.verify_feats_size(feats,
+                              feat_sizes=self.feat_sizes,
+                              min_level=self.config.min_level,
+                              max_level=self.config.max_level,
+                              data_format=self.config.data_format)
+   
     return new_feats
 
 
@@ -701,24 +728,7 @@ class FPNCell(tf.keras.layers.Layer):
   def call(self, feats):
     for fnode in self.fnodes:
       feats = fnode(feats)
-
-    new_feats = {}
-    for l in range(self.config.min_level, self.config.max_level + 1):
-      for i, fnode in enumerate(reversed(self.fpn_config.nodes)):
-        if fnode['feat_level'] == l:
-          new_feats[l] = feats[-1 - i]
-          break
-    feats = [
-        new_feats[level]
-        for level in range(self.config.min_level, self.config.max_level + 1)
-    ]
-
-    utils.verify_feats_size(feats,
-                            feat_sizes=self.feat_sizes,
-                            min_level=self.config.min_level,
-                            max_level=self.config.max_level,
-                            data_format=self.config.data_format)
-    return new_feats, feats
+    return feats
 
 
 def build_feature_network(features, config):
