@@ -305,7 +305,7 @@ def _generate_detections_tf(cls_outputs,
                             image_size,
                             min_score_thresh=MIN_SCORE_THRESH,
                             max_boxes_to_draw=MAX_DETECTIONS_PER_IMAGE,
-                            soft_nms_sigma=0.0,
+                            soft_nms_sigma=1.0,
                             iou_threshold=0.5):
   """Generates detections with model outputs and anchors.
 
@@ -351,7 +351,8 @@ def _generate_detections_tf(cls_outputs,
   scores = tf.math.sigmoid(cls_outputs)
   # apply bounding box regression to anchors
   boxes = decode_box_outputs_tf(box_outputs, anchor_boxes)
-
+  # Follow paper setting, get details 
+  # https://github.com/tensorflow/tensorflow/issues/40253.
   top_detection_idx, scores = tf.image.non_max_suppression_with_scores(
       boxes,
       scores,
