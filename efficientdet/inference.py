@@ -327,7 +327,10 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
         image_size=params['image_size'],
         min_score_thresh=min_score_thresh,
         max_boxes_to_draw=max_boxes_to_draw,
-        disable_pyfun=params.get('disable_pyfun'))
+        disable_pyfun=params.get('disable_pyfun'),
+        iou_threshold=params["iou_threshold"],
+        nms=params["nms"],
+      )
     if params['batch_size'] > 1:
       # pad to fixed length if batch size > 1.
       padding_size = max_boxes_to_draw - tf.shape(detections)[0]

@@ -112,7 +112,63 @@ def decode_box_outputs_tf(rel_codes, anchors):
   return tf.stack([ymin, xmin, ymax, xmax], axis=-1)
 
 
-def nms(dets, thresh):
+def diou_nms(dets, thresh):
+  """
+  DIOU Non-maximum suppression.
+
+  diou = iou - square of euclidian distance of box centers
+     / square of diagonal of smallest enclosing bounding box
+
+  Reference: https://arxiv.org/pdf/1911.08287.pdf
+  """
+  x1 = dets[:, 0]
+  y1 = dets[:, 1]
+  x2 = dets[:, 2]
+  y2 = dets[:, 3]
+  scores = dets[:, 4]
+
+  areas = (x2 - x1 + 1) * (y2 - y1 + 1)
+  order = scores.argsort()[::-1]
+
+  center_x = (x1 + x2) / 2
+  center_y = (y1 + y2) / 2
+
+  keep = []
+  while order.size > 0:
+    i = order[0]
+    keep.append(i)
+    xx1 = np.maximum(x1[i], x1[order[1:]])
+    yy1 = np.maximum(y1[i], y1[order[1:]])
+    xx2 = np.minimum(x2[i], x2[order[1:]])
+    yy2 = np.minimum(y2[i], y2[order[1:]])
+
+    w = np.maximum(0.0, xx2 - xx1 + 1)
+    h = np.maximum(0.0, yy2 - yy1 + 1)
+    intersection = w * h
+    iou = intersection / (areas[i] + areas[order[1:]] - intersection)
+
+    smallest_enclosing_box_x1 = np.minimum(x1[i], x1[order[1:]])
+    smallest_enclosing_box_x2 = np.maximum(x2[i], x2[order[1:]])
+    smallest_enclosing_box_y1 = np.minimum(y1[i], y1[order[1:]])
+    smallest_enclosing_box_y2 = np.maximum(y2[i], y2[order[1:]])
+
+    square_of_the_diagonal = (
+        smallest_enclosing_box_x2 - smallest_enclosing_box_x1) ** 2 + \
+      (smallest_enclosing_box_y2 - smallest_enclosing_box_y1) ** 2 \
+        + EPSILON
+
+    square_of_center_distance = (
+        center_x[i] - center_x[order[1:]]) ** 2 \
+      + (center_y[i] - center_y[order[1:]]) ** 2
+
+    diou = iou - square_of_center_distance / square_of_the_diagonal
+
+    inds = np.where(diou <= thresh)[0]
+    order = order[inds + 1]
+  return keep
+
+
+def iou_nms(dets, thresh):
   """Non-maximum suppression."""
   x1 = dets[:, 0]
   y1 = dets[:, 1]
@@ -300,7 +356,7 @@ def _generate_detections_tf(cls_outputs,
 
 def _generate_detections(cls_outputs, box_outputs, anchor_boxes, indices,
                          classes, image_id, image_scale, num_classes,
-                         max_boxes_to_draw):
+                         max_boxes_to_draw, iou_threshold, nms="iou"):
   """Generates detections with model outputs and anchors.
 
   Args:
@@ -323,6 +379,8 @@ def _generate_detections(cls_outputs, box_outputs, anchor_boxes, indices,
       evaluating with the original groundtruth annotations.
     num_classes: a integer that indicates the number of classes.
     max_boxes_to_draw: max number of boxes to draw per image.
+    iou_threshold: The threshold to remove overlapping boxes in NMS.
+    nms: The NMS method to use. Must be "iou" or "diou"
 
   Returns:
     detections: detection results in a tensor with each row representing
@@ -346,7 +404,13 @@ def _generate_detections(cls_outputs, box_outputs, anchor_boxes, indices,
     # (nms) for boxes in the same class. The selected boxes from each class are
     # then concatenated for the final detection outputs.
     all_detections_cls = np.column_stack((boxes_cls, scores_cls))
-    top_detection_idx = nms(all_detections_cls, 0.5)
+
+    assert nms in ("iou", "diou"), nms + " invalid nms function"
+    if nms == "iou":
+      top_detection_idx = iou_nms(all_detections_cls, iou_threshold)
+    elif nms == "diou":
+      top_detection_idx = diou_nms(all_detections_cls, iou_threshold)
+
     top_detections_cls = all_detections_cls[top_detection_idx]
     top_detections_cls[:, 2] -= top_detections_cls[:, 0]
     top_detections_cls[:, 3] -= top_detections_cls[:, 1]
@@ -519,7 +583,10 @@ class AnchorLabeler(object):
                           image_size=None,
                           min_score_thresh=MIN_SCORE_THRESH,
                           max_boxes_to_draw=MAX_DETECTIONS_PER_IMAGE,
-                          disable_pyfun=None):
+                          disable_pyfun=None,
+                          iou_threshold=0.5,
+                          nms="iou",
+                        ):
     """Generate detections based on class and box predictions."""
     if disable_pyfun:
       return _generate_detections_tf(
@@ -532,9 +599,11 @@ class AnchorLabeler(object):
           image_scale,
           image_size,
           min_score_thresh=min_score_thresh,
+          iou_threshold=iou_threshold,
           max_boxes_to_draw=max_boxes_to_draw)
     else:
       return tf.py_func(_generate_detections, [
           cls_outputs, box_outputs, self._anchors.boxes, indices, classes,
           image_id, image_scale, self._num_classes, max_boxes_to_draw,
+          iou_threshold, nms
       ], tf.float32)
