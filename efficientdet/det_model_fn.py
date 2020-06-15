@@ -165,7 +165,7 @@ def focal_loss(y_pred, y_true, alpha, gamma, label_smoothing, normalizer):
 
     # Get the cross_entropy for each entry
     ce = tf.keras.losses.categorical_crossentropy(
-        y_true, y_pred, from_logints=True, label_smoothing=label_smoothing)
+        y_true, y_pred, from_logits=True, label_smoothing=label_smoothing)
 
     pred_prob = tf.sigmoid(y_pred)
 
