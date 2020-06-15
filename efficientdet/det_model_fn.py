@@ -157,7 +157,7 @@ def focal_loss(y_pred, y_true, alpha, gamma, label_smoothing, normalizer):
       and (1-alpha) to the loss from negative examples.
     gamma: A float32 scalar modulating loss from hard and easy examples.
     label_smoothing: Float in [0, 1]. If > `0` then smooth the labels.
-    normalzier: Divide loss by this value
+    normalizer: Divide loss by this value
   """
   with tf.name_scope('focal_loss'):
     alpha = tf.convert_to_tensor(alpha, dtype=y_pred.dtype)
