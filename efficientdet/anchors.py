@@ -46,6 +46,8 @@ MAX_DETECTIONS_PER_IMAGE = 100
 # The minimal score threshold.
 MIN_SCORE_THRESH = 0.4
 
+# A small number to stabilize division
+EPSILON = 1e-16
 
 def sigmoid(x):
   """Sigmoid function for use with Numpy for CPU evaluation."""
@@ -224,7 +226,7 @@ def softnms(dets, nms_configs):
   iou_thresh = nms_configs.get('iou_thresh', 0.3)
   score_thresh = nms_configs.get('score_thresh', 0.001)
 
-  if method not in ('linear', 'gaussian', 'hard'):
+  if method not in ('linear', 'gaussian', 'hard', 'diou'):
     raise ValueError(
         'NMS method must be linear/gaussian/hard, got: {}'.format(method))
 
