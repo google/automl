@@ -240,12 +240,8 @@ def default_detection_configs():
   h.use_native_resize_op = True
   h.pooling_type = None
 
-  # post processing
-  # Method used by nms to compare bounding boxes.
-  # diou may be more accurate but only has a numpy
-  # implementatipn for now
-  h.nms = "iou" # iou or diou.
-  h.iou_threshold = 0.5
+  # For post-processing nms, must be a dict.
+  h.nms_configs = None
 
   # version.
   h.fpn_name = None

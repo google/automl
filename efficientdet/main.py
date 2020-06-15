@@ -284,7 +284,7 @@ def main(_):
           strategy=FLAGS.strategy,
           input_rand_hflip=False,
           is_training_bn=False,
-          precision=None,
+          mixed_precision=None,
       )
       eval_estimator = tf.estimator.tpu.TPUEstimator(
           model_fn=model_fn_instance,
@@ -312,7 +312,7 @@ def main(_):
         strategy=FLAGS.strategy,
         input_rand_hflip=False,
         is_training_bn=False,
-        precision=None,
+        mixed_precision=None,
     )
 
     eval_estimator = tf.estimator.tpu.TPUEstimator(

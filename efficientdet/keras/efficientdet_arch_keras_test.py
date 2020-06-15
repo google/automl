@@ -20,6 +20,8 @@ import tensorflow.compat.v1 as tf
 import efficientdet_arch as legacy_arch
 import hparams_config
 from keras import efficientdet_arch_keras
+import functools
+import utils
 
 SEED = 111111
 
@@ -48,8 +50,7 @@ class KerasTest(tf.test.TestCase):
       self.assertAllEqual(class_output1[i], class_output2[i])
       self.assertAllEqual(box_output1[i], box_output2[i])
 
-  def _test_build_feature_network(self):
-    # TODO(fsx950223): Fix the test case
+  def test_build_feature_network(self):
     config = hparams_config.get_efficientdet_config('efficientdet-d0')
     with tf.Session(graph=tf.Graph()) as sess:
       inputs = {
