@@ -153,7 +153,7 @@ def softnms(dets, nms_configs):
   Args:
     dets: detection with shape (num, 5) and format [x1, y1, x2, y2, score].
     nms_configs: a dict config that may contain the following members
-      * method: one of {`linear`, `gaussian` or 'greedy'}. Use `greedy` if None.
+      * method: one of {`linear`, `gaussian` or 'hard'}. Use `hard` if None.
       * sigma: Gaussian parameter, only for method 'gaussian'.
       * iou_thresh (float): IOU threshold, only for `linear`.
       * score_thresh (float): Box score threshold for final boxes.
@@ -162,18 +162,18 @@ def softnms(dets, nms_configs):
     numpy.array: Retained boxes.
   """
   nms_configs = nms_configs or {}
-  method = nms_configs.get('method', 'greedy')
+  method = nms_configs.get('method', 'hard')
   # Default sigma and iou_thresh are from the original soft-nms paper.
   sigma = nms_configs.get('sigma', 0.5)
   iou_thresh = nms_configs.get('iou_thresh', 0.3)
   score_thresh = nms_configs.get('score_thresh', 0.001)
 
-  if method not in ('linear', 'gaussian', 'greedy'):
+  if method not in ('linear', 'gaussian', 'hard'):
     raise ValueError(
-        'NMS method must be linear/gaussian/greedy, got: {}'.format(method))
+        'NMS method must be linear/gaussian/hard, got: {}'.format(method))
 
-  if method == 'greedy' or not method:
-    # the default nms has the same output as greedy method, but runs faster.
+  if method == 'hard' or not method:
+    # the default nms has the same output as hard method, but runs faster.
     return nms(dets)
 
   x1 = dets[:, 0]
@@ -305,7 +305,7 @@ def _generate_detections_tf(cls_outputs,
                             image_size,
                             min_score_thresh=MIN_SCORE_THRESH,
                             max_boxes_to_draw=MAX_DETECTIONS_PER_IMAGE,
-                            soft_nms_sigma=1.0,
+                            soft_nms_sigma=0.25,
                             iou_threshold=0.5):
   """Generates detections with model outputs and anchors.
 
