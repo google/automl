@@ -211,14 +211,18 @@ def default_detection_configs():
   h.data_format = 'channels_last'
 
   # classification loss
+  h.label_smoothing = 0.0 # 0.1 is a good default
+  # Behold the focal loss parameters
   h.alpha = 0.25
   h.gamma = 1.5
-  h.label_smoothing = 0.0 # 0.1 is a good default
+
   # localization loss
-  h.delta = 0.1
+  h.delta = 0.1 # This is the regularization parameter of huber loss
+  # total loss = box_loss * box_loss_weight + iou_loss * iou_loss_weight
   h.box_loss_weight = 50.0
   h.iou_loss_type = None
   h.iou_loss_weight = 1.0
+
   # regularization l2 loss.
   h.weight_decay = 4e-5
   # use horovod for multi-gpu training. If None, use TF default.
@@ -235,6 +239,13 @@ def default_detection_configs():
   h.conv_bn_act_pattern = False
   h.use_native_resize_op = True
   h.pooling_type = None
+
+  # post processing
+  # Method used by nms to compare bounding boxes.
+  # diou may be more accurate but only has a numpy
+  # implementatipn for now
+  h.nms = "iou" # iou or diou.
+  h.iou_threshold = 0.5
 
   # version.
   h.fpn_name = None

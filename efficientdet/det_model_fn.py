@@ -304,12 +304,15 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
         tf.expand_dims(tf.not_equal(labels['cls_targets_%d' % level], -2), -1),
         tf.float32)
     cls_losses.append(tf.reduce_sum(cls_loss))
-    box_losses.append(
-        _box_loss(
+
+    if params["box_loss_weight"]:
+      box_losses.append(
+          _box_loss(
             box_outputs[level],
             box_targets_at_level,
             num_positives_sum,
             delta=params['delta']))
+
     if params['iou_loss_type']:
       box_iou_losses.append(
           _box_iou_loss(box_outputs[level], box_targets_at_level,
@@ -317,11 +320,13 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
 
   # Sum per level losses to total loss.
   cls_loss = tf.add_n(cls_losses)
-  box_loss = tf.add_n(box_losses)
+  box_loss = tf.add_n(box_losses) if box_losses else 0
   box_iou_loss = tf.add_n(box_iou_losses) if box_iou_losses else 0
   total_loss = (
-      cls_loss + params['box_loss_weight'] * box_loss +
+      cls_loss +
+      params['box_loss_weight'] * box_loss +
       params['iou_loss_weight'] * box_iou_loss)
+
   return total_loss, cls_loss, box_loss, box_iou_loss
 
 
