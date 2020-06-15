@@ -27,6 +27,71 @@ from backbone import efficientnet_builder
 from keras import utils_keras
 
 
+class FuseFeatures(tf.keras.layers.Layer):
+  """Fuse features from different resolutions and return a weighted sum."""
+  def __init__(self, inputs_offsets, weight_method, fpn_num_filters, **kwargs):
+    super(FuseFeatures, self).__init__(**kwargs)
+
+    self.inputs_num = len(inputs_offsets)
+    self.inputs_offsets = inputs_offsets
+    self.weight_method = weight_method
+    self.fpn_num_filters = fpn_num_filters
+    self.edge_weights = []
+
+    if self.weight_method == 'attn':
+      self._add_wsm('ones')
+    elif self.weight_method == 'fastattn':
+      self._add_wsm('ones')
+    elif self.weight_method == 'channel_attn':
+      num_filters = int(self.fpn_num_filters)
+      self._add_wsm(lambda shape, dtype: tf.ones(shape, dtype=dtype))
+    elif self.weight_method == 'channel_fastattn':
+      num_filters = int(self.fpn_num_filters)
+      self._add_wsm(lambda shape, dtype: tf.ones(shape, dtype=dtype))
+    elif self.weight_method == 'sum':
+      # no weight for sum
+      pass
+    else:
+      raise ValueError('unknown weight_method {}'.format(weight_method))
+
+  def _add_wsm(self, initializer):
+    for i in range(self.inputs_num):
+      if i == 0:
+        name = 'WSM'
+      else:
+        name = 'WSM_{}'.format(i)
+      self.edge_weights.append(
+          self.add_weight(initializer=initializer, name=name, trainable=True, dtype=self.dtype))
+
+  def call(self, nodes):
+    if self.weight_method == 'attn':
+      normalized_weights = tf.nn.softmax(tf.stack(self.edge_weights))
+      nodes = tf.stack(nodes, axis=-1)
+      new_node = tf.reduce_sum(nodes * normalized_weights, -1)
+    elif self.weight_method == 'fastattn':
+      weights_sum = tf.math.add_n(self.edge_weights)
+      nodes = [
+          nodes[i] * self.edge_weights[i] / (weights_sum + 0.0001)
+          for i in range(self.inputs_num)
+      ]
+      new_node = tf.math.add_n(nodes)
+    elif self.weight_method == 'channel_attn':
+      normalized_weights = tf.nn.softmax(tf.stack(self.edge_weights, -1), axis=-1)
+      nodes = tf.stack(nodes, axis=-1)
+      new_node = tf.reduce_sum(nodes * normalized_weights, -1)
+    elif self.weight_method == 'channel_fastattn':
+      weights_sum = tf.math.add_n(self.edge_weights)
+      nodes = [
+          nodes[i] * self.edge_weights[i] / (weights_sum + 0.0001)
+          for i in range(self.inputs_num)
+      ]
+      new_node = tf.math.add_n(nodes)
+    elif self.weight_method == 'sum':
+      new_node = tf.math.add_n(nodes)
+
+    return new_node
+
+
 class FNode(tf.keras.layers.Layer):
   """A Keras Layer implementing BiFPN Node."""
 
@@ -63,77 +128,10 @@ class FNode(tf.keras.layers.Layer):
     self.data_format = data_format
     self.weight_method = weight_method
     self.conv_bn_act_pattern = conv_bn_act_pattern
-    self.resample_feature_maps = []
-    self.op_after_combines = []
-    self.vars = []
 
-  def fuse_features(self, nodes):
-    """Fuse features from different resolutions and return a weighted sum.
+    self.fuse_features = FuseFeatures(inputs_offsets, weight_method, fpn_num_filters, dtype=self.dtype)
 
-    Args:
-      nodes: a list of tensorflow features at different levels
-
-    Returns:
-      A tensor denoting the fused feature.
-    """
-    dtype = nodes[0].dtype
-
-    if self.weight_method == 'attn':
-      edge_weights = []
-      for var in self.vars:
-        var = tf.cast(var, dtype=dtype)
-        edge_weights.append(var)
-      normalized_weights = tf.nn.softmax(tf.stack(edge_weights))
-      nodes = tf.stack(nodes, axis=-1)
-      new_node = tf.reduce_sum(nodes * normalized_weights, -1)
-    elif self.weight_method == 'fastattn':
-      edge_weights = []
-      for var in self.vars:
-        var = tf.cast(var, dtype=dtype)
-        edge_weights.append(var)
-      weights_sum = tf.add_n(edge_weights)
-      nodes = [
-          nodes[i] * edge_weights[i] / (weights_sum + 0.0001)
-          for i in range(len(nodes))
-      ]
-      new_node = tf.add_n(nodes)
-    elif self.weight_method == 'channel_attn':
-      edge_weights = []
-      for var in self.vars:
-        var = tf.cast(var, dtype=dtype)
-        edge_weights.append(var)
-      normalized_weights = tf.nn.softmax(tf.stack(edge_weights, -1), axis=-1)
-      nodes = tf.stack(nodes, axis=-1)
-      new_node = tf.reduce_sum(nodes * normalized_weights, -1)
-    elif self.weight_method == 'channel_fastattn':
-      edge_weights = []
-      for var in self.vars:
-        var = tf.cast(var, dtype=dtype)
-        edge_weights.append(var)
-
-      weights_sum = tf.add_n(edge_weights)
-      nodes = [
-          nodes[i] * edge_weights[i] / (weights_sum + 0.0001)
-          for i in range(len(nodes))
-      ]
-      new_node = tf.add_n(nodes)
-    elif self.weight_method == 'sum':
-      new_node = tf.add_n(nodes)
-    else:
-      raise ValueError('unknown weight_method {}'.format(self.weight_method))
-
-    return new_node
-
-  def _add_wsm(self, initializer):
-    for i, _ in enumerate(self.inputs_offsets):
-      if i == 0:
-        name = 'WSM'
-      else:
-        name = 'WSM_{}'.format(i)
-      self.vars.append(
-          self.add_weight(initializer=initializer, name=name, trainable=True))
-
-  def build(self, feats_shape):
+    self.resample_feature_maps = {}
     for idx, input_offset in enumerate(self.inputs_offsets):
       resample_feature_map = ResampleFeatureMap(self.new_node_height,
                                                 self.new_node_width,
@@ -147,18 +145,8 @@ class FNode(tf.keras.layers.Layer):
                                                 data_format=self.data_format,
                                                 name='resample_{}_{}_{}'.format(
                                                     idx, input_offset,
-                                                    len(feats_shape)))
-      self.resample_feature_maps.insert(idx, resample_feature_map)
-    if self.weight_method == 'attn':
-      self._add_wsm('ones')
-    elif self.weight_method == 'fastattn':
-      self._add_wsm('ones')
-    elif self.weight_method == 'channel_attn':
-      num_filters = int(self.fpn_num_filters)
-      self._add_wsm(lambda: tf.ones([num_filters]))
-    elif self.weight_method == 'channel_fastattn':
-      num_filters = int(self.fpn_num_filters)
-      self._add_wsm(lambda: tf.ones([num_filters]))
+                                                    len(self.inputs_offsets)))
+      self.resample_feature_maps[idx] = resample_feature_map
     self.op_after_combine = OpAfterCombine(self.is_training_bn,
                                            self.conv_bn_act_pattern,
                                            self.separable_conv,
@@ -166,20 +154,18 @@ class FNode(tf.keras.layers.Layer):
                                            self.act_type,
                                            self.data_format,
                                            self.strategy,
-                                           name='op_after_combine{}'.format(
-                                               len(feats_shape)))
-    self.built = True
+                                           name='op_after_combine_{}'.format(
+                                               '_'.join(map(str, self.inputs_offsets))))
 
   def call(self, feats):
     nodes = []
     for idx, input_offset in enumerate(self.inputs_offsets):
-      input_node = feats[input_offset]
-      input_node = self.resample_feature_maps[idx](input_node)
-      nodes.append(input_node)
+      nodes.append(self.resample_feature_maps[idx](feats[input_offset]))
+
     new_node = self.fuse_features(nodes)
     new_node = self.op_after_combine(new_node)
-    feats.append(new_node)
-    return feats
+
+    return feats + [new_node]
 
 
 class OpAfterCombine(tf.keras.layers.Layer):
@@ -221,12 +207,11 @@ class OpAfterCombine(tf.keras.layers.Layer):
 
   def call(self, new_node):
     if not self.conv_bn_act_pattern:
-      new_node = utils.activation_fn(new_node, self.act_type)
+      new_node = utils_keras.activation_fn(new_node, self.act_type)
     new_node = self.conv_op(new_node)
     new_node = self.bn(new_node, self.is_training_bn)
-    act_type = None if not self.conv_bn_act_pattern else self.act_type
-    if act_type:
-      new_node = utils.activation_fn(new_node, act_type)
+    if self.conv_bn_act_pattern:
+      new_node = utils_keras.activation_fn(new_node, self.act_type)
     return new_node
 
 
@@ -311,7 +296,6 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
                                           height_scale=height_scale,
                                           width_scale=width_scale,
                                           data_format=self.data_format)
-    super(ResampleFeatureMap, self).build(input_shape)
 
   def _maybe_apply_1x1(self, feat):
     """Apply 1x1 conv to change layer width if necessary."""
@@ -453,9 +437,9 @@ class ClassNet(tf.keras.layers.Layer):
   def call(self, inputs, **kwargs):
     """Call ClassNet."""
 
-    class_outputs = {}
+    class_outputs = []
     for level in range(self.min_level, self.max_level + 1):
-      image = inputs[level]
+      image = inputs[level - self.min_level]
       for i in range(self.repeats):
         original_image = image
         image = self.conv_ops[i](image)
@@ -467,7 +451,7 @@ class ClassNet(tf.keras.layers.Layer):
                                      self.survival_prob)
           image = image + original_image
 
-      class_outputs[level] = self.classes(image)
+      class_outputs.append(self.classes(image))
 
     return class_outputs
 
@@ -607,9 +591,9 @@ class BoxNet(tf.keras.layers.Layer):
 
   def call(self, inputs, **kwargs):
     """Call boxnet."""
-    box_outputs = {}
+    box_outputs = []
     for level in range(self.min_level, self.max_level + 1):
-      image = inputs[level]
+      image = inputs[level - self.min_level]
       for i in range(self.repeats):
         original_image = image
         image = self.conv_ops[i](image)
@@ -621,7 +605,7 @@ class BoxNet(tf.keras.layers.Layer):
                                      self.survival_prob)
           image = image + original_image
 
-      box_outputs[level] = self.boxes(image)
+      box_outputs.append(self.boxes(image))
 
     return box_outputs
 
@@ -687,7 +671,7 @@ class FPNCells(tf.keras.layers.Layer):
                               max_level=self.config.max_level,
                               data_format=self.config.data_format)
    
-    return new_feats
+    return [new_feats[level] for level in range(self.config.min_level, self.config.max_level + 1)]
 
 
 class FPNCell(tf.keras.layers.Layer):
@@ -731,6 +715,56 @@ class FPNCell(tf.keras.layers.Layer):
     return feats
 
 
+class ResampleFeatureAdder(tf.keras.layers.Layer):
+  def __init__(self, config, **kwargs):
+    super(ResampleFeatureAdder, self).__init__(**kwargs)
+    self.min_level = config.min_level
+    self.max_level = config.max_level
+    self.target_num_channels=config.fpn_num_filters
+    self.apply_bn=config.apply_bn_for_resampling
+    self.is_training=config.is_training_bn
+    self.conv_after_downsample=config.conv_after_downsample
+    self.use_native_resize_op=config.use_native_resize_op
+    self.pooling_type=config.pooling_type
+    self.strategy=config.strategy
+    self.data_format=config.data_format
+    self.h_id, self.w_id = (2, 3) if config.data_format == 'channels_first' else (1, 2)
+
+  def build(self, inputs_shape):
+    self.max_exists_level = len(inputs_shape)
+
+    # we need at least on exist level to resample from it
+    if self.min_level >= self.max_exists_level:
+      raise ValueError('features.keys ({}) should include min_level ({})'.format(
+        range(self.max_exists_level), self.min_level))
+
+    self.resample_feature_mapper = {}
+    target_height = inputs_shape[self.max_exists_level - 1][self.h_id]
+    target_width = inputs_shape[self.max_exists_level - 1][self.w_id]
+    for level in range(self.max_exists_level, self.max_level + 1):
+      target_height = (target_height - 1) // 2 + 1
+      target_width = (target_width - 1) // 2 + 1
+      self.resample_feature_mapper[level] = ResampleFeatureMap(
+              target_height=target_height,
+              target_width=target_width,
+              target_num_channels=self.target_num_channels,
+              apply_bn=self.apply_bn,
+              is_training=self.is_training,
+              conv_after_downsample=self.conv_after_downsample,
+              use_native_resize_op=self.use_native_resize_op,
+              pooling_type=self.pooling_type,
+              strategy=self.strategy,
+              data_format=self.data_format,
+              name='resample_p{}'.format(level),
+      )
+ 
+  def call(self, inputs):
+    feats = inputs[self.min_level:self.max_exists_level]
+    for level in range(self.max_exists_level, self.max_level + 1):
+      feats.append(self.resample_feature_mapper[level](feats[-1]))
+    return feats
+
+
 def build_feature_network(features, config):
   """Build FPN input features.
 
@@ -742,39 +776,7 @@ def build_feature_network(features, config):
     A dict from levels to the feature maps processed after feature network.
   """
   feat_sizes = utils.get_feat_sizes(config.image_size, config.max_level)
-  feats = []
-  if config.min_level not in features.keys():
-    raise ValueError('features.keys ({}) should include min_level ({})'.format(
-        features.keys(), config.min_level))
-
-  # Build additional input features that are not from backbone.
-  for level in range(config.min_level, config.max_level + 1):
-    if level in features.keys():
-      feats.append(features[level])
-    else:
-      h_id, w_id = (2, 3) if config.data_format == 'channels_first' else (1, 2)
-      # Adds a coarser level by downsampling the last feature map.
-      feats.append(
-          ResampleFeatureMap(
-              target_height=(feats[-1].shape[h_id] - 1) // 2 + 1,
-              target_width=(feats[-1].shape[w_id] - 1) // 2 + 1,
-              target_num_channels=config.fpn_num_filters,
-              apply_bn=config.apply_bn_for_resampling,
-              is_training=config.is_training_bn,
-              conv_after_downsample=config.conv_after_downsample,
-              use_native_resize_op=config.use_native_resize_op,
-              pooling_type=config.pooling_type,
-              strategy=config.strategy,
-              data_format=config.data_format,
-              name='resample_p{}'.format(level),
-          )(feats[-1]))
-
-  utils.verify_feats_size(feats,
-                          feat_sizes=feat_sizes,
-                          min_level=config.min_level,
-                          max_level=config.max_level,
-                          data_format=config.data_format)
-
+  feats = ResampleFeatureAdder(config)(features)
   new_feats = FPNCells(feat_sizes, config)(feats)
   return new_feats
 
@@ -838,7 +840,7 @@ def build_backbone(features, config):
   if 'efficientnet' in backbone_name:
     override_params = {
         'batch_norm':
-            utils.batch_norm_class(is_training_bn, config.strategy),
+            utils_keras.batch_norm_class(is_training_bn, config.strategy),
         'relu_fn':
             functools.partial(utils.activation_fn, act_type=config.act_type),
     }
@@ -863,7 +865,7 @@ def build_backbone(features, config):
   else:
     raise ValueError(
         'backbone model {} is not supported.'.format(backbone_name))
-  return {0: features, 1: u1, 2: u2, 3: u3, 4: u4, 5: u5}, outputs
+  return [features, u1, u2, u3, u4, u5], outputs
 
 
 def efficientdet(model_name=None, config=None, **kwargs):

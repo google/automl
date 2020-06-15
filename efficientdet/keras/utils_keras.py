@@ -18,7 +18,14 @@
 
 from typing import Text
 import tensorflow as tf
-import utils
+
+
+def batch_norm_class(is_training, strategy=None):
+  if is_training and strategy == 'horovod':
+    return tf.keras.layers.experimental.SyncBatchNormalization
+  else:
+    return tf.keras.layers.BatchNormalization
+
 
 
 def build_batch_norm(is_training_bn: bool,
@@ -50,13 +57,28 @@ def build_batch_norm(is_training_bn: bool,
     gamma_initializer = tf.ones_initializer()
 
   axis = 1 if data_format == 'channels_first' else -1
-  batch_norm_class = utils.batch_norm_class(is_training_bn, strategy)
-  bn_layer = batch_norm_class(axis=axis,
-                              momentum=momentum,
-                              epsilon=epsilon,
-                              center=True,
-                              scale=True,
-                              gamma_initializer=gamma_initializer,
-                              name=name)
+  batch_norm_cls = batch_norm_class(is_training_bn, strategy)
+  bn_layer = batch_norm_cls(axis=axis,
+                            momentum=momentum,
+                            epsilon=epsilon,
+                            center=True,
+                            scale=True,
+                            gamma_initializer=gamma_initializer,
+                            name=name)
 
   return bn_layer
+
+
+def activation_fn(features: tf.Tensor, act_type: Text):
+  """Customized non-linear activation type."""
+  if act_type == 'swish':
+    return tf.nn.swish(features)
+  elif act_type == 'swish_native':
+    return features * tf.sigmoid(features)
+  elif act_type == 'relu':
+    return tf.nn.relu(features)
+  elif act_type == 'relu6':
+    return tf.nn.relu6(features)
+  else:
+    raise ValueError('Unsupported act_type {}'.format(act_type))
+
