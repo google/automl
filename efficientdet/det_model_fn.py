@@ -142,66 +142,41 @@ def learning_rate_schedule(params, global_step):
   raise ValueError('unknown lr_decay_method: {}'.format(lr_decay_method))
 
 
-def focal_loss(logits, targets, alpha, gamma, normalizer):
+def focal_loss(y_pred, y_true, alpha, gamma, label_smoothing, normalizer):
   """Compute the focal loss between `logits` and the golden `target` values.
 
   Focal loss = -(1-pt)^gamma * log(pt)
   where pt is the probability of being classified to the true class.
 
   Args:
-    logits: A float32 tensor of size [batch, height_in, width_in,
+    y_pred: A float32 tensor of size [batch, height_in, width_in,
       num_predictions].
-    targets: A float32 tensor of size [batch, height_in, width_in,
+    y_true: A float32 tensor of size [batch, height_in, width_in,
       num_predictions].
     alpha: A float32 scalar multiplying alpha to the loss from positive examples
       and (1-alpha) to the loss from negative examples.
     gamma: A float32 scalar modulating loss from hard and easy examples.
-    normalizer: A float32 scalar normalizes the total loss from all examples.
-
-  Returns:
-    loss: A float32 scalar representing normalized total loss.
+    label_smoothing: Float in [0, 1]. If > `0` then smooth the labels.
+    normalzier: Divide loss by this value
   """
   with tf.name_scope('focal_loss'):
-    positive_label_mask = tf.equal(targets, 1.0)
-    cross_entropy = (
-        tf.nn.sigmoid_cross_entropy_with_logits(labels=targets, logits=logits))
-    # Below are comments/derivations for computing modulator.
-    # For brevity, let x = logits,  z = targets, r = gamma, and p_t = sigmod(x)
-    # for positive samples and 1 - sigmoid(x) for negative examples.
-    #
-    # The modulator, defined as (1 - P_t)^r, is a critical part in focal loss
-    # computation. For r > 0, it puts more weights on hard examples, and less
-    # weights on easier ones. However if it is directly computed as (1 - P_t)^r,
-    # its back-propagation is not stable when r < 1. The implementation here
-    # resolves the issue.
-    #
-    # For positive samples (labels being 1),
-    #    (1 - p_t)^r
-    #  = (1 - sigmoid(x))^r
-    #  = (1 - (1 / (1 + exp(-x))))^r
-    #  = (exp(-x) / (1 + exp(-x)))^r
-    #  = exp(log((exp(-x) / (1 + exp(-x)))^r))
-    #  = exp(r * log(exp(-x)) - r * log(1 + exp(-x)))
-    #  = exp(- r * x - r * log(1 + exp(-x)))
-    #
-    # For negative samples (labels being 0),
-    #    (1 - p_t)^r
-    #  = (sigmoid(x))^r
-    #  = (1 / (1 + exp(-x)))^r
-    #  = exp(log((1 / (1 + exp(-x)))^r))
-    #  = exp(-r * log(1 + exp(-x)))
-    #
-    # Therefore one unified form for positive (z = 1) and negative (z = 0)
-    # samples is:
-    #      (1 - p_t)^r = exp(-r * z * x - r * log(1 + exp(-x))).
-    neg_logits = -1.0 * logits
-    modulator = tf.exp(gamma * targets * neg_logits -
-                       gamma * tf.log1p(tf.exp(neg_logits)))
-    loss = modulator * cross_entropy
-    weighted_loss = tf.where(positive_label_mask, alpha * loss,
-                             (1.0 - alpha) * loss)
-    weighted_loss /= normalizer
-  return weighted_loss
+    alpha = tf.convert_to_tensor(alpha, dtype=y_pred.dtype)
+    gamma = tf.convert_to_tensor(gamma, dtype=y_pred.dtype)
+
+    # Get the cross_entropy for each entry
+    ce = tf.keras.losses.categorical_crossentropy(
+        y_true, y_pred, from_logints=True, label_smoothing=label_smoothing)
+
+    pred_prob = tf.sigmoid(y_pred)
+
+    p_t = (y_true * pred_prob) + ((1 - y_true) * (1 - pred_prob))
+
+    alpha_factor = y_true * alpha + (1 - y_true) * (1 - alpha)
+
+    modulating_factor = tf.pow(1.0 - p_t, gamma)
+
+    # compute the final loss and return
+    return alpha_factor * modulating_factor * ce / normalizer
 
 
 def _box_loss(box_outputs, box_targets, num_positives, delta=0.1):
@@ -269,14 +244,6 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
     cls_targets_at_level = tf.one_hot(labels['cls_targets_%d' % level],
                                       params['num_classes'])
 
-    if params['label_smoothing'] > 0:
-      # see https://arxiv.org/pdf/1512.00567.pdf p7 for a discussion of label_smoothing
-      assert 1 > params['label_smoothing'] > 0
-      smooth_positives = tf.cast(1.0 - params['label_smoothing'], tf.float32)
-      smooth_negatives = tf.cast(params['label_smoothing'] / params['num_classes'],
-        tf.float32)
-      cls_targets_at_level = cls_targets_at_level * smooth_positives + smooth_negatives
-
     if params['data_format'] == 'channels_first':
       bs, _, width, height, _ = cls_targets_at_level.get_shape().as_list()
       cls_targets_at_level = tf.reshape(cls_targets_at_level,
@@ -292,7 +259,8 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
       cls_targets_at_level,
       params['alpha'],
       params['gamma'],
-      num_positives_sum)
+      label_smoothing=params['label_smoothing'],
+      normalizer=num_positives_sum)
 
     if params['data_format'] == 'channels_first':
       cls_loss = tf.reshape(cls_loss,
