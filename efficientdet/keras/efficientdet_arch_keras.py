@@ -777,7 +777,7 @@ def build_feature_network(features, config):
     A dict from levels to the feature maps processed after feature network.
   """
   feat_sizes = utils.get_feat_sizes(config.image_size, config.max_level)
-  feats = ResampleFeatureAdder(config, name='')(features)
+  feats = ResampleFeatureAdder(config)(features)
   new_feats = FPNCells(feat_sizes, config)(feats)
   return new_feats
 
