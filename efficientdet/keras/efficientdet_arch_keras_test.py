@@ -20,32 +20,49 @@ import tensorflow.compat.v1 as tf
 import efficientdet_arch as legacy_arch
 import hparams_config
 from keras import efficientdet_arch_keras
-import functools
-import utils
 
 SEED = 111111
 
 
 class KerasTest(tf.test.TestCase):
 
-  def _test_model_output(self):
-    # TODO(fsx950223): Fix the test case
+  def test_backbone(self):
     inputs_shape = [1, 512, 512, 3]
+    config = hparams_config.get_efficientdet_config('efficientdet-d0')
     with tf.Session(graph=tf.Graph()) as sess:
       feats = tf.ones(inputs_shape)
       tf.random.set_random_seed(SEED)
-      _, class_outputs1, box_outputs1 = efficientdet_arch_keras.efficientdet(
-          'efficientdet-d0')(feats)
+      feats, _ = efficientdet_arch_keras.build_backbone(feats, config)
       sess.run(tf.global_variables_initializer())
-      class_output1, box_output1 = sess.run([class_outputs1, box_outputs1])
+      feats1 = sess.run(feats)
     with tf.Session(graph=tf.Graph()) as sess:
       feats = tf.ones(inputs_shape)
       tf.random.set_random_seed(SEED)
-      class_outputs2, box_outputs2 = legacy_arch.efficientdet(
-          feats, 'efficientdet-d0')
+      feats = legacy_arch.build_backbone(feats, config)
       sess.run(tf.global_variables_initializer())
-      class_output2, box_output2 = sess.run([class_outputs2, box_outputs2])
+      feats2 = sess.run(feats)
+    for key in list(feats.keys()):
+      self.assertAllEqual(feats1[key], feats2[key])
 
+  def test_model_output(self):
+    inputs_shape = [1, 512, 512, 3]
+    config = hparams_config.get_efficientdet_config('efficientdet-d0')
+    with tf.Session(graph=tf.Graph()) as sess:
+      feats = tf.ones(inputs_shape)
+      tf.random.set_random_seed(SEED)
+      feats, _ = efficientdet_arch_keras.build_backbone(feats, config)
+      feats = efficientdet_arch_keras.build_feature_network(feats, config)
+      feats = efficientdet_arch_keras.build_class_and_box_outputs(feats, config)
+      sess.run(tf.global_variables_initializer())
+      class_output1, box_output1 = sess.run(feats)
+    with tf.Session(graph=tf.Graph()) as sess:
+      feats = tf.ones(inputs_shape)
+      tf.random.set_random_seed(SEED)
+      feats = legacy_arch.build_backbone(feats, config)
+      feats = legacy_arch.build_feature_network(feats, config)
+      feats = legacy_arch.build_class_and_box_outputs(feats, config)
+      sess.run(tf.global_variables_initializer())
+      class_output2, box_output2 = sess.run(feats)
     for i in range(3, 8):
       self.assertAllEqual(class_output1[i], class_output2[i])
       self.assertAllEqual(box_output1[i], box_output2[i])
@@ -82,15 +99,15 @@ class KerasTest(tf.test.TestCase):
     for i in range(config.min_level, config.max_level + 1):
       self.assertAllEqual(new_feats1[i], new_feats2[i])
 
-  def _test_model_variables(self):
+  def test_model_variables(self):
     with tf.Graph().as_default():
-      feats = tf.random.uniform([1, 512, 512, 3])
+      feats = tf.ones([1, 512, 512, 3])
       model = efficientdet_arch_keras.efficientdet('efficientdet-d0')
       model(feats)
       vars1 = [var.name for var in model.trainable_variables]
       vars3 = [var.name for var in model.variables]
     with tf.Graph().as_default():
-      feats = tf.constant(feats)
+      feats = tf.ones([1, 512, 512, 3])
       legacy_arch.efficientdet(feats, 'efficientdet-d0')
       vars2 = [var.name for var in tf.trainable_variables()]
       vars4 = [var.name for var in tf.global_variables()]
@@ -131,7 +148,7 @@ class KerasTest(tf.test.TestCase):
             actual_result = resample_layer(feat)
             self.assertAllCloseAccordingToType(expect_result, actual_result)
 
-  def test_op_name(self):
+  def test_var_names(self):
     with tf.Graph().as_default():
       feat = tf.random.uniform([1, 16, 16, 320])
       resample_layer = efficientdet_arch_keras.ResampleFeatureMap(
@@ -158,7 +175,7 @@ class EfficientDetVariablesNamesTest(tf.test.TestCase):
 
   def build_model(self, keras=False):
     with tf.Graph().as_default():
-      config = hparams_config.get_efficientdet_config()
+      config = hparams_config.get_efficientdet_config('efficientdet-d0')
       inputs_shape = [1, 512, 512, 3]
       inputs = dict()
       for i in range(config.min_level, config.max_level + 1):
@@ -177,9 +194,9 @@ class EfficientDetVariablesNamesTest(tf.test.TestCase):
     self.assertEqual(legacy_names, keras_names)
 
   def test_output(self):
-    config = hparams_config.get_efficientdet_config()
+    config = hparams_config.get_efficientdet_config('efficientdet-d0')
     inputs_shape = [1, 512, 512, 3]
-
+    config.max_level = config.min_level + 1
     with tf.Session(graph=tf.Graph()) as sess:
       inputs = dict()
       for i in range(config.min_level, config.max_level + 1):
