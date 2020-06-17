@@ -299,7 +299,7 @@ def nms(dets, nms_configs):
   if method == 'diou':
     return diou_nms(dets, nms_configs.get('iou_thresh', None))
 
-  if method not in ('linear', 'gaussian'):
+  if method in ('linear', 'gaussian'):
     return soft_nms(dets, nms_configs)
 
   raise ValueError('Unknown NMS method: {}'.format(method))
