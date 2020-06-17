@@ -52,11 +52,11 @@ def build_batch_norm(is_training_bn: bool,
   axis = 1 if data_format == 'channels_first' else -1
   batch_norm_class = utils.batch_norm_class(is_training_bn, strategy)
   bn_layer = batch_norm_class(axis=axis,
-                            momentum=momentum,
-                            epsilon=epsilon,
-                            center=True,
-                            scale=True,
-                            gamma_initializer=gamma_initializer,
-                            name=name)
+                              momentum=momentum,
+                              epsilon=epsilon,
+                              center=True,
+                              scale=True,
+                              gamma_initializer=gamma_initializer,
+                              name=name)
 
   return bn_layer

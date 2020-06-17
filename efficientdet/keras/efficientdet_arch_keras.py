@@ -87,7 +87,8 @@ class FNode(tf.keras.layers.Layer):
                                            self.act_type,
                                            self.data_format,
                                            self.strategy,
-                                           name='op_after_combine{}'.format(len(input_shape)))
+                                           name='op_after_combine{}'.format(
+                                               len(input_shape)))
 
     if self.weight_method == 'attn':
       self._add_wsm('ones')
@@ -113,7 +114,10 @@ class FNode(tf.keras.layers.Layer):
       else:
         name = 'WSM_{}'.format(i)
       self.edge_weights.append(
-          self.add_weight(initializer=initializer, name=name, trainable=True, dtype=self.dtype))
+          self.add_weight(initializer=initializer,
+                          name=name,
+                          trainable=True,
+                          dtype=self.dtype))
 
   def fuse_features(self, nodes):
     if self.weight_method == 'attn':
@@ -128,7 +132,8 @@ class FNode(tf.keras.layers.Layer):
       ]
       new_node = tf.math.add_n(nodes)
     elif self.weight_method == 'channel_attn':
-      normalized_weights = tf.nn.softmax(tf.stack(self.edge_weights, -1), axis=-1)
+      normalized_weights = tf.nn.softmax(tf.stack(self.edge_weights, -1),
+                                         axis=-1)
       nodes = tf.stack(nodes, axis=-1)
       new_node = tf.reduce_sum(nodes * normalized_weights, -1)
     elif self.weight_method == 'channel_fastattn':
@@ -142,7 +147,6 @@ class FNode(tf.keras.layers.Layer):
       new_node = tf.math.add_n(nodes)
 
     return new_node
-
 
   def call(self, feats):
     nodes = []
@@ -262,8 +266,8 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
 
     height_scale = self.target_height // self.height
     width_scale = self.target_width // self.width
-    self.upsample2d = tf.keras.layers.UpSampling2D(
-        (height_scale, width_scale), data_format=self.data_format)
+    self.upsample2d = tf.keras.layers.UpSampling2D((height_scale, width_scale),
+                                                   data_format=self.data_format)
     super(ResampleFeatureMap, self).build(input_shape)
 
   def _maybe_apply_1x1(self, feat):
@@ -631,8 +635,11 @@ class FPNCells(tf.keras.layers.Layer):
       feats = [new_feats[level] for level in range(min_level, max_level + 1)]
       utils.verify_feats_size(feats, self.feat_sizes, min_level, max_level,
                               self.config.data_format)
-   
-    return [new_feats[level] for level in range(self.config.min_level, self.config.max_level + 1)]
+
+    return [
+        new_feats[level]
+        for level in range(self.config.min_level, self.config.max_level + 1)
+    ]
 
 
 class FPNCell(tf.keras.layers.Layer):
@@ -675,32 +682,35 @@ class FPNCell(tf.keras.layers.Layer):
 
 
 class ResampleFeatureAdder(tf.keras.layers.Layer):
+
   def __init__(self, config, **kwargs):
     super(ResampleFeatureAdder, self).__init__(**kwargs)
     self.min_level = config.min_level
     self.max_level = config.max_level
-    self.target_num_channels=config.fpn_num_filters
-    self.apply_bn=config.apply_bn_for_resampling
-    self.is_training=config.is_training_bn
-    self.conv_after_downsample=config.conv_after_downsample
-    self.strategy=config.strategy
-    self.data_format=config.data_format
-    self.h_id, self.w_id = (2, 3) if config.data_format == 'channels_first' else (1, 2)
+    self.target_num_channels = config.fpn_num_filters
+    self.apply_bn = config.apply_bn_for_resampling
+    self.is_training = config.is_training_bn
+    self.conv_after_downsample = config.conv_after_downsample
+    self.strategy = config.strategy
+    self.data_format = config.data_format
+    self.h_id, self.w_id = (
+        2, 3) if config.data_format == 'channels_first' else (1, 2)
 
   # this method allows to set empty name to the current layer
   # so child will not contain this layer name as a prefix.
   # this trick allows to have same name for resample_p6
   # for keras and notkeras models
   def _name_scope(self):
-      return ''
+    return ''
 
   def build(self, inputs_shape):
     self.max_exists_level = len(inputs_shape)
 
     # we need at least on exist level to resample from it
     if self.min_level >= self.max_exists_level:
-      raise ValueError('features.keys ({}) should include min_level ({})'.format(
-        range(self.max_exists_level), self.min_level))
+      raise ValueError(
+          'features.keys ({}) should include min_level ({})'.format(
+              range(self.max_exists_level), self.min_level))
 
     self.resample_feature_mapper = {}
     target_height = inputs_shape[self.max_exists_level - 1][self.h_id]
@@ -709,17 +719,17 @@ class ResampleFeatureAdder(tf.keras.layers.Layer):
       target_height = (target_height - 1) // 2 + 1
       target_width = (target_width - 1) // 2 + 1
       self.resample_feature_mapper[str(level)] = ResampleFeatureMap(
-              target_height=target_height,
-              target_width=target_width,
-              target_num_channels=self.target_num_channels,
-              apply_bn=self.apply_bn,
-              is_training=self.is_training,
-              conv_after_downsample=self.conv_after_downsample,
-              strategy=self.strategy,
-              data_format=self.data_format,
-              name='resample_p{}'.format(level),
+          target_height=target_height,
+          target_width=target_width,
+          target_num_channels=self.target_num_channels,
+          apply_bn=self.apply_bn,
+          is_training=self.is_training,
+          conv_after_downsample=self.conv_after_downsample,
+          strategy=self.strategy,
+          data_format=self.data_format,
+          name='resample_p{}'.format(level),
       )
- 
+
   def call(self, inputs):
     feats = inputs[self.min_level:self.max_exists_level]
     for level in range(self.max_exists_level, self.max_level + 1):
