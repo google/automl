@@ -38,10 +38,14 @@ def activation_fn(features: tf.Tensor, act_type: Text):
     return tf.nn.swish(features)
   elif act_type == 'swish_native':
     return features * tf.sigmoid(features)
+  elif act_type == 'hswish':
+    return features * tf.nn.relu6(features + 3) / 6
   elif act_type == 'relu':
     return tf.nn.relu(features)
   elif act_type == 'relu6':
     return tf.nn.relu6(features)
+  elif act_type == 'mish':
+    return features * tf.math.tanh(tf.math.softplus(features))
   else:
     raise ValueError('Unsupported act_type {}'.format(act_type))
 

@@ -211,13 +211,18 @@ def default_detection_configs():
   h.data_format = 'channels_last'
 
   # classification loss
+  h.label_smoothing = 0.0 # 0.1 is a good default
+  # Behold the focal loss parameters
   h.alpha = 0.25
   h.gamma = 1.5
+
   # localization loss
-  h.delta = 0.1
+  h.delta = 0.1 # This is the regularization parameter of huber loss
+  # total loss = box_loss * box_loss_weight + iou_loss * iou_loss_weight
   h.box_loss_weight = 50.0
   h.iou_loss_type = None
   h.iou_loss_weight = 1.0
+
   # regularization l2 loss.
   h.weight_decay = 4e-5
   # use horovod for multi-gpu training. If None, use TF default.

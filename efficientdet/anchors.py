@@ -46,6 +46,8 @@ MAX_DETECTIONS_PER_IMAGE = 100
 # The minimal score threshold.
 MIN_SCORE_THRESH = 0.4
 
+# A small number to stabilize division
+EPSILON = 1e-16
 
 def sigmoid(x):
   """Sigmoid function for use with Numpy for CPU evaluation."""
@@ -113,7 +115,63 @@ def decode_box_outputs_tf(rel_codes, anchors):
   return tf.stack([ymin, xmin, ymax, xmax], axis=-1)
 
 
-def nms(dets, thresh=0.5):
+def diou_nms(dets, thresh):
+  """
+  DIOU Non-maximum suppression.
+
+  diou = iou - square of euclidian distance of box centers
+     / square of diagonal of smallest enclosing bounding box
+
+  Reference: https://arxiv.org/pdf/1911.08287.pdf
+  """
+  x1 = dets[:, 0]
+  y1 = dets[:, 1]
+  x2 = dets[:, 2]
+  y2 = dets[:, 3]
+  scores = dets[:, 4]
+
+  areas = (x2 - x1 + 1) * (y2 - y1 + 1)
+  order = scores.argsort()[::-1]
+
+  center_x = (x1 + x2) / 2
+  center_y = (y1 + y2) / 2
+
+  keep = []
+  while order.size > 0:
+    i = order[0]
+    keep.append(i)
+    xx1 = np.maximum(x1[i], x1[order[1:]])
+    yy1 = np.maximum(y1[i], y1[order[1:]])
+    xx2 = np.minimum(x2[i], x2[order[1:]])
+    yy2 = np.minimum(y2[i], y2[order[1:]])
+
+    w = np.maximum(0.0, xx2 - xx1 + 1)
+    h = np.maximum(0.0, yy2 - yy1 + 1)
+    intersection = w * h
+    iou = intersection / (areas[i] + areas[order[1:]] - intersection)
+
+    smallest_enclosing_box_x1 = np.minimum(x1[i], x1[order[1:]])
+    smallest_enclosing_box_x2 = np.maximum(x2[i], x2[order[1:]])
+    smallest_enclosing_box_y1 = np.minimum(y1[i], y1[order[1:]])
+    smallest_enclosing_box_y2 = np.maximum(y2[i], y2[order[1:]])
+
+    square_of_the_diagonal = (
+        smallest_enclosing_box_x2 - smallest_enclosing_box_x1) ** 2 + \
+      (smallest_enclosing_box_y2 - smallest_enclosing_box_y1) ** 2 \
+        + EPSILON
+
+    square_of_center_distance = (
+        center_x[i] - center_x[order[1:]]) ** 2 \
+      + (center_y[i] - center_y[order[1:]]) ** 2
+
+    diou = iou - square_of_center_distance / square_of_the_diagonal
+
+    inds = np.where(diou <= thresh)[0]
+    order = order[inds + 1]
+  return dets[keep]
+
+
+def hard_nms(dets, thresh):
   """Non-maximum suppression."""
   x1 = dets[:, 0]
   y1 = dets[:, 1]
@@ -153,9 +211,9 @@ def softnms(dets, nms_configs):
   Args:
     dets: detection with shape (num, 5) and format [x1, y1, x2, y2, score].
     nms_configs: a dict config that may contain the following members
-      * method: one of {`linear`, `gaussian` or 'hard'}. Use `hard` if None.
+      * method: one of {`linear`, `gaussian`, `diou` or 'hard'}. Use `hard` if None.
+      * iou_thresh (float): IOU threshold, only for `linear`, `hard`, and `diou`.
       * sigma: Gaussian parameter, only for method 'gaussian'.
-      * iou_thresh (float): IOU threshold, only for `linear`.
       * score_thresh (float): Box score threshold for final boxes.
 
   Returns:
@@ -168,13 +226,16 @@ def softnms(dets, nms_configs):
   iou_thresh = nms_configs.get('iou_thresh', 0.3)
   score_thresh = nms_configs.get('score_thresh', 0.001)
 
-  if method not in ('linear', 'gaussian', 'hard'):
+  if method not in ('linear', 'gaussian', 'hard', 'diou'):
     raise ValueError(
         'NMS method must be linear/gaussian/hard, got: {}'.format(method))
 
   if method == 'hard' or not method:
     # the default nms has the same output as hard method, but runs faster.
-    return nms(dets)
+    return hard_nms(dets, iou_thresh)
+  elif method == 'diou':
+    # the default nms has the same output as hard method, but runs faster.
+    return diou_nms(dets, iou_thresh)
 
   x1 = dets[:, 0]
   y1 = dets[:, 1]
