@@ -84,7 +84,7 @@ class FNode(tf.keras.layers.Layer):
                                                 name='resample_{}_{}_{}'.format(
                                                     idx, input_offset,
                                                     len(input_shape)))
-      self.resample_feature_maps[idx] = resample_feature_map
+      self.resample_feature_maps[str(idx)] = resample_feature_map
 
     self.op_after_combine = OpAfterCombine(self.is_training_bn,
                                            self.conv_bn_act_pattern,
@@ -153,7 +153,7 @@ class FNode(tf.keras.layers.Layer):
   def call(self, feats):
     nodes = []
     for idx, input_offset in enumerate(self.inputs_offsets):
-      nodes.append(self.resample_feature_maps[idx](feats[input_offset]))
+      nodes.append(self.resample_feature_maps[str(idx)](feats[input_offset]))
 
     new_node = self.fuse_features(nodes)
     new_node = self.op_after_combine(new_node)
@@ -412,7 +412,7 @@ class ClassNet(tf.keras.layers.Layer):
 
       bn_per_level = {}
       for level in range(self.min_level, self.max_level + 1):
-        bn_per_level[level] = utils_keras.build_batch_norm(
+        bn_per_level[str(level)] = utils_keras.build_batch_norm(
             is_training_bn=self.is_training,
             init_zero=False,
             strategy=self.strategy,
@@ -437,7 +437,7 @@ class ClassNet(tf.keras.layers.Layer):
       for i in range(self.repeats):
         original_image = image
         image = self.conv_ops[i](image)
-        image = self.bns[i][level](image, training=self.is_training)
+        image = self.bns[i][str(level)](image, training=self.is_training)
         if self.act_type:
           image = utils.activation_fn(image, self.act_type)
         if i > 0 and self.survival_prob:
@@ -551,7 +551,7 @@ class BoxNet(tf.keras.layers.Layer):
 
       bn_per_level = {}
       for level in range(self.min_level, self.max_level + 1):
-        bn_per_level[level] = utils_keras.build_batch_norm(
+        bn_per_level[str(level)] = utils_keras.build_batch_norm(
             is_training_bn=self.is_training,
             init_zero=False,
             strategy=self.strategy,
@@ -591,7 +591,7 @@ class BoxNet(tf.keras.layers.Layer):
       for i in range(self.repeats):
         original_image = image
         image = self.conv_ops[i](image)
-        image = self.bns[i][level](image, training=self.is_training)
+        image = self.bns[i][str(level)](image, training=self.is_training)
         if self.act_type:
           image = utils.activation_fn(image, self.act_type)
         if i > 0 and self.survival_prob:
@@ -745,7 +745,7 @@ class ResampleFeatureAdder(tf.keras.layers.Layer):
     for level in range(self.max_exists_level, self.max_level + 1):
       target_height = (target_height - 1) // 2 + 1
       target_width = (target_width - 1) // 2 + 1
-      self.resample_feature_mapper[level] = ResampleFeatureMap(
+      self.resample_feature_mapper[str(level)] = ResampleFeatureMap(
               target_height=target_height,
               target_width=target_width,
               target_num_channels=self.target_num_channels,
@@ -762,7 +762,7 @@ class ResampleFeatureAdder(tf.keras.layers.Layer):
   def call(self, inputs):
     feats = inputs[self.min_level:self.max_exists_level]
     for level in range(self.max_exists_level, self.max_level + 1):
-      feats.append(self.resample_feature_mapper[level](feats[-1]))
+      feats.append(self.resample_feature_mapper[str(level)](feats[-1]))
     return feats
 
 

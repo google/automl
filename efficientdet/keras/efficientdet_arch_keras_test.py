@@ -270,12 +270,11 @@ class KerasTest(tf.test.TestCase):
 
 
   def test_model_variables(self):
-    with tf.Graph().as_default():
-      feats = tf.ones([1, 512, 512, 3])
-      model = efficientdet_arch_keras.efficientdet('efficientdet-d0')
-      model(feats)
-      vars1 = [var.name for var in model.trainable_variables]
-      vars3 = [var.name for var in model.variables]
+    feats = tf.ones([1, 512, 512, 3])
+    model = efficientdet_arch_keras.efficientdet('efficientdet-d0')
+    model(feats)
+    vars1 = [var.name for var in model.trainable_variables]
+    vars3 = [var.name for var in model.variables]
     with tf.Graph().as_default():
       feats = tf.ones([1, 512, 512, 3])
       legacy_arch.efficientdet(feats, 'efficientdet-d0')

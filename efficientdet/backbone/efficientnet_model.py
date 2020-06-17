@@ -209,8 +209,17 @@ class MBConvBlock(tf.keras.layers.Layer):
   def block_args(self):
     return self._block_args
 
+  def class_name_by_index(self, cls_base_name, index):
+    if index == 0:
+      return cls_base_name
+    else:
+      return "{}_{}".format(cls_base_name, index)
+
   def _build(self):
     """Builds block according to the arguments."""
+    conv_base_name = "conv2d"
+    conv_name_idx = 0
+
     if self._block_args.super_pixel == 1:
       self._superpixel = self.conv_cls(
           self._block_args.input_filters,
@@ -220,6 +229,7 @@ class MBConvBlock(tf.keras.layers.Layer):
           padding='same',
           data_format=self._data_format,
           use_bias=False)
+
       self._bnsp = self._batch_norm(
           axis=self._channel_axis,
           momentum=self._batch_norm_momentum,
@@ -236,7 +246,9 @@ class MBConvBlock(tf.keras.layers.Layer):
         kernel_initializer=conv_kernel_initializer,
         padding='same',
         data_format=self._data_format,
-        use_bias=False)
+        use_bias=False,
+        name=self.class_name_by_index(conv_base_name, conv_name_idx))
+    conv_name_idx += 1
 
     # Expansion phase. Called if not using fused convolutions and expansion
     # phase is necessary.
@@ -248,10 +260,27 @@ class MBConvBlock(tf.keras.layers.Layer):
         padding='same',
         data_format=self._data_format,
         use_bias=False)
+
+
+    if self._block_args.fused_conv:
+      bn0_name = "tpu_batch_normalization"
+      bn1_name = "tpu_batch_normalization"
+      bn2_name = "tpu_batch_normalization_1"
+    else:
+      if self._block_args.expand_ratio != 1:
+        bn0_name = "tpu_batch_normalization"
+        bn1_name = "tpu_batch_normalization_1"
+        bn2_name = "tpu_batch_normalization_2"
+      else:
+        bn0_name = "tpu_batch_normalization"
+        bn1_name = "tpu_batch_normalization"
+        bn2_name = "tpu_batch_normalization_1"
+
     self._bn0 = self._batch_norm(
         axis=self._channel_axis,
         momentum=self._batch_norm_momentum,
-        epsilon=self._batch_norm_epsilon)
+        epsilon=self._batch_norm_epsilon,
+        name=bn0_name)
 
     # Depth-wise convolution phase. Called if not using fused convolutions.
     self._depthwise_conv = self.depthwise_conv_cls(
@@ -265,7 +294,8 @@ class MBConvBlock(tf.keras.layers.Layer):
     self._bn1 = self._batch_norm(
         axis=self._channel_axis,
         momentum=self._batch_norm_momentum,
-        epsilon=self._batch_norm_epsilon)
+        epsilon=self._batch_norm_epsilon,
+        name=bn1_name)
 
     if self._has_se:
       num_reduced_filters = max(
@@ -278,6 +308,7 @@ class MBConvBlock(tf.keras.layers.Layer):
           kernel_initializer=conv_kernel_initializer,
           padding='same',
           data_format=self._data_format,
+          name='conv2d',
           use_bias=True)
       self._se_expand = self.conv_cls(
           filters,
@@ -286,10 +317,15 @@ class MBConvBlock(tf.keras.layers.Layer):
           kernel_initializer=conv_kernel_initializer,
           padding='same',
           data_format=self._data_format,
+          name='conv2d_1',
           use_bias=True)
 
     # Output phase.
     filters = self._block_args.output_filters
+    if not self._block_args.fused_conv and self._block_args.expand_ratio != 1:
+      project_conv_name = "conv2d_1"
+    else:
+      project_conv_name = "conv2d"
     self._project_conv = self.conv_cls(
         filters=filters,
         kernel_size=[1, 1],
@@ -297,11 +333,13 @@ class MBConvBlock(tf.keras.layers.Layer):
         kernel_initializer=conv_kernel_initializer,
         padding='same',
         data_format=self._data_format,
-        use_bias=False)
+        use_bias=False,
+        name=project_conv_name)
     self._bn2 = self._batch_norm(
         axis=self._channel_axis,
         momentum=self._batch_norm_momentum,
-        epsilon=self._batch_norm_epsilon)
+        epsilon=self._batch_norm_epsilon,
+        name=bn2_name)
 
   def _call_se(self, input_tensor):
     """Call Squeeze and Excitation layer.
@@ -414,6 +452,7 @@ class MBConvBlockWithoutDepthwise(MBConvBlock):
 
     # Output phase:
     filters = self._block_args.output_filters
+
     self._project_conv = self.conv_cls(
         filters,
         kernel_size=[1, 1],
