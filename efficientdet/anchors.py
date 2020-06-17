@@ -46,8 +46,6 @@ MAX_DETECTIONS_PER_IMAGE = 100
 # The minimal score threshold.
 MIN_SCORE_THRESH = 0.4
 
-# A small number to stabilize division
-EPSILON = 1e-16
 
 def sigmoid(x):
   """Sigmoid function for use with Numpy for CPU evaluation."""
@@ -115,15 +113,22 @@ def decode_box_outputs_tf(rel_codes, anchors):
   return tf.stack([ymin, xmin, ymax, xmax], axis=-1)
 
 
-def diou_nms(dets, thresh):
-  """
-  DIOU Non-maximum suppression.
+def diou_nms(dets, iou_thresh=None):
+  """DIOU non-maximum suppression.
 
   diou = iou - square of euclidian distance of box centers
      / square of diagonal of smallest enclosing bounding box
 
   Reference: https://arxiv.org/pdf/1911.08287.pdf
+
+  Args:
+    dets: detection with shape (num, 5) and format [x1, y1, x2, y2, score].
+    iou_thresh: IOU threshold,
+
+  Returns:
+    numpy.array: Retained boxes.
   """
+  iou_thresh = iou_thresh or 0.5
   x1 = dets[:, 0]
   y1 = dets[:, 1]
   x2 = dets[:, 2]
@@ -156,23 +161,30 @@ def diou_nms(dets, thresh):
     smallest_enclosing_box_y2 = np.maximum(y2[i], y2[order[1:]])
 
     square_of_the_diagonal = (
-        smallest_enclosing_box_x2 - smallest_enclosing_box_x1) ** 2 + \
-      (smallest_enclosing_box_y2 - smallest_enclosing_box_y1) ** 2 \
-        + EPSILON
+        (smallest_enclosing_box_x2 - smallest_enclosing_box_x1)**2 +
+        (smallest_enclosing_box_y2 - smallest_enclosing_box_y1)**2)
 
-    square_of_center_distance = (
-        center_x[i] - center_x[order[1:]]) ** 2 \
-      + (center_y[i] - center_y[order[1:]]) ** 2
+    square_of_center_distance = ((center_x[i] - center_x[order[1:]])**2 +
+                                 (center_y[i] - center_y[order[1:]])**2)
 
-    diou = iou - square_of_center_distance / square_of_the_diagonal
-
-    inds = np.where(diou <= thresh)[0]
+    # Add 1e-10 for numerical stability.
+    diou = iou - square_of_center_distance / (square_of_the_diagonal  + 1e-10)
+    inds = np.where(diou <= iou_thresh)[0]
     order = order[inds + 1]
   return dets[keep]
 
 
-def hard_nms(dets, thresh):
-  """Non-maximum suppression."""
+def hard_nms(dets, iou_thresh=None):
+  """The basic hard non-maximum suppression.
+
+  Args:
+    dets: detection with shape (num, 5) and format [x1, y1, x2, y2, score].
+    iou_thresh: IOU threshold,
+
+  Returns:
+    numpy.array: Retained boxes.
+  """
+  iou_thresh = iou_thresh or 0.5
   x1 = dets[:, 0]
   y1 = dets[:, 1]
   x2 = dets[:, 2]
@@ -196,13 +208,13 @@ def hard_nms(dets, thresh):
     intersection = w * h
     overlap = intersection / (areas[i] + areas[order[1:]] - intersection)
 
-    inds = np.where(overlap <= thresh)[0]
+    inds = np.where(overlap <= iou_thresh)[0]
     order = order[inds + 1]
 
   return dets[keep]
 
 
-def softnms(dets, nms_configs):
+def soft_nms(dets, nms_configs):
   """Soft non-maximum suppression.
 
   [1] Soft-NMS -- Improving Object Detection With One Line of Code.
@@ -211,31 +223,19 @@ def softnms(dets, nms_configs):
   Args:
     dets: detection with shape (num, 5) and format [x1, y1, x2, y2, score].
     nms_configs: a dict config that may contain the following members
-      * method: one of {`linear`, `gaussian`, `diou` or 'hard'}. Use `hard` if None.
-      * iou_thresh (float): IOU threshold, only for `linear`, `hard`, and `diou`.
+      * method: one of {`linear`, `gaussian`, 'hard'}. Use `gaussian` if None.
+      * iou_thresh (float): IOU threshold, only for `linear`, `hard`.
       * sigma: Gaussian parameter, only for method 'gaussian'.
       * score_thresh (float): Box score threshold for final boxes.
 
   Returns:
     numpy.array: Retained boxes.
   """
-  nms_configs = nms_configs or {}
-  method = nms_configs.get('method', 'hard')
+  method = nms_configs.get('method', 'gaussian')
   # Default sigma and iou_thresh are from the original soft-nms paper.
   sigma = nms_configs.get('sigma', 0.5)
   iou_thresh = nms_configs.get('iou_thresh', 0.3)
   score_thresh = nms_configs.get('score_thresh', 0.001)
-
-  if method not in ('linear', 'gaussian', 'hard', 'diou'):
-    raise ValueError(
-        'NMS method must be linear/gaussian/hard, got: {}'.format(method))
-
-  if method == 'hard' or not method:
-    # the default nms has the same output as hard method, but runs faster.
-    return hard_nms(dets, iou_thresh)
-  elif method == 'diou':
-    # the default nms has the same output as hard method, but runs faster.
-    return diou_nms(dets, iou_thresh)
 
   x1 = dets[:, 0]
   y1 = dets[:, 1]
@@ -277,6 +277,32 @@ def softnms(dets, nms_configs):
     dets = dets[retained_idx + 1, :]
 
   return np.vstack(retained_box)
+
+
+def nms(dets, nms_configs):
+  """Non-maximum suppression.
+
+  Args:
+    dets: detection with shape (num, 5) and format [x1, y1, x2, y2, score].
+    nms_configs: a dict config that may contain parameters.
+
+  Returns:
+    numpy.array: Retained boxes.
+  """
+
+  nms_configs = nms_configs or {}
+  method = nms_configs.get('method', None)
+
+  if method == 'hard' or not method:
+    return hard_nms(dets, nms_configs.get('iou_thresh', None))
+
+  if method == 'diou':
+    return diou_nms(dets, nms_configs.get('iou_thresh', None))
+
+  if method not in ('linear', 'gaussian'):
+    return soft_nms(dets, nms_configs)
+
+  raise ValueError('Unknown NMS method: {}'.format(method))
 
 
 def _generate_anchor_configs(feat_sizes, min_level, max_level, num_scales,
@@ -412,7 +438,7 @@ def _generate_detections_tf(cls_outputs,
   scores = tf.math.sigmoid(cls_outputs)
   # apply bounding box regression to anchors
   boxes = decode_box_outputs_tf(box_outputs, anchor_boxes)
-  # Follow paper setting, get details 
+  # TF API is slightly different from paper, here we follow the paper value:
   # https://github.com/tensorflow/tensorflow/issues/40253.
   top_detection_idx, scores = tf.image.non_max_suppression_with_scores(
       boxes,
@@ -485,7 +511,7 @@ def _generate_detections(cls_outputs, box_outputs, anchor_boxes, indices,
     # (nms) for boxes in the same class. The selected boxes from each class are
     # then concatenated for the final detection outputs.
     all_detections_cls = np.column_stack((boxes_cls, scores_cls))
-    top_detections_cls = softnms(all_detections_cls, nms_configs)
+    top_detections_cls = nms(all_detections_cls, nms_configs)
     top_detections_cls[:, 2] -= top_detections_cls[:, 0]
     top_detections_cls[:, 3] -= top_detections_cls[:, 1]
     top_detections_cls = np.column_stack(

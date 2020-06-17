@@ -38,8 +38,6 @@ class FNode(tf.keras.layers.Layer):
                apply_bn_for_resampling,
                is_training_bn,
                conv_after_downsample,
-               use_native_resize_op,
-               pooling_type,
                conv_bn_act_pattern,
                separable_conv,
                act_type,
@@ -57,8 +55,6 @@ class FNode(tf.keras.layers.Layer):
     self.act_type = act_type
     self.is_training_bn = is_training_bn
     self.conv_after_downsample = conv_after_downsample
-    self.use_native_resize_op = use_native_resize_op
-    self.pooling_type = pooling_type
     self.strategy = strategy
     self.data_format = data_format
     self.weight_method = weight_method
@@ -141,8 +137,6 @@ class FNode(tf.keras.layers.Layer):
                                                 self.apply_bn_for_resampling,
                                                 self.is_training_bn,
                                                 self.conv_after_downsample,
-                                                self.use_native_resize_op,
-                                                self.pooling_type,
                                                 strategy=self.strategy,
                                                 data_format=self.data_format,
                                                 name='resample_{}_{}_{}'.format(
@@ -240,8 +234,6 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
                apply_bn=False,
                is_training=None,
                conv_after_downsample=False,
-               use_native_resize_op=False,
-               pooling_type=None,
                strategy=None,
                data_format=None,
                name='resample_p0'):
@@ -254,8 +246,6 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     self.target_width = target_width
     self.strategy = strategy
     self.conv_after_downsample = conv_after_downsample
-    self.use_native_resize_op = use_native_resize_op
-    self.pooling_type = pooling_type
     self.conv2d = tf.keras.layers.Conv2D(self.target_num_channels, (1, 1),
                                          padding='same',
                                          data_format=self.data_format,
@@ -284,33 +274,17 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     height_stride_size = int((self.height - 1) // self.target_height + 1)
     width_stride_size = int((self.width - 1) // self.target_width + 1)
 
-    if self.pooling_type == 'max' or self.pooling_type is None:
-      # Use max pooling in default.
-      self.pool2d = tf.keras.layers.MaxPooling2D(
-          pool_size=[height_stride_size + 1, width_stride_size + 1],
-          strides=[height_stride_size, width_stride_size],
-          padding='SAME',
-          data_format=self.data_format)
-    elif self.pooling_type == 'avg':
-      self.pool2d = tf.keras.layers.AveragePooling2D(
-          pool_size=[height_stride_size + 1, width_stride_size + 1],
-          strides=[height_stride_size, width_stride_size],
-          padding='SAME',
-          data_format=self.data_format)
-    else:
-      raise ValueError('Unknown pooling type: {}'.format(self.pooling_type))
+    # Use max pooling in default.
+    self.pool2d = tf.keras.layers.MaxPooling2D(
+        pool_size=[height_stride_size + 1, width_stride_size + 1],
+        strides=[height_stride_size, width_stride_size],
+        padding='SAME',
+        data_format=self.data_format)
 
     height_scale = self.target_height // self.height
     width_scale = self.target_width // self.width
-    if (self.use_native_resize_op or self.target_height % self.height != 0 or
-        self.target_width % self.width != 0):
-      self.upsample2d = tf.keras.layers.UpSampling2D(
-          (height_scale, width_scale), data_format=self.data_format)
-    else:
-      self.upsample2d = functools.partial(legacy_arch.nearest_upsampling,
-                                          height_scale=height_scale,
-                                          width_scale=width_scale,
-                                          data_format=self.data_format)
+    self.upsample2d = tf.keras.layers.UpSampling2D(
+        (height_scale, width_scale), data_format=self.data_format)
     super(ResampleFeatureMap, self).build(input_shape)
 
   def _maybe_apply_1x1(self, feat):
@@ -351,8 +325,6 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
         'target_width': self.target_width,
         'strategy': self.strategy,
         'conv_after_downsample': self.conv_after_downsample,
-        'use_native_resize_op': self.use_native_resize_op,
-        'pooling_type': self.pooling_type,
     }
     base_config = super(ResampleFeatureMap, self).get_config()
     return dict(list(base_config.items()) + list(config.items()))
@@ -653,12 +625,12 @@ class FPNCells(tf.keras.layers.Layer):
     self.config = config
 
     if config.fpn_config:
-      fpn_config = config.fpn_config
+      self.fpn_config = config.fpn_config
     else:
-      fpn_config = legacy_arch.get_fpn_config(config.fpn_name, config.min_level,
-                                              config.max_level,
-                                              config.fpn_weight_method)
-    self.fpn_config = fpn_config
+      self.fpn_config = legacy_arch.get_fpn_config(config.fpn_name,
+                                                   config.min_level,
+                                                   config.max_level,
+                                                   config.fpn_weight_method)
 
     self.cells = [
         FPNCell(self.feat_sizes, self.config, name='cell_{}'.format(rep))
@@ -668,25 +640,20 @@ class FPNCells(tf.keras.layers.Layer):
   def call(self, feats):
     for cell in self.cells:
       cell_feats = cell(feats)
-   
+      min_level = self.config.min_level
+      max_level = self.config.max_level
+
       new_feats = {}
-      for l in range(self.config.min_level, self.config.max_level + 1):
+      for l in range(min_level, max_level + 1):
         for i, fnode in enumerate(reversed(self.fpn_config.nodes)):
           if fnode['feat_level'] == l:
             new_feats[l] = cell_feats[-1 - i]
             break
-   
-      feats = [
-          new_feats[level]
-          for level in range(self.config.min_level, self.config.max_level + 1)
-      ]
-      
-      utils.verify_feats_size(feats,
-                              feat_sizes=self.feat_sizes,
-                              min_level=self.config.min_level,
-                              max_level=self.config.max_level,
-                              data_format=self.config.data_format)
-   
+
+      feats = [new_feats[level] for level in range(min_level, max_level + 1)]
+      utils.verify_feats_size(feats, self.feat_sizes, min_level, max_level,
+                              self.config.data_format)
+
     return new_feats
 
 
@@ -714,8 +681,6 @@ class FPNCell(tf.keras.layers.Layer):
                     config.apply_bn_for_resampling,
                     config.is_training_bn,
                     config.conv_after_downsample,
-                    config.use_native_resize_op,
-                    config.pooling_type,
                     config.conv_bn_act_pattern,
                     config.separable_conv,
                     config.act_type,
@@ -762,8 +727,6 @@ def build_feature_network(features, config):
               apply_bn=config.apply_bn_for_resampling,
               is_training=config.is_training_bn,
               conv_after_downsample=config.conv_after_downsample,
-              use_native_resize_op=config.use_native_resize_op,
-              pooling_type=config.pooling_type,
               strategy=config.strategy,
               data_format=config.data_format,
               name='resample_p{}'.format(level),
