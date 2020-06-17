@@ -53,27 +53,6 @@ def freeze_vars(variables, pattern):
   return variables
 
 
-def nearest_upsampling(data, height_scale, width_scale, data_format):
-  """Nearest neighbor upsampling implementation."""
-  with tf.name_scope('nearest_upsampling'):
-    # Use reshape to quickly upsample the input. The nearest pixel is selected
-    # implicitly via broadcasting.
-    if data_format == 'channels_first':
-      # Possibly faster for certain GPUs only.
-      bs, c, h, w = data.get_shape().as_list()
-      bs = -1 if bs is None else bs
-      data = tf.reshape(data, [bs, c, h, 1, w, 1]) * tf.ones(
-          [1, 1, 1, height_scale, 1, width_scale], dtype=data.dtype)
-      return tf.reshape(data, [bs, c, h * height_scale, w * width_scale])
-
-    # Normal format for CPU/TPU/GPU.
-    bs, h, w, c = data.get_shape().as_list()
-    bs = -1 if bs is None else bs
-    data = tf.reshape(data, [bs, h, 1, w, 1, c]) * tf.ones(
-        [1, 1, height_scale, 1, width_scale, 1], dtype=data.dtype)
-    return tf.reshape(data, [bs, h * height_scale, w * width_scale, c])
-
-
 def resize_bilinear(images, size, output_type):
   """Returns resized images as output_type."""
   images = tf.image.resize_bilinear(images, size, align_corners=True)
@@ -110,8 +89,6 @@ def resample_feature_map(feat,
                          apply_bn=False,
                          is_training=None,
                          conv_after_downsample=False,
-                         use_native_resize_op=False,
-                         pooling_type=None,
                          strategy=None,
                          data_format='channels_last'):
   """Resample input feature map to have target number of channels and size."""
@@ -154,46 +131,28 @@ def resample_feature_map(feat,
         feat = _maybe_apply_1x1(feat)
       height_stride_size = int((height - 1) // target_height + 1)
       width_stride_size = int((width - 1) // target_width + 1)
-      if pooling_type == 'max' or pooling_type is None:
-        # Use max pooling in default.
-        feat = tf.layers.max_pooling2d(
-            inputs=feat,
-            pool_size=[height_stride_size + 1, width_stride_size + 1],
-            strides=[height_stride_size, width_stride_size],
-            padding='SAME',
-            data_format=data_format)
-      elif pooling_type == 'avg':
-        feat = tf.layers.average_pooling2d(
-            inputs=feat,
-            pool_size=[height_stride_size + 1, width_stride_size + 1],
-            strides=[height_stride_size, width_stride_size],
-            padding='SAME',
-            data_format=data_format)
-      else:
-        raise ValueError('Unknown pooling type: {}'.format(pooling_type))
+
+      # Use max pooling in default.
+      feat = tf.layers.max_pooling2d(
+          inputs=feat,
+          pool_size=[height_stride_size + 1, width_stride_size + 1],
+          strides=[height_stride_size, width_stride_size],
+          padding='SAME',
+          data_format=data_format)
+
       if conv_after_downsample:
         feat = _maybe_apply_1x1(feat)
     elif height <= target_height and width <= target_width:
       feat = _maybe_apply_1x1(feat)
       if height < target_height or width < target_width:
-        height_scale = target_height // height
-        width_scale = target_width // width
-        if (use_native_resize_op or target_height % height != 0 or
-            target_width % width != 0):
-          if data_format == 'channels_first':
-            feat = tf.transpose(feat, [0, 2, 3, 1])
-          feat = tf.cast(
-              tf.image.resize_nearest_neighbor(
-                  tf.cast(feat, tf.float32), [target_height, target_width]),
-              dtype=feat.dtype)
-          if data_format == 'channels_first':
-            feat = tf.transpose(feat, [0, 3, 1, 2])
-        else:
-          feat = nearest_upsampling(
-              feat,
-              height_scale=height_scale,
-              width_scale=width_scale,
-              data_format=data_format)
+        if data_format == 'channels_first':
+          feat = tf.transpose(feat, [0, 2, 3, 1])
+        feat = tf.cast(
+            tf.image.resize_nearest_neighbor(
+                tf.cast(feat, tf.float32), [target_height, target_width]),
+            dtype=feat.dtype)
+        if data_format == 'channels_first':
+          feat = tf.transpose(feat, [0, 3, 1, 2])
     else:
       raise ValueError(
           'Incompatible target feature map size: target_height: {},'
@@ -452,8 +411,6 @@ def build_feature_network(features, config):
               apply_bn=config.apply_bn_for_resampling,
               is_training=config.is_training_bn,
               conv_after_downsample=config.conv_after_downsample,
-              use_native_resize_op=config.use_native_resize_op,
-              pooling_type=config.pooling_type,
               strategy=config.strategy,
               data_format=config.data_format
           ))
@@ -485,30 +442,6 @@ def build_feature_network(features, config):
             data_format=config.data_format)
 
   return new_feats
-
-
-def bifpn_sum_config():
-  """BiFPN config with sum."""
-  p = hparams_config.Config()
-  p.nodes = [
-      {'feat_level': 6, 'inputs_offsets': [3, 4]},
-      {'feat_level': 5, 'inputs_offsets': [2, 5]},
-      {'feat_level': 4, 'inputs_offsets': [1, 6]},
-      {'feat_level': 3, 'inputs_offsets': [0, 7]},
-      {'feat_level': 4, 'inputs_offsets': [1, 7, 8]},
-      {'feat_level': 5, 'inputs_offsets': [2, 6, 9]},
-      {'feat_level': 6, 'inputs_offsets': [3, 5, 10]},
-      {'feat_level': 7, 'inputs_offsets': [4, 11]},
-  ]
-  p.weight_method = 'sum'
-  return p
-
-
-def bifpn_fa_config():
-  """BiFPN config with fast weighted sum."""
-  p = bifpn_sum_config()
-  p.weight_method = 'fastattn'
-  return p
 
 
 def bifpn_dynamic_config(min_level, max_level, weight_method):
@@ -564,10 +497,8 @@ def bifpn_dynamic_config(min_level, max_level, weight_method):
 def get_fpn_config(fpn_name, min_level, max_level, weight_method):
   """Get fpn related configuration."""
   if not fpn_name:
-    fpn_name = 'bifpn_fa'
+    fpn_name = 'bifpn_dyn'
   name_to_config = {
-      'bifpn_sum': bifpn_sum_config(),
-      'bifpn_fa': bifpn_fa_config(),
       'bifpn_dyn': bifpn_dynamic_config(min_level, max_level, weight_method)
   }
   return name_to_config[fpn_name]
@@ -657,8 +588,6 @@ def build_bifpn_layer(feats, feat_sizes, config):
             new_node_height, new_node_width, p.fpn_num_filters,
             p.apply_bn_for_resampling, p.is_training_bn,
             p.conv_after_downsample,
-            p.use_native_resize_op,
-            p.pooling_type,
             strategy=p.strategy,
             data_format=config.data_format)
         nodes.append(input_node)

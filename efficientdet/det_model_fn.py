@@ -142,58 +142,13 @@ def learning_rate_schedule(params, global_step):
   raise ValueError('unknown lr_decay_method: {}'.format(lr_decay_method))
 
 
-def focal_loss(logits, targets, alpha, gamma, normalizer):
-  """Compute the focal loss between `logits` and the golden `target` values.
-
-  Focal loss = -(1-pt)^gamma * log(pt)
-  where pt is the probability of being classified to the true class.
-
-  Args:
-    logits: A float32 tensor of size [batch, height_in, width_in,
-      num_predictions].
-    targets: A float32 tensor of size [batch, height_in, width_in,
-      num_predictions].
-    alpha: A float32 scalar multiplying alpha to the loss from positive examples
-      and (1-alpha) to the loss from negative examples.
-    gamma: A float32 scalar modulating loss from hard and easy examples.
-    normalizer: A float32 scalar normalizes the total loss from all examples.
-
-  Returns:
-    loss: A float32 scalar representing normalized total loss.
-  """
+def legacy_focal_loss(logits, targets, alpha, gamma, normalizer, _):
+  """A legacy focal loss that does not support label smooth."""
   with tf.name_scope('focal_loss'):
     positive_label_mask = tf.equal(targets, 1.0)
     cross_entropy = (
         tf.nn.sigmoid_cross_entropy_with_logits(labels=targets, logits=logits))
-    # Below are comments/derivations for computing modulator.
-    # For brevity, let x = logits,  z = targets, r = gamma, and p_t = sigmod(x)
-    # for positive samples and 1 - sigmoid(x) for negative examples.
-    #
-    # The modulator, defined as (1 - P_t)^r, is a critical part in focal loss
-    # computation. For r > 0, it puts more weights on hard examples, and less
-    # weights on easier ones. However if it is directly computed as (1 - P_t)^r,
-    # its back-propagation is not stable when r < 1. The implementation here
-    # resolves the issue.
-    #
-    # For positive samples (labels being 1),
-    #    (1 - p_t)^r
-    #  = (1 - sigmoid(x))^r
-    #  = (1 - (1 / (1 + exp(-x))))^r
-    #  = (exp(-x) / (1 + exp(-x)))^r
-    #  = exp(log((exp(-x) / (1 + exp(-x)))^r))
-    #  = exp(r * log(exp(-x)) - r * log(1 + exp(-x)))
-    #  = exp(- r * x - r * log(1 + exp(-x)))
-    #
-    # For negative samples (labels being 0),
-    #    (1 - p_t)^r
-    #  = (sigmoid(x))^r
-    #  = (1 / (1 + exp(-x)))^r
-    #  = exp(log((1 / (1 + exp(-x)))^r))
-    #  = exp(-r * log(1 + exp(-x)))
-    #
-    # Therefore one unified form for positive (z = 1) and negative (z = 0)
-    # samples is:
-    #      (1 - p_t)^r = exp(-r * z * x - r * log(1 + exp(-x))).
+
     neg_logits = -1.0 * logits
     modulator = tf.exp(gamma * targets * neg_logits -
                        gamma * tf.log1p(tf.exp(neg_logits)))
@@ -204,16 +159,43 @@ def focal_loss(logits, targets, alpha, gamma, normalizer):
   return weighted_loss
 
 
-def _classification_loss(cls_outputs,
-                         cls_targets,
-                         num_positives,
-                         alpha=0.25,
-                         gamma=2.0):
-  """Computes classification loss."""
-  normalizer = num_positives
-  classification_loss = focal_loss(cls_outputs, cls_targets, alpha, gamma,
-                                   normalizer)
-  return classification_loss
+def focal_loss(y_pred, y_true, alpha, gamma, normalizer, label_smoothing):
+  """Compute the focal loss between `logits` and the golden `target` values.
+
+  Focal loss = -(1-pt)^gamma * log(pt)
+  where pt is the probability of being classified to the true class.
+
+  Args:
+    y_pred: A float32 tensor of size [batch, height_in, width_in,
+      num_predictions].
+    y_true: A float32 tensor of size [batch, height_in, width_in,
+      num_predictions].
+    alpha: A float32 scalar multiplying alpha to the loss from positive examples
+      and (1-alpha) to the loss from negative examples.
+    gamma: A float32 scalar modulating loss from hard and easy examples.
+    normalizer: Divide loss by this value.
+    label_smoothing: Float in [0, 1]. If > `0` then smooth the labels.
+
+  Returns:
+    loss: A float32 scalar representing normalized total loss.
+  """
+  with tf.name_scope('focal_loss'):
+    alpha = tf.convert_to_tensor(alpha, dtype=y_pred.dtype)
+    gamma = tf.convert_to_tensor(gamma, dtype=y_pred.dtype)
+
+    # apply label smoothing.
+    y_true = y_true * (1.0 - label_smoothing) + 0.5 * label_smoothing
+
+    # get cross_entropy for each entry.
+    ce = tf.nn.sigmoid_cross_entropy_with_logits(labels=y_true, logits=y_pred)
+
+    pred_prob = tf.sigmoid(y_pred)
+    p_t = (y_true * pred_prob) + ((1 - y_true) * (1 - pred_prob))
+    alpha_factor = y_true * alpha + (1 - y_true) * (1 - alpha)
+    modulating_factor = (1.0 - p_t) ** gamma
+
+    # compute the final loss and return
+    return alpha_factor * modulating_factor * ce / normalizer
 
 
 def _box_loss(box_outputs, box_targets, num_positives, delta=0.1):
@@ -280,6 +262,7 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
     # Onehot encoding for classification labels.
     cls_targets_at_level = tf.one_hot(labels['cls_targets_%d' % level],
                                       params['num_classes'])
+
     if params['data_format'] == 'channels_first':
       bs, _, width, height, _ = cls_targets_at_level.get_shape().as_list()
       cls_targets_at_level = tf.reshape(cls_targets_at_level,
@@ -289,12 +272,15 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
       cls_targets_at_level = tf.reshape(cls_targets_at_level,
                                         [bs, width, height, -1])
     box_targets_at_level = labels['box_targets_%d' % level]
-    cls_loss = _classification_loss(
+
+    cls_loss = focal_loss(
         cls_outputs[level],
         cls_targets_at_level,
-        num_positives_sum,
-        alpha=params['alpha'],
-        gamma=params['gamma'])
+        params['alpha'],
+        params['gamma'],
+        normalizer=num_positives_sum,
+        label_smoothing=params['label_smoothing'])
+
     if params['data_format'] == 'channels_first':
       cls_loss = tf.reshape(cls_loss,
                             [bs, -1, width, height, params['num_classes']])
@@ -305,12 +291,15 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
         tf.expand_dims(tf.not_equal(labels['cls_targets_%d' % level], -2), -1),
         tf.float32)
     cls_losses.append(tf.reduce_sum(cls_loss))
-    box_losses.append(
-        _box_loss(
-            box_outputs[level],
-            box_targets_at_level,
-            num_positives_sum,
-            delta=params['delta']))
+
+    if params['box_loss_weight']:
+      box_losses.append(
+          _box_loss(
+              box_outputs[level],
+              box_targets_at_level,
+              num_positives_sum,
+              delta=params['delta']))
+
     if params['iou_loss_type']:
       box_iou_losses.append(
           _box_iou_loss(box_outputs[level], box_targets_at_level,
@@ -318,11 +307,13 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
 
   # Sum per level losses to total loss.
   cls_loss = tf.add_n(cls_losses)
-  box_loss = tf.add_n(box_losses)
+  box_loss = tf.add_n(box_losses) if box_losses else 0
   box_iou_loss = tf.add_n(box_iou_losses) if box_iou_losses else 0
   total_loss = (
-      cls_loss + params['box_loss_weight'] * box_loss +
+      cls_loss +
+      params['box_loss_weight'] * box_loss +
       params['iou_loss_weight'] * box_iou_loss)
+
   return total_loss, cls_loss, box_loss, box_iou_loss
 
 

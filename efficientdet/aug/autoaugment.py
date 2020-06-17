@@ -1134,7 +1134,7 @@ def sharpness(image, factor):
   strides = [1, 1, 1, 1]
   with tf.device('/cpu:0'):
     degenerate = tf.nn.depthwise_conv2d(
-      image, kernel, strides, padding='VALID', rate=[1, 1])
+        image, kernel, strides, padding='VALID', rate=[1, 1])
   degenerate = tf.clip_by_value(degenerate, 0.0, 255.0)
   degenerate = tf.squeeze(tf.cast(degenerate, tf.uint8), [0])
 
@@ -1690,7 +1690,6 @@ def distort_image_with_autoaugment(image,
       cutout_bbox_const=50,
       translate_bbox_const=120))
 
-  with tf.device('/cpu:0'):
-    return build_and_apply_nas_policy(policy, image, bboxes,
-                                      augmentation_hparams, use_augmix,
-                                      mixture_width, mixture_depth, alpha)
+  return build_and_apply_nas_policy(policy, image, bboxes,
+                                    augmentation_hparams, use_augmix,
+                                    mixture_width, mixture_depth, alpha)
