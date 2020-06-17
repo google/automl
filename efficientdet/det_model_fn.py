@@ -142,7 +142,24 @@ def learning_rate_schedule(params, global_step):
   raise ValueError('unknown lr_decay_method: {}'.format(lr_decay_method))
 
 
-def focal_loss(y_pred, y_true, alpha, gamma, label_smoothing, normalizer):
+def legacy_focal_loss(logits, targets, alpha, gamma, normalizer, _):
+  """A legacy focal loss that does not support label smooth."""
+  with tf.name_scope('focal_loss'):
+    positive_label_mask = tf.equal(targets, 1.0)
+    cross_entropy = (
+        tf.nn.sigmoid_cross_entropy_with_logits(labels=targets, logits=logits))
+
+    neg_logits = -1.0 * logits
+    modulator = tf.exp(gamma * targets * neg_logits -
+                       gamma * tf.log1p(tf.exp(neg_logits)))
+    loss = modulator * cross_entropy
+    weighted_loss = tf.where(positive_label_mask, alpha * loss,
+                             (1.0 - alpha) * loss)
+    weighted_loss /= normalizer
+  return weighted_loss
+
+
+def focal_loss(y_pred, y_true, alpha, gamma, normalizer, label_smoothing):
   """Compute the focal loss between `logits` and the golden `target` values.
 
   Focal loss = -(1-pt)^gamma * log(pt)
@@ -156,24 +173,26 @@ def focal_loss(y_pred, y_true, alpha, gamma, label_smoothing, normalizer):
     alpha: A float32 scalar multiplying alpha to the loss from positive examples
       and (1-alpha) to the loss from negative examples.
     gamma: A float32 scalar modulating loss from hard and easy examples.
+    normalizer: Divide loss by this value.
     label_smoothing: Float in [0, 1]. If > `0` then smooth the labels.
-    normalizer: Divide loss by this value
+
+  Returns:
+    loss: A float32 scalar representing normalized total loss.
   """
   with tf.name_scope('focal_loss'):
     alpha = tf.convert_to_tensor(alpha, dtype=y_pred.dtype)
     gamma = tf.convert_to_tensor(gamma, dtype=y_pred.dtype)
 
-    # Get the cross_entropy for each entry
-    ce = tf.keras.losses.categorical_crossentropy(
-        y_true, y_pred, from_logits=True, label_smoothing=label_smoothing)
+    # apply label smoothing.
+    y_true = y_true * (1.0 - label_smoothing) + 0.5 * label_smoothing
+
+    # get cross_entropy for each entry.
+    ce = tf.nn.sigmoid_cross_entropy_with_logits(labels=y_true, logits=y_pred)
 
     pred_prob = tf.sigmoid(y_pred)
-
     p_t = (y_true * pred_prob) + ((1 - y_true) * (1 - pred_prob))
-
     alpha_factor = y_true * alpha + (1 - y_true) * (1 - alpha)
-
-    modulating_factor = tf.pow(1.0 - p_t, gamma)
+    modulating_factor = (1.0 - p_t) ** gamma
 
     # compute the final loss and return
     return alpha_factor * modulating_factor * ce / normalizer
@@ -255,12 +274,12 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
     box_targets_at_level = labels['box_targets_%d' % level]
 
     cls_loss = focal_loss(
-      cls_outputs[level],
-      cls_targets_at_level,
-      params['alpha'],
-      params['gamma'],
-      label_smoothing=params['label_smoothing'],
-      normalizer=num_positives_sum)
+        cls_outputs[level],
+        cls_targets_at_level,
+        params['alpha'],
+        params['gamma'],
+        normalizer=num_positives_sum,
+        label_smoothing=params['label_smoothing'])
 
     if params['data_format'] == 'channels_first':
       cls_loss = tf.reshape(cls_loss,
@@ -273,13 +292,13 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
         tf.float32)
     cls_losses.append(tf.reduce_sum(cls_loss))
 
-    if params["box_loss_weight"]:
+    if params['box_loss_weight']:
       box_losses.append(
           _box_loss(
-            box_outputs[level],
-            box_targets_at_level,
-            num_positives_sum,
-            delta=params['delta']))
+              box_outputs[level],
+              box_targets_at_level,
+              num_positives_sum,
+              delta=params['delta']))
 
     if params['iou_loss_type']:
       box_iou_losses.append(

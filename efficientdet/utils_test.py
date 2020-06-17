@@ -119,32 +119,33 @@ class ActivationTest(tf.test.TestCase):
   def test_swish(self):
     features = tf.constant([.5, 10])
 
-    result = utils.activation_fn(features, "swish")
+    result = utils.activation_fn(features, 'swish')
     expected = features * tf.sigmoid(features)
     self.assertAllClose(result, expected)
 
-    result = utils.activation_fn(features, "swish_native")
+    result = utils.activation_fn(features, 'swish_native')
     self.assertAllClose(result, expected)
 
-  def test_hard_swish(self):
+  def test_hswish(self):
     features = tf.constant([.5, 10])
-    result = utils.activation_fn(features, "hswish")
-    self.assertAllClose(result, [0.2916666666666667, 10.0])
+    result = utils.activation_fn(features, 'hswish')
+    self.assertAllClose(result, [0.29166667, 10.0])
 
   def test_relu(self):
     features = tf.constant([.5, 10])
-    result = utils.activation_fn(features, "relu")
+    result = utils.activation_fn(features, 'relu')
     self.assertAllClose(result, [0.5, 10])
 
   def test_relu6(self):
     features = tf.constant([.5, 10])
-    result = utils.activation_fn(features, "relu6")
+    result = utils.activation_fn(features, 'relu6')
     self.assertAllClose(result, [0.5, 6])
 
   def test_mish(self):
     features = tf.constant([.5, 10])
-    result = utils.activation_fn(features, "mish")
+    result = utils.activation_fn(features, 'mish')
     self.assertAllClose(result, [0.37524524, 10.0])
+
 
 if __name__ == '__main__':
   logging.set_verbosity(logging.WARNING)
