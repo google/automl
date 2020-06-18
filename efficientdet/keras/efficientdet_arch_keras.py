@@ -36,7 +36,7 @@ class FNode(tf.keras.layers.Layer):
                inputs_offsets,
                fpn_num_filters,
                apply_bn_for_resampling,
-               is_training_bn,
+               is_training,
                conv_after_downsample,
                conv_bn_act_pattern,
                separable_conv,
@@ -53,7 +53,7 @@ class FNode(tf.keras.layers.Layer):
     self.apply_bn_for_resampling = apply_bn_for_resampling
     self.separable_conv = separable_conv
     self.act_type = act_type
-    self.is_training_bn = is_training_bn
+    self.is_training = is_training
     self.conv_after_downsample = conv_after_downsample
     self.strategy = strategy
     self.data_format = data_format
@@ -135,7 +135,7 @@ class FNode(tf.keras.layers.Layer):
                                                 self.new_node_width,
                                                 self.fpn_num_filters,
                                                 self.apply_bn_for_resampling,
-                                                self.is_training_bn,
+                                                self.is_training,
                                                 self.conv_after_downsample,
                                                 strategy=self.strategy,
                                                 data_format=self.data_format,
@@ -153,7 +153,7 @@ class FNode(tf.keras.layers.Layer):
     elif self.weight_method == 'channel_fastattn':
       num_filters = int(self.fpn_num_filters)
       self._add_wsm(lambda: tf.ones([num_filters]))
-    self.op_after_combine = OpAfterCombine(self.is_training_bn,
+    self.op_after_combine = OpAfterCombine(self.is_training,
                                            self.conv_bn_act_pattern,
                                            self.separable_conv,
                                            self.fpn_num_filters,
@@ -180,7 +180,7 @@ class OpAfterCombine(tf.keras.layers.Layer):
   """Operation after combining input features during feature fusiong."""
 
   def __init__(self,
-               is_training_bn,
+               is_training,
                conv_bn_act_pattern,
                separable_conv,
                fpn_num_filters,
@@ -195,7 +195,7 @@ class OpAfterCombine(tf.keras.layers.Layer):
     self.act_type = act_type
     self.data_format = data_format
     self.strategy = strategy
-    self.is_training_bn = is_training_bn
+    self.is_training = is_training
     if self.separable_conv:
       conv2d_layer = functools.partial(tf.keras.layers.SeparableConv2D,
                                        depth_multiplier=1)
@@ -208,7 +208,7 @@ class OpAfterCombine(tf.keras.layers.Layer):
                                 use_bias=not self.conv_bn_act_pattern,
                                 data_format=self.data_format,
                                 name='conv')
-    self.bn = utils_keras.build_batch_norm(is_training_bn=self.is_training_bn,
+    self.bn = utils_keras.build_batch_norm(is_training_bn=self.is_training,
                                            data_format=self.data_format,
                                            strategy=self.strategy,
                                            name='bn')
@@ -217,7 +217,7 @@ class OpAfterCombine(tf.keras.layers.Layer):
     if not self.conv_bn_act_pattern:
       new_node = utils.activation_fn(new_node, self.act_type)
     new_node = self.conv_op(new_node)
-    new_node = self.bn(new_node, self.is_training_bn)
+    new_node = self.bn(new_node, training=self.is_training)
     act_type = None if not self.conv_bn_act_pattern else self.act_type
     if act_type:
       new_node = utils.activation_fn(new_node, act_type)
@@ -314,20 +314,6 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
           'target_width: {}'.format(self.target_height, self.target_width))
 
     return feat
-
-  def get_config(self):
-    config = {
-        'apply_bn': self.apply_bn,
-        'is_training': self.is_training,
-        'data_format': self.data_format,
-        'target_num_channels': self.target_num_channels,
-        'target_height': self.target_height,
-        'target_width': self.target_width,
-        'strategy': self.strategy,
-        'conv_after_downsample': self.conv_after_downsample,
-    }
-    base_config = super(ResampleFeatureMap, self).get_config()
-    return dict(list(base_config.items()) + list(config.items()))
 
 
 class ClassNet(tf.keras.layers.Layer):
@@ -442,25 +428,6 @@ class ClassNet(tf.keras.layers.Layer):
       class_outputs[level] = self.classes(image)
 
     return class_outputs
-
-  def get_config(self):
-    base_config = super(ClassNet, self).get_config()
-
-    return {
-        **base_config,
-        'num_classes': self.num_classes,
-        'num_anchors': self.num_anchors,
-        'num_filters': self.num_filters,
-        'min_level': self.min_level,
-        'max_level': self.max_level,
-        'is_training': self.is_training,
-        'act_type': self.act_type,
-        'repeats': self.repeats,
-        'separable_conv': self.separable_conv,
-        'survival_prob': self.survival_prob,
-        'strategy': self.strategy,
-        'data_format': self.data_format,
-    }
 
 
 class BoxNet(tf.keras.layers.Layer):
@@ -596,24 +563,6 @@ class BoxNet(tf.keras.layers.Layer):
       box_outputs[level] = self.boxes(image)
 
     return box_outputs
-
-  def get_config(self):
-    base_config = super(BoxNet, self).get_config()
-
-    return {
-        **base_config,
-        'num_anchors': self.num_anchors,
-        'num_filters': self.num_filters,
-        'min_level': self.min_level,
-        'max_level': self.max_level,
-        'is_training': self.is_training,
-        'act_type': self.act_type,
-        'repeats': self.repeats,
-        'separable_conv': self.separable_conv,
-        'survival_prob': self.survival_prob,
-        'strategy': self.strategy,
-        'data_format': self.data_format,
-    }
 
 
 class FPNCells(tf.keras.layers.Layer):
@@ -787,7 +736,7 @@ def build_backbone(features, config):
 
   Args:
    features: input tensor.
-   config: config for backbone, such as is_training_bn and backbone name.
+   config: config for backbone, such as is_training and backbone name.
 
   Returns:
     A dict from levels to the feature maps from the output of the backbone model
