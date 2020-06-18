@@ -802,7 +802,7 @@ def efficientdet(model_name=None, config=None, **kwargs):
 
   logging.info(config)
   inputs = tf.keras.layers.Input(
-      [*utils.parse_image_size(config.image_size), 3], dtype=tf.float32)
+      [*utils.parse_image_size(config.image_size), 3])
   # build backbone features.
   features, backbone_outputs = build_backbone(inputs, config)
   logging.info('backbone params/flops = {:.6f}M, {:.9f}B'.format(
