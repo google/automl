@@ -283,8 +283,8 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
 
     height_scale = self.target_height // self.height
     width_scale = self.target_width // self.width
-    self.upsample2d = tf.keras.layers.UpSampling2D(
-        (height_scale, width_scale), data_format=self.data_format)
+    self.upsample2d = tf.keras.layers.UpSampling2D((height_scale, width_scale),
+                                                   data_format=self.data_format)
     super(ResampleFeatureMap, self).build(input_shape)
 
   def _maybe_apply_1x1(self, feat):
@@ -802,7 +802,7 @@ def efficientdet(model_name=None, config=None, **kwargs):
 
   logging.info(config)
   inputs = tf.keras.layers.Input(
-      [*utils.parse_image_size(config.image_size), 3])
+      [*utils.parse_image_size(config.image_size), 3], dtype=tf.float32)
   # build backbone features.
   features, backbone_outputs = build_backbone(inputs, config)
   logging.info('backbone params/flops = {:.6f}M, {:.9f}B'.format(
@@ -820,3 +820,16 @@ def efficientdet(model_name=None, config=None, **kwargs):
 
   return tf.keras.Model(inputs=inputs,
                         outputs=[backbone_outputs, class_outputs, box_outputs])
+
+
+def export_saved_model(model_name, saved_model_dir):
+  """
+  Test saved model
+  TODO(fsx950223): migrate it to model_inspect.py
+  """
+  with tf.compat.v1.Session():
+    model = efficientdet(model_name)
+    tf.compat.v1.saved_model.simple_save(
+        tf.compat.v1.keras.backend.get_session(), saved_model_dir,
+        {'images': model.inputs[0]},
+        {output.name: output for output in model.outputs})

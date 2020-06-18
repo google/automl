@@ -60,3 +60,14 @@ def build_batch_norm(is_training_bn: bool,
                               name=name)
 
   return bn_layer
+
+
+def load_weights(model: tf.keras.Model, filepath: str):
+  """load weights from checkpoints or keras weights"""
+  if (filepath.endswith('.h5') or filepath.endswith('.keras') or
+      filepath.endswith('.hdf5')):
+    model.load_weights(filepath)
+  else:
+    ckpt = tf.train.load_checkpoint(filepath)
+    for var in model.variables:
+      var.assign(ckpt.get_tensor(var.name.split(':')[0]))
