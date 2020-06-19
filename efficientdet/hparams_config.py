@@ -189,7 +189,9 @@ def default_detection_configs():
   h.augmix_params = (3, -1, 1)
 
   # dataset specific parameters
-  h.num_classes = 90
+  # TODO(tanmingxing): update this to be 91 for COCO, and 21 for pascal.
+  h.num_classes = 90  # 1+ actual classes, 0 is reserved for background.
+
   h.skip_crowd_during_training = True
   h.label_id_mapping = None
   h.max_instances_per_image = 100  # Default to 100 for COCO.
@@ -246,7 +248,7 @@ def default_detection_configs():
   h.conv_bn_act_pattern = False
 
   # For post-processing nms, must be a dict.
-  h.nms_configs = None
+  h.nms_configs = {'method': 'hard'}
 
   # version.
   h.fpn_name = None
