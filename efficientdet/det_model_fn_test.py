@@ -19,18 +19,32 @@ import tensorflow as tf
 import det_model_fn
 
 
-class DetModelFnTest(tf.test.TestCase):
+class FocalLossTest(tf.test.TestCase):
 
   def test_focal_loss(self):
-    tf.random.set_seed(111)
     y_pred = tf.random.uniform([4, 32, 32, 90])
     y_true = tf.ones([4, 32, 32, 90])
     alpha, gamma, n = 0.25, 1.5, 100
     legacy_output = det_model_fn.legacy_focal_loss(y_pred, y_true, alpha, gamma,
-                                                   n, 0)
-    new_output = det_model_fn.focal_loss(y_pred, y_true, alpha, gamma, n, 0)
+                                                   n)
+    new_output = det_model_fn.focal_loss(y_pred, y_true, alpha, gamma, n)
     self.assertAllClose(legacy_output, new_output)
 
+
+  def test_focal_loss_with_label_smoothing(self):
+    y_pred = tf.random.uniform([4, 32, 32, 2]) 
+
+    # A binary classification target [0.0, 1.0] becomes [.1, .9]
+    #  with smoothing .2
+    y_true = tf.ones([4, 32, 32, 2]) * [0.0, 1.0]
+    y_true_presmoothed = tf.ones([4, 32, 32, 2]) * [0.1, 0.9]
+
+    alpha, gamma, n = 0.25, 1.5, 100
+
+    presmoothed = det_model_fn.focal_loss(y_pred, y_true_presmoothed, alpha, gamma, n, 0)
+    unsmoothed = det_model_fn.focal_loss(y_pred, y_true, alpha, gamma, n, 0.2)
+
+    self.assertAllClose(presmoothed, unsmoothed)
 
 if __name__ == '__main__':
   tf.test.main()
