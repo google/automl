@@ -142,8 +142,8 @@ def learning_rate_schedule(params, global_step):
   raise ValueError('unknown lr_decay_method: {}'.format(lr_decay_method))
 
 
-def legacy_focal_loss(logits, targets, alpha, gamma, normalizer, _):
-  """A legacy focal loss that does not support label smooth."""
+def legacy_focal_loss(logits, targets, alpha, gamma, normalizer, _=0):
+  """A legacy focal loss that does not support label smoothing."""
   with tf.name_scope('focal_loss'):
     positive_label_mask = tf.equal(targets, 1.0)
     cross_entropy = (
@@ -159,7 +159,7 @@ def legacy_focal_loss(logits, targets, alpha, gamma, normalizer, _):
   return weighted_loss
 
 
-def focal_loss(y_pred, y_true, alpha, gamma, normalizer, label_smoothing):
+def focal_loss(y_pred, y_true, alpha, gamma, normalizer, label_smoothing=0):
   """Compute the focal loss between `logits` and the golden `target` values.
 
   Focal loss = -(1-pt)^gamma * log(pt)
