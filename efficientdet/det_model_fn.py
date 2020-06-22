@@ -142,24 +142,7 @@ def learning_rate_schedule(params, global_step):
   raise ValueError('unknown lr_decay_method: {}'.format(lr_decay_method))
 
 
-def legacy_focal_loss(logits, targets, alpha, gamma, normalizer, _=0):
-  """A legacy focal loss that does not support label smoothing."""
-  with tf.name_scope('focal_loss'):
-    positive_label_mask = tf.equal(targets, 1.0)
-    cross_entropy = (
-        tf.nn.sigmoid_cross_entropy_with_logits(labels=targets, logits=logits))
-
-    neg_logits = -1.0 * logits
-    modulator = tf.exp(gamma * targets * neg_logits -
-                       gamma * tf.log1p(tf.exp(neg_logits)))
-    loss = modulator * cross_entropy
-    weighted_loss = tf.where(positive_label_mask, alpha * loss,
-                             (1.0 - alpha) * loss)
-    weighted_loss /= normalizer
-  return weighted_loss
-
-
-def focal_loss(y_pred, y_true, alpha, gamma, normalizer, label_smoothing=0):
+def focal_loss(y_pred, y_true, alpha, gamma, normalizer, label_smoothing=0.0):
   """Compute the focal loss between `logits` and the golden `target` values.
 
   Focal loss = -(1-pt)^gamma * log(pt)
@@ -183,16 +166,16 @@ def focal_loss(y_pred, y_true, alpha, gamma, normalizer, label_smoothing=0):
     alpha = tf.convert_to_tensor(alpha, dtype=y_pred.dtype)
     gamma = tf.convert_to_tensor(gamma, dtype=y_pred.dtype)
 
-    # apply label smoothing.
-    y_true = y_true * (1.0 - label_smoothing) + 0.5 * label_smoothing
-
-    # get cross_entropy for each entry.
-    ce = tf.nn.sigmoid_cross_entropy_with_logits(labels=y_true, logits=y_pred)
-
+    # compute focal loss multipliers before label smoothing, such that it will
+    # not blow up the loss.
     pred_prob = tf.sigmoid(y_pred)
     p_t = (y_true * pred_prob) + ((1 - y_true) * (1 - pred_prob))
     alpha_factor = y_true * alpha + (1 - y_true) * (1 - alpha)
     modulating_factor = (1.0 - p_t) ** gamma
+
+    # apply label smoothing for cross_entropy for each entry.
+    y_true = y_true * (1.0 - label_smoothing) + 0.5 * label_smoothing
+    ce = tf.nn.sigmoid_cross_entropy_with_logits(labels=y_true, logits=y_pred)
 
     # compute the final loss and return
     return alpha_factor * modulating_factor * ce / normalizer
