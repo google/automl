@@ -578,7 +578,17 @@ def verify_feats_size(feats,
 def get_precision(strategy: str, mixed_precision: bool = False):
   """Get the precision policy for a given strategy."""
   if mixed_precision:
-    return 'mixed_bfloat16' if strategy == 'tpu' else 'mixed_float16'
+    if strategy == 'tpu':
+      return 'mixed_bfloat16'
+    else:
+      if len(tf.config.experimental.list_physical_devices('GPU')) > 0:
+        return 'mixed_float16'
+      else:
+        # TODO(fsx950223): Fix CPU float16 inference(https://github.com/google/automl/issues/504)
+        logging.warning("There are some bugs in CPU float16 kernel,"
+                        " use float32 instead")
+        return 'float32'
+
   return 'float32'
 
 
