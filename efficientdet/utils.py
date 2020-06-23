@@ -580,14 +580,14 @@ def get_precision(strategy: str, mixed_precision: bool = False):
   if mixed_precision:
     if strategy == 'tpu':
       return 'mixed_bfloat16'
-    else:
-      if len(tf.config.experimental.list_physical_devices('GPU')) > 0:
-        return 'mixed_float16'
-      else:
-        # TODO(fsx950223): Fix CPU float16 inference(https://github.com/google/automl/issues/504)
-        logging.warning("There are some bugs in CPU float16 kernel,"
-                        " use float32 instead")
-        return 'float32'
+
+    if tf.config.experimental.list_physical_devices('GPU'):
+      return 'mixed_float16'
+
+    # TODO(fsx950223): Fix CPU float16 inference
+    # https://github.com/google/automl/issues/504
+    logging.warning('float16 is not supported for CPU, use float32 instead')
+    return 'float32'
 
   return 'float32'
 

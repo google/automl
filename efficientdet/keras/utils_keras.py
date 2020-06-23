@@ -17,13 +17,13 @@
 # gtype import
 
 from typing import Text
-import tensorflow as tf
 import utils
 
 
 def build_batch_norm(is_training_bn: bool,
                      strategy: Text = None,
-                     init_zero: bool = False,
+                     beta_initializer: Text = 'zeros',
+                     gamma_initializer: Text = 'ones',
                      data_format: Text = 'channels_last',
                      momentum: float = 0.99,
                      epsilon: float = 1e-3,
@@ -33,8 +33,8 @@ def build_batch_norm(is_training_bn: bool,
   Args:
     is_training_bn: `bool` for whether the model is training.
     strategy: `str`, whether to use tpu, horovod or other version of batch norm.
-    init_zero: `bool` if True, initializes scale parameter of batch
-      normalization with 0 instead of 1 (default).
+    beta_initializer: `str`, beta initializer.
+    gamma_initializer: `str`, gamma initializer.
     data_format: `str` either "channels_first" for `[batch, channels, height,
       width]` or "channels_last for `[batch, height, width, channels]`.
     momentum: `float`, momentume of batch norm.
@@ -44,11 +44,6 @@ def build_batch_norm(is_training_bn: bool,
   Returns:
     A normalized `Tensor` with the same `data_format`.
   """
-  if init_zero:
-    gamma_initializer = tf.zeros_initializer()
-  else:
-    gamma_initializer = tf.ones_initializer()
-
   axis = 1 if data_format == 'channels_first' else -1
   batch_norm_class = utils.batch_norm_class(is_training_bn, strategy)
   bn_layer = batch_norm_class(axis=axis,
@@ -56,6 +51,7 @@ def build_batch_norm(is_training_bn: bool,
                               epsilon=epsilon,
                               center=True,
                               scale=True,
+                              beta_initializer=beta_initializer,
                               gamma_initializer=gamma_initializer,
                               name=name)
 

@@ -394,7 +394,6 @@ class ClassNet(tf.keras.layers.Layer):
       for level in range(self.min_level, self.max_level + 1):
         bn_per_level[level] = utils_keras.build_batch_norm(
             is_training_bn=self.is_training,
-            init_zero=False,
             strategy=self.strategy,
             data_format=self.data_format,
             name='class-%d-bn-%d' % (i, level),
@@ -514,7 +513,6 @@ class BoxNet(tf.keras.layers.Layer):
       for level in range(self.min_level, self.max_level + 1):
         bn_per_level[level] = utils_keras.build_batch_norm(
             is_training_bn=self.is_training,
-            init_zero=False,
             strategy=self.strategy,
             data_format=self.data_format,
             name='box-%d-bn-%d' % (i, level))
@@ -746,11 +744,11 @@ def build_backbone(features, config):
     ValueError: if backbone_name is not supported.
   """
   backbone_name = config.backbone_name
-  is_training_bn = config.is_training_bn
+  is_training = config.is_training_bn
   if 'efficientnet' in backbone_name:
     override_params = {
         'batch_norm':
-            utils.batch_norm_class(is_training_bn, config.strategy),
+            utils.batch_norm_class(is_training, config.strategy),
         'relu_fn':
             functools.partial(utils.activation_fn, act_type=config.act_type),
     }
@@ -765,7 +763,7 @@ def build_backbone(features, config):
     outputs, endpoints = model_builder.build_model_base(
         features,
         backbone_name,
-        training=is_training_bn,
+        training=is_training,
         override_params=override_params)
     u1 = endpoints['reduction_1']
     u2 = endpoints['reduction_2']
