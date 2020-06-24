@@ -269,6 +269,9 @@ def default_detection_configs():
   h.backbone_config = None
   h.var_freeze_expr = None
 
+  # A temporary flag to switch between legacy and keras models.
+  h.use_keras_model = None
+
   # RetinaNet.
   h.resnet_depth = 50
   return h

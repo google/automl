@@ -161,11 +161,19 @@ def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
     (cls_outputs, box_outputs): the outputs for class and box predictions.
     Each is a dictionary with key as feature level and value as predictions.
   """
-  model_arch = det_model_fn.get_model_arch(model_name)
   mixed_precision = kwargs.get('mixed_precision', None)
   precision = utils.get_precision(kwargs.get('strategy', None), mixed_precision)
-  cls_outputs, box_outputs = utils.build_model_with_precision(
-      precision, model_arch, inputs, False, model_name, **kwargs)
+
+  if kwargs.get('use_keras_model', None):
+    from keras import efficientdet_arch_keras
+    model_arch = efficientdet_arch_keras.efficientdet(model_name, **kwargs)
+    _, cls_outputs, box_outputs = utils.build_model_with_precision(
+        precision, model_arch, inputs, False)
+  else:
+    model_arch = det_model_fn.get_model_arch(model_name)
+    cls_outputs, box_outputs = utils.build_model_with_precision(
+        precision, model_arch, inputs, False, model_name, **kwargs)
+
   if mixed_precision:
     # Post-processing has multiple places with hard-coded float32.
     # TODO(tanmingxing): Remove them once post-process can adpat to dtypes.
