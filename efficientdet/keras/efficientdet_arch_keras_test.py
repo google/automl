@@ -58,14 +58,23 @@ class KerasTest(tf.test.TestCase):
     with tf.Session(graph=tf.Graph()) as sess:
       feats = tf.ones(inputs_shape)
       tf.random.set_random_seed(SEED)
-      feats = legacy_arch.build_backbone(feats, config)
-      feats = legacy_arch.build_feature_network(feats, config)
-      feats = legacy_arch.build_class_and_box_outputs(feats, config)
+      feats = legacy_arch.efficientdet(feats, config=config)
       sess.run(tf.global_variables_initializer())
       class_output2, box_output2 = sess.run(feats)
     for i in range(3, 8):
       self.assertAllEqual(class_output1[i], class_output2[i])
       self.assertAllEqual(box_output1[i], box_output2[i])
+
+    with tf.Session(graph=tf.Graph()) as sess:
+      feats = tf.ones(inputs_shape)
+      tf.random.set_random_seed(SEED)
+      feats = efficientdet_arch_keras.efficientdet(config=config)(feats)
+      sess.run(tf.global_variables_initializer())
+      _, class_output3, box_output3 = sess.run(feats)
+    for i in range(3, 8):
+      # Failing.
+      self.assertAllEqual(class_output1[i], class_output3[i])
+      self.assertAllEqual(box_output1[i], box_output3[i])
 
   def test_build_feature_network(self):
     config = hparams_config.get_efficientdet_config('efficientdet-d0')
