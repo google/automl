@@ -173,10 +173,14 @@ def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
         config = hparams_config.Config(config)  # wrap dict in Config object
       if kwargs:
         config.override(kwargs)
-      model = efficientdet_arch_keras.efficientdet(model_name, config=config, feats=feats)
+      model = efficientdet_arch_keras.efficientdet(model_name,
+                                                   config=config,
+                                                   feats=feats)
       cls_outputs, box_outputs = model.outputs[1:6], model.outputs[6:]
-      cls_outputs = {index+config.min_level:output for index, output in enumerate(cls_outputs)}
-      box_outputs = {index+config.min_level:output for index, output in enumerate(box_outputs)}
+      cls_outputs = {index+config.min_level: output
+                     for index, output in enumerate(cls_outputs)}
+      box_outputs = {index+config.min_level: output
+                     for index, output in enumerate(box_outputs)}
       return cls_outputs, box_outputs
     cls_outputs, box_outputs = utils.build_model_with_precision(
         precision, model_arch, inputs, False, model_name, **kwargs)
