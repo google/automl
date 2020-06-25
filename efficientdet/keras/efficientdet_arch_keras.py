@@ -410,9 +410,9 @@ class ClassNet(tf.keras.layers.Layer):
   def call(self, inputs, **kwargs):
     """Call ClassNet."""
 
-    class_outputs = {}
+    class_outputs = []
     for level in range(self.min_level, self.max_level + 1):
-      image = inputs[level]
+      image = inputs[level - self.min_level]
       for i in range(self.repeats):
         original_image = image
         image = self.conv_ops[i](image)
@@ -424,7 +424,7 @@ class ClassNet(tf.keras.layers.Layer):
                                      self.survival_prob)
           image = image + original_image
 
-      class_outputs[level] = self.classes(image)
+      class_outputs.append(self.classes(image))
 
     return class_outputs
 
@@ -544,9 +544,9 @@ class BoxNet(tf.keras.layers.Layer):
 
   def call(self, inputs, **kwargs):
     """Call boxnet."""
-    box_outputs = {}
+    box_outputs = []
     for level in range(self.min_level, self.max_level + 1):
-      image = inputs[level]
+      image = inputs[level - self.min_level]
       for i in range(self.repeats):
         original_image = image
         image = self.conv_ops[i](image)
@@ -558,7 +558,7 @@ class BoxNet(tf.keras.layers.Layer):
                                      self.survival_prob)
           image = image + original_image
 
-      box_outputs[level] = self.boxes(image)
+      box_outputs.append(self.boxes(image))
 
     return box_outputs
 
@@ -591,17 +591,17 @@ class FPNCells(tf.keras.layers.Layer):
       max_level = self.config.max_level
 
       new_feats = {}
-      for l in range(min_level, max_level + 1):
+      for level in range(min_level, max_level + 1):
         for i, fnode in enumerate(reversed(self.fpn_config.nodes)):
-          if fnode['feat_level'] == l:
-            new_feats[l] = cell_feats[-1 - i]
+          if fnode['feat_level'] == level:
+            new_feats[level] = cell_feats[-1 - i]
             break
 
       feats = [new_feats[level] for level in range(min_level, max_level + 1)]
       utils.verify_feats_size(feats, self.feat_sizes, min_level, max_level,
                               self.config.data_format)
 
-    return new_feats
+    return [new_feats[level] for level in range(min_level, max_level + 1)]
 
 
 class FPNCell(tf.keras.layers.Layer):
@@ -643,41 +643,37 @@ class FPNCell(tf.keras.layers.Layer):
     return feats
 
 
-def build_feature_network(features, config):
+def build_feature_network(feats, config):
   """Build FPN input features.
 
   Args:
-   features: input tensor.
+   feats: A list of input tensors starting from min_level.
    config: a dict-like config, including all parameters.
 
   Returns:
     A dict from levels to the feature maps processed after feature network.
   """
   feat_sizes = utils.get_feat_sizes(config.image_size, config.max_level)
-  feats = []
-  if config.min_level not in features.keys():
-    raise ValueError('features.keys ({}) should include min_level ({})'.format(
-        features.keys(), config.min_level))
+  if not feats:
+    raise ValueError('FPN input features cannot be empty.')
 
   # Build additional input features that are not from backbone.
-  for level in range(config.min_level, config.max_level + 1):
-    if level in features.keys():
-      feats.append(features[level])
-    else:
-      h_id, w_id = (2, 3) if config.data_format == 'channels_first' else (1, 2)
-      # Adds a coarser level by downsampling the last feature map.
-      feats.append(
-          ResampleFeatureMap(
-              target_height=(feats[-1].shape[h_id] - 1) // 2 + 1,
-              target_width=(feats[-1].shape[w_id] - 1) // 2 + 1,
-              target_num_channels=config.fpn_num_filters,
-              apply_bn=config.apply_bn_for_resampling,
-              is_training=config.is_training_bn,
-              conv_after_downsample=config.conv_after_downsample,
-              strategy=config.strategy,
-              data_format=config.data_format,
-              name='resample_p{}'.format(level),
-          )(feats[-1]))
+  while len(feats) < config.max_level - config.min_level + 1:
+    level = len(feats) + config.min_level
+    h_id, w_id = (2, 3) if config.data_format == 'channels_first' else (1, 2)
+    # Adds a coarser level by downsampling the last feature map.
+    feats.append(
+        ResampleFeatureMap(
+            target_height=(feats[-1].shape[h_id] - 1) // 2 + 1,
+            target_width=(feats[-1].shape[w_id] - 1) // 2 + 1,
+            target_num_channels=config.fpn_num_filters,
+            apply_bn=config.apply_bn_for_resampling,
+            is_training=config.is_training_bn,
+            conv_after_downsample=config.conv_after_downsample,
+            strategy=config.strategy,
+            data_format=config.data_format,
+            name='resample_p{}'.format(level),
+        )(feats[-1]))
 
   utils.verify_feats_size(feats,
                           feat_sizes=feat_sizes,
@@ -760,23 +756,29 @@ def build_backbone(features, config):
               config.backbone_config.blocks))
     override_params['data_format'] = config.data_format
     model_builder = backbone_factory.get_model_builder(backbone_name)
-    outputs, endpoints = model_builder.build_model_base(
+    _, endpoints = model_builder.build_model_base(
         features,
         backbone_name,
         training=is_training,
         override_params=override_params)
-    u1 = endpoints['reduction_1']
-    u2 = endpoints['reduction_2']
-    u3 = endpoints['reduction_3']
-    u4 = endpoints['reduction_4']
-    u5 = endpoints['reduction_5']
+
+    all_feats = [
+        features,
+        endpoints['reduction_1'],
+        endpoints['reduction_2'],
+        endpoints['reduction_3'],
+        endpoints['reduction_4'],
+        endpoints['reduction_5'],
+    ]
   else:
     raise ValueError(
         'backbone model {} is not supported.'.format(backbone_name))
-  return {0: features, 1: u1, 2: u2, 3: u3, 4: u4, 5: u5}, outputs
+
+  # Only return features within the expected levels.
+  return all_feats[config.min_level:config.max_level + 1]
 
 
-def efficientdet(model_name=None, config=None, **kwargs):
+def efficientdet(model_name=None, config=None, feats=None, **kwargs):
   """Build EfficientDet model.
 
   Args:
@@ -800,16 +802,12 @@ def efficientdet(model_name=None, config=None, **kwargs):
 
   logging.info(config)
   inputs = tf.keras.layers.Input(
-      [*utils.parse_image_size(config.image_size), 3])
+      [*utils.parse_image_size(config.image_size), 3], tensor=feats)
   # build backbone features.
-  features, backbone_outputs = build_backbone(inputs, config)
-  logging.info('backbone params/flops = {:.6f}M, {:.9f}B'.format(
-      *utils.num_params_flops()))
+  features = build_backbone(inputs, config)
 
   # build feature network.
   fpn_feats = build_feature_network(features, config)
-  logging.info('backbone+fpn params/flops = {:.6f}M, {:.9f}B'.format(
-      *utils.num_params_flops()))
 
   # build class and box predictions.
   class_outputs, box_outputs = build_class_and_box_outputs(fpn_feats, config)
@@ -817,4 +815,4 @@ def efficientdet(model_name=None, config=None, **kwargs):
       *utils.num_params_flops()))
 
   return tf.keras.Model(inputs=inputs,
-                        outputs=[backbone_outputs, class_outputs, box_outputs])
+                        outputs=[class_outputs, box_outputs])
