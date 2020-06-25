@@ -141,7 +141,7 @@ def build_inputs(image_path_pattern: Text, image_size: Union[int, Tuple[int,
   for f in tf.io.gfile.glob(image_path_pattern):
     image = Image.open(f)
     raw_images.append(image)
-    image, scale = image_preprocess(image, image_size)
+    image, scale = image_preprocess(np.array(image), image_size)
     images.append(image)
     scales.append(scale)
   if not images:
@@ -166,19 +166,20 @@ def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
   precision = utils.get_precision(kwargs.get('strategy', None), mixed_precision)
 
   if kwargs.get('use_keras_model', None):
-    config = hparams_config.get_efficientdet_config(model_name)
-    if kwargs:
-      config.override(kwargs)
-    model_arch = efficientdet_arch_keras.efficientdet(model_name, config=config, feats=inputs)
-    cls_out_list, box_out_list = utils.build_model_with_precision(
-        precision, model_arch, inputs, False)
-    assert len(cls_out_list) == config.max_level -  config.min_level + 1
-    assert len(box_out_list) == config.max_level -  config.min_level + 1
-    # convert list to dictionary with key=level.
-    cls_outputs, box_outputs = {}, {}
-    for i in range(config.min_level, config.max_level + 1):
-      cls_outputs[i] = cls_out_list[i - config.min_level]
-      box_outputs[i] = box_out_list[i - config.min_level]
+    def model_arch(feats, model_name=None, config=None, **kwargs):
+      if not config:
+        config = hparams_config.get_efficientdet_config(model_name)
+      elif isinstance(config, dict):
+        config = hparams_config.Config(config)  # wrap dict in Config object
+      if kwargs:
+        config.override(kwargs)
+      model = efficientdet_arch_keras.efficientdet(model_name, config=config, feats=feats)
+      cls_outputs, box_outputs = model.outputs[1:6], model.outputs[6:]
+      cls_outputs = {index+config.min_level:output for index, output in enumerate(cls_outputs)}
+      box_outputs = {index+config.min_level:output for index, output in enumerate(box_outputs)}
+      return cls_outputs, box_outputs
+    cls_outputs, box_outputs = utils.build_model_with_precision(
+        precision, model_arch, inputs, False, model_name, **kwargs)
   else:
     model_arch = det_model_fn.get_model_arch(model_name)
     cls_outputs, box_outputs = utils.build_model_with_precision(
