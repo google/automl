@@ -50,7 +50,7 @@ class KerasTest(tf.test.TestCase):
     with tf.Session(graph=tf.Graph()) as sess:
       feats = tf.ones(inputs_shape)
       tf.random.set_random_seed(SEED)
-      feats, _ = efficientdet_arch_keras.build_backbone(feats, config)
+      feats = efficientdet_arch_keras.build_backbone(feats, config)
       feats = efficientdet_arch_keras.build_feature_network(feats, config)
       feats = efficientdet_arch_keras.build_class_and_box_outputs(feats, config)
       sess.run(tf.global_variables_initializer())
@@ -70,7 +70,10 @@ class KerasTest(tf.test.TestCase):
       tf.random.set_random_seed(SEED)
       feats = efficientdet_arch_keras.efficientdet(config=config)(feats)
       sess.run(tf.global_variables_initializer())
-      _, class_output3, box_output3 = sess.run(feats)
+      class_list, box_list = sess.run(feats)
+      for i in range(config.min_level, config.max_level + 1):
+        class_output3[i] = class_list[i - config.min_level]
+        box_outputs3[i] = box_list[i - config.min_level]
     for i in range(3, 8):
       # Failing.
       self.assertAllEqual(class_output1[i], class_output3[i])

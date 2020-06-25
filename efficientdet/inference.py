@@ -37,6 +37,7 @@ import det_model_fn
 import hparams_config
 import utils
 from visualize import vis_utils
+from keras import efficientdet_arch_keras
 from tensorflow.python.client import timeline  # pylint: disable=g-direct-tensorflow-import
 
 coco_id_mapping = {
@@ -165,10 +166,19 @@ def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
   precision = utils.get_precision(kwargs.get('strategy', None), mixed_precision)
 
   if kwargs.get('use_keras_model', None):
-    from keras import efficientdet_arch_keras
-    model_arch = efficientdet_arch_keras.efficientdet(model_name, **kwargs)
-    _, cls_outputs, box_outputs = utils.build_model_with_precision(
+    config = hparams_config.get_efficientdet_config(model_name)
+    if kwargs:
+      config.override(kwargs)
+    model_arch = efficientdet_arch_keras.efficientdet(model_name, config=config, feats=inputs)
+    cls_out_list, box_out_list = utils.build_model_with_precision(
         precision, model_arch, inputs, False)
+    assert len(cls_out_list) == config.max_level -  config.min_level + 1
+    assert len(box_out_list) == config.max_level -  config.min_level + 1
+    # convert list to dictionary with key=level.
+    cls_outputs, box_outputs = {}, {}
+    for i in range(config.min_level, config.max_level + 1):
+      cls_outputs[i] = cls_out_list[i - config.min_level]
+      box_outputs[i] = box_out_list[i - config.min_level]
   else:
     model_arch = det_model_fn.get_model_arch(model_name)
     cls_outputs, box_outputs = utils.build_model_with_precision(
