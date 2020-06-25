@@ -171,11 +171,9 @@ def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
       """Construct a model arch for keras models."""
       config = hparams_config.get_efficientdet_config(model_name)
       config.override(kwargs)
-      model = efficientdet_arch_keras.efficientdet(model_name,
-                                                   config=config,
-                                                   feats=feats)
+      model = efficientdet_arch_keras.EfficientDetModel(config=config)
+      cls_out_list, box_out_list = model(feats)
       # convert the list of model outputs to a dictionary with key=level.
-      cls_out_list, box_out_list = model.outputs[0:5], model.outputs[5:]
       assert len(cls_out_list) == config.max_level - config.min_level + 1
       assert len(box_out_list) == config.max_level - config.min_level + 1
       cls_outputs, box_outputs = {}, {}

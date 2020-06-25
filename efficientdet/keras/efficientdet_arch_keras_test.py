@@ -54,31 +54,28 @@ class KerasTest(tf.test.TestCase):
       feats = efficientdet_arch_keras.build_backbone(feats, config)
       feats = efficientdet_arch_keras.build_feature_network(feats, config)
       feats = efficientdet_arch_keras.build_class_and_box_outputs(feats, config)
+      # TODO(tanmingxing): Fix the failure for keras Model.
+      # feats = efficientdet_arch_keras.EfficientDetModel(config=config)(feats)
       sess.run(tf.global_variables_initializer())
-      class_output1, box_output1 = sess.run(feats)
+      keras_class_out, keras_box_out = sess.run(feats)
     with tf.Session(graph=tf.Graph()) as sess:
       feats = tf.ones(inputs_shape)
       tf.random.set_random_seed(SEED)
       feats = legacy_arch.efficientdet(feats, config=config)
       sess.run(tf.global_variables_initializer())
-      class_output2, box_output2 = sess.run(feats)
+      legacy_class_out, legacy_box_out = sess.run(feats)
     for i in range(3, 8):
-      self.assertAllEqual(class_output1[i], class_output2[i])
-      self.assertAllEqual(box_output1[i], box_output2[i])
+      self.assertAllEqual(keras_class_out[i - 3], legacy_class_out[i])
+      self.assertAllEqual(keras_box_out[i - 3], legacy_box_out[i])
 
-    with tf.Session(graph=tf.Graph()) as sess:
-      feats = tf.ones(inputs_shape)
-      tf.random.set_random_seed(SEED)
-      feats = efficientdet_arch_keras.efficientdet(config=config)(feats)
-      sess.run(tf.global_variables_initializer())
-      class_list, box_list = sess.run(feats)
-      for i in range(config.min_level, config.max_level + 1):
-        class_output3[i] = class_list[i - config.min_level]
-        box_outputs3[i] = box_list[i - config.min_level]
+    feats = tf.ones(inputs_shape)
+    tf.random.set_random_seed(SEED)
+    model = efficientdet_arch_keras.EfficientDetModel(config=config)
+    eager_class_out, eager_box_out = model(feats)
     for i in range(3, 8):
-      # Failing.
-      self.assertAllEqual(class_output1[i], class_output3[i])
-      self.assertAllEqual(box_output1[i], box_output3[i])
+      # TODO(tanmingxing): fix the failing case.
+      self.assertAllEqual(eager_class_out[i - 3], legacy_class_out[i])
+      self.assertAllEqual(eager_box_out[i - 3], legacy_box_out[i])
 
   def test_build_feature_network(self):
     config = hparams_config.get_efficientdet_config('efficientdet-d0')
@@ -110,28 +107,27 @@ class KerasTest(tf.test.TestCase):
       self.assertAllEqual(keras_feats[i - config.min_level], legacy_feats[i])
 
   def test_model_variables(self):
-    # TODO(tanmingxing): Re-enable this code once pass internal tests.
-    feats = tf.ones([1, 512, 512, 3])
-    model = efficientdet_arch_keras.efficientdet('efficientdet-d0')
-    model(feats)
-    vars1 = sorted([var.name for var in model.trainable_variables])
-    vars2 = sorted([var.name for var in model.variables])
+    input_shape = (1, 512, 512, 3)
+    model = efficientdet_arch_keras.EfficientDetModel('efficientdet-d0')
+    model.build(input_shape)
+    eager_train_vars = sorted([var.name for var in model.trainable_variables])
+    eager_model_vars = sorted([var.name for var in model.variables])
     with tf.Graph().as_default():
       feats = tf.ones([1, 512, 512, 3])
-      model = efficientdet_arch_keras.efficientdet('efficientdet-d0')
-      model(feats)
-      vars3 = sorted([var.name for var in model.trainable_variables])
-      vars4 = sorted([var.name for var in model.variables])
+      model = efficientdet_arch_keras.EfficientDetModel('efficientdet-d0')
+      model.build(input_shape)
+      keras_train_vars = sorted([var.name for var in model.trainable_variables])
+      keras_model_vars = sorted([var.name for var in model.variables])
     with tf.Graph().as_default():
       feats = tf.ones([1, 512, 512, 3])
       legacy_arch.efficientdet(feats, 'efficientdet-d0')
-      vars5 = sorted([var.name for var in tf.trainable_variables()])
-      vars6 = sorted([var.name for var in tf.global_variables()])
+      legacy_train_vars = sorted([var.name for var in tf.trainable_variables()])
+      legacy_model_vars = sorted([var.name for var in tf.global_variables()])
 
-    self.assertEqual(vars1, vars3)
-    self.assertEqual(vars3, vars5)
-    self.assertEqual(vars2, vars4)
-    self.assertEqual(vars4, vars6)
+    self.assertEqual(eager_train_vars, legacy_train_vars)
+    self.assertEqual(eager_model_vars, legacy_model_vars)
+    self.assertEqual(keras_train_vars, legacy_train_vars)
+    self.assertEqual(keras_model_vars, legacy_model_vars)
 
   def test_resample_feature_map(self):
     feat = tf.random.uniform([1, 16, 16, 320])

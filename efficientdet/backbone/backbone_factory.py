@@ -53,15 +53,15 @@ def get_model(model_name, override_params=None, model_dir=None):
   if override_params and override_params.get('drop_connect_rate', None):
     override_params['survival_prob'] = 1 - override_params['drop_connect_rate']
 
-    if not override_params:
-      override_params = {}
+  if not override_params:
+    override_params = {}
 
-    if model_name.startswith('efficientnet-lite'):
-      builder = efficientnet_lite_builder
-    elif model_name.startswith('efficientnet-b'):
-      builder = efficientnet_builder
-    else:
-      raise ValueError('Unknown model name {}'.format(model_name))
+  if model_name.startswith('efficientnet-lite'):
+    builder = efficientnet_lite_builder
+  elif model_name.startswith('efficientnet-b'):
+    builder = efficientnet_builder
+  else:
+    raise ValueError('Unknown model name {}'.format(model_name))
 
   blocks_args, global_params = builder.get_model_params(model_name,
                                                         override_params)
