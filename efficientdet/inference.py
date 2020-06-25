@@ -166,19 +166,26 @@ def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
   precision = utils.get_precision(kwargs.get('strategy', None), mixed_precision)
 
   if kwargs.get('use_keras_model', None):
-    config = hparams_config.get_efficientdet_config(model_name)
-    if kwargs:
+
+    def model_arch(feats, model_name=None, **kwargs):
+      """Construct a model arch for keras models."""
+      config = hparams_config.get_efficientdet_config(model_name)
       config.override(kwargs)
-    model_arch = efficientdet_arch_keras.efficientdet(model_name, config=config, feats=inputs)
-    cls_out_list, box_out_list = utils.build_model_with_precision(
-        precision, model_arch, inputs, False)
-    assert len(cls_out_list) == config.max_level -  config.min_level + 1
-    assert len(box_out_list) == config.max_level -  config.min_level + 1
-    # convert list to dictionary with key=level.
-    cls_outputs, box_outputs = {}, {}
-    for i in range(config.min_level, config.max_level + 1):
-      cls_outputs[i] = cls_out_list[i - config.min_level]
-      box_outputs[i] = box_out_list[i - config.min_level]
+      model = efficientdet_arch_keras.efficientdet(model_name,
+                                                   config=config,
+                                                   feats=feats)
+      # convert the list of model outputs to a dictionary with key=level.
+      cls_out_list, box_out_list = model.outputs[0:5], model.outputs[5:]
+      assert len(cls_out_list) == config.max_level - config.min_level + 1
+      assert len(box_out_list) == config.max_level - config.min_level + 1
+      cls_outputs, box_outputs = {}, {}
+      for i in range(config.min_level, config.max_level + 1):
+        cls_outputs[i] = cls_out_list[i - config.min_level]
+        box_outputs[i] = box_out_list[i - config.min_level]
+      return cls_outputs, box_outputs
+
+    cls_outputs, box_outputs = utils.build_model_with_precision(
+        precision, model_arch, inputs, False, model_name, **kwargs)
   else:
     model_arch = det_model_fn.get_model_arch(model_name)
     cls_outputs, box_outputs = utils.build_model_with_precision(

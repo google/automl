@@ -194,11 +194,13 @@ class EfficientDetVariablesNamesTest(tf.test.TestCase):
       inputs_shape = [1, 512, 512, 3]
       legacy_inputs, keras_inputs = dict(), []
       for i in range(config.min_level, config.max_level + 1):
-        keras_inputs.append(tf.ones(shape=inputs_shape, name='input', dtype=tf.float32))
+        keras_inputs.append(
+            tf.ones(shape=inputs_shape, name='input', dtype=tf.float32))
         legacy_inputs[i] = keras_inputs[-1]
 
       if keras:
-        efficientdet_arch_keras.build_class_and_box_outputs(keras_inputs, config)
+        efficientdet_arch_keras.build_class_and_box_outputs(
+            keras_inputs, config)
       else:
         legacy_arch.build_class_and_box_outputs(legacy_inputs, config)
       return [n.name for n in tf.global_variables()]
@@ -217,7 +219,8 @@ class EfficientDetVariablesNamesTest(tf.test.TestCase):
       tf.random.set_random_seed(SEED)
       keras_inputs = []
       for i in range(config.min_level, config.max_level + 1):
-        keras_inputs.append(tf.ones(shape=inputs_shape, name='input', dtype=tf.float32))
+        keras_inputs.append(
+            tf.ones(shape=inputs_shape, name='input', dtype=tf.float32))
 
       output1 = efficientdet_arch_keras.build_class_and_box_outputs(
           keras_inputs, config)
@@ -227,7 +230,9 @@ class EfficientDetVariablesNamesTest(tf.test.TestCase):
       tf.random.set_random_seed(SEED)
       legacy_inputs = dict()
       for i in range(config.min_level, config.max_level + 1):
-        legacy_inputs[i] = tf.ones(shape=inputs_shape, name='input', dtype=tf.float32)
+        legacy_inputs[i] = tf.ones(shape=inputs_shape,
+                                   name='input',
+                                   dtype=tf.float32)
       output2 = legacy_arch.build_class_and_box_outputs(legacy_inputs, config)
       sess.run(tf.global_variables_initializer())
       legacy_class, legacy_box = sess.run(output2)
