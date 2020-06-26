@@ -25,6 +25,7 @@ import utils
 from backbone import backbone_factory
 from backbone import efficientnet_builder
 from keras import utils_keras
+# pylint: disable=arguments=differ  # fo keras layers.
 
 
 class FNode(tf.keras.layers.Layer):
@@ -778,41 +779,114 @@ def build_backbone(features, config):
   return all_feats[config.min_level:config.max_level + 1]
 
 
-def efficientdet(model_name=None, config=None, feats=None, **kwargs):
-  """Build EfficientDet model.
+class EfficientDetModel(tf.keras.Model):
+  """EfficientDet keras model."""
 
-  Args:
-    model_name: String of the model (eg. efficientdet-d0)
-    config: Dict of parameters for the network
-    **kwargs: other parameters.
+  def __init__(self, model_name=None, config=None, name=''):
+    """Initialize model."""
+    super(EfficientDetModel, self).__init__(name=name)
 
-  Returns:
-    A tuple (class_outputs, box_outputs) for predictions.
-  """
-  if not config and not model_name:
-    raise ValueError('please specify either model name or config')
+    config = config or hparams_config.get_efficientdet_config(model_name)
+    self.config = config
 
-  if not config:
-    config = hparams_config.get_efficientdet_config(model_name)
-  elif isinstance(config, dict):
-    config = hparams_config.Config(config)  # wrap dict in Config object
+    # Backbone.
+    backbone_name = config.backbone_name
+    is_training = config.is_training_bn
+    if 'efficientnet' in backbone_name:
+      override_params = {
+          'batch_norm':
+              utils.batch_norm_class(is_training, config.strategy),
+          'relu_fn':
+              functools.partial(utils.activation_fn, act_type=config.act_type),
+      }
+      if 'b0' in backbone_name:
+        override_params['survival_prob'] = 0.0
+      if config.backbone_config is not None:
+        override_params['blocks_args'] = (
+            efficientnet_builder.BlockDecoder().encode(
+                config.backbone_config.blocks))
+      override_params['data_format'] = config.data_format
+      self.backbone = backbone_factory.get_model(
+          backbone_name, override_params=override_params)
 
-  if kwargs:
-    config.override(kwargs)
+    # Feature network.
+    feat_sizes = utils.get_feat_sizes(config.image_size, config.max_level)
+    self.resample_layers = {}  # additional resampling layers.
+    for level in range(config.min_level, config.max_level + 1):
+      # Adds a coarser level by downsampling the last feature map.
+      self.resample_layers[level] = ResampleFeatureMap(
+          target_height=feat_sizes[level]['height'],
+          target_width=feat_sizes[level]['width'],
+          target_num_channels=config.fpn_num_filters,
+          apply_bn=config.apply_bn_for_resampling,
+          is_training=config.is_training_bn,
+          conv_after_downsample=config.conv_after_downsample,
+          strategy=config.strategy,
+          data_format=config.data_format,
+          name='resample_p{}'.format(level),
+      )
+    self.fpn_cells = FPNCells(feat_sizes, config)
 
-  logging.info(config)
-  inputs = tf.keras.layers.Input(
-      [*utils.parse_image_size(config.image_size), 3], tensor=feats)
-  # build backbone features.
-  features = build_backbone(inputs, config)
 
-  # build feature network.
-  fpn_feats = build_feature_network(features, config)
+    # class/box output prediction network.
+    num_anchors = len(config.aspect_ratios) * config.num_scales
+    num_filters = config.fpn_num_filters
+    self.class_net = ClassNet(num_classes=config.num_classes,
+                              num_anchors=num_anchors,
+                              num_filters=num_filters,
+                              min_level=config.min_level,
+                              max_level=config.max_level,
+                              is_training=config.is_training_bn,
+                              act_type=config.act_type,
+                              repeats=config.box_class_repeats,
+                              separable_conv=config.separable_conv,
+                              survival_prob=config.survival_prob,
+                              strategy=config.strategy,
+                              data_format=config.data_format)
 
-  # build class and box predictions.
-  class_outputs, box_outputs = build_class_and_box_outputs(fpn_feats, config)
-  logging.info('backbone+fpn+box params/flops = {:.6f}M, {:.9f}B'.format(
-      *utils.num_params_flops()))
+    self.box_net = BoxNet(num_anchors=num_anchors,
+                          num_filters=num_filters,
+                          min_level=config.min_level,
+                          max_level=config.max_level,
+                          is_training=config.is_training_bn,
+                          act_type=config.act_type,
+                          repeats=config.box_class_repeats,
+                          separable_conv=config.separable_conv,
+                          survival_prob=config.survival_prob,
+                          strategy=config.strategy,
+                          data_format=config.data_format)
 
-  return tf.keras.Model(inputs=inputs,
-                        outputs=[class_outputs, box_outputs])
+  def _init_set_name(self, name, zero_based=True):
+    """A hack to allow empty model name for legacy checkpoint compitability."""
+    if name == '':
+      self._name = name
+    else:
+      self._name = super(EfficientDetModel, self).__init__(name, zero_based)
+
+  def call(self, features):
+    config = self.config
+    # call backbone network.
+    self.backbone(features, training=config.is_training_bn, features_only=True)
+    all_feats = [
+        features,
+        self.backbone.endpoints['reduction_1'],
+        self.backbone.endpoints['reduction_2'],
+        self.backbone.endpoints['reduction_3'],
+        self.backbone.endpoints['reduction_4'],
+        self.backbone.endpoints['reduction_5'],
+    ]
+    feats = all_feats[config.min_level:config.max_level + 1]
+
+    # Build additional input features that are not from backbone.
+    while len(feats) < config.max_level - config.min_level + 1:
+      level = len(feats) + config.min_level
+      feats.append(self.resample_layers[level](feats[-1]))
+
+    # call feature network.
+    feats = self.fpn_cells(feats)
+
+    # call class/box output network.
+    class_outputs = self.class_net(feats)
+    box_outputs = self.box_net(feats)
+
+    return class_outputs, box_outputs
