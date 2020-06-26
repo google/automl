@@ -36,8 +36,8 @@ import dataloader
 import det_model_fn
 import hparams_config
 import utils
-from visualize import vis_utils
 from keras import efficientdet_arch_keras
+from visualize import vis_utils
 from tensorflow.python.client import timeline  # pylint: disable=g-direct-tensorflow-import
 
 coco_id_mapping = {
@@ -759,7 +759,6 @@ class ServingDriver(object):
           input_arrays=[input_name],
           input_shapes=input_shapes,
           output_arrays=[signitures['prediction'].op.name])
-      converter.experimental_new_converter = True
       converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
       tflite_model = converter.convert()
 

@@ -25,6 +25,7 @@ from __future__ import print_function
 
 import collections
 import functools
+import itertools
 import math
 
 from absl import logging
@@ -211,6 +212,17 @@ class MBConvBlock(tf.keras.layers.Layer):
 
   def _build(self):
     """Builds block according to the arguments."""
+    # pylint: disable=g-long-lambda
+    # Keras layers have different names under graph and eager mode, so here we
+    # force their names to be the same for compatible.
+    bn_id = itertools.count(0)
+    get_bn_name = lambda: 'tpu_batch_normalization' if not next(
+        bn_id) else 'tpu_batch_normalization_' + str(next(bn_id) // 2)
+    conv_id = itertools.count(0)
+    get_conv_name = lambda: 'conv2d' if not next(
+        conv_id) else 'conv2d_' + str(next(conv_id) // 2)
+    # pylint: enable=g-long-lambda
+
     if self._block_args.super_pixel == 1:
       self._superpixel = self.conv_cls(
           self._block_args.input_filters,
@@ -219,53 +231,61 @@ class MBConvBlock(tf.keras.layers.Layer):
           kernel_initializer=conv_kernel_initializer,
           padding='same',
           data_format=self._data_format,
-          use_bias=False)
+          use_bias=False,
+          name=get_conv_name())
       self._bnsp = self._batch_norm(
           axis=self._channel_axis,
           momentum=self._batch_norm_momentum,
-          epsilon=self._batch_norm_epsilon)
+          epsilon=self._batch_norm_epsilon,
+          name=get_bn_name())
 
     filters = self._block_args.input_filters * self._block_args.expand_ratio
     kernel_size = self._block_args.kernel_size
 
-    # Fused expansion phase. Called if using fused convolutions.
-    self._fused_conv = self.conv_cls(
-        filters=filters,
-        kernel_size=[kernel_size, kernel_size],
-        strides=self._block_args.strides,
-        kernel_initializer=conv_kernel_initializer,
-        padding='same',
-        data_format=self._data_format,
-        use_bias=False)
+    if self._block_args.fused_conv:
+      # Fused expansion phase. Called if using fused convolutions.
+      self._fused_conv = self.conv_cls(
+          filters=filters,
+          kernel_size=[kernel_size, kernel_size],
+          strides=self._block_args.strides,
+          kernel_initializer=conv_kernel_initializer,
+          padding='same',
+          data_format=self._data_format,
+          use_bias=False,
+          name=get_conv_name())
+    else:
+      # Expansion phase. Called if not using fused convolutions and expansion
+      # phase is necessary.
+      if self._block_args.expand_ratio != 1:
+        self._expand_conv = self.conv_cls(
+            filters=filters,
+            kernel_size=[1, 1],
+            strides=[1, 1],
+            kernel_initializer=conv_kernel_initializer,
+            padding='same',
+            data_format=self._data_format,
+            use_bias=False,
+            name=get_conv_name())
+        self._bn0 = self._batch_norm(
+            axis=self._channel_axis,
+            momentum=self._batch_norm_momentum,
+            epsilon=self._batch_norm_epsilon,
+            name=get_bn_name())
 
-    # Expansion phase. Called if not using fused convolutions and expansion
-    # phase is necessary.
-    self._expand_conv = self.conv_cls(
-        filters=filters,
-        kernel_size=[1, 1],
-        strides=[1, 1],
-        kernel_initializer=conv_kernel_initializer,
-        padding='same',
-        data_format=self._data_format,
-        use_bias=False)
-    self._bn0 = self._batch_norm(
-        axis=self._channel_axis,
-        momentum=self._batch_norm_momentum,
-        epsilon=self._batch_norm_epsilon)
-
-    # Depth-wise convolution phase. Called if not using fused convolutions.
-    self._depthwise_conv = self.depthwise_conv_cls(
-        kernel_size=[kernel_size, kernel_size],
-        strides=self._block_args.strides,
-        depthwise_initializer=conv_kernel_initializer,
-        padding='same',
-        data_format=self._data_format,
-        use_bias=False)
+      # Depth-wise convolution phase. Called if not using fused convolutions.
+      self._depthwise_conv = self.depthwise_conv_cls(
+          kernel_size=[kernel_size, kernel_size],
+          strides=self._block_args.strides,
+          depthwise_initializer=conv_kernel_initializer,
+          padding='same',
+          data_format=self._data_format,
+          use_bias=False)
 
     self._bn1 = self._batch_norm(
         axis=self._channel_axis,
         momentum=self._batch_norm_momentum,
-        epsilon=self._batch_norm_epsilon)
+        epsilon=self._batch_norm_epsilon,
+        name=get_bn_name())
 
     if self._has_se:
       num_reduced_filters = max(
@@ -278,7 +298,8 @@ class MBConvBlock(tf.keras.layers.Layer):
           kernel_initializer=conv_kernel_initializer,
           padding='same',
           data_format=self._data_format,
-          use_bias=True)
+          use_bias=True,
+          name='conv2d')
       self._se_expand = self.conv_cls(
           filters,
           kernel_size=[1, 1],
@@ -286,7 +307,8 @@ class MBConvBlock(tf.keras.layers.Layer):
           kernel_initializer=conv_kernel_initializer,
           padding='same',
           data_format=self._data_format,
-          use_bias=True)
+          use_bias=True,
+          name='conv2d_1')
 
     # Output phase.
     filters = self._block_args.output_filters
@@ -297,11 +319,13 @@ class MBConvBlock(tf.keras.layers.Layer):
         kernel_initializer=conv_kernel_initializer,
         padding='same',
         data_format=self._data_format,
-        use_bias=False)
+        use_bias=False,
+        name=get_conv_name())
     self._bn2 = self._batch_norm(
         axis=self._channel_axis,
         momentum=self._batch_norm_momentum,
-        epsilon=self._batch_norm_epsilon)
+        epsilon=self._batch_norm_epsilon,
+        name=get_bn_name())
 
   def _call_se(self, input_tensor):
     """Call Squeeze and Excitation layer.
@@ -343,11 +367,6 @@ class MBConvBlock(tf.keras.layers.Layer):
     logging.info('Block %s  input shape: %s', self.name, inputs.shape)
     x = inputs
 
-    fused_conv_fn = self._fused_conv
-    expand_conv_fn = self._expand_conv
-    depthwise_conv_fn = self._depthwise_conv
-    project_conv_fn = self._project_conv
-
     # creates conv 2x2 kernel
     if self._block_args.super_pixel == 1:
       with tf.name_scope('super_pixel'):
@@ -357,15 +376,15 @@ class MBConvBlock(tf.keras.layers.Layer):
 
     if self._block_args.fused_conv:
       # If use fused mbconv, skip expansion and use regular conv.
-      x = self._relu_fn(self._bn1(fused_conv_fn(x), training=training))
+      x = self._relu_fn(self._bn1(self._fused_conv(x), training=training))
       logging.info('Conv2D shape: %s', x.shape)
     else:
       # Otherwise, first apply expansion and then apply depthwise conv.
       if self._block_args.expand_ratio != 1:
-        x = self._relu_fn(self._bn0(expand_conv_fn(x), training=training))
+        x = self._relu_fn(self._bn0(self._expand_conv(x), training=training))
         logging.info('Expand shape: %s', x.shape)
 
-      x = self._relu_fn(self._bn1(depthwise_conv_fn(x), training=training))
+      x = self._relu_fn(self._bn1(self._depthwise_conv(x), training=training))
       logging.info('DWConv shape: %s', x.shape)
 
     if self._has_se:
@@ -374,7 +393,7 @@ class MBConvBlock(tf.keras.layers.Layer):
 
     self.endpoints = {'expansion_output': x}
 
-    x = self._bn2(project_conv_fn(x), training=training)
+    x = self._bn2(self._project_conv(x), training=training)
     # Add identity so that quantization-aware training can insert quantization
     # ops correctly.
     x = tf.identity(x)
