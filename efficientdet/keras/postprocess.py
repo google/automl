@@ -46,7 +46,7 @@ def pad_zeros(inputs: T, max_output_size: int, indices=None) -> T:
 def merge_class_box_level_outputs(params, cls_outputs, box_outputs) -> List[T]:
   """Concatenates class and box of all levels into one tensor."""
   cls_outputs_all, box_outputs_all = [], []
-  batch_size = cls_outputs[params['min_level']].get_shape()[0]
+  batch_size = cls_outputs[0].shape[0]
   for level in range(0, params['max_level'] - params['max_level'] + 1):
     if params['data_format'] == 'channels_first':
       cls_outputs[level] = tf.transpose(cls_outputs[level], [0, 2, 3, 1])
@@ -59,7 +59,7 @@ def merge_class_box_level_outputs(params, cls_outputs, box_outputs) -> List[T]:
 
 def topk_class_boxes(params, cls_outputs: T, box_outputs: T) -> List[T]:
   """Pick the topk class and box outputs."""
-  batch_size = cls_outputs.get_shape()[0]
+  batch_size = cls_outputs.shape[0]
   num_classes = params['num_classes']
 
   max_detection_points = params.get('max_detection_points', 5000)
@@ -103,10 +103,10 @@ def pre_nms(params, cls_outputs, box_outputs) -> List[T]:
 
   Args:
     params: a dict of parameters.
-    cls_outputs: a dict of class outputs with format {level: logits}, where
-      logits has shape [N, H, W, num_class * num_anchors].
-    box_outputs: a dict of box outputs with forrmat {level: boxes}, where
-      boxes has shape [N, H, W, 4 * num_anchors].
+    cls_outputs: a list of tensors for classes, each tensor denotes a level
+      of logits with shape [N, H, W, num_class * num_anchors].
+    box_outputs: a list of tensors for boxes, each tensor ddenotes a level of
+      boxes with shape [N, H, W, 4 * num_anchors].
 
   Returns:
     A tuple of (boxes, scores, classes).
@@ -128,7 +128,7 @@ def pre_nms(params, cls_outputs, box_outputs) -> List[T]:
   return boxes, scores, classes
 
 
-def nms(params, boxes: T, scores: T, classes: T) -> List[T]:
+def nms(params, boxes: T, scores: T, classes: T, padded: bool) -> List[T]:
   """Non-maximum suppression.
 
   Args:
@@ -138,7 +138,8 @@ def nms(params, boxes: T, scores: T, classes: T) -> List[T]:
     classes: a tensor with shape [N].
 
   Returns:
-    A tuple (nms_boxes, nms_scores, nms_classes)
+    A tuple (boxes, scores, classes, valid_lens), where valid_lens is a scalar
+    denoting the valid length of boxes/scores/classes outputs.
   """
   logging.info('performing per-sample nms')
   nms_configs = params['nms_configs'] or {}
@@ -159,16 +160,17 @@ def nms(params, boxes: T, scores: T, classes: T) -> List[T]:
 
   # TF API's sigma is twice as the paper's value, so here we divide it by 2:
   # https://github.com/tensorflow/tensorflow/issues/40253.
-  top_nms_idx, nms_scores = tf.image.non_max_suppression_with_scores(
-      boxes,
-      scores,
-      max_output_size,
+  nms_top_idx, nms_scores, nms_valid_lens = tf.raw_ops.NonMaxSuppressionV5(
+      boxes=boxes,
+      scores=scores,
+      max_output_size=max_output_size,
       iou_threshold=iou_thresh,
       score_threshold=score_thresh,
-      soft_nms_sigma=(sigma / 2))
-  nms_boxes = tf.gather(boxes, top_nms_idx)
-  nms_classes = tf.cast(tf.gather(classes, top_nms_idx) + 1, tf.float32)
-  return nms_boxes, nms_scores, nms_classes
+      soft_nms_sigma=(sigma / 2),
+      pad_to_max_output_size=padded)
+  nms_boxes = tf.gather(boxes, nms_top_idx)
+  nms_classes = tf.cast(tf.gather(classes, nms_top_idx) + 1, tf.float32)
+  return nms_boxes, nms_scores, nms_classes, nms_valid_lens
 
 
 def postprocess_global(params, cls_outputs, box_outputs, img_scales=None):
@@ -179,44 +181,39 @@ def postprocess_global(params, cls_outputs, box_outputs, img_scales=None):
 
   Args:
     params: a dict of parameters.
-    cls_outputs: a dict of class outputs with format {level: logits}, where
-      logits has shape [N, H, W, num_class * num_anchors].
-    box_outputs: a dict of box outputs with forrmat {level: boxes}, where
-      boxes has shape [N, H, W, 4 * num_anchors].
+    cls_outputs: a list of tensors for classes, each tensor denotes a level
+      of logits with shape [N, H, W, num_class * num_anchors].
+    box_outputs: a list of tensors for boxes, each tensor ddenotes a level of
+      boxes with shape [N, H, W, 4 * num_anchors].
     img_scales: scaling factor or the final image and bounding boxes.
 
   Returns:
-    A tuple of batch level (boxes, scores, classess) after nms.
+    A tuple of batch level (boxes, scores, classess, valid_len) after nms.
   """
   boxes, scores, classes = pre_nms(params, cls_outputs, box_outputs)
 
   # A list of batched boxes, scores, and classes.
-  nms_boxes_bs, nms_scores_bs, nms_classes_bs = [], [], []
-  batch_size = boxes.get_shape()[0]
+  nms_boxes_bs, nms_scores_bs, nms_classes_bs, nms_valid_len_bs = [], [], [], []
+  batch_size = boxes.shape[0]
   for i in range(batch_size):
-    nms_boxes, nms_scores, nms_classes = nms(params, boxes[i], scores[i],
-                                             classes[i])
+    padded = batch_size > 1  # only pad if batch size > 1 for simplicity.
+    nms_boxes, nms_scores, nms_classes, nms_valid_len = nms(
+        params, boxes[i], scores[i], classes[i], padded)
     nms_boxes = clip_boxes(nms_boxes, params['image_size'])
-
-    if batch_size > 1:
-      # pad to fixed length if batch size > 1.
-      max_output_size = params['nms_configs'].get('max_output_size',
-                                                  MAX_BOXES_PER_IMAGE)
-      nms_boxes = pad_zeros(nms_boxes, max_output_size)
-      nms_scores = pad_zeros(nms_scores, max_output_size)
-      nms_classes = pad_zeros(nms_classes, max_output_size)
 
     nms_boxes_bs.append(nms_boxes)
     nms_scores_bs.append(nms_scores)
     nms_classes_bs.append(nms_classes)
+    nms_valid_len_bs.append(nms_valid_len)
 
   nms_boxes_bs = tf.stack(nms_boxes_bs)
   nms_scores_bs = tf.stack(nms_scores_bs)
   nms_classes_bs = tf.stack(nms_classes_bs)
+  nms_valid_len_bs = tf.stack(nms_valid_len_bs)
   if img_scales:
     scales = tf.expand_dims(tf.expand_dims(img_scales, -1), -1)
     nms_boxes_bs = nms_boxes_bs * scales
-  return nms_boxes_bs, nms_scores_bs, nms_classes_bs
+  return nms_boxes_bs, nms_scores_bs, nms_classes_bs, nms_valid_len_bs
 
 
 def postprocess_per_class(params, cls_outputs, box_outputs, img_scales=None):
@@ -227,39 +224,42 @@ def postprocess_per_class(params, cls_outputs, box_outputs, img_scales=None):
 
   Args:
     params: a dict of parameters.
-    cls_outputs: a dict of class outputs with format {level: logits}, where
-      logits has shape [N, H, W, num_class * num_anchors].
-    box_outputs: a dict of box outputs with forrmat {level: boxes}, where
-      boxes has shape [N, H, W, 4 * num_anchors].
+    cls_outputs: a list of tensors for classes, each tensor denotes a level
+      of logits with shape [N, H, W, num_class * num_anchors].
+    box_outputs: a list of tensors for boxes, each tensor ddenotes a level of
+      boxes with shape [N, H, W, 4 * num_anchors].
     img_scales: scaling factor or the final image and bounding boxes.
 
   Returns:
-    A tuple of batch level (boxes, scores, classess) after nms.
+    A tuple of batch level (boxes, scores, classess, valid_len) after nms.
   """
   boxes, scores, classes = pre_nms(params, cls_outputs, box_outputs)
 
-  nms_boxes_bs, nms_scores_bs, nms_classes_bs = [], [], []
-  batch_size = boxes.get_shape()[0]
+  nms_boxes_bs, nms_scores_bs, nms_classes_bs, nms_valid_len_bs = [], [], [], []
+  batch_size = boxes.shape[0]
   for i in range(batch_size):
     boxes_i, scores_i, classes_i = boxes[i], scores[i], classes[i]
     nms_boxes_cls, nms_scores_cls, nms_classes_cls = [], [], []
+    nms_valid_len_cls = []
     for cid in range(params['num_classes']):
       indices = tf.squeeze(tf.where(classes_i == cid))
-      if indices.get_shape().as_list() == 0:
+      if indices.shape.as_list() == 0:
         continue
       classes_cls = tf.gather(classes_i, indices)
       boxes_cls = tf.gather(boxes_i, indices)
       scores_cls = tf.gather(scores_i, indices)
 
-      nms_boxes, nms_scores, nms_classes = nms(params, boxes_cls, scores_cls,
-                                               classes_cls)
+      nms_boxes, nms_scores, nms_classes, nms_valid_len = nms(
+          params, boxes_cls, scores_cls, classes_cls, False)
       nms_boxes_cls.append(nms_boxes)
       nms_scores_cls.append(nms_scores)
       nms_classes_cls.append(nms_classes)
+      nms_valid_len_cls.append(nms_valid_len)
 
     nms_boxes_cls = tf.concat(nms_boxes_cls, 0)
     nms_scores_cls = tf.concat(nms_scores_cls, 0)
     nms_classes_cls = tf.concat(nms_classes_cls, 0)
+    nms_valid_len_cls = tf.concat(nms_valid_len_cls, 0)
     # get top detections and pad to fix size.
     max_output_size = params['nms_configs'].get('max_output_size', 100)
     _, indices = tf.math.top_k(nms_scores_cls, k=max_output_size, sorted=True)
@@ -267,19 +267,21 @@ def postprocess_per_class(params, cls_outputs, box_outputs, img_scales=None):
     nms_boxes_bs.append(pad_zeros(nms_boxes_cls, max_output_size, indices))
     nms_scores_bs.append(pad_zeros(nms_scores_cls, max_output_size, indices))
     nms_classes_bs.append(pad_zeros(nms_classes_cls, max_output_size, indices))
+    nms_valid_len_bs.append(indices.shape[0])
 
   nms_scores_bs = tf.stack(nms_scores_bs)
   nms_classes_bs = tf.stack(nms_classes_bs)
   nms_boxes_bs = tf.stack(nms_boxes_bs)
+  nms_valid_len_bs = tf.stack(nms_valid_len_bs)
   if img_scales:
     scales = tf.expand_dims(tf.expand_dims(img_scales, -1), -1)
     nms_boxes_bs = nms_boxes_bs * scales
-  return nms_boxes_bs, nms_scores_bs, nms_classes_bs
+  return nms_boxes_bs, nms_scores_bs, nms_classes_bs, nms_valid_len_bs
 
 
 def generate_detections(params, cls_outputs, box_outputs, img_scales, img_ids):
   """A legacy interface for generating [id, x, y, w, h, score, class]."""
-  nms_boxes_bs, nms_scores_bs, nms_classes_bs = postprocess_per_class(
+  nms_boxes_bs, nms_scores_bs, nms_classes_bs, _ = postprocess_per_class(
       params, cls_outputs, box_outputs, img_scales)
 
   img_ids_bs = tf.cast(tf.expand_dims(img_ids, -1), nms_scores_bs.dtype)

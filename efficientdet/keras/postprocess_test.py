@@ -45,11 +45,14 @@ class PostprocessTest(tf.test.TestCase):
     tf.random.set_seed(1111)
     cls_outputs = {1: tf.random.normal([2, 4, 4, 2])}
     box_outputs = {1: tf.random.normal([2, 4, 4, 4])}
+    cls_outputs_list = [cls_outputs[1]]
+    box_outputs_list = [box_outputs[1]]
     scales = [1.0, 2.0]
 
     self.params['max_detection_points'] = 10
-    boxes, scores, classes = postprocess.postprocess_global(
-        self.params, cls_outputs, box_outputs, scales)
+    boxes, scores, classes, valid_len = postprocess.postprocess_global(
+        self.params, cls_outputs_list, box_outputs_list, scales)
+    self.assertAllClose(valid_len, [2, 2])
 
     self.params['disable_pyfun'] = True
     score_thresh = 0.5
@@ -71,12 +74,14 @@ class PostprocessTest(tf.test.TestCase):
     tf.random.set_seed(1111)
     cls_outputs = {1: tf.random.normal([2, 4, 4, 2])}
     box_outputs = {1: tf.random.normal([2, 4, 4, 4])}
+    cls_outputs_list =  [cls_outputs[1]]
+    box_outputs_list =  [box_outputs[1]]
     scales = [1.0, 2.0]
     ids = [0, 1]
 
     self.params['max_detection_points'] = 10
-    outputs = postprocess.generate_detections(self.params, cls_outputs,
-                                              box_outputs, scales, ids)
+    outputs = postprocess.generate_detections(self.params, cls_outputs_list,
+                                              box_outputs_list, scales, ids)
 
     self.params['disable_pyfun'] = False
     score_thresh = 0.5

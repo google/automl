@@ -62,7 +62,7 @@ class FNode(tf.keras.layers.Layer):
     self.data_format = data_format
     self.weight_method = weight_method
     self.conv_bn_act_pattern = conv_bn_act_pattern
-    self.resample_feature_maps = {}
+    self.resample_feature_maps = []
     self.vars = []
 
   def fuse_features(self, nodes):
@@ -118,21 +118,19 @@ class FNode(tf.keras.layers.Layer):
     elif self.weight_method == 'sum':
       new_node = tf.add_n(nodes)
     else:
-      raise ValueError('unknown weight_method {}'.format(self.weight_method))
+      raise ValueError('unknown weight_method %s' % self.weight_method)
 
     return new_node
 
   def _add_wsm(self, initializer):
     for i, _ in enumerate(self.inputs_offsets):
-      if i == 0:
-        name = 'WSM'
-      else:
-        name = 'WSM_{}'.format(i)
+      name = 'WSM' + ('' if i == 0 else '_' + str(i))
       self.vars.append(
           self.add_weight(initializer=initializer, name=name, trainable=True))
 
   def build(self, feats_shape):
-    for idx, input_offset in enumerate(self.inputs_offsets):
+    for i, input_offset in enumerate(self.inputs_offsets):
+      name = 'resample_{}_{}_{}'.format(i, input_offset, len(feats_shape))
       resample_feature_map = ResampleFeatureMap(self.new_node_height,
                                                 self.new_node_width,
                                                 self.fpn_num_filters,
@@ -141,10 +139,8 @@ class FNode(tf.keras.layers.Layer):
                                                 self.conv_after_downsample,
                                                 strategy=self.strategy,
                                                 data_format=self.data_format,
-                                                name='resample_{}_{}_{}'.format(
-                                                    idx, input_offset,
-                                                    len(feats_shape)))
-      self.resample_feature_maps[str(idx)] = resample_feature_map
+                                                name=name)
+      self.resample_feature_maps.append(resample_feature_map)
     if self.weight_method == 'attn':
       self._add_wsm('ones')
     elif self.weight_method == 'fastattn':
@@ -168,9 +164,9 @@ class FNode(tf.keras.layers.Layer):
 
   def call(self, feats):
     nodes = []
-    for idx, input_offset in enumerate(self.inputs_offsets):
+    for i, input_offset in enumerate(self.inputs_offsets):
       input_node = feats[input_offset]
-      input_node = self.resample_feature_maps[str(idx)](input_node)
+      input_node = self.resample_feature_maps[i](input_node)
       nodes.append(input_node)
     new_node = self.fuse_features(nodes)
     new_node = self.op_after_combine(new_node)
@@ -392,16 +388,15 @@ class ClassNet(tf.keras.layers.Layer):
                        padding='same',
                        name='class-%d' % i))
 
-      bn_per_level = {}
+      bn_per_level = []
       for level in range(self.min_level, self.max_level + 1):
-        # NOTE(tanmingxing): key must be str to support model save/load.
-        # github.com/tensorflow/tensorflow/issues/36916#issuecomment-640395999
-        bn_per_level[str(level)] = utils_keras.build_batch_norm(
-            is_training_bn=self.is_training,
-            strategy=self.strategy,
-            data_format=self.data_format,
-            name='class-%d-bn-%d' % (i, level),
-        )
+        bn_per_level.append(
+            utils_keras.build_batch_norm(
+                is_training_bn=self.is_training,
+                strategy=self.strategy,
+                data_format=self.data_format,
+                name='class-%d-bn-%d' % (i, level),
+            ))
       self.bns.append(bn_per_level)
 
     self.classes = conv2d_layer(
@@ -415,12 +410,12 @@ class ClassNet(tf.keras.layers.Layer):
     """Call ClassNet."""
 
     class_outputs = []
-    for level in range(self.min_level, self.max_level + 1):
-      image = inputs[level - self.min_level]
+    for level_id in range(0, self.max_level - self.min_level + 1):
+      image = inputs[level_id]
       for i in range(self.repeats):
         original_image = image
         image = self.conv_ops[i](image)
-        image = self.bns[i][str(level)](image, training=self.is_training)
+        image = self.bns[i][level_id](image, training=self.is_training)
         if self.act_type:
           image = utils.activation_fn(image, self.act_type)
         if i > 0 and self.survival_prob:
@@ -513,13 +508,13 @@ class BoxNet(tf.keras.layers.Layer):
                 padding='same',
                 name='box-%d' % i))
 
-      bn_per_level = {}
+      bn_per_level = []
       for level in range(self.min_level, self.max_level + 1):
-        bn_per_level[str(level)] = utils_keras.build_batch_norm(
-            is_training_bn=self.is_training,
-            strategy=self.strategy,
-            data_format=self.data_format,
-            name='box-%d-bn-%d' % (i, level))
+        bn_per_level.append(
+            utils_keras.build_batch_norm(is_training_bn=self.is_training,
+                                         strategy=self.strategy,
+                                         data_format=self.data_format,
+                                         name='box-%d-bn-%d' % (i, level)))
       self.bns.append(bn_per_level)
 
     if self.separable_conv:
@@ -549,12 +544,12 @@ class BoxNet(tf.keras.layers.Layer):
   def call(self, inputs, **kwargs):
     """Call boxnet."""
     box_outputs = []
-    for level in range(self.min_level, self.max_level + 1):
-      image = inputs[level - self.min_level]
+    for level_id in range(0, self.max_level - self.min_level + 1):
+      image = inputs[level_id]
       for i in range(self.repeats):
         original_image = image
         image = self.conv_ops[i](image)
-        image = self.bns[i][str(level)](image, training=self.is_training)
+        image = self.bns[i][level_id](image, training=self.is_training)
         if self.act_type:
           image = utils.activation_fn(image, self.act_type)
         if i > 0 and self.survival_prob:
@@ -584,7 +579,7 @@ class FPNCells(tf.keras.layers.Layer):
                                                    config.fpn_weight_method)
 
     self.cells = [
-        FPNCell(self.feat_sizes, self.config, name='cell_{}'.format(rep))
+        FPNCell(self.feat_sizes, self.config, name='cell_%d' % rep)
         for rep in range(self.config.fpn_cell_repeats)
     ]
 
@@ -637,7 +632,7 @@ class FPNCell(tf.keras.layers.Layer):
                     strategy=config.strategy,
                     weight_method=fpn_config.weight_method,
                     data_format=config.data_format,
-                    name='fnode{}'.format(i))
+                    name='fnode%d' % i)
       self.fnodes.append(fnode)
 
   def call(self, feats):
@@ -675,7 +670,7 @@ def build_feature_network(feats, config):
             conv_after_downsample=config.conv_after_downsample,
             strategy=config.strategy,
             data_format=config.data_format,
-            name='resample_p{}'.format(level),
+            name='resample_p%d' % level,
         )(feats[-1]))
 
   utils.verify_feats_size(feats,
@@ -813,10 +808,10 @@ class EfficientDetNet(tf.keras.Model):
 
     # Feature network.
     feat_sizes = utils.get_feat_sizes(config.image_size, config.max_level)
-    self.resample_layers = {}  # additional resampling layers.
+    self.resample_layers = []  # additional resampling layers.
     for level in range(6, config.max_level + 1):
       # Adds a coarser level by downsampling the last feature map.
-      self.resample_layers[str(level)] = ResampleFeatureMap(
+      self.resample_layers.append(ResampleFeatureMap(
           target_height=feat_sizes[level]['height'],
           target_width=feat_sizes[level]['width'],
           target_num_channels=config.fpn_num_filters,
@@ -825,8 +820,8 @@ class EfficientDetNet(tf.keras.Model):
           conv_after_downsample=config.conv_after_downsample,
           strategy=config.strategy,
           data_format=config.data_format,
-          name='resample_p{}'.format(level),
-      )
+          name='resample_p%d' % level,
+      ))
     self.fpn_cells = FPNCells(feat_sizes, config)
 
     # class/box output prediction network.
@@ -879,9 +874,8 @@ class EfficientDetNet(tf.keras.Model):
     feats = all_feats[config.min_level:config.max_level + 1]
 
     # Build additional input features that are not from backbone.
-    while len(feats) < config.max_level - config.min_level + 1:
-      level = len(feats) + config.min_level
-      feats.append(self.resample_layers[str(level)](feats[-1]))
+    for resample_layer in self.resample_layers:
+      feats.append(resample_layer(feats[-1]))
 
     # call feature network.
     feats = self.fpn_cells(feats)
@@ -907,7 +901,7 @@ class EfficientDetModel(EfficientDetNet):
 
     scales, images = [], []
     if isinstance(raw_images, tf.Tensor):
-      batch_size = raw_images.get_shape()[0]
+      batch_size = raw_images.shape[0]
     else:
       batch_size = len(raw_image)
     for i in range(batch_size):
