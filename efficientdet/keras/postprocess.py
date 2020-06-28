@@ -46,8 +46,8 @@ def pad_zeros(inputs: T, max_output_size: int, indices=None) -> T:
 def merge_class_box_level_outputs(params, cls_outputs, box_outputs) -> List[T]:
   """Concatenates class and box of all levels into one tensor."""
   cls_outputs_all, box_outputs_all = [], []
-  batch_size = params['batch_size']
-  for level in range(params['min_level'], params['max_level'] + 1):
+  batch_size = cls_outputs[params['min_level']].get_shape()[0]
+  for level in range(0, params['max_level'] - params['max_level'] + 1):
     if params['data_format'] == 'channels_first':
       cls_outputs[level] = tf.transpose(cls_outputs[level], [0, 2, 3, 1])
       box_outputs[level] = tf.transpose(box_outputs[level], [0, 2, 3, 1])
@@ -59,7 +59,7 @@ def merge_class_box_level_outputs(params, cls_outputs, box_outputs) -> List[T]:
 
 def topk_class_boxes(params, cls_outputs: T, box_outputs: T) -> List[T]:
   """Pick the topk class and box outputs."""
-  batch_size = params['batch_size']
+  batch_size = cls_outputs.get_shape()[0]
   num_classes = params['num_classes']
 
   max_detection_points = params.get('max_detection_points', 5000)
@@ -192,12 +192,13 @@ def postprocess_global(params, cls_outputs, box_outputs, img_scales=None):
 
   # A list of batched boxes, scores, and classes.
   nms_boxes_bs, nms_scores_bs, nms_classes_bs = [], [], []
-  for i in range(params['batch_size']):
+  batch_size = boxes.get_shape()[0]
+  for i in range(batch_size):
     nms_boxes, nms_scores, nms_classes = nms(params, boxes[i], scores[i],
                                              classes[i])
     nms_boxes = clip_boxes(nms_boxes, params['image_size'])
 
-    if params['batch_size'] > 1:
+    if batch_size > 1:
       # pad to fixed length if batch size > 1.
       max_output_size = params['nms_configs'].get('max_output_size',
                                                   MAX_BOXES_PER_IMAGE)
@@ -238,7 +239,8 @@ def postprocess_per_class(params, cls_outputs, box_outputs, img_scales=None):
   boxes, scores, classes = pre_nms(params, cls_outputs, box_outputs)
 
   nms_boxes_bs, nms_scores_bs, nms_classes_bs = [], [], []
-  for i in range(params['batch_size']):
+  batch_size = boxes.get_shape()[0]
+  for i in range(batch_size):
     boxes_i, scores_i, classes_i = boxes[i], scores[i], classes[i]
     nms_boxes_cls, nms_scores_cls, nms_classes_cls = [], [], []
     for cid in range(params['num_classes']):

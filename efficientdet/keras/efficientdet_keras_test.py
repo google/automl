@@ -13,18 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for efficientdet_arch_keras."""
+"""Tests for efficientdet_keras."""
+import os
+import tempfile
 from absl import logging
 import tensorflow.compat.v1 as tf
 
 import efficientdet_arch as legacy_arch
 import hparams_config
-from keras import efficientdet_arch_keras
+from keras import efficientdet_keras
 
 SEED = 111111
 
 
-class KerasTest(tf.test.TestCase):
+class EfficientDetKerasTest(tf.test.TestCase):
 
   def test_backbone(self):
     inputs_shape = [1, 512, 512, 3]
@@ -32,7 +34,7 @@ class KerasTest(tf.test.TestCase):
     with tf.Session(graph=tf.Graph()) as sess:
       feats = tf.ones(inputs_shape)
       tf.random.set_random_seed(SEED)
-      feats = efficientdet_arch_keras.build_backbone(feats, config)
+      feats = efficientdet_keras.build_backbone(feats, config)
       sess.run(tf.global_variables_initializer())
       keras_feats = sess.run(feats)
     with tf.Session(graph=tf.Graph()) as sess:
@@ -41,22 +43,22 @@ class KerasTest(tf.test.TestCase):
       feats = legacy_arch.build_backbone(feats, config)
       sess.run(tf.global_variables_initializer())
       legacy_feats = sess.run(feats)
-    for i in range(len(keras_feats)):
+    for i, feat in enumerate(keras_feats):
       level = i + config.min_level
-      self.assertAllClose(keras_feats[i], legacy_feats[level])
+      self.assertAllClose(feat, legacy_feats[level])
 
   def test_model_output(self):
     inputs_shape = [1, 512, 512, 3]
     config = hparams_config.get_efficientdet_config('efficientdet-d0')
+    tmp_ckpt = os.path.join(tempfile.mkdtemp(), 'ckpt')
     with tf.Session(graph=tf.Graph()) as sess:
       feats = tf.ones(inputs_shape)
       tf.random.set_random_seed(SEED)
-      # feats = efficientdet_arch_keras.build_backbone(feats, config)
-      # feats = efficientdet_arch_keras.build_feature_network(feats, config)
-      # v = efficientdet_arch_keras.build_class_and_box_outputs(feats, config)
-      v = efficientdet_arch_keras.EfficientDetModel(config=config)(feats)
+      model = efficientdet_keras.EfficientDetNet(config=config)
+      outputs = model(feats)
       sess.run(tf.global_variables_initializer())
-      keras_class_out, keras_box_out = sess.run(v)
+      keras_class_out, keras_box_out = sess.run(outputs)
+      model.save_weights(tmp_ckpt)
     with tf.Session(graph=tf.Graph()) as sess:
       feats = tf.ones(inputs_shape)
       tf.random.set_random_seed(SEED)
@@ -70,13 +72,14 @@ class KerasTest(tf.test.TestCase):
           keras_box_out[i - 3], legacy_box_out[i], rtol=1e-4, atol=1e-4)
 
     feats = tf.ones(inputs_shape)
-    tf.random.set_random_seed(SEED)
-    model = efficientdet_arch_keras.EfficientDetModel(config=config)
-    eager_class_out, eager_box_out = model(feats)  # pylint: disable=unused-variable
-    # # TODO(tanmingxing): fix the failing case.
-    # for i in range(3, 8):
-    #   self.assertAllClose(eager_class_out[i - 3], legacy_class_out[i])
-    #   self.assertAllClose(eager_box_out[i - 3], legacy_box_out[i])
+    model = efficientdet_keras.EfficientDetNet(config=config)
+    model.load_weights(tmp_ckpt)
+    eager_class_out, eager_box_out = model(feats)
+    for i in range(3, 8):
+      self.assertAllClose(
+        eager_class_out[i - 3], legacy_class_out[i], rtol=1e-4, atol=1e-4)
+      self.assertAllClose(
+        eager_box_out[i - 3], legacy_box_out[i], rtol=1e-4, atol=1e-4)
 
   def test_build_feature_network(self):
     config = hparams_config.get_efficientdet_config('efficientdet-d0')
@@ -87,7 +90,7 @@ class KerasTest(tf.test.TestCase):
           tf.ones([1, 16, 16, 320]),  # level 5
       ]
       tf.random.set_random_seed(SEED)
-      new_feats1 = efficientdet_arch_keras.build_feature_network(inputs, config)
+      new_feats1 = efficientdet_keras.build_feature_network(inputs, config)
       sess.run(tf.global_variables_initializer())
       keras_feats = sess.run(new_feats1)
     with tf.Session(graph=tf.Graph()) as sess:
@@ -109,13 +112,13 @@ class KerasTest(tf.test.TestCase):
 
   def test_model_variables(self):
     input_shape = (1, 512, 512, 3)
-    model = efficientdet_arch_keras.EfficientDetModel('efficientdet-d0')
+    model = efficientdet_keras.EfficientDetNet('efficientdet-d0')
     model.build(input_shape)
     eager_train_vars = sorted([var.name for var in model.trainable_variables])
     eager_model_vars = sorted([var.name for var in model.variables])
     with tf.Graph().as_default():
       feats = tf.ones([1, 512, 512, 3])
-      model = efficientdet_arch_keras.EfficientDetModel('efficientdet-d0')
+      model = efficientdet_keras.EfficientDetNet('efficientdet-d0')
       model.build(input_shape)
       keras_train_vars = sorted([var.name for var in model.trainable_variables])
       keras_model_vars = sorted([var.name for var in model.variables])
@@ -149,7 +152,7 @@ class KerasTest(tf.test.TestCase):
                 is_training=is_training,
                 strategy=strategy)
             tf.random.set_random_seed(SEED)
-            resample_layer = efficientdet_arch_keras.ResampleFeatureMap(
+            resample_layer = efficientdet_keras.ResampleFeatureMap(
                 name='resample_p0',
                 target_height=8,
                 target_width=8,
@@ -163,7 +166,7 @@ class KerasTest(tf.test.TestCase):
   def test_var_names(self):
     with tf.Graph().as_default():
       feat = tf.random.uniform([1, 16, 16, 320])
-      resample_layer = efficientdet_arch_keras.ResampleFeatureMap(
+      resample_layer = efficientdet_keras.ResampleFeatureMap(
           name='resample_p0',
           target_height=8,
           target_width=8,
@@ -196,7 +199,7 @@ class EfficientDetVariablesNamesTest(tf.test.TestCase):
         legacy_inputs[i] = keras_inputs[-1]
 
       if keras:
-        efficientdet_arch_keras.build_class_and_box_outputs(
+        efficientdet_keras.build_class_and_box_outputs(
             keras_inputs, config)
       else:
         legacy_arch.build_class_and_box_outputs(legacy_inputs, config)
@@ -219,7 +222,7 @@ class EfficientDetVariablesNamesTest(tf.test.TestCase):
         keras_inputs.append(
             tf.ones(shape=inputs_shape, name='input', dtype=tf.float32))
 
-      output1 = efficientdet_arch_keras.build_class_and_box_outputs(
+      output1 = efficientdet_keras.build_class_and_box_outputs(
           keras_inputs, config)
       sess.run(tf.global_variables_initializer())
       keras_class, keras_box = sess.run(output1)

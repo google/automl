@@ -34,7 +34,6 @@ class PostprocessTest(tf.test.TestCase):
         'image_size': 8,
         'num_classes': 2,
         'data_format': 'channels_last',
-        'batch_size': 2,
         'max_detection_points': 10,
         'nms_configs': {
             'max_output_size': 2,
@@ -54,6 +53,7 @@ class PostprocessTest(tf.test.TestCase):
 
     self.params['disable_pyfun'] = True
     score_thresh = 0.5
+    self.params['batch_size'] = len(scales)
     max_output_size = self.params['nms_configs']['max_output_size']
     legacy_detections = inference.det_post_process(self.params, cls_outputs,
                                                    box_outputs, scales,
@@ -81,10 +81,10 @@ class PostprocessTest(tf.test.TestCase):
     self.params['disable_pyfun'] = False
     score_thresh = 0.5
     max_output_size = self.params['nms_configs']['max_output_size']
+    self.params['batch_size'] = len(scales)
     legacy_outputs = inference.det_post_process(self.params, cls_outputs,
                                                 box_outputs, scales,
                                                 score_thresh, max_output_size)
-    print(outputs, legacy_outputs)
     self.assertAllClose(outputs, legacy_outputs)
 
 
