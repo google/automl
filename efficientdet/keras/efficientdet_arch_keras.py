@@ -25,7 +25,7 @@ import utils
 from backbone import backbone_factory
 from backbone import efficientnet_builder
 from keras import utils_keras
-# pylint: disable=arguments=differ  # fo keras layers.
+# pylint: disable=arguments-differ  # fo keras layers.
 
 
 class FNode(tf.keras.layers.Layer):
@@ -734,8 +734,8 @@ def build_backbone(features, config):
    config: config for backbone, such as is_training and backbone name.
 
   Returns:
-    A dict from levels to the feature maps from the output of the backbone model
-    with strides of 8, 16 and 32.
+    An arrray of features (starting from min_level) from the output of the
+    backbone model with strides of 8, 16 and 32.
 
   Raises:
     ValueError: if backbone_name is not supported.
@@ -812,7 +812,7 @@ class EfficientDetModel(tf.keras.Model):
     # Feature network.
     feat_sizes = utils.get_feat_sizes(config.image_size, config.max_level)
     self.resample_layers = {}  # additional resampling layers.
-    for level in range(config.min_level, config.max_level + 1):
+    for level in range(6, config.max_level + 1):
       # Adds a coarser level by downsampling the last feature map.
       self.resample_layers[level] = ResampleFeatureMap(
           target_height=feat_sizes[level]['height'],
@@ -826,7 +826,6 @@ class EfficientDetModel(tf.keras.Model):
           name='resample_p{}'.format(level),
       )
     self.fpn_cells = FPNCells(feat_sizes, config)
-
 
     # class/box output prediction network.
     num_anchors = len(config.aspect_ratios) * config.num_scales
@@ -858,7 +857,7 @@ class EfficientDetModel(tf.keras.Model):
 
   def _init_set_name(self, name, zero_based=True):
     """A hack to allow empty model name for legacy checkpoint compitability."""
-    if name == '':
+    if name == '':  # pylint: disable=g-explicit-bool-comparison
       self._name = name
     else:
       self._name = super(EfficientDetModel, self).__init__(name, zero_based)

@@ -227,8 +227,8 @@ class TpuBatchNormalization(tf.keras.layers.BatchNormalization):
     else:
       return (shard_mean, shard_variance)
 
-  def call(self, *args, **kwargs):
-    outputs = super(TpuBatchNormalization, self).call(*args, **kwargs)
+  def call(self, inputs, training=None):
+    outputs = super(TpuBatchNormalization, self).call(inputs, training)
     # A temporary hack for tf1 compatibility with keras batch norm.
     for u in self.updates:
       tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, u)
@@ -264,8 +264,8 @@ class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
     else:
       return (shard_mean, shard_variance)
 
-  def call(self, *args, **kwargs):
-    outputs = super(SyncBatchNormalization, self).call(*args, **kwargs)
+  def call(self, inputs, training=None):
+    outputs = super(SyncBatchNormalization, self).call(inputs, training)
     # A temporary hack for tf1 compatibility with keras batch norm.
     for u in self.updates:
       tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, u)
@@ -280,8 +280,8 @@ class BatchNormalization(tf.keras.layers.BatchNormalization):
       kwargs['name'] = 'tpu_batch_normalization'
     super(BatchNormalization, self).__init__(**kwargs)
 
-  def call(self, *args, **kwargs):
-    outputs = super(BatchNormalization, self).call(*args, **kwargs)
+  def call(self, inputs, training=None):
+    outputs = super(BatchNormalization, self).call(inputs, training)
     # A temporary hack for tf1 compatibility with keras batch norm.
     for u in self.updates:
       tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, u)
