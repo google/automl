@@ -27,7 +27,7 @@ class PostprocessTest(tf.test.TestCase):
   def setUp(self):
     self.params = {
         'min_level': 1,
-        'max_level': 1,
+        'max_level': 2,
         'aspect_ratios': [(1.0, 1.0)],
         'num_scales': 1,
         'anchor_scale': 1,
@@ -43,10 +43,16 @@ class PostprocessTest(tf.test.TestCase):
   def test_postprocess_global(self):
     """Test the postprocess with global nms."""
     tf.random.set_seed(1111)
-    cls_outputs = {1: tf.random.normal([2, 4, 4, 2])}
-    box_outputs = {1: tf.random.normal([2, 4, 4, 4])}
-    cls_outputs_list = [cls_outputs[1]]
-    box_outputs_list = [box_outputs[1]]
+    cls_outputs = {
+        1: tf.random.normal([2, 4, 4, 2]),
+        2: tf.random.normal([2, 2, 2, 2])
+    }
+    box_outputs = {
+        1: tf.random.normal([2, 4, 4, 4]),
+        2: tf.random.normal([2, 2, 2, 4])
+    }
+    cls_outputs_list = [cls_outputs[1], cls_outputs[2]]
+    box_outputs_list = [box_outputs[1], box_outputs[2]]
     scales = [1.0, 2.0]
 
     self.params['max_detection_points'] = 10
@@ -72,10 +78,16 @@ class PostprocessTest(tf.test.TestCase):
   def test_postprocess_per_class(self):
     """Test postprocess with per class nms."""
     tf.random.set_seed(1111)
-    cls_outputs = {1: tf.random.normal([2, 4, 4, 2])}
-    box_outputs = {1: tf.random.normal([2, 4, 4, 4])}
-    cls_outputs_list =  [cls_outputs[1]]
-    box_outputs_list =  [box_outputs[1]]
+    cls_outputs = {
+        1: tf.random.normal([2, 4, 4, 2]),
+        2: tf.random.normal([2, 2, 2, 2])
+    }
+    box_outputs = {
+        1: tf.random.normal([2, 4, 4, 4]),
+        2: tf.random.normal([2, 2, 2, 4])
+    }
+    cls_outputs_list = [cls_outputs[1], cls_outputs[2]]
+    box_outputs_list = [box_outputs[1], box_outputs[2]]
     scales = [1.0, 2.0]
     ids = [0, 1]
 

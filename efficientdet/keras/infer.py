@@ -29,16 +29,16 @@ from keras import efficientdet_keras
 # !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz -O tmp/efficientdet-d0.tar.gz
 # !tar zxf tmp/efficientdet-d0.tar.gz -C tmp
 imgs = [np.array(Image.open('tmp/img.png'))]
-nms_score_thresh, nms_max_output_size = 0.35, 200
+nms_score_thresh, nms_max_output_size = 0.4, 100
 
 # Create model.
 config = hparams_config.get_efficientdet_config('efficientdet-d0')
 config.is_training_bn = False
-config.image_size = 1280
+config.image_size = '1920x1280'
 config.nms_configs.score_thresh = nms_score_thresh
 config.nms_configs.max_output_size = nms_max_output_size
 model = efficientdet_keras.EfficientDetModel(config=config)
-model.build((1, 1280, 1280, 3))
+model.build((1, 1280, 1920, 3))
 model.load_weights('tmp/efficientdet-d0/model')
 boxes, scores, classes, valid_len = model(imgs)
 model.summary()

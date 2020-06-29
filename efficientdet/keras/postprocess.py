@@ -47,7 +47,7 @@ def merge_class_box_level_outputs(params, cls_outputs, box_outputs) -> List[T]:
   """Concatenates class and box of all levels into one tensor."""
   cls_outputs_all, box_outputs_all = [], []
   batch_size = cls_outputs[0].shape[0]
-  for level in range(0, params['max_level'] - params['max_level'] + 1):
+  for level in range(0, params['max_level'] - params['min_level'] + 1):
     if params['data_format'] == 'channels_first':
       cls_outputs[level] = tf.transpose(cls_outputs[level], [0, 2, 3, 1])
       box_outputs[level] = tf.transpose(box_outputs[level], [0, 2, 3, 1])
@@ -142,7 +142,7 @@ def nms(params, boxes: T, scores: T, classes: T, padded: bool) -> List[T]:
     denoting the valid length of boxes/scores/classes outputs.
   """
   logging.info('performing per-sample nms')
-  nms_configs = params['nms_configs'] or {}
+  nms_configs = params['nms_configs'] or dict()
   method = nms_configs.get('method', None)
   max_output_size = nms_configs.get('max_output_size', MAX_BOXES_PER_IMAGE)
 
