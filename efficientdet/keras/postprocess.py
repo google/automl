@@ -62,14 +62,14 @@ def topk_class_boxes(params, cls_outputs: T, box_outputs: T) -> List[T]:
   batch_size = cls_outputs.shape[0]
   num_classes = params['num_classes']
 
-  max_detection_points = params.get('max_detection_points', 5000)
-  if max_detection_points > 0:
-    # Prune anchors and detections to only keep max_detection_points.
+  max_nms_inputs = params['nms_configs'].get('max_nms_inputs', 0)
+  if max_nms_inputs > 0:
+    # Prune anchors and detections to only keep max_nms_inputs.
     # Due to some issues, top_k is currently slow in graph model.
-    logging.info('use max_detection_points for pre-nms topk.')
+    logging.info('use max_nms_inputs for pre-nms topk.')
     cls_outputs_reshape = tf.reshape(cls_outputs, [batch_size, -1])
     _, cls_topk_indices = tf.math.top_k(cls_outputs_reshape,
-                                        k=max_detection_points,
+                                        k=max_nms_inputs,
                                         sorted=False)
     indices = cls_topk_indices // num_classes
     classes = cls_topk_indices % num_classes
@@ -210,7 +210,7 @@ def postprocess_global(params, cls_outputs, box_outputs, img_scales=None):
   nms_scores_bs = tf.stack(nms_scores_bs)
   nms_classes_bs = tf.stack(nms_classes_bs)
   nms_valid_len_bs = tf.stack(nms_valid_len_bs)
-  if img_scales:
+  if img_scales is not None:
     scales = tf.expand_dims(tf.expand_dims(img_scales, -1), -1)
     nms_boxes_bs = nms_boxes_bs * scales
   return nms_boxes_bs, nms_scores_bs, nms_classes_bs, nms_valid_len_bs

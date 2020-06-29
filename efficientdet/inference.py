@@ -365,7 +365,7 @@ def visualize_image(image,
                     boxes,
                     classes,
                     scores,
-                    id_mapping,
+                    id_mapping=None,
                     min_score_thresh=anchors.MIN_SCORE_THRESH,
                     max_boxes_to_draw=anchors.MAX_DETECTIONS_PER_IMAGE,
                     line_thickness=2,
@@ -387,6 +387,7 @@ def visualize_image(image,
   Returns:
     output_image: an output image with annotated boxes and classes.
   """
+  id_mapping = parse_label_id_mapping(id_mapping)
   category_index = {k: {'id': k, 'name': id_mapping[k]} for k in id_mapping}
   img = np.array(image)
   vis_utils.visualize_boxes_and_labels_on_image_array(

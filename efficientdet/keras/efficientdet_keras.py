@@ -281,8 +281,8 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
 
     height_scale = self.target_height // self.height
     width_scale = self.target_width // self.width
-    self.upsample2d = tf.keras.layers.UpSampling2D(
-        (height_scale, width_scale), data_format=self.data_format)
+    self.upsample2d = tf.keras.layers.UpSampling2D((height_scale, width_scale),
+                                                   data_format=self.data_format)
     super(ResampleFeatureMap, self).build(input_shape)
 
   def _maybe_apply_1x1(self, feat):
@@ -811,17 +811,18 @@ class EfficientDetNet(tf.keras.Model):
     self.resample_layers = []  # additional resampling layers.
     for level in range(6, config.max_level + 1):
       # Adds a coarser level by downsampling the last feature map.
-      self.resample_layers.append(ResampleFeatureMap(
-          target_height=feat_sizes[level]['height'],
-          target_width=feat_sizes[level]['width'],
-          target_num_channels=config.fpn_num_filters,
-          apply_bn=config.apply_bn_for_resampling,
-          is_training=config.is_training_bn,
-          conv_after_downsample=config.conv_after_downsample,
-          strategy=config.strategy,
-          data_format=config.data_format,
-          name='resample_p%d' % level,
-      ))
+      self.resample_layers.append(
+          ResampleFeatureMap(
+              target_height=feat_sizes[level]['height'],
+              target_width=feat_sizes[level]['width'],
+              target_num_channels=config.fpn_num_filters,
+              apply_bn=config.apply_bn_for_resampling,
+              is_training=config.is_training_bn,
+              conv_after_downsample=config.conv_after_downsample,
+              strategy=config.strategy,
+              data_format=config.data_format,
+              name='resample_p%d' % level,
+          ))
     self.fpn_cells = FPNCells(feat_sizes, config)
 
     # class/box output prediction network.
@@ -895,6 +896,7 @@ class EfficientDetModel(EfficientDetNet):
     if not mode:
       return raw_images, None
 
+    image_size = utils.parse_image_size(image_size)
     if mode != 'infer':
       # We only support inference for now.
       raise ValueError('preprocessing must be infer or empty')
@@ -903,7 +905,7 @@ class EfficientDetModel(EfficientDetNet):
     if isinstance(raw_images, tf.Tensor):
       batch_size = raw_images.shape[0]
     else:
-      batch_size = len(raw_image)
+      batch_size = len(raw_images)
     for i in range(batch_size):
       input_processor = dataloader.DetectionInputProcessor(
           raw_images[i], image_size)
@@ -917,11 +919,11 @@ class EfficientDetModel(EfficientDetNet):
     if not mode:
       return cls_outputs, box_outputs
     if mode == 'global':
-      return postprocess.postprocess_global(
-        self.config.as_dict(), cls_outputs, box_outputs, scales)
+      return postprocess.postprocess_global(self.config.as_dict(), cls_outputs,
+                                            box_outputs, scales)
     if mode == 'per_class':
-      return postprocess.postprocess_per_class(
-        self.config.as_dict(), cls_outputs, box_outputs, scales)
+      return postprocess.postprocess_per_class(self.config.as_dict(),
+                                               cls_outputs, box_outputs, scales)
     raise ValueError('Unsupported postprocess mode {}'.format(mode))
 
   def call(self, inputs, preprocess_mode='infer', postprocess_type='global'):
