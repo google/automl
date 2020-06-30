@@ -36,7 +36,7 @@ import dataloader
 import det_model_fn
 import hparams_config
 import utils
-from keras import efficientdet_arch_keras
+from keras import efficientdet_keras
 from visualize import vis_utils
 from tensorflow.python.client import timeline  # pylint: disable=g-direct-tensorflow-import
 
@@ -171,7 +171,7 @@ def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
       """Construct a model arch for keras models."""
       config = hparams_config.get_efficientdet_config(model_name)
       config.override(kwargs)
-      model = efficientdet_arch_keras.EfficientDetModel(config=config)
+      model = efficientdet_keras.EfficientDetNet(config=config)
       cls_out_list, box_out_list = model(feats)
       # convert the list of model outputs to a dictionary with key=level.
       assert len(cls_out_list) == config.max_level - config.min_level + 1
@@ -313,7 +313,8 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
     detections_batch: a batch of detection results. Each detection is a tensor
       with each row as [image_id, ymin, xmin, ymax, xmax, score, class].
   """
-  if not params['batch_size']:
+  batch_size = cls_outputs[params['min_level']].get_shape()[0]
+  if not batch_size:
     # Use combined version for dynamic batch size.
     return det_post_process_combined(params, cls_outputs, box_outputs, scales,
                                      min_score_thresh, max_boxes_to_draw)
@@ -364,7 +365,7 @@ def visualize_image(image,
                     boxes,
                     classes,
                     scores,
-                    id_mapping,
+                    id_mapping=None,
                     min_score_thresh=anchors.MIN_SCORE_THRESH,
                     max_boxes_to_draw=anchors.MAX_DETECTIONS_PER_IMAGE,
                     line_thickness=2,
@@ -386,6 +387,7 @@ def visualize_image(image,
   Returns:
     output_image: an output image with annotated boxes and classes.
   """
+  id_mapping = parse_label_id_mapping(id_mapping)
   category_index = {k: {'id': k, 'name': id_mapping[k]} for k in id_mapping}
   img = np.array(image)
   vis_utils.visualize_boxes_and_labels_on_image_array(
