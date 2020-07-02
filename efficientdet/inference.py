@@ -23,6 +23,7 @@ import copy
 import functools
 import os
 import time
+import ntpath
 from typing import Text, Dict, Any, List, Tuple, Union
 
 from absl import logging
@@ -137,8 +138,9 @@ def build_inputs(image_path_pattern: Text, image_size: Union[int, Tuple[int,
   Raises:
     ValueError if image_path_pattern doesn't match any file.
   """
-  raw_images, images, scales = [], [], []
+  raw_images, images, scales, files = [], [], [], []
   for f in tf.io.gfile.glob(image_path_pattern):
+    files.append(f)
     image = Image.open(f)
     raw_images.append(image)
     image, scale = image_preprocess(image, image_size)
@@ -147,7 +149,7 @@ def build_inputs(image_path_pattern: Text, image_size: Union[int, Tuple[int,
   if not images:
     raise ValueError(
         'Cannot find any images for pattern {}'.format(image_path_pattern))
-  return raw_images, tf.stack(images), tf.stack(scales)
+  return raw_images, tf.stack(images), tf.stack(scales), files
 
 
 def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
@@ -171,7 +173,7 @@ def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
       """Construct a model arch for keras models."""
       config = hparams_config.get_efficientdet_config(model_name)
       config.override(kwargs)
-      model = efficientdet_keras.EfficientDetNet(config=config)
+      model = efficientdet_arch_keras.EfficientDetModel(config=config)
       cls_out_list, box_out_list = model(feats)
       # convert the list of model outputs to a dictionary with key=level.
       assert len(cls_out_list) == config.max_level - config.min_level + 1
@@ -313,8 +315,7 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
     detections_batch: a batch of detection results. Each detection is a tensor
       with each row as [image_id, ymin, xmin, ymax, xmax, score, class].
   """
-  batch_size = cls_outputs[params['min_level']].get_shape()[0]
-  if not batch_size:
+  if not params['batch_size']:
     # Use combined version for dynamic batch size.
     return det_post_process_combined(params, cls_outputs, box_outputs, scales,
                                      min_score_thresh, max_boxes_to_draw)
@@ -365,7 +366,7 @@ def visualize_image(image,
                     boxes,
                     classes,
                     scores,
-                    id_mapping=None,
+                    id_mapping,
                     min_score_thresh=anchors.MIN_SCORE_THRESH,
                     max_boxes_to_draw=anchors.MAX_DETECTIONS_PER_IMAGE,
                     line_thickness=2,
@@ -387,7 +388,6 @@ def visualize_image(image,
   Returns:
     output_image: an output image with annotated boxes and classes.
   """
-  id_mapping = parse_label_id_mapping(id_mapping)
   category_index = {k: {'id': k, 'name': id_mapping[k]} for k in id_mapping}
   img = np.array(image)
   vis_utils.visualize_boxes_and_labels_on_image_array(
@@ -829,7 +829,7 @@ class InferenceDriver(object):
     params = copy.deepcopy(self.params)
     with tf.Session() as sess:
       # Buid inputs and preprocessing.
-      raw_images, images, scales = build_inputs(image_path_pattern,
+      raw_images, images, scales, file_urls = build_inputs(image_path_pattern,
                                                 params['image_size'])
       if params['data_format'] == 'channels_first':
         images = tf.transpose(images, [0, 3, 1, 2])
@@ -868,4 +868,4 @@ class InferenceDriver(object):
         Image.fromarray(img).save(output_image_path)
         logging.info('writing file to %s', output_image_path)
 
-      return predictions
+      return predictions, file_urls, self.label_id_mapping, raw_images

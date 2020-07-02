@@ -21,6 +21,8 @@ from __future__ import print_function
 
 import os
 import time
+import json
+import ntpath
 from typing import Text, Tuple, List
 
 from absl import app
@@ -76,6 +78,7 @@ flags.DEFINE_string('tflite_path', None, 'Path for exporting tflite file.')
 
 FLAGS = flags.FLAGS
 
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'foo.json'
 
 class ModelInspector(object):
   """A simple helper class for inspecting a model."""
@@ -250,7 +253,34 @@ class ModelInspector(object):
   def inference_single_image(self, image_image_path, output_dir, **kwargs):
     driver = inference.InferenceDriver(self.model_name, self.ckpt_path,
                                        self.model_config.as_dict())
-    driver.inference(image_image_path, output_dir, **kwargs)
+    predictions, file_urls, label_id_mapping, raw_images = driver.inference(image_image_path, output_dir, **kwargs)
+    resutl = []
+    for i, image_prediction in enumerate(predictions):
+      image_data = []
+      width, height  = raw_images[i].size
+      for j, class_prediction in enumerate(image_prediction):
+        confidence = round(class_prediction[5] * 100)
+        if confidence > 0:
+          xmin = class_prediction[2]
+          xmax = class_prediction[4]
+          ymin = class_prediction[1]
+          ymax = class_prediction[3]
+          detectedWidth = float((xmax-xmin)/width)
+          detectedHeight = float((ymax-ymin)/height)
+          data = {
+            "detectedCenterX" : float(xmin/width) + float(detectedWidth/2),
+            "detectedCenterY" : float(ymin/height) + float(detectedHeight/2),
+            "detectedWidth" : detectedWidth,
+            "detectedHeight" : detectedHeight,
+            "confidence" : round(class_prediction[5] * 100),
+            "label": label_id_mapping[class_prediction[6]],
+            "height": height,
+            "width": width,
+            "filename": ntpath.basename(file_urls[i])
+          }
+          image_data.append(data)
+        resutl.append(image_data)
+    open('result.txt', 'w').write(str(resutl))
 
   def build_and_save_model(self):
     """build and save the model into self.logdir."""
