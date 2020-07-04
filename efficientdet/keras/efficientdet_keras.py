@@ -48,7 +48,7 @@ class FNode(tf.keras.layers.Layer):
                weight_method,
                data_format,
                name='fnode'):
-    super(FNode, self).__init__(name=name)
+    super().__init__(name=name)
     self.new_node_height = new_node_height
     self.new_node_width = new_node_width
     self.inputs_offsets = inputs_offsets
@@ -126,7 +126,9 @@ class FNode(tf.keras.layers.Layer):
     for i, _ in enumerate(self.inputs_offsets):
       name = 'WSM' + ('' if i == 0 else '_' + str(i))
       self.vars.append(
-          self.add_weight(initializer=initializer, name=name, trainable=True))
+          self.add_weight(initializer=initializer,
+                          name=name,
+                          trainable=self.is_training))
 
   def build(self, feats_shape):
     for i, input_offset in enumerate(self.inputs_offsets):
@@ -186,7 +188,7 @@ class OpAfterCombine(tf.keras.layers.Layer):
                data_format,
                strategy,
                name='op_after_combine'):
-    super(OpAfterCombine, self).__init__(name=name)
+    super().__init__(name=name)
     self.conv_bn_act_pattern = conv_bn_act_pattern
     self.separable_conv = separable_conv
     self.fpn_num_filters = fpn_num_filters
@@ -235,7 +237,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
                strategy=None,
                data_format=None,
                name='resample_p0'):
-    super(ResampleFeatureMap, self).__init__(name=name)
+    super().__init__(name=name)
     self.apply_bn = apply_bn
     self.is_training = is_training
     self.data_format = data_format
@@ -283,7 +285,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     width_scale = self.target_width // self.width
     self.upsample2d = tf.keras.layers.UpSampling2D((height_scale, width_scale),
                                                    data_format=self.data_format)
-    super(ResampleFeatureMap, self).build(input_shape)
+    super().build(input_shape)
 
   def _maybe_apply_1x1(self, feat):
     """Apply 1x1 conv to change layer width if necessary."""
@@ -351,7 +353,7 @@ class ClassNet(tf.keras.layers.Layer):
       **kwargs: other parameters.
     """
 
-    super(ClassNet, self).__init__(name=name, **kwargs)
+    super().__init__(name=name, **kwargs)
     self.num_classes = num_classes
     self.num_anchors = num_anchors
     self.num_filters = num_filters
@@ -463,7 +465,7 @@ class BoxNet(tf.keras.layers.Layer):
       **kwargs: other parameters.
     """
 
-    super(BoxNet, self).__init__(name=name, **kwargs)
+    super().__init__(name=name, **kwargs)
 
     self.num_anchors = num_anchors
     self.num_filters = num_filters
@@ -566,7 +568,7 @@ class FPNCells(tf.keras.layers.Layer):
   """FPN cells."""
 
   def __init__(self, feat_sizes, config, name='fpn_cells'):
-    super(FPNCells, self).__init__(name=name)
+    super().__init__(name=name)
     self.feat_sizes = feat_sizes
     self.config = config
 
@@ -606,7 +608,7 @@ class FPNCell(tf.keras.layers.Layer):
   """A single FPN cell."""
 
   def __init__(self, feat_sizes, config, name='fpn_cell'):
-    super(FPNCell, self).__init__(name=name)
+    super().__init__(name=name)
     self.feat_sizes = feat_sizes
     self.config = config
     if config.fpn_config:
@@ -781,7 +783,7 @@ class EfficientDetNet(tf.keras.Model):
 
   def __init__(self, model_name=None, config=None, name=''):
     """Initialize model."""
-    super(EfficientDetNet, self).__init__(name=name)
+    super().__init__(name=name)
 
     config = config or hparams_config.get_efficientdet_config(model_name)
     self.config = config
@@ -858,7 +860,7 @@ class EfficientDetNet(tf.keras.Model):
     if name == '':  # pylint: disable=g-explicit-bool-comparison
       self._name = name
     else:
-      self._name = super(EfficientDetNet, self).__init__(name, zero_based)
+      self._name = super().__init__(name, zero_based)
 
   def call(self, inputs):
     config = self.config
@@ -932,6 +934,6 @@ class EfficientDetModel(EfficientDetNet):
     inputs, scales = self._preprocessing(inputs, config.image_size,
                                          preprocess_mode)
     # network.
-    cls_outputs, box_outputs = super(EfficientDetModel, self).call(inputs)
+    cls_outputs, box_outputs = super().call(inputs)
     # postprocess.
     return self._postprocess(cls_outputs, box_outputs, scales, postprocess_type)

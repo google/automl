@@ -66,20 +66,28 @@ class EfficientDetKerasTest(tf.test.TestCase):
       sess.run(tf.global_variables_initializer())
       legacy_class_out, legacy_box_out = sess.run(feats)
     for i in range(3, 8):
-      self.assertAllClose(
-          keras_class_out[i - 3], legacy_class_out[i], rtol=1e-4, atol=1e-4)
-      self.assertAllClose(
-          keras_box_out[i - 3], legacy_box_out[i], rtol=1e-4, atol=1e-4)
+      self.assertAllClose(keras_class_out[i - 3],
+                          legacy_class_out[i],
+                          rtol=1e-4,
+                          atol=1e-4)
+      self.assertAllClose(keras_box_out[i - 3],
+                          legacy_box_out[i],
+                          rtol=1e-4,
+                          atol=1e-4)
 
     feats = tf.ones(inputs_shape)
     model = efficientdet_keras.EfficientDetNet(config=config)
     model.load_weights(tmp_ckpt)
     eager_class_out, eager_box_out = model(feats)
     for i in range(3, 8):
-      self.assertAllClose(
-        eager_class_out[i - 3], legacy_class_out[i], rtol=1e-4, atol=1e-4)
-      self.assertAllClose(
-        eager_box_out[i - 3], legacy_box_out[i], rtol=1e-4, atol=1e-4)
+      self.assertAllClose(eager_class_out[i - 3],
+                          legacy_class_out[i],
+                          rtol=1e-4,
+                          atol=1e-4)
+      self.assertAllClose(eager_box_out[i - 3],
+                          legacy_box_out[i],
+                          rtol=1e-4,
+                          atol=1e-4)
 
   def test_build_feature_network(self):
     config = hparams_config.get_efficientdet_config('efficientdet-d0')
@@ -199,8 +207,7 @@ class EfficientDetVariablesNamesTest(tf.test.TestCase):
         legacy_inputs[i] = keras_inputs[-1]
 
       if keras:
-        efficientdet_keras.build_class_and_box_outputs(
-            keras_inputs, config)
+        efficientdet_keras.build_class_and_box_outputs(keras_inputs, config)
       else:
         legacy_arch.build_class_and_box_outputs(legacy_inputs, config)
       return [n.name for n in tf.global_variables()]

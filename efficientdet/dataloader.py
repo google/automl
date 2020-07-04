@@ -14,7 +14,7 @@
 # ==============================================================================
 """Data loader and processing."""
 from absl import logging
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 
 import anchors
 import utils
@@ -83,7 +83,7 @@ class InputProcessor(object):
                  self._output_size)
 
     # Select a random scale factor.
-    random_scale_factor = tf.random_uniform([], scale_min, scale_max)
+    random_scale_factor = tf.random.uniform([], scale_min, scale_max)
     scaled_y = tf.cast(random_scale_factor * target_size[0], tf.int32)
     scaled_x = tf.cast(random_scale_factor * target_size[1], tf.int32)
 
@@ -100,8 +100,8 @@ class InputProcessor(object):
     scaled_width = tf.cast(width * image_scale, tf.int32)
     offset_y = tf.cast(scaled_height - self._output_size[0], tf.float32)
     offset_x = tf.cast(scaled_width - self._output_size[1], tf.float32)
-    offset_y = tf.maximum(0.0, offset_y) * tf.random_uniform([], 0, 1)
-    offset_x = tf.maximum(0.0, offset_x) * tf.random_uniform([], 0, 1)
+    offset_y = tf.maximum(0.0, offset_y) * tf.random.uniform([], 0, 1)
+    offset_x = tf.maximum(0.0, offset_x) * tf.random.uniform([], 0, 1)
     offset_y = tf.cast(offset_y, tf.int32)
     offset_x = tf.cast(offset_x, tf.int32)
     self._image_scale = image_scale
@@ -126,7 +126,7 @@ class InputProcessor(object):
 
   def resize_and_crop_image(self, method=tf.image.ResizeMethod.BILINEAR):
     """Resize input image and crop it to the self._output dimension."""
-    scaled_image = tf.image.resize_images(
+    scaled_image = tf.image.resize(
         self._image, [self._scaled_height, self._scaled_width], method=method)
     scaled_image = scaled_image[self._crop_offset_y:self._crop_offset_y +
                                 self._output_size[0],
@@ -333,7 +333,7 @@ class InputReader(object):
 
         source_id = tf.where(
             tf.equal(source_id, tf.constant('')), '-1', source_id)
-        source_id = tf.string_to_number(source_id)
+        source_id = tf.strings.to_number(source_id)
 
         # Pad groundtruth data for evaluation.
         image_scale = input_processor.image_scale_to_original
@@ -356,7 +356,7 @@ class InputReader(object):
 
     # Prefetch data from files.
     def _prefetch_dataset(filename):
-      dataset = tf.data.TFRecordDataset(filename).prefetch(1)
+      dataset = tf.data.TFRecordDataset(filename, 'GZIP').prefetch(1)
       return dataset
 
     dataset = dataset.apply(
@@ -382,7 +382,15 @@ class InputReader(object):
               batch_size,
           ]), [batch_size, 1])
 
+      if params['data_format'] == 'channels_first':
+        images = tf.transpose(images, [0, 3, 1, 2])
+
       for level in range(params['min_level'], params['max_level'] + 1):
+        if params['data_format'] == 'channels_first':
+          labels['cls_targets_%d' % level] = tf.transpose(
+            labels['cls_targets_%d' % level], [0, 3, 1, 2])
+          labels['box_targets_%d' % level] = tf.transpose(
+            labels['box_targets_%d' % level], [0, 3, 1, 2])
         labels['cls_targets_%d' % level] = cls_targets[level]
         labels['box_targets_%d' % level] = box_targets[level]
       # Concatenate groundtruth annotations to a tensor.
