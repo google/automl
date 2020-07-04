@@ -156,7 +156,7 @@ def main(_):
                 model_dir=FLAGS.model_dir,
                 num_examples_per_epoch=FLAGS.num_examples_per_epoch,
                 strategy=FLAGS.strategy,
-                batch_size=FLAGS.batch_size,
+                batch_size=FLAGS.batch_size // ds_strategy.num_replicas_in_sync,
                 num_shards=FLAGS.num_cores,
                 val_json_file=FLAGS.val_json_file,
                 testdev_dir=FLAGS.testdev_dir,
@@ -168,8 +168,6 @@ def main(_):
   tf.keras.mixed_precision.experimental.set_policy(policy)
 
   def get_dataset(is_training, params):
-    global_batch_size = FLAGS.batch_size
-    batch_size = global_batch_size // ds_strategy.num_replicas_in_sync
     file_pattern = FLAGS.training_file_pattern if is_training else FLAGS.validation_file_pattern
     return dataloader.InputReader(
         file_pattern,
