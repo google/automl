@@ -318,6 +318,29 @@ class EfficientDetNetTrain(EfficientDetNet):
     ])
 
   def _detection_loss(self, cls_outputs, box_outputs, labels):
+    """Computes total detection loss.
+
+    Computes total detection loss including box and class loss from all levels.
+    Args:
+      cls_outputs: an OrderDict with keys representing levels and values
+        representing logits in [batch_size, height, width, num_anchors].
+      box_outputs: an OrderDict with keys representing levels and values
+        representing box regression targets in [batch_size, height, width,
+        num_anchors * 4].
+      labels: the dictionary that returned from dataloader that includes
+        groundtruth targets.
+      params: the dictionary including training parameters specified in
+        default_haprams function in this file.
+
+    Returns:
+      total_loss: an integer tensor representing total loss reducing from
+        class and box losses from all levels.
+      cls_loss: an integer tensor representing total class loss.
+      box_loss: an integer tensor representing total box regression loss.
+      box_iou_loss: an integer tensor representing total box iou loss.
+    """
+    # Sum all positives in a batch for normalization and avoid zero
+    # num_positives_sum, which would lead to inf loss during training
     num_positives_sum = tf.reduce_sum(labels['mean_num_positives']) + 1.0
     levels = range(len(cls_outputs))
     cls_losses = []
@@ -373,9 +396,20 @@ class EfficientDetNetTrain(EfficientDetNet):
     return total_loss, cls_loss, box_loss, box_iou_loss
 
   def train_step(self, data):
-    features, labels = data
+    """Train step.
+
+    Args:
+      data: Tuple of (images, labels). Image tensor with shape [batch_size, height, width, 3].
+        The height and width are fixed and equal.Input labels in a dictionary. The labels include class targets
+        and box targets which are dense label maps. The labels are generated from
+        get_input_fn function in data/dataloader.py.
+
+    Returns:
+      A dict record loss info.
+    """
+    images, labels = data
     with tf.GradientTape() as tape:
-      cls_outputs, box_outputs = self(features, training=True)
+      cls_outputs, box_outputs = self(images, training=True)
       det_loss, cls_loss, box_loss, box_iou_loss = self._detection_loss(
           cls_outputs, box_outputs, labels)
       reg_l2loss = self._reg_l2_loss(self.config.weight_decay)
@@ -403,8 +437,19 @@ class EfficientDetNetTrain(EfficientDetNet):
     return {'loss': total_loss}
 
   def test_step(self, data):
-    features, labels = data
-    cls_outputs, box_outputs = self(features, training=False)
+    """Test step.
+
+    Args:
+      data: Tuple of (images, labels). Image tensor with shape [batch_size, height, width, 3].
+        The height and width are fixed and equal.Input labels in a dictionary. The labels include class targets
+        and box targets which are dense label maps. The labels are generated from
+        get_input_fn function in data/dataloader.py.
+
+    Returns:
+      A dict record loss info.
+    """
+    images, labels = data
+    cls_outputs, box_outputs = self(images, training=False)
     det_loss, cls_loss, box_loss, box_iou_loss = self._detection_loss(
         cls_outputs, box_outputs, labels)
     reg_l2loss = self._reg_l2_loss(self.config.weight_decay)
