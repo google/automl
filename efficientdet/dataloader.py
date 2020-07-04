@@ -356,7 +356,7 @@ class InputReader(object):
 
     # Prefetch data from files.
     def _prefetch_dataset(filename):
-      dataset = tf.data.TFRecordDataset(filename, 'GZIP').prefetch(1)
+      dataset = tf.data.TFRecordDataset(filename).prefetch(1)
       return dataset
 
     dataset = dataset.apply(
