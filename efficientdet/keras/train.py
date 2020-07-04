@@ -67,8 +67,7 @@ flags.DEFINE_string('model_dir', None, 'Location of model_dir')
 flags.DEFINE_string(
     'hparams', '', 'Comma separated k=v pairs of hyperparameters or a module'
     ' containing attributes to use as hyperparameters.')
-flags.DEFINE_integer('train_batch_size', 64, 'training batch size')
-flags.DEFINE_integer('eval_batch_size', 64, 'evaluation batch size')
+flags.DEFINE_integer('batch_size', 64, 'training batch size')
 flags.DEFINE_integer('eval_samples', 5000, 'The number of samples for '
                      'evaluation.')
 flags.DEFINE_integer('iterations_per_loop', 100,
@@ -157,8 +156,7 @@ def main(_):
                 model_dir=FLAGS.model_dir,
                 num_examples_per_epoch=FLAGS.num_examples_per_epoch,
                 strategy=FLAGS.strategy,
-                batch_size=FLAGS.train_batch_size,
-                eval_batch_size=FLAGS.eval_batch_size,
+                batch_size=FLAGS.batch_size,
                 num_shards=FLAGS.num_cores,
                 val_json_file=FLAGS.val_json_file,
                 testdev_dir=FLAGS.testdev_dir,
@@ -170,13 +168,9 @@ def main(_):
   tf.keras.mixed_precision.experimental.set_policy(policy)
 
   def get_dataset(is_training, params):
-    global_batch_size = FLAGS.train_batch_size if is_training else FLAGS.eval_batch_size
+    global_batch_size = FLAGS.batch_size
     batch_size = global_batch_size // ds_strategy.num_replicas_in_sync
     file_pattern = FLAGS.training_file_pattern if is_training else FLAGS.validation_file_pattern
-    params = copy.deepcopy(params)
-    update_params = dict(batch_size=batch_size) if is_training else dict(
-        eval_batch_size=batch_size)
-    params.update(update_params)
     return dataloader.InputReader(
         file_pattern,
         is_training=is_training,
@@ -185,25 +179,25 @@ def main(_):
 
   with ds_strategy.scope():
     model = EfficientDetNetTrain(params['model_name'], config)
+    model.build([params["batch_size"], params["image_size"], 3])
+    model.compile(optimizer=get_optimizer(params),
+              loss={
+                  "box_loss":
+                      BoxLoss(params['delta'],
+                              reduction=tf.keras.losses.Reduction.NONE),
+                  "box_iou_loss":
+                      BoxIouLoss(params['iou_loss_type'],
+                                  reduction=tf.keras.losses.Reduction.NONE),
+                  "class_loss":
+                      FocalLoss(params['alpha'],
+                                params['gamma'],
+                                label_smoothing=params['label_smoothing'],
+                                reduction=tf.keras.losses.Reduction.NONE)
+              })
   ckpt_path = tf.train.latest_checkpoint(FLAGS.model_dir)
   if ckpt_path:
     model.load_weights(ckpt_path)
   model.freeze_vars(params['var_freeze_expr'])
-  with ds_strategy.scope():
-    model.compile(optimizer=get_optimizer(params),
-                  loss={
-                      "box_loss":
-                          BoxLoss(params['delta'],
-                                  reduction=tf.keras.losses.Reduction.NONE),
-                      "box_iou_loss":
-                          BoxIouLoss(params['iou_loss_type'],
-                                     reduction=tf.keras.losses.Reduction.NONE),
-                      "class_loss":
-                          FocalLoss(params['alpha'],
-                                    params['gamma'],
-                                    label_smoothing=params['label_smoothing'],
-                                    reduction=tf.keras.losses.Reduction.NONE)
-                  })
   model.fit(get_dataset(True, params=params),
             steps_per_epoch=FLAGS.num_examples_per_epoch,
             callbacks=get_callbacks(params, FLAGS.profile),
