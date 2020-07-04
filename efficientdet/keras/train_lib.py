@@ -317,10 +317,6 @@ class EfficientDetNetTrain(EfficientDetNet):
         if var_match.match(v.name)
     ])
 
-  def _configure_callbacks(self, callbacks):
-    for callback in callbacks:
-      callback.set_model(self)
-
   def _detection_loss(self, cls_outputs, box_outputs, labels):
     num_positives_sum = tf.reduce_sum(labels['mean_num_positives']) + 1.0
     levels = range(len(cls_outputs))
@@ -376,37 +372,6 @@ class EfficientDetNetTrain(EfficientDetNet):
                   self.config.iou_loss_weight * box_iou_loss)
     return total_loss, cls_loss, box_loss, box_iou_loss
 
-  def _steps_loop(self, steps, dataset_iter, is_train, logs, callbacks):
-    total_loss = 0.0
-    for step in (1, steps + 1):
-      self.step.assign(step)
-      features, labels = next(dataset_iter)
-      [callback.on_batch_begin(step, logs) for callback in callbacks]
-      return_logs = self.train_on_batch(
-          features, labels,
-          return_dict=True) if is_train else self.test_on_batch(
-              features, labels, return_dict=True)
-      total_loss += return_logs['loss']
-      [callback.on_batch_end(step, logs) for callback in callbacks]
-      total_loss /= step
-      tf.print('\r', step, ':', total_loss, end='', sep='')
-
-  def _dataset_loop(self, dataset_iter, is_train, logs, callbacks):
-    total_loss = 0.0
-    step = 1
-    for (features, labels) in dataset_iter:
-      self.step.assign(step)
-      [callback.on_batch_begin(step, logs) for callback in callbacks]
-      return_logs = self.train_on_batch(
-          features, labels,
-          return_dict=True) if is_train else self.test_on_batch(
-              features, labels, return_dict=True)
-      total_loss += return_logs['loss']
-      [callback.on_batch_end(step, logs) for callback in callbacks]
-      total_loss /= step
-      tf.print('\r', step, ':', total_loss, end='', sep='')
-      step += 1
-
   def train_step(self, data):
     features, labels = data
     with tf.GradientTape() as tape:
@@ -445,30 +410,3 @@ class EfficientDetNetTrain(EfficientDetNet):
     reg_l2loss = self._reg_l2_loss(self.config.weight_decay)
     total_loss = det_loss + reg_l2loss
     return {'loss': total_loss}
-
-  def train(self,
-            callbacks,
-            train_dataset,
-            val_dataset,
-            train_steps=None,
-            val_steps=None):
-    self._configure_callbacks(callbacks)
-    logs = {}
-    [callback.on_train_begin(logs) for callback in callbacks]
-    for epoch in range(self.config.num_epochs):
-      train_dataset_iter = iter(train_dataset)
-      if self.stop_training:
-        break
-      [callback.on_epoch_begin(epoch, logs) for callback in callbacks]
-      if train_steps:
-        self._steps_loop(train_steps, train_dataset_iter, True, logs, callbacks)
-      else:
-        self._dataset_loop(train_dataset_iter, True, logs, callbacks)
-      if val_dataset:
-        val_dataset_iter = iter(val_dataset)
-        if val_steps:
-          self._steps_loop(val_steps, val_dataset_iter, False, logs, callbacks)
-        else:
-          self._dataset_loop(val_dataset_iter, False, logs, callbacks)
-      [callback.on_epoch_end(logs) for callback in callbacks]
-    [callback.on_train_end(logs) for callback in callbacks]

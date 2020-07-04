@@ -76,8 +76,8 @@ class TrainLibTest(tf.test.TestCase, parameterized.TestCase):
                                     label_smoothing=params['label_smoothing'],
                                     reduction=tf.keras.losses.Reduction.NONE)
                   })
-    outputs = model.train_on_batch(x, labels)
-    outputs = model.test_on_batch(x, labels)
+    outputs = model.train_on_batch(x, labels, return_dict=True)
+    outputs = model.test_on_batch(x, labels, return_dict=True)
 
 
 if __name__ == '__main__':

@@ -204,9 +204,11 @@ def main(_):
                                     label_smoothing=params['label_smoothing'],
                                     reduction=tf.keras.losses.Reduction.NONE)
                   })
-    model.train(get_callbacks(params, FLAGS.profile),
-                get_dataset(True, params=params),
-                get_dataset(False, params=params))
+  model.fit(get_dataset(True, params=params),
+            steps_per_epoch=FLAGS.num_examples_per_epoch,
+            callbacks=get_callbacks(params, FLAGS.profile),
+            validation_data=get_dataset(False, params=params),
+            validation_steps=FLAGS.eval_samples)
   model.save_weights(FLAGS.model_dir)
 
 
