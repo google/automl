@@ -150,6 +150,7 @@ def main(_):
       raise RuntimeError('You must specify --validation_file_pattern '
                          'for evaluation.')
 
+  num_shards = FLAGS.num_cores if FLAGS.strategy=='tpu' else ds_strategy.num_replicas_in_sync
   params = dict(config.as_dict(),
                 model_name=FLAGS.model_name,
                 iterations_per_loop=FLAGS.iterations_per_loop,
@@ -157,7 +158,7 @@ def main(_):
                 num_examples_per_epoch=FLAGS.num_examples_per_epoch,
                 strategy=FLAGS.strategy,
                 batch_size=FLAGS.batch_size // ds_strategy.num_replicas_in_sync,
-                num_shards=FLAGS.num_cores,
+                num_shards=num_shards,
                 val_json_file=FLAGS.val_json_file,
                 testdev_dir=FLAGS.testdev_dir,
                 mode=FLAGS.mode)
