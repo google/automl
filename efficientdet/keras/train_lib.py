@@ -25,10 +25,7 @@ from keras import efficientdet_keras
 
 def update_learning_rate_schedule_parameters(params):
   """Updates params that are related to the learning rate schedule."""
-  # params['batch_size'] is per-shard within model_fn if strategy=tpu.
-  batch_size = (
-      params['batch_size'] * params['num_shards']
-      if params['strategy'] == 'tpu' else params['batch_size'])
+  batch_size = params['batch_size'] * params['num_shards']
   # Learning rate is proportional to the batch size
   params['adjusted_learning_rate'] = (params['learning_rate'] * batch_size / 64)
   steps_per_epoch = params['num_examples_per_epoch'] / batch_size
