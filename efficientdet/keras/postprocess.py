@@ -14,7 +14,7 @@
 # limitations under the License.
 # =============================================================================
 """Postprocessing for anchor-based detection."""
-from typing import List
+from typing import List, Tuple
 from absl import logging
 import tensorflow as tf
 
@@ -43,7 +43,8 @@ def pad_zeros(inputs: T, max_output_size: int, indices=None) -> T:
   raise ValueError('pad_zeros only support rank 1 or 2 inputs.')
 
 
-def merge_class_box_level_outputs(params, cls_outputs, box_outputs) -> List[T]:
+def merge_class_box_level_outputs(params, cls_outputs: List[T],
+                                  box_outputs: List[T]) -> Tuple[T, T]:
   """Concatenates class and box of all levels into one tensor."""
   cls_outputs_all, box_outputs_all = [], []
   batch_size = cls_outputs[0].shape[0]
@@ -57,7 +58,8 @@ def merge_class_box_level_outputs(params, cls_outputs, box_outputs) -> List[T]:
   return tf.concat(cls_outputs_all, 1), tf.concat(box_outputs_all, 1)
 
 
-def topk_class_boxes(params, cls_outputs: T, box_outputs: T) -> List[T]:
+def topk_class_boxes(params, cls_outputs: T,
+                     box_outputs: T) -> Tuple[T, T, T, T]:
   """Pick the topk class and box outputs."""
   batch_size = cls_outputs.shape[0]
   num_classes = params['num_classes']
@@ -95,7 +97,7 @@ def topk_class_boxes(params, cls_outputs: T, box_outputs: T) -> List[T]:
   return cls_outputs_topk, box_outputs_topk, classes, indices
 
 
-def pre_nms(params, cls_outputs, box_outputs) -> List[T]:
+def pre_nms(params, cls_outputs, box_outputs) -> Tuple[T, T, T]:
   """Detection post processing before nms.
 
   It takes the multi-level class and box predictions from network, merge them
@@ -128,7 +130,8 @@ def pre_nms(params, cls_outputs, box_outputs) -> List[T]:
   return boxes, scores, classes
 
 
-def nms(params, boxes: T, scores: T, classes: T, padded: bool) -> List[T]:
+def nms(params, boxes: T, scores: T, classes: T,
+        padded: bool) -> Tuple[T, T, T, T]:
   """Non-maximum suppression.
 
   Args:
@@ -136,6 +139,7 @@ def nms(params, boxes: T, scores: T, classes: T, padded: bool) -> List[T]:
     boxes: a tensor with shape [N, 4], where N is the number of boxes.
     scores: a tensor with shape [N].
     classes: a tensor with shape [N].
+    padded: a bool vallue indicating whether the results are padded.
 
   Returns:
     A tuple (boxes, scores, classes, valid_lens), where valid_lens is a scalar

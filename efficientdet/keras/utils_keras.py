@@ -17,35 +17,45 @@
 # gtype import
 
 from typing import Text
+import tensorflow as tf
+
 import utils
 
 
 def build_batch_norm(is_training_bn: bool,
-                     strategy: Text = None,
                      beta_initializer: Text = 'zeros',
                      gamma_initializer: Text = 'ones',
                      data_format: Text = 'channels_last',
                      momentum: float = 0.99,
                      epsilon: float = 1e-3,
+                     strategy: Text = None,
                      name: Text = 'tpu_batch_normalization'):
   """Build a batch normalization layer.
 
   Args:
     is_training_bn: `bool` for whether the model is training.
-    strategy: `str`, whether to use tpu, horovod or other version of batch norm.
     beta_initializer: `str`, beta initializer.
     gamma_initializer: `str`, gamma initializer.
     data_format: `str` either "channels_first" for `[batch, channels, height,
       width]` or "channels_last for `[batch, height, width, channels]`.
     momentum: `float`, momentume of batch norm.
     epsilon: `float`, small value for numerical stability.
+    strategy: `str`, whether to use tpu, horovod or other version of batch norm.
     name: the name of the batch normalization layer
 
   Returns:
     A normalized `Tensor` with the same `data_format`.
   """
   axis = 1 if data_format == 'channels_first' else -1
-  batch_norm_class = utils.batch_norm_class(is_training_bn, strategy)
+  if is_training_bn:
+    if strategy in ('horovod', None):
+      batch_norm_class = tf.keras.layers.experimental.SyncBatchNormalization
+    else:
+      # TODO(tanmingxing): compare them on TPU.
+      batch_norm_class = utils.batch_norm_class(is_training_bn, strategy)
+  else:
+    batch_norm_class = tf.keras.layers.BatchNormalization
+
   bn_layer = batch_norm_class(
       axis=axis,
       momentum=momentum,

@@ -24,9 +24,9 @@ from __future__ import division
 from __future__ import print_function
 
 import math
+from typing import Union, Text
 import numpy as np
 import tensorflow.compat.v1 as tf
-from typing import Union, Text
 
 FloatType = Union[tf.Tensor, float, np.float32, np.float64]
 
@@ -42,17 +42,12 @@ def _get_v(b1_height: FloatType, b1_width: FloatType, b2_height: FloatType,
         tf.math.divide_no_nan(width, height))
     v = 4 * ((arctan / math.pi)**2)
 
-    def _grad_v_graph(dv, variables=None):
+    def _grad_v(dv, variables=None):
       gdw = dv * 8 * arctan * height / (math.pi**2)
       gdh = -dv * 8 * arctan * width / (math.pi**2)
       return [gdh, gdw], tf.gradients(v, variables, grad_ys=dv)
 
-    def _grad_v(dv):
-      gdw = dv * 8 * arctan * height / (math.pi**2)
-      gdh = -dv * 8 * arctan * width / (math.pi**2)
-      return [gdh, gdw]
-
-    return v, _grad_v if tf.executing_eagerly() else _grad_v_graph
+    return v, _grad_v
 
   return _get_grad_v(b2_height, b2_width)
 

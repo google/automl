@@ -15,14 +15,15 @@
 # ==============================================================================
 """A simple example on how to use keras model for inference."""
 import os
-from PIL import Image
 import numpy as np
+from PIL import Image
 
-import inference
 import hparams_config
+import inference
 from keras import efficientdet_keras
 
 
+# pylint: disable=line-too-long
 # Prepare images and checkpoints: please run these commands in shell.
 # !mkdir tmp
 # !wget https://user-images.githubusercontent.com/11736571/77320690-099af300-6d37-11ea-9d86-24f14dc2d540.png -O tmp/img.png

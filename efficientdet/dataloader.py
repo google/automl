@@ -388,9 +388,9 @@ class InputReader(object):
       for level in range(params['min_level'], params['max_level'] + 1):
         if params['data_format'] == 'channels_first':
           labels['cls_targets_%d' % level] = tf.transpose(
-            labels['cls_targets_%d' % level], [0, 3, 1, 2])
+              labels['cls_targets_%d' % level], [0, 3, 1, 2])
           labels['box_targets_%d' % level] = tf.transpose(
-            labels['box_targets_%d' % level], [0, 3, 1, 2])
+              labels['box_targets_%d' % level], [0, 3, 1, 2])
         labels['cls_targets_%d' % level] = cls_targets[level]
         labels['box_targets_%d' % level] = box_targets[level]
       # Concatenate groundtruth annotations to a tensor.
