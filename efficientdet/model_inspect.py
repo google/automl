@@ -46,7 +46,7 @@ flags.DEFINE_integer('bm_runs', 10, 'Number of benchmark runs.')
 flags.DEFINE_string('tensorrt', None, 'TensorRT mode: {None, FP32, FP16, INT8}')
 flags.DEFINE_bool('delete_logdir', True, 'Whether to delete logdir.')
 flags.DEFINE_bool('freeze', False, 'Freeze graph.')
-flags.DEFINE_bool('xla', False, 'Run with xla optimization.')
+flags.DEFINE_bool('use_xla', False, 'Run with xla optimization.')
 flags.DEFINE_integer('batch_size', 1, 'Batch size for inference.')
 
 flags.DEFINE_string('ckpt_path', None, 'checkpoint dir used for eval.')
@@ -337,7 +337,6 @@ class ModelInspector(object):
     else:
       sess_config = tf.ConfigProto()
 
-    # rewriter_config_pb2.RewriterConfig.OFF
     sess_config.graph_options.rewrite_options.dependency_optimization = 2
     if self.use_xla:
       sess_config.graph_options.optimizer_options.global_jit_level = (
@@ -463,7 +462,7 @@ def main(_):
       model_name=FLAGS.model_name,
       logdir=FLAGS.logdir,
       tensorrt=FLAGS.tensorrt,
-      use_xla=FLAGS.xla,
+      use_xla=FLAGS.use_xla,
       ckpt_path=FLAGS.ckpt_path,
       export_ckpt=FLAGS.export_ckpt,
       saved_model_dir=FLAGS.saved_model_dir,

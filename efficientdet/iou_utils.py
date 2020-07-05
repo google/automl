@@ -42,12 +42,17 @@ def _get_v(b1_height: FloatType, b1_width: FloatType, b2_height: FloatType,
         tf.math.divide_no_nan(width, height))
     v = 4 * ((arctan / math.pi)**2)
 
-    def _grad_v(dv, variables=None):
+    def _grad_v_graph(dv, variables=None):
       gdw = dv * 8 * arctan * height / (math.pi**2)
       gdh = -dv * 8 * arctan * width / (math.pi**2)
       return [gdh, gdw], tf.gradients(v, variables, grad_ys=dv)
 
-    return v, _grad_v
+    def _grad_v(dv):
+      gdw = dv * 8 * arctan * height / (math.pi**2)
+      gdh = -dv * 8 * arctan * width / (math.pi**2)
+      return [gdh, gdw]
+
+    return v, _grad_v if tf.executing_eagerly() else _grad_v_graph
 
   return _get_grad_v(b2_height, b2_width)
 
@@ -169,8 +174,8 @@ def iou_loss(pred_boxes: FloatType,
 
   iou_loss_list = []
   for i in range(0, len(pred_boxes_list), 4):
-    pred_boxes = pred_boxes_list[i: i + 4]
-    target_boxes = target_boxes_list[i: i + 4]
+    pred_boxes = pred_boxes_list[i:i + 4]
+    target_boxes = target_boxes_list[i:i + 4]
 
     # Compute mask.
     t_ymin, t_xmin, t_ymax, t_xmax = target_boxes
@@ -183,4 +188,3 @@ def iou_loss(pred_boxes: FloatType,
   if len(iou_loss_list) == 1:
     return iou_loss_list[0]
   return tf.reduce_sum(tf.stack(iou_loss_list), 0)
-
