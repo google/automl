@@ -53,9 +53,8 @@ flags.DEFINE_string('eval_name', default=None, help='Eval job name')
 flags.DEFINE_enum('strategy', None, ['tpu', 'gpus', ''],
                   'Training: gpus for multi-gpu, if None, use TF default.')
 
-flags.DEFINE_integer('num_cores',
-                     default=8,
-                     help='Number of TPU cores for training')
+flags.DEFINE_integer(
+    'num_cores', default=8, help='Number of TPU cores for training')
 
 flags.DEFINE_bool('use_fake_data', False, 'Use fake input.')
 flags.DEFINE_bool(
@@ -150,18 +149,19 @@ def main(_):
       raise RuntimeError('You must specify --validation_file_pattern '
                          'for evaluation.')
 
-  num_shards = FLAGS.num_cores if FLAGS.strategy=='tpu' else ds_strategy.num_replicas_in_sync
-  params = dict(config.as_dict(),
-                model_name=FLAGS.model_name,
-                iterations_per_loop=FLAGS.iterations_per_loop,
-                model_dir=FLAGS.model_dir,
-                num_examples_per_epoch=FLAGS.num_examples_per_epoch,
-                strategy=FLAGS.strategy,
-                batch_size=FLAGS.batch_size // ds_strategy.num_replicas_in_sync,
-                num_shards=num_shards,
-                val_json_file=FLAGS.val_json_file,
-                testdev_dir=FLAGS.testdev_dir,
-                mode=FLAGS.mode)
+  num_shards = FLAGS.num_cores if FLAGS.strategy == 'tpu' else ds_strategy.num_replicas_in_sync
+  params = dict(
+      config.as_dict(),
+      model_name=FLAGS.model_name,
+      iterations_per_loop=FLAGS.iterations_per_loop,
+      model_dir=FLAGS.model_dir,
+      num_examples_per_epoch=FLAGS.num_examples_per_epoch,
+      strategy=FLAGS.strategy,
+      batch_size=FLAGS.batch_size // ds_strategy.num_replicas_in_sync,
+      num_shards=num_shards,
+      val_json_file=FLAGS.val_json_file,
+      testdev_dir=FLAGS.testdev_dir,
+      mode=FLAGS.mode)
 
   # set mixed precision policy by keras api which will generate mixed precision model
   precision = utils.get_precision(params['strategy'], params['mixed_precision'])
@@ -174,34 +174,39 @@ def main(_):
         file_pattern,
         is_training=is_training,
         use_fake_data=FLAGS.use_fake_data,
-        max_instances_per_image=config.max_instances_per_image)(params)
+        max_instances_per_image=config.max_instances_per_image)(
+            params)
 
   with ds_strategy.scope():
     model = EfficientDetNetTrain(params['model_name'], config)
     model.build([params["batch_size"], params["image_size"], 3])
-    model.compile(optimizer=get_optimizer(params),
-              loss={
-                  "box_loss":
-                      BoxLoss(params['delta'],
-                              reduction=tf.keras.losses.Reduction.NONE),
-                  "box_iou_loss":
-                      BoxIouLoss(params['iou_loss_type'],
-                                  reduction=tf.keras.losses.Reduction.NONE),
-                  "class_loss":
-                      FocalLoss(params['alpha'],
-                                params['gamma'],
-                                label_smoothing=params['label_smoothing'],
-                                reduction=tf.keras.losses.Reduction.NONE)
-              })
+    model.compile(
+        optimizer=get_optimizer(params),
+        loss={
+            "box_loss":
+                BoxLoss(
+                    params['delta'], reduction=tf.keras.losses.Reduction.NONE),
+            "box_iou_loss":
+                BoxIouLoss(
+                    params['iou_loss_type'],
+                    reduction=tf.keras.losses.Reduction.NONE),
+            "class_loss":
+                FocalLoss(
+                    params['alpha'],
+                    params['gamma'],
+                    label_smoothing=params['label_smoothing'],
+                    reduction=tf.keras.losses.Reduction.NONE)
+        })
   ckpt_path = tf.train.latest_checkpoint(FLAGS.model_dir)
   if ckpt_path:
     model.load_weights(ckpt_path)
   model.freeze_vars(params['var_freeze_expr'])
-  model.fit(get_dataset(True, params=params),
-            steps_per_epoch=FLAGS.num_examples_per_epoch,
-            callbacks=get_callbacks(params, FLAGS.profile),
-            validation_data=get_dataset(False, params=params),
-            validation_steps=FLAGS.eval_samples)
+  model.fit(
+      get_dataset(True, params=params),
+      steps_per_epoch=FLAGS.num_examples_per_epoch,
+      callbacks=get_callbacks(params, FLAGS.profile),
+      validation_data=get_dataset(False, params=params),
+      validation_steps=FLAGS.eval_samples)
   model.save_weights(FLAGS.model_dir)
 
 

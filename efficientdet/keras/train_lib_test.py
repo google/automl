@@ -21,7 +21,7 @@ import tensorflow as tf
 
 import hparams_config
 from keras.train_lib import StepwiseLrSchedule, CosineLrSchedule, PolynomialLrSchedule, BoxLoss, BoxIouLoss, FocalLoss, EfficientDetNetTrain, get_optimizer
-from det_model_fn import stepwise_lr_schedule, cosine_lr_schedule, polynomial_lr_schedule, _box_loss
+from det_model_fn import stepwise_lr_schedule, cosine_lr_schedule, polynomial_lr_schedule, _box_loss, _box_iou_loss, focal_loss
 
 
 class TrainLibTest(tf.test.TestCase, parameterized.TestCase):
@@ -31,19 +31,31 @@ class TrainLibTest(tf.test.TestCase, parameterized.TestCase):
     cosine = CosineLrSchedule(1e-3, 1e-4, 1, 5)
     polynomial = PolynomialLrSchedule(1e-3, 1e-4, 1, 2, 5)
     for i in range(5):
-      self.assertEqual(stepwise_lr_schedule(1e-3, 1e-4, 1, 3, 5, i),
-                       stepwise(i))
+      self.assertEqual(
+          stepwise_lr_schedule(1e-3, 1e-4, 1, 3, 5, i), stepwise(i))
       self.assertEqual(cosine_lr_schedule(1e-3, 1e-4, 1, 5, i), cosine(i))
-      self.assertEqual(polynomial_lr_schedule(1e-3, 1e-4, 1, 2, 5, i),
-                       polynomial(i))
+      self.assertEqual(
+          polynomial_lr_schedule(1e-3, 1e-4, 1, 2, 5, i), polynomial(i))
 
   def test_losses(self):
     box_loss = BoxLoss()
-    box_outputs = tf.ones([10])
-    box_targets = tf.zeros([10])
+    box_iou_loss = BoxIouLoss('ciou')
+    alpha = 0.25
+    gamma = 1.5
+    focal_loss_v2 = FocalLoss(
+        alpha, gamma, reduction=tf.keras.losses.Reduction.NONE)
+    box_outputs = tf.ones([8])
+    box_targets = tf.zeros([8])
     num_positives = 4.0
-    self.assertEqual(_box_loss(box_outputs, box_targets, num_positives),
-                     box_loss([num_positives, box_targets], box_outputs))
+    self.assertEqual(
+        _box_loss(box_outputs, box_targets, num_positives),
+        box_loss([num_positives, box_targets], box_outputs))
+    self.assertEqual(
+        _box_iou_loss(box_outputs, box_targets, num_positives, 'ciou'),
+        box_iou_loss([num_positives, box_targets], box_outputs))
+    self.assertAllEqual(
+        focal_loss(box_outputs, box_targets, alpha, gamma, num_positives),
+        focal_loss_v2([num_positives, box_targets], box_outputs))
 
   def test_train(self):
     config = hparams_config.get_detection_config('efficientdet-d0')
@@ -62,20 +74,24 @@ class TrainLibTest(tf.test.TestCase, parameterized.TestCase):
 
     model = EfficientDetNetTrain(config=config)
     params = config.as_dict()
-    model.compile(optimizer=get_optimizer(params),
-                  loss={
-                      "box_loss":
-                          BoxLoss(params['delta'],
-                                  reduction=tf.keras.losses.Reduction.NONE),
-                      "box_iou_loss":
-                          BoxIouLoss(params['iou_loss_type'],
-                                     reduction=tf.keras.losses.Reduction.NONE),
-                      "class_loss":
-                          FocalLoss(params['alpha'],
-                                    params['gamma'],
-                                    label_smoothing=params['label_smoothing'],
-                                    reduction=tf.keras.losses.Reduction.NONE)
-                  })
+    params.update({'num_shards': 1})
+    model.compile(
+        optimizer=get_optimizer(params),
+        loss={
+            "box_loss":
+                BoxLoss(
+                    params['delta'], reduction=tf.keras.losses.Reduction.NONE),
+            "box_iou_loss":
+                BoxIouLoss(
+                    params['iou_loss_type'],
+                    reduction=tf.keras.losses.Reduction.NONE),
+            "class_loss":
+                FocalLoss(
+                    params['alpha'],
+                    params['gamma'],
+                    label_smoothing=params['label_smoothing'],
+                    reduction=tf.keras.losses.Reduction.NONE)
+        })
     outputs = model.train_on_batch(x, labels, return_dict=True)
     outputs = model.test_on_batch(x, labels, return_dict=True)
 

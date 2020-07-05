@@ -60,9 +60,10 @@ class StepwiseLrSchedule(tf.optimizers.schedules.LearningRateSchedule):
     self.second_lr_drop_step = second_lr_drop_step
 
   def __call__(self, step):
-    linear_warmup = (self.lr_warmup_init +
-                     (tf.cast(step, dtype=tf.float32) / self.lr_warmup_step *
-                      (self.adjusted_lr - self.lr_warmup_init)))
+    linear_warmup = (
+        self.lr_warmup_init +
+        (tf.cast(step, dtype=tf.float32) / self.lr_warmup_step *
+         (self.adjusted_lr - self.lr_warmup_init)))
     learning_rate = tf.where(step < self.lr_warmup_step, linear_warmup,
                              self.adjusted_lr)
     lr_schedule = [[1.0, self.lr_warmup_step], [0.1, self.first_lr_drop_step],
@@ -94,9 +95,10 @@ class CosineLrSchedule(tf.optimizers.schedules.LearningRateSchedule):
 
   def __call__(self, step):
 
-    linear_warmup = (self.lr_warmup_init +
-                     (tf.cast(step, dtype=tf.float32) / self.lr_warmup_step *
-                      (self.adjusted_lr - self.lr_warmup_init)))
+    linear_warmup = (
+        self.lr_warmup_init +
+        (tf.cast(step, dtype=tf.float32) / self.lr_warmup_step *
+         (self.adjusted_lr - self.lr_warmup_init)))
     cosine_lr = 0.5 * self.adjusted_lr * (
         1 + tf.cos(math.pi * tf.cast(step, tf.float32) / self.total_steps))
     return tf.where(step < self.lr_warmup_step, linear_warmup, cosine_lr)
@@ -124,9 +126,10 @@ class PolynomialLrSchedule(tf.optimizers.schedules.LearningRateSchedule):
     self.total_steps = total_steps
 
   def __call__(self, step):
-    linear_warmup = (self.lr_warmup_init +
-                     (tf.cast(step, dtype=tf.float32) / self.lr_warmup_step *
-                      (self.adjusted_lr - self.lr_warmup_init)))
+    linear_warmup = (
+        self.lr_warmup_init +
+        (tf.cast(step, dtype=tf.float32) / self.lr_warmup_step *
+         (self.adjusted_lr - self.lr_warmup_init)))
     polynomial_lr = self.adjusted_lr * tf.pow(
         1 - (tf.cast(step, dtype=tf.float32) / self.total_steps), self.power)
     return tf.where(step < self.lr_warmup_step, linear_warmup, polynomial_lr)
@@ -161,8 +164,8 @@ def get_optimizer(params: dict):
   learning_rate = learning_rate_schedule(params)
   if params['optimizer'].lower() == 'sgd':
     logging.info("Use SGD optimizer")
-    optimizer = tf.keras.optimizers.SGD(learning_rate,
-                                        momentum=params['momentum'])
+    optimizer = tf.keras.optimizers.SGD(
+        learning_rate, momentum=params['momentum'])
   elif params['optimizer'].lower() == 'adam':
     logging.info("Use Adam optimizer")
     optimizer = tf.keras.optimizers.Adam(learning_rate)
@@ -177,13 +180,10 @@ def get_optimizer(params: dict):
 def get_callbacks(params: dict, profile=False):
   tb_callback = tf.keras.callbacks.TensorBoard(
       log_dir=params['model_dir'], profile_batch=2 if profile else 0)
-  ckpt_callback = tf.keras.callbacks.ModelCheckpoint(params['model_dir'],
-                                                     verbose=1,
-                                                     save_weights_only=True)
-  early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
-                                                    min_delta=0,
-                                                    patience=10,
-                                                    verbose=1)
+  ckpt_callback = tf.keras.callbacks.ModelCheckpoint(
+      params['model_dir'], verbose=1, save_weights_only=True)
+  early_stopping = tf.keras.callbacks.EarlyStopping(
+      monitor='val_loss', min_delta=0, patience=10, verbose=1)
   return [tb_callback, ckpt_callback, early_stopping]
 
 
@@ -249,8 +249,8 @@ class BoxLoss(tf.keras.losses.Loss):
 
   def __init__(self, delta=0.1, **kwargs):
     super().__init__(**kwargs)
-    self.huber = tf.keras.losses.Huber(delta,
-                                       reduction=tf.keras.losses.Reduction.NONE)
+    self.huber = tf.keras.losses.Huber(
+        delta, reduction=tf.keras.losses.Reduction.NONE)
 
   @tf.autograph.experimental.do_not_convert
   def call(self, y_true, box_outputs):
@@ -269,7 +269,7 @@ class BoxIouLoss(tf.keras.losses.Loss):
 
   def __init__(self, iou_loss_type, **kwargs):
     super().__init__(**kwargs)
-    self.iou_loss_dtype = iou_loss_type
+    self.iou_loss_type = iou_loss_type
 
   @tf.autograph.experimental.do_not_convert
   def call(self, y_true, box_outputs):
@@ -328,8 +328,6 @@ class EfficientDetNetTrain(EfficientDetNet):
         num_anchors * 4].
       labels: the dictionary that returned from dataloader that includes
         groundtruth targets.
-      params: the dictionary including training parameters specified in
-        default_haprams function in this file.
 
     Returns:
       total_loss: an integer tensor representing total loss reducing from
@@ -390,8 +388,9 @@ class EfficientDetNetTrain(EfficientDetNet):
     cls_loss = tf.add_n(cls_losses)
     box_loss = tf.add_n(box_losses) if box_losses else 0
     box_iou_loss = tf.add_n(box_iou_losses) if box_iou_losses else 0
-    total_loss = (cls_loss + self.config.box_loss_weight * box_loss +
-                  self.config.iou_loss_weight * box_iou_loss)
+    total_loss = (
+        cls_loss + self.config.box_loss_weight * box_loss +
+        self.config.iou_loss_weight * box_iou_loss)
     return total_loss, cls_loss, box_loss, box_iou_loss
 
   def train_step(self, data):
@@ -428,8 +427,8 @@ class EfficientDetNetTrain(EfficientDetNet):
     if self.config.clip_gradients_norm > 0:
       gradients, gnorm = tf.clip_by_global_norm(gradients,
                                                 self.config.clip_gradients_norm)
-    optimizer_op = self.optimizer.apply_gradients(zip(gradients,
-                                                      trainable_vars))
+    optimizer_op = self.optimizer.apply_gradients(
+        zip(gradients, trainable_vars))
     if self.config.moving_average_decay:
       with tf.control_dependencies([optimizer_op]):
         self.ema.apply(self.trainable_variables)
