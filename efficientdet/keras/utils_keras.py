@@ -48,7 +48,7 @@ def build_batch_norm(is_training_bn: bool,
   """
   axis = 1 if data_format == 'channels_first' else -1
   if is_training_bn:
-    if strategy in ('horovod', None):
+    if strategy in ('gpus', None):
       batch_norm_class = tf.keras.layers.experimental.SyncBatchNormalization
     else:
       # TODO(tanmingxing): compare them on TPU.
