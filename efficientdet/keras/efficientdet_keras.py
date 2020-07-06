@@ -25,8 +25,8 @@ import hparams_config
 import utils
 from backbone import backbone_factory
 from backbone import efficientnet_builder
-from keras import utils_keras
 from keras import postprocess
+from keras import utils_keras
 # pylint: disable=arguments-differ  # fo keras layers.
 
 

@@ -24,9 +24,9 @@ from __future__ import division
 from __future__ import print_function
 
 import math
+from typing import Union, Text
 import numpy as np
 import tensorflow.compat.v1 as tf
-from typing import Union, Text
 
 FloatType = Union[tf.Tensor, float, np.float32, np.float64]
 

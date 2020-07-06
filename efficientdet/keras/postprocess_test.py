@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # =============================================================================
-"""Test for postprocess"""
+"""Test for postprocess."""
 from absl import logging
 import tensorflow as tf
 
@@ -25,6 +25,7 @@ class PostprocessTest(tf.test.TestCase):
   """A test for postprocess."""
 
   def setUp(self):
+    super().setUp()
     self.params = {
         'min_level': 1,
         'max_level': 2,

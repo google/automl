@@ -13,18 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-
-from absl import logging
-from keras.efficientdet_keras import EfficientDetNet
-import re
+"""Training related libraries."""
 import math
-import iou_utils
+import re
+from absl import logging
 import tensorflow as tf
+
+import iou_utils
+from keras import efficientdet_keras
 
 
 def update_learning_rate_schedule_parameters(params):
   """Updates params that are related to the learning rate schedule."""
-  # params['batch_size'] is per-shard within model_fn if strategy=tpu.
   batch_size = params['batch_size'] * params['num_shards']
   # Learning rate is proportional to the batch size
   params['adjusted_learning_rate'] = (params['learning_rate'] * batch_size / 64)
@@ -38,6 +38,7 @@ def update_learning_rate_schedule_parameters(params):
 
 
 class StepwiseLrSchedule(tf.optimizers.schedules.LearningRateSchedule):
+  """Stepwise learning rate schedule."""
 
   def __init__(self, adjusted_lr: float, lr_warmup_init: float,
                lr_warmup_step: int, first_lr_drop_step: int,
@@ -75,6 +76,7 @@ class StepwiseLrSchedule(tf.optimizers.schedules.LearningRateSchedule):
 
 
 class CosineLrSchedule(tf.optimizers.schedules.LearningRateSchedule):
+  """Cosine learning rate schedule."""
 
   def __init__(self, adjusted_lr: float, lr_warmup_init: float,
                lr_warmup_step: int, total_steps: int):
@@ -105,6 +107,7 @@ class CosineLrSchedule(tf.optimizers.schedules.LearningRateSchedule):
 
 
 class PolynomialLrSchedule(tf.optimizers.schedules.LearningRateSchedule):
+  """Polynomial learning rate schedule."""
 
   def __init__(self, adjusted_lr: float, lr_warmup_init: float,
                lr_warmup_step: int, power: float, total_steps: int):
@@ -135,7 +138,7 @@ class PolynomialLrSchedule(tf.optimizers.schedules.LearningRateSchedule):
     return tf.where(step < self.lr_warmup_step, linear_warmup, polynomial_lr)
 
 
-def learning_rate_schedule(params: dict):
+def learning_rate_schedule(params):
   """Learning rate schedule based on global step."""
   update_learning_rate_schedule_parameters(params)
   lr_decay_method = params['lr_decay_method']
@@ -160,14 +163,15 @@ def learning_rate_schedule(params: dict):
   raise ValueError('unknown lr_decay_method: {}'.format(lr_decay_method))
 
 
-def get_optimizer(params: dict):
+def get_optimizer(params):
+  """Get optimizer."""
   learning_rate = learning_rate_schedule(params)
   if params['optimizer'].lower() == 'sgd':
-    logging.info("Use SGD optimizer")
+    logging.info('Use SGD optimizer')
     optimizer = tf.keras.optimizers.SGD(
         learning_rate, momentum=params['momentum'])
   elif params['optimizer'].lower() == 'adam':
-    logging.info("Use Adam optimizer")
+    logging.info('Use Adam optimizer')
     optimizer = tf.keras.optimizers.Adam(learning_rate)
   else:
     raise ValueError('optimizers should be adam or sgd')
@@ -177,7 +181,7 @@ def get_optimizer(params: dict):
   return optimizer
 
 
-def get_callbacks(params: dict, profile=False):
+def get_callbacks(params, profile=False):
   tb_callback = tf.keras.callbacks.TensorBoard(
       log_dir=params['model_dir'], profile_batch=2 if profile else 0)
   ckpt_callback = tf.keras.callbacks.ModelCheckpoint(
@@ -192,23 +196,18 @@ class FocalLoss(tf.keras.losses.Loss):
 
   Focal loss = -(1-pt)^gamma * log(pt)
   where pt is the probability of being classified to the true class.
-
-  Args:
-    y_pred: A float32 tensor of size [batch, height_in, width_in,
-      num_predictions].
-    y_true: A float32 tensor of size [batch, height_in, width_in,
-      num_predictions].
-    alpha: A float32 scalar multiplying alpha to the loss from positive examples
-      and (1-alpha) to the loss from negative examples.
-    gamma: A float32 scalar modulating loss from hard and easy examples.
-    normalizer: Divide loss by this value.
-    label_smoothing: Float in [0, 1]. If > `0` then smooth the labels.
-
-  Returns:
-    loss: A float32 scalar representing normalized total loss.
   """
 
   def __init__(self, alpha, gamma, label_smoothing=0.0, **kwargs):
+    """Initialize focal loss.
+
+    Args:
+      alpha: A float32 scalar multiplying alpha to the loss from positive
+        examples and (1-alpha) to the loss from negative examples.
+      gamma: A float32 scalar modulating loss from hard and easy examples.
+      label_smoothing: Float in [0, 1]. If > `0` then smooth the labels.
+      **kwargs: other params.
+    """
     super().__init__(**kwargs)
     self.alpha = alpha
     self.gamma = gamma
@@ -216,6 +215,15 @@ class FocalLoss(tf.keras.losses.Loss):
 
   @tf.autograph.experimental.do_not_convert
   def call(self, y, y_pred):
+    """Compute focal loss for y and y_pred.
+
+    Args:
+      y: A tuple of (normalizer, y_true), where y_true is the target class.
+      y_pred: A float32 tensor [batch, height_in, width_in, num_predictions].
+
+    Returns:
+      the focal loss.
+    """
     normalizer, y_true = y
     alpha = tf.convert_to_tensor(self.alpha, dtype=y_pred.dtype)
     gamma = tf.convert_to_tensor(self.gamma, dtype=y_pred.dtype)
@@ -236,18 +244,18 @@ class FocalLoss(tf.keras.losses.Loss):
 
 
 class BoxLoss(tf.keras.losses.Loss):
-  """Computes box regression loss.
-
-  delta is typically around the mean value of regression target.
-  for instances, the regression targets of 512x512 input with 6 anchors on
-  P3-P7 pyramid is about [0.1, 0.1, 0.2, 0.2].
-
-  Args:
-    delta: `float`, the point where the huber loss function changes from a
-      quadratic to linear.
-  """
+  """L2 box regression loss."""
 
   def __init__(self, delta=0.1, **kwargs):
+    """Initialize box loss.
+
+    Args:
+      delta: `float`, the point where the huber loss function changes from a
+        quadratic to linear. It is typically around the mean value of regression
+        target. For instances, the regression targets of 512x512 input with 6
+        anchors on P3-P7 pyramid is about [0.1, 0.1, 0.2, 0.2].
+      **kwargs: other params.
+    """
     super().__init__(**kwargs)
     self.huber = tf.keras.losses.Huber(
         delta, reduction=tf.keras.losses.Reduction.NONE)
@@ -266,6 +274,7 @@ class BoxLoss(tf.keras.losses.Loss):
 
 
 class BoxIouLoss(tf.keras.losses.Loss):
+  """Box iou loss."""
 
   def __init__(self, iou_loss_type, **kwargs):
     super().__init__(**kwargs)
@@ -281,10 +290,14 @@ class BoxIouLoss(tf.keras.losses.Loss):
     return box_iou_loss
 
 
-class EfficientDetNetTrain(EfficientDetNet):
+class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
+  """A customized trainer for EfficientDet.
+
+  see https://www.tensorflow.org/guide/keras/customizing_what_happens_in_fit
+  """
 
   def __init__(self, *args, **kwargs):
-    super(EfficientDetNetTrain, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.step = tf.Variable(
         0,
         trainable=False,
@@ -358,7 +371,7 @@ class EfficientDetNetTrain(EfficientDetNet):
                                           [bs, width, height, -1])
       box_targets_at_level = labels['box_targets_%d' % (level + 3)]
 
-      class_loss = self.loss.get("class_loss", None)
+      class_loss = self.loss.get('class_loss', None)
       cls_loss = class_loss([num_positives_sum, cls_outputs[level]],
                             cls_targets_at_level)
 
@@ -375,13 +388,13 @@ class EfficientDetNetTrain(EfficientDetNet):
       cls_losses.append(tf.reduce_sum(cls_loss))
 
       if self.config.box_loss_weight:
-        box_loss = self.loss.get("box_loss", None)
+        box_loss = self.loss.get('box_loss', None)
         box_losses.append(
             box_loss([num_positives_sum, box_outputs[level]],
                      box_targets_at_level))
 
       if self.config.iou_loss_type:
-        box_iou_loss = self.loss.get("box_iou_loss", None)
+        box_iou_loss = self.loss.get('box_iou_loss', None)
         box_iou_losses.append(
             box_iou_loss(box_outputs[level], box_targets_at_level,
                          num_positives_sum, self.config.iou_loss_type))
@@ -397,10 +410,11 @@ class EfficientDetNetTrain(EfficientDetNet):
     """Train step.
 
     Args:
-      data: Tuple of (images, labels). Image tensor with shape [batch_size, height, width, 3].
-        The height and width are fixed and equal.Input labels in a dictionary. The labels include class targets
-        and box targets which are dense label maps. The labels are generated from
-        get_input_fn function in data/dataloader.py.
+      data: Tuple of (images, labels). Image tensor with shape [batch_size,
+        height, width, 3]. The height and width are fixed and equal.Input labels
+        in a dictionary. The labels include class targets and box targets which
+        are dense label maps. The labels are generated from get_input_fn
+        function in data/dataloader.py.
 
     Returns:
       A dict record loss info.
@@ -408,8 +422,7 @@ class EfficientDetNetTrain(EfficientDetNet):
     images, labels = data
     with tf.GradientTape() as tape:
       cls_outputs, box_outputs = self(images, training=True)
-      det_loss, cls_loss, box_loss, box_iou_loss = self._detection_loss(
-          cls_outputs, box_outputs, labels)
+      det_loss, _, _, _ = self._detection_loss(cls_outputs, box_outputs, labels)
       reg_l2loss = self._reg_l2_loss(self.config.weight_decay)
       total_loss = det_loss + reg_l2loss
       if isinstance(self.optimizer,
@@ -425,8 +438,8 @@ class EfficientDetNetTrain(EfficientDetNet):
     else:
       gradients = scaled_gradients
     if self.config.clip_gradients_norm > 0:
-      gradients, gnorm = tf.clip_by_global_norm(gradients,
-                                                self.config.clip_gradients_norm)
+      gradients, _ = tf.clip_by_global_norm(gradients,
+                                            self.config.clip_gradients_norm)
     optimizer_op = self.optimizer.apply_gradients(
         zip(gradients, trainable_vars))
     if self.config.moving_average_decay:
@@ -438,18 +451,18 @@ class EfficientDetNetTrain(EfficientDetNet):
     """Test step.
 
     Args:
-      data: Tuple of (images, labels). Image tensor with shape [batch_size, height, width, 3].
-        The height and width are fixed and equal.Input labels in a dictionary. The labels include class targets
-        and box targets which are dense label maps. The labels are generated from
-        get_input_fn function in data/dataloader.py.
+      data: Tuple of (images, labels). Image tensor with shape [batch_size,
+        height, width, 3]. The height and width are fixed and equal.Input labels
+        in a dictionary. The labels include class targets and box targets which
+        are dense label maps. The labels are generated from get_input_fn
+        function in data/dataloader.py.
 
     Returns:
       A dict record loss info.
     """
     images, labels = data
     cls_outputs, box_outputs = self(images, training=False)
-    det_loss, cls_loss, box_loss, box_iou_loss = self._detection_loss(
-        cls_outputs, box_outputs, labels)
+    det_loss, _, _, _ = self._detection_loss(cls_outputs, box_outputs, labels)
     reg_l2loss = self._reg_l2_loss(self.config.weight_decay)
     total_loss = det_loss + reg_l2loss
     return {'loss': total_loss}

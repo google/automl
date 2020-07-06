@@ -17,13 +17,12 @@
 from absl import app
 from absl import flags
 from absl import logging
+import tensorflow as tf
 
 import dataloader
 import hparams_config
 import utils
-import copy
-import tensorflow as tf
-from keras.train_lib import get_optimizer, get_callbacks, EfficientDetNetTrain, BoxLoss, BoxIouLoss, FocalLoss
+from keras import train_lib
 
 # Cloud TPU Cluster Resolvers
 flags.DEFINE_string(
@@ -116,7 +115,8 @@ def main(_):
 
   if FLAGS.use_xla and FLAGS.strategy != 'tpu':
     tf.config.optimizer.set_jit(True)
-    tf.config.experimental.set_memory_growth(True)
+    for gpu in tf.config.list_physical_devices('GPU'):
+      tf.config.experimental.set_memory_growth(gpu, True)
 
   if FLAGS.debug:
     tf.config.experimental_run_functions_eagerly(True)
@@ -130,15 +130,15 @@ def main(_):
     tf.config.experimental_connect_to_cluster(tpu_cluster_resolver)
     tf.tpu.experimental.initialize_tpu_system(tpu_cluster_resolver)
     ds_strategy = tf.distribute.TPUStrategy(tpu_cluster_resolver)
-    logging.info("All devices: ", tf.config.list_logical_devices('TPU'))
+    logging.info('All devices: %s', tf.config.list_logical_devices('TPU'))
   elif FLAGS.strategy == 'gpus':
     ds_strategy = tf.distribute.MirroredStrategy()
-    logging.info("All devices: ", tf.config.list_physical_devices('GPU'))
+    logging.info('All devices: %s', tf.config.list_physical_devices('GPU'))
   else:
     if tf.config.list_physical_devices('GPU'):
-      ds_strategy = tf.distribute.OneDeviceStrategy("device:GPU:0")
+      ds_strategy = tf.distribute.OneDeviceStrategy('device:GPU:0')
     else:
-      ds_strategy = tf.distribute.OneDeviceStrategy("device:CPU:0")
+      ds_strategy = tf.distribute.OneDeviceStrategy('device:CPU:0')
 
   # Check data path
   if FLAGS.mode in ('train',
@@ -149,7 +149,6 @@ def main(_):
       raise RuntimeError('You must specify --validation_file_pattern '
                          'for evaluation.')
 
-  num_shards = FLAGS.num_cores if FLAGS.strategy == 'tpu' else ds_strategy.num_replicas_in_sync
   params = dict(
       config.as_dict(),
       model_name=FLAGS.model_name,
@@ -158,18 +157,20 @@ def main(_):
       num_examples_per_epoch=FLAGS.num_examples_per_epoch,
       strategy=FLAGS.strategy,
       batch_size=FLAGS.batch_size // ds_strategy.num_replicas_in_sync,
-      num_shards=num_shards,
+      num_shards=ds_strategy.num_replicas_in_sync,
       val_json_file=FLAGS.val_json_file,
       testdev_dir=FLAGS.testdev_dir,
       mode=FLAGS.mode)
 
-  # set mixed precision policy by keras api which will generate mixed precision model
+  # set mixed precision policy by keras api.
   precision = utils.get_precision(params['strategy'], params['mixed_precision'])
   policy = tf.keras.mixed_precision.experimental.Policy(precision)
   tf.keras.mixed_precision.experimental.set_policy(policy)
 
   def get_dataset(is_training, params):
-    file_pattern = FLAGS.training_file_pattern if is_training else FLAGS.validation_file_pattern
+    file_pattern = (
+        FLAGS.training_file_pattern
+        if is_training else FLAGS.validation_file_pattern)
     return dataloader.InputReader(
         file_pattern,
         is_training=is_training,
@@ -178,20 +179,21 @@ def main(_):
             params)
 
   with ds_strategy.scope():
-    model = EfficientDetNetTrain(params['model_name'], config)
-    model.build([params["batch_size"], params["image_size"], 3])
+    model = train_lib.EfficientDetNetTrain(params['model_name'], config)
+    height, width = utils.parse_image_size(params['image_size'])
+    model.build((params['batch_size'], height, width, 3))
     model.compile(
-        optimizer=get_optimizer(params),
+        optimizer=train_lib.get_optimizer(params),
         loss={
-            "box_loss":
-                BoxLoss(
+            'box_loss':
+                train_lib.BoxLoss(
                     params['delta'], reduction=tf.keras.losses.Reduction.NONE),
-            "box_iou_loss":
-                BoxIouLoss(
+            'box_iou_loss':
+                train_lib.BoxIouLoss(
                     params['iou_loss_type'],
                     reduction=tf.keras.losses.Reduction.NONE),
-            "class_loss":
-                FocalLoss(
+            'class_loss':
+                train_lib.FocalLoss(
                     params['alpha'],
                     params['gamma'],
                     label_smoothing=params['label_smoothing'],
@@ -204,7 +206,7 @@ def main(_):
   model.fit(
       get_dataset(True, params=params),
       steps_per_epoch=FLAGS.num_examples_per_epoch,
-      callbacks=get_callbacks(params, FLAGS.profile),
+      callbacks=train_lib.get_callbacks(params, FLAGS.profile),
       validation_data=get_dataset(False, params=params),
       validation_steps=FLAGS.eval_samples)
   model.save_weights(FLAGS.model_dir)

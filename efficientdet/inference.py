@@ -313,7 +313,7 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
     detections_batch: a batch of detection results. Each detection is a tensor
       with each row as [image_id, ymin, xmin, ymax, xmax, score, class].
   """
-  batch_size = cls_outputs[params['min_level']].get_shape()[0]
+  batch_size = cls_outputs[params['min_level']].shape[0]
   if not batch_size:
     # Use combined version for dynamic batch size.
     return det_post_process_combined(params, cls_outputs, box_outputs, scales,
