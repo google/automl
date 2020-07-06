@@ -191,12 +191,10 @@ class EvaluationMetric(object):
         for data in groundtruth_data[i, indices]:
           box = data[0:4]
           is_crowd = data[4]
-          area = data[5]
+          area = (box[3] - box[1]) * (box[2] - box[0])
           category_id = data[6]
           if category_id < 0:
             break
-          if area == -1:
-            area = (box[3] - box[1]) * (box[2] - box[0])
           self.dataset['annotations'].append({
               'id': int(self.annotation_id),
               'image_id': int(image_id),
