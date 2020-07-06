@@ -47,7 +47,7 @@ def _get_v(b1_height: FloatType, b1_width: FloatType, b2_height: FloatType,
       gdh = -dv * 8 * arctan * width / (math.pi**2)
       return [gdh, gdw], tf.gradients(v, variables, grad_ys=dv)
 
-    def _grad_v(dv, variables=None):
+    def _grad_v(dv):
       gdw = dv * 8 * arctan * height / (math.pi**2)
       gdh = -dv * 8 * arctan * width / (math.pi**2)
       return [gdh, gdw]
