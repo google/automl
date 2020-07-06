@@ -53,12 +53,11 @@ See https://github.com/google/automl/issues/93 for more discussion.
 ### 2.1 How can I format my code for PRs?
 
 Please use [yapf](https://github.com/google/yapf) with option
---style='{based_on_style: google, indent_width: 2}'. You can also save the
+--style='{based_on_style: yapf}'. You can also save the
 following file to ~/.config/yapf/style:
 
     [style]
-    based_on_style = google
-    indent_width = 2
+    based_on_style = yapf
 
 If you want to check the format with lint, please run:
 

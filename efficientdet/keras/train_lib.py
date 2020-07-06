@@ -278,7 +278,7 @@ class BoxIouLoss(tf.keras.losses.Loss):
 
   def __init__(self, iou_loss_type, **kwargs):
     super().__init__(**kwargs)
-    self.iou_loss_dtype = iou_loss_type
+    self.iou_loss_type = iou_loss_type
 
   @tf.autograph.experimental.do_not_convert
   def call(self, y_true, box_outputs):
