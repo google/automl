@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 from absl import logging
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 import iou_utils
 
 
@@ -70,6 +70,15 @@ class IouUtilsTest(tf.test.TestCase):
     tb = tf.concat([self.tb, self.zeros], axis=-1)
     self.assertAllClose(iou_utils.iou_loss(pb, tb, 'iou'), [0.875, 1.0])
 
+  def test_ciou_grad(self):
+    pb = tf.concat([self.pb, self.zeros], axis=-1)
+    tb = tf.concat([self.tb, self.zeros], axis=-1)
+    with tf.GradientTape() as tape:
+      tape.watch([pb, tb])
+      loss = iou_utils.iou_loss(pb, tb, 'ciou')
+    grad = tape.gradient(loss, [tb, pb])
+    self.assertEqual(tf.reduce_sum(grad[0]), 0.16687772)
+    self.assertEqual(tf.reduce_sum(grad[1]), -0.16687769)
 
 if __name__ == '__main__':
   logging.set_verbosity(logging.WARNING)
