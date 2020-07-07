@@ -401,8 +401,8 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       if self.config.iou_loss_type and self.loss.get('box_iou_loss', None):
         box_iou_loss_layer = self.loss['box_iou_loss']
         box_iou_losses.append(
-            box_iou_loss_layer(box_targets_at_level, box_outputs[level],
-                               num_positives_sum, self.config.iou_loss_type))
+            box_iou_loss_layer([num_positives_sum, box_targets_at_level],
+                               box_outputs[level]))
     cls_loss = tf.add_n(cls_losses) if cls_losses else 0
     box_loss = tf.add_n(box_losses) if box_losses else 0
     box_iou_loss = tf.add_n(box_iou_losses) if box_iou_losses else 0
