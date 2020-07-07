@@ -15,10 +15,10 @@
 # ==============================================================================
 """A simple example on how to use keras model for inference."""
 import os
-import numpy as np
-from PIL import Image
 from absl import app
 from absl import logging
+import numpy as np
+from PIL import Image
 import tensorflow as tf
 
 import hparams_config

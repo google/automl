@@ -15,7 +15,6 @@
 # ==============================================================================
 import tempfile
 from absl import logging
-from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 
@@ -24,7 +23,7 @@ import hparams_config
 from keras import train_lib
 
 
-class TrainLibTest(tf.test.TestCase, parameterized.TestCase):
+class TrainLibTest(tf.test.TestCase):
 
   def test_lr_schedule(self):
     stepwise = train_lib.StepwiseLrSchedule(1e-3, 1e-4, 1, 3, 5)

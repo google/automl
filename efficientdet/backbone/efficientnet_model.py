@@ -1,3 +1,4 @@
+# Lint as: python3
 # Copyright 2020 Google Research. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,10 +19,6 @@
   EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks.
   ICML'19, https://arxiv.org/abs/1905.11946
 """
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import collections
 import itertools
@@ -183,7 +180,7 @@ class SE(tf.keras.layers.Layer):
         padding='same',
         data_format=self._data_format,
         use_bias=True,
-        name='conv2d')
+        name='conv2d_1')
 
   def call(self, inputs):
     h_axis, w_axis = [2, 3] if self._data_format == 'channels_first' else [1, 2]
@@ -214,7 +211,7 @@ class SuperPixel(tf.keras.layers.Layer):
         data_format=global_params.data_format,
         use_bias=False,
         name='conv2d')
-    self._bnsp = self._batch_norm(
+    self._bnsp = global_params.batch_norm(
         axis=1 if global_params.data_format == 'channels_first' else -1,
         momentum=global_params.batch_norm_momentum,
         epsilon=global_params.batch_norm_epsilon,
@@ -238,6 +235,7 @@ class MBConvBlock(tf.keras.layers.Layer):
     Args:
       block_args: BlockArgs, arguments to create a Block.
       global_params: GlobalParams, a set of global parameters.
+      name: layer name.
     """
     super().__init__(name=name)
 
@@ -249,12 +247,7 @@ class MBConvBlock(tf.keras.layers.Layer):
     self._batch_norm = global_params.batch_norm
     self._condconv_num_experts = global_params.condconv_num_experts
     self._data_format = global_params.data_format
-    if self._data_format == 'channels_first':
-      self._channel_axis = 1
-      self._spatial_dims = [2, 3]
-    else:
-      self._channel_axis = -1
-      self._spatial_dims = [1, 2]
+    self._channel_axis = 1 if self._data_format == 'channels_first' else -1
 
     self._relu_fn = global_params.relu_fn or tf.nn.swish
     self._has_se = (
@@ -277,7 +270,14 @@ class MBConvBlock(tf.keras.layers.Layer):
 
   def _build(self):
     """Builds block according to the arguments."""
-    bn_name = 'tpu_batch_normalization'
+    # pylint: disable=g-long-lambda
+    bid = itertools.count(0)
+    get_bn_name = lambda: 'tpu_batch_normalization' + ('' if not next(
+        bid) else '_' + str(next(bid) // 2))
+    cid = itertools.count(0)
+    get_conv_name = lambda: 'conv2d' + ('' if not next(cid) else '_' + str(
+        next(cid) // 2))
+    # pylint: enable=g-long-lambda
 
     if self._block_args.super_pixel == 1:
       self.super_pixel = SuperPixel(
@@ -298,7 +298,7 @@ class MBConvBlock(tf.keras.layers.Layer):
           padding='same',
           data_format=self._data_format,
           use_bias=False,
-          name='conv2d')
+          name=get_conv_name())
     else:
       # Expansion phase. Called if not using fused convolutions and expansion
       # phase is necessary.
@@ -311,12 +311,12 @@ class MBConvBlock(tf.keras.layers.Layer):
             padding='same',
             data_format=self._data_format,
             use_bias=False,
-            name='conv2d')
+            name=get_conv_name())
         self._bn0 = self._batch_norm(
             axis=self._channel_axis,
             momentum=self._batch_norm_momentum,
             epsilon=self._batch_norm_epsilon,
-            name=bn_name)
+            name=get_bn_name())
 
       # Depth-wise convolution phase. Called if not using fused convolutions.
       self._depthwise_conv = tf.keras.layers.DepthwiseConv2D(
@@ -332,7 +332,7 @@ class MBConvBlock(tf.keras.layers.Layer):
         axis=self._channel_axis,
         momentum=self._batch_norm_momentum,
         epsilon=self._batch_norm_epsilon,
-        name=bn_name)
+        name=get_bn_name())
 
     if self._has_se:
       num_reduced_filters = max(
@@ -352,12 +352,12 @@ class MBConvBlock(tf.keras.layers.Layer):
         padding='same',
         data_format=self._data_format,
         use_bias=False,
-        name='conv2d')
+        name=get_conv_name())
     self._bn2 = self._batch_norm(
         axis=self._channel_axis,
         momentum=self._batch_norm_momentum,
         epsilon=self._batch_norm_epsilon,
-        name=bn_name)
+        name=get_bn_name())
 
   def call(self, inputs, training, survival_prob=None):
     """Implementation of call().
@@ -376,7 +376,7 @@ class MBConvBlock(tf.keras.layers.Layer):
     # creates conv 2x2 kernel
     if self.super_pixel:
       x = self.super_pixel(x, training)
-      logging.info('Start with SuperPixel: %s', self.name, x.shape)
+      logging.info('SuperPixel %s: %s', self.name, x.shape)
 
     if self._block_args.fused_conv:
       # If use fused mbconv, skip expansion and use regular conv.
@@ -549,6 +549,9 @@ class Head(tf.keras.layers.Layer):
     else:
       self._dropout = None
 
+    self.h_axis, self.w_axis = (
+        [2, 3] if global_params.data_format == 'channels_first' else [1, 2])
+
   def call(self, inputs, training, pooled_features_only):
     """Call the layer."""
     outputs = self._relu_fn(
@@ -557,9 +560,7 @@ class Head(tf.keras.layers.Layer):
 
     if self._global_params.local_pooling:
       shape = outputs.get_shape().as_list()
-      kernel_size = [
-          1, shape[self._spatial_dims[0]], shape[self._spatial_dims[1]], 1
-      ]
+      kernel_size = [1, shape[self.h_axis], shape[self.w_axis], 1]
       outputs = tf.nn.avg_pool(
           outputs, ksize=kernel_size, strides=[1, 1, 1, 1], padding='VALID')
       self.endpoints['pooled_features'] = outputs
@@ -568,7 +569,7 @@ class Head(tf.keras.layers.Layer):
           outputs = self._dropout(outputs, training=training)
         self.endpoints['global_pool'] = outputs
         if self._fc:
-          outputs = tf.squeeze(outputs, self._spatial_dims)
+          outputs = tf.squeeze(outputs, [self.h_axis, self.w_axis])
           outputs = self._fc(outputs)
         self.endpoints['head'] = outputs
     else:
@@ -622,10 +623,6 @@ class Model(tf.keras.Model):
   def _build(self):
     """Builds a model."""
     self._blocks = []
-    if self._global_params.data_format == 'channels_first':
-      self._spatial_dims = [2, 3]
-    else:
-      self._spatial_dims = [1, 2]
 
     # Stem part.
     self._stem = Stem(self._global_params, self._blocks_args[0].input_filters)
