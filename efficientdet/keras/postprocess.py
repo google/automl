@@ -123,6 +123,7 @@ def pre_nms(params, cls_outputs, box_outputs) -> Tuple[T, T, T]:
                                  params['num_scales'], params['aspect_ratios'],
                                  params['anchor_scale'], params['image_size'])
   anchor_boxes = tf.gather(eval_anchors.boxes, indices)
+  anchor_boxes = tf.cast(anchor_boxes, box_outputs.dtype)
   boxes = anchors.decode_box_outputs_tf(box_outputs, anchor_boxes)
 
   # convert logits to scores.
@@ -216,6 +217,7 @@ def postprocess_global(params, cls_outputs, box_outputs, img_scales=None):
   nms_valid_len_bs = tf.stack(nms_valid_len_bs)
   if img_scales is not None:
     scales = tf.expand_dims(tf.expand_dims(img_scales, -1), -1)
+    scales = tf.cast(scales, nms_boxes_bs.dtype)
     nms_boxes_bs = nms_boxes_bs * scales
   return nms_boxes_bs, nms_scores_bs, nms_classes_bs, nms_valid_len_bs
 
@@ -246,12 +248,12 @@ def postprocess_per_class(params, cls_outputs, box_outputs, img_scales=None):
     nms_boxes_cls, nms_scores_cls, nms_classes_cls = [], [], []
     nms_valid_len_cls = []
     for cid in range(params['num_classes']):
-      indices = tf.squeeze(tf.where(classes_i == cid))
+      indices = tf.where(classes_i == cid)
       if indices.shape.as_list() == 0:
         continue
-      classes_cls = tf.gather(classes_i, indices)
-      boxes_cls = tf.gather(boxes_i, indices)
-      scores_cls = tf.gather(scores_i, indices)
+      classes_cls = tf.gather_nd(classes_i, indices)
+      boxes_cls = tf.gather_nd(boxes_i, indices)
+      scores_cls = tf.gather_nd(scores_i, indices)
 
       nms_boxes, nms_scores, nms_classes, nms_valid_len = nms(
           params, boxes_cls, scores_cls, classes_cls, False)
@@ -266,6 +268,7 @@ def postprocess_per_class(params, cls_outputs, box_outputs, img_scales=None):
     nms_valid_len_cls = tf.concat(nms_valid_len_cls, 0)
     # get top detections and pad to fix size.
     max_output_size = params['nms_configs'].get('max_output_size', 100)
+    max_output_size = tf.math.minimum(max_output_size, nms_scores_cls.shape[-1])
     _, indices = tf.math.top_k(nms_scores_cls, k=max_output_size, sorted=True)
 
     nms_boxes_bs.append(pad_zeros(nms_boxes_cls, max_output_size, indices))
