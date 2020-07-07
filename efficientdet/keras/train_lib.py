@@ -349,6 +349,10 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       box_loss: an integer tensor representing total box regression loss.
       box_iou_loss: an integer tensor representing total box iou loss.
     """
+    # convert to float32 for loss computing.
+    cls_outputs = [tf.cast(i, tf.float32) for i in cls_outputs]
+    box_outputs = [tf.cast(i, tf.float32) for i in box_outputs]
+
     # Sum all positives in a batch for normalization and avoid zero
     # num_positives_sum, which would lead to inf loss during training
     num_positives_sum = tf.reduce_sum(labels['mean_num_positives']) + 1.0
@@ -371,34 +375,35 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
                                           [bs, width, height, -1])
       box_targets_at_level = labels['box_targets_%d' % (level + 3)]
 
-      class_loss = self.loss.get('class_loss', None)
-      cls_loss = class_loss([num_positives_sum, cls_outputs[level]],
-                            cls_targets_at_level)
+      class_loss_layer = self.loss.get('class_loss', None)
+      if class_loss_layer:
+        cls_loss = class_loss_layer([num_positives_sum, cls_targets_at_level],
+                                    cls_outputs[level])
 
-      if self.config.data_format == 'channels_first':
-        cls_loss = tf.reshape(cls_loss,
-                              [bs, -1, width, height, self.config.num_classes])
-      else:
-        cls_loss = tf.reshape(cls_loss,
-                              [bs, width, height, -1, self.config.num_classes])
-      cls_loss *= tf.cast(
-          tf.expand_dims(
-              tf.not_equal(labels['cls_targets_%d' % (level + 3)], -2), -1),
-          tf.float32)
-      cls_losses.append(tf.reduce_sum(cls_loss))
+        if self.config.data_format == 'channels_first':
+          cls_loss = tf.reshape(
+              cls_loss, [bs, -1, width, height, self.config.num_classes])
+        else:
+          cls_loss = tf.reshape(
+              cls_loss, [bs, width, height, -1, self.config.num_classes])
+        cls_loss *= tf.cast(
+            tf.expand_dims(
+                tf.not_equal(labels['cls_targets_%d' % (level + 3)], -2), -1),
+            tf.float32)
+        cls_losses.append(tf.reduce_sum(cls_loss))
 
-      if self.config.box_loss_weight:
-        box_loss = self.loss.get('box_loss', None)
+      if self.config.box_loss_weight and self.loss.get('box_loss', None):
+        box_loss_layer = self.loss['box_loss']
         box_losses.append(
-            box_loss([num_positives_sum, box_outputs[level]],
-                     box_targets_at_level))
+            box_loss_layer([num_positives_sum, box_targets_at_level],
+                           box_outputs[level]))
 
-      if self.config.iou_loss_type:
-        box_iou_loss = self.loss.get('box_iou_loss', None)
+      if self.config.iou_loss_type and self.loss.get('box_iou_loss', None):
+        box_iou_loss_layer = self.loss['box_iou_loss']
         box_iou_losses.append(
-            box_iou_loss(box_outputs[level], box_targets_at_level,
-                         num_positives_sum, self.config.iou_loss_type))
-    cls_loss = tf.add_n(cls_losses)
+            box_iou_loss_layer(box_targets_at_level, box_outputs[level],
+                               num_positives_sum, self.config.iou_loss_type))
+    cls_loss = tf.add_n(cls_losses) if cls_losses else 0
     box_loss = tf.add_n(box_losses) if box_losses else 0
     box_iou_loss = tf.add_n(box_iou_losses) if box_iou_losses else 0
     total_loss = (

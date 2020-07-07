@@ -62,7 +62,7 @@ class TrainLibTest(tf.test.TestCase, parameterized.TestCase):
         focal_loss_v2([num_positives, box_targets], box_outputs))
 
   def test_predict(self):
-    x = np.random.random((1, 512, 512, 3))
+    x = np.random.random((1, 512, 512, 3)).astype(np.float32)
     model = train_lib.EfficientDetNetTrain('efficientdet-d0')
     cls_outputs, box_outputs = model(x)
     self.assertLen(cls_outputs, 5)
@@ -86,6 +86,7 @@ class TrainLibTest(tf.test.TestCase, parameterized.TestCase):
     labels.update({'mean_num_positives': tf.constant([10.0])})
 
     params = config.as_dict()
+    params['num_shards'] = 1
     model = train_lib.EfficientDetNetTrain(config=config)
     model.build((1, 512, 512, 3))
     model.compile(
@@ -108,9 +109,9 @@ class TrainLibTest(tf.test.TestCase, parameterized.TestCase):
 
     # Test single-batch
     outputs = model.train_on_batch(x, labels, return_dict=True)
-    self.assertAllClose(outputs, {'loss': 704961.9375}, rtol=.1, atol=100.)
+    self.assertAllClose(outputs, {'loss': 26278.2539}, rtol=.1, atol=100.)
     outputs = model.test_on_batch(x, labels, return_dict=True)
-    self.assertAllClose(outputs, {'loss': 701433.125}, rtol=.1, atol=100.)
+    self.assertAllClose(outputs, {'loss': 26061.1582}, rtol=.1, atol=100.)
 
     # Test fit.
     hist = model.fit(
@@ -120,7 +121,7 @@ class TrainLibTest(tf.test.TestCase, parameterized.TestCase):
         epochs=1,
         callbacks=train_lib.get_callbacks(params))
     self.assertAllClose(
-        hist.history, {'loss': [701433.125]}, rtol=.1, atol=100.)
+        hist.history, {'loss': [26061.1582]}, rtol=.1, atol=100.)
 
 
 if __name__ == '__main__':
