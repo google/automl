@@ -17,41 +17,59 @@
 import os
 import numpy as np
 from PIL import Image
+from absl import app
+from absl import logging
+import tensorflow as tf
 
 import hparams_config
 import inference
 from keras import efficientdet_keras
 
 
-# pylint: disable=line-too-long
-# Prepare images and checkpoints: please run these commands in shell.
-# !mkdir tmp
-# !wget https://user-images.githubusercontent.com/11736571/77320690-099af300-6d37-11ea-9d86-24f14dc2d540.png -O tmp/img.png
-# !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz -O tmp/efficientdet-d0.tar.gz
-# !tar zxf tmp/efficientdet-d0.tar.gz -C tmp
-imgs = [np.array(Image.open('tmp/img.png'))]
-nms_score_thresh, nms_max_output_size = 0.4, 100
+def main(_):
+  # pylint: disable=line-too-long
+  # Prepare images and checkpoints: please run these commands in shell.
+  # !mkdir tmp
+  # !wget https://user-images.githubusercontent.com/11736571/77320690-099af300-6d37-11ea-9d86-24f14dc2d540.png -O tmp/img.png
+  # !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz -O tmp/efficientdet-d0.tar.gz
+  # !tar zxf tmp/efficientdet-d0.tar.gz -C tmp
+  imgs = [np.array(Image.open('tmp/img.png'))]
+  nms_score_thresh, nms_max_output_size = 0.4, 100
 
-# Create model.
-config = hparams_config.get_efficientdet_config('efficientdet-d0')
-config.is_training_bn = False
-config.image_size = '1920x1280'
-config.nms_configs.score_thresh = nms_score_thresh
-config.nms_configs.max_output_size = nms_max_output_size
-model = efficientdet_keras.EfficientDetModel(config=config)
-model.build((1, 1280, 1920, 3))
-model.load_weights('tmp/efficientdet-d0/model')
-boxes, scores, classes, valid_len = model(imgs)
-model.summary()
+  # Create model config.
+  config = hparams_config.get_efficientdet_config('efficientdet-d0')
+  config.is_training_bn = False
+  config.image_size = '1920x1280'
+  config.nms_configs.score_thresh = nms_score_thresh
+  config.nms_configs.max_output_size = nms_max_output_size
 
-# Visualize results.
-for i, img in enumerate(imgs):
-  img = inference.visualize_image(img,
-                                  boxes[i].numpy(),
-                                  classes[i].numpy().astype(np.int),
-                                  scores[i].numpy(),
-                                  min_score_thresh=nms_score_thresh,
-                                  max_boxes_to_draw=nms_max_output_size)
-  output_image_path = os.path.join('tmp/', str(i) + '.jpg')
-  Image.fromarray(img).save(output_image_path)
-  print('writing annotated image to %s', output_image_path)
+  # Use 'mixed_float16' if running on GPUs.
+  policy = tf.keras.mixed_precision.experimental.Policy('float32')
+  tf.keras.mixed_precision.experimental.set_policy(policy)
+
+  # Create and run the model.
+  model = efficientdet_keras.EfficientDetModel(config=config)
+  model.build((1, 1280, 1920, 3))
+  model.load_weights('tmp/efficientdet-d0/model')
+  boxes, scores, classes, valid_len = model(
+      imgs, training=False, post_mode='global')
+  model.summary()
+
+  # Visualize results.
+  for i, img in enumerate(imgs):
+    length = valid_len[i]
+    img = inference.visualize_image(
+        img,
+        boxes[i].numpy()[:length],
+        classes[i].numpy().astype(np.int)[:length],
+        scores[i].numpy()[:length],
+        min_score_thresh=nms_score_thresh,
+        max_boxes_to_draw=nms_max_output_size)
+    output_image_path = os.path.join('tmp/', str(i) + '.jpg')
+    Image.fromarray(img).save(output_image_path)
+    print('writing annotated image to %s', output_image_path)
+
+
+if __name__ == '__main__':
+  logging.set_verbosity(logging.WARNING)
+  app.run(main)
