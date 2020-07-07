@@ -1,3 +1,4 @@
+# Lint as: python3
 # Copyright 2020 Google Research. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,12 +18,6 @@
 Distance-IoU Loss: Faster and Better Learning for Bounding Box Regression.
 https://arxiv.org/pdf/1911.08287.pdf
 """
-
-from __future__ import absolute_import
-from __future__ import division
-# gtype import
-from __future__ import print_function
-
 import math
 from typing import Union, Text
 import numpy as np

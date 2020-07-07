@@ -572,10 +572,10 @@ class BoxNet(tf.keras.layers.Layer):
 class FPNCells(tf.keras.layers.Layer):
   """FPN cells."""
 
-  def __init__(self, feat_sizes, config, name='fpn_cells'):
+  def __init__(self, config, name='fpn_cells'):
     super().__init__(name=name)
-    self.feat_sizes = feat_sizes
     self.config = config
+    self.feat_sizes = utils.get_feat_sizes(config.image_size, config.max_level)
 
     if config.fpn_config:
       self.fpn_config = config.fpn_config
@@ -696,7 +696,7 @@ class EfficientDetNet(tf.keras.Model):
               data_format=config.data_format,
               name='resample_p%d' % level,
           ))
-    self.fpn_cells = FPNCells(feat_sizes, config)
+    self.fpn_cells = FPNCells(config)
 
     # class/box output prediction network.
     num_anchors = len(config.aspect_ratios) * config.num_scales

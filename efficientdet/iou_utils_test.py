@@ -80,6 +80,7 @@ class IouUtilsTest(tf.test.TestCase):
     self.assertEqual(tf.reduce_sum(grad[0]), 0.16687772)
     self.assertEqual(tf.reduce_sum(grad[1]), -0.16687769)
 
+
 if __name__ == '__main__':
   logging.set_verbosity(logging.WARNING)
   tf.test.main()
