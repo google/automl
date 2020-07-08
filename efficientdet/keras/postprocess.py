@@ -18,11 +18,17 @@ from typing import List, Tuple
 from absl import logging
 import tensorflow as tf
 
-import anchors
+import anchors as anchors_lib
 import utils
-
 T = tf.Tensor  # a shortcut for typing check.
-MAX_BOXES_PER_IMAGE = 100
+
+
+def to_list(inputs):
+  if isinstance(inputs, dict):
+    return [inputs[k] for k in sorted(inputs.keys())]
+  if isinstance(inputs, list):
+    return inputs
+  raise ValueError('Unrecognized inputs : {}'.format(inputs))
 
 
 def clip_boxes(boxes: T, image_size: int) -> T:
@@ -31,16 +37,34 @@ def clip_boxes(boxes: T, image_size: int) -> T:
   return tf.clip_by_value(boxes, [0], image_size)
 
 
-def pad_zeros(inputs: T, max_output_size: int, indices=None) -> T:
-  """Pad the inputs (or a subset specified by indices) to max_output_size."""
-  if indices is not None:
-    inputs = tf.gather(inputs, indices)
-  padding_size = max_output_size - tf.shape(inputs)[0]
-  if tf.rank(inputs) == 1:
-    return tf.pad(inputs, [[0, padding_size]])
-  if tf.rank(inputs) == 2:
-    return tf.pad(inputs, [[0, padding_size], [0, 0]])
-  raise ValueError('pad_zeros only support rank 1 or 2 inputs.')
+def decode_box_outputs(pred_boxes, anchor_boxes):
+  """Transforms relative regression coordinates to absolute positions.
+
+  Network predictions are normalized and relative to a given anchor; this
+  reverses the transformation and outputs absolute coordinates for the input
+  image.
+
+  Args:
+    pred_boxes: predicted box regression targets.
+    anchor_boxess: anchors on all feature levels.
+  Returns:
+    outputs: bounding boxes.
+  """
+  ycenter_a = (anchor_boxes[..., 0] + anchor_boxes[..., 2]) / 2
+  xcenter_a = (anchor_boxes[..., 1] + anchor_boxes[..., 3]) / 2
+  ha = anchor_boxes[..., 2] - anchor_boxes[..., 0]
+  wa = anchor_boxes[..., 3] - anchor_boxes[..., 1]
+  ty, tx, th, tw = tf.unstack(pred_boxes, num=4, axis=-1)
+
+  w = tf.math.exp(tw) * wa
+  h = tf.math.exp(th) * ha
+  ycenter = ty * ha + ycenter_a
+  xcenter = tx * wa + xcenter_a
+  ymin = ycenter - h / 2.
+  xmin = xcenter - w / 2.
+  ymax = ycenter + h / 2.
+  xmax = xcenter + w / 2.
+  return tf.stack([ymin, xmin, ymax, xmax], axis=-1)
 
 
 def merge_class_box_level_outputs(params, cls_outputs: List[T],
@@ -119,12 +143,14 @@ def pre_nms(params, cls_outputs, box_outputs) -> Tuple[T, T, T]:
       params, cls_outputs, box_outputs)
 
   # get boxes by apply bounding box regression to anchors.
-  eval_anchors = anchors.Anchors(params['min_level'], params['max_level'],
-                                 params['num_scales'], params['aspect_ratios'],
-                                 params['anchor_scale'], params['image_size'])
+  eval_anchors = anchors_lib.Anchors(params['min_level'], params['max_level'],
+                                     params['num_scales'],
+                                     params['aspect_ratios'],
+                                     params['anchor_scale'],
+                                     params['image_size'])
   anchor_boxes = tf.gather(eval_anchors.boxes, indices)
   anchor_boxes = tf.cast(anchor_boxes, box_outputs.dtype)
-  boxes = anchors.decode_box_outputs_tf(box_outputs, anchor_boxes)
+  boxes = decode_box_outputs(box_outputs, anchor_boxes)
 
   # convert logits to scores.
   scores = tf.math.sigmoid(cls_outputs)
@@ -147,19 +173,19 @@ def nms(params, boxes: T, scores: T, classes: T,
     denoting the valid length of boxes/scores/classes outputs.
   """
   logging.info('performing per-sample nms')
-  nms_configs = params['nms_configs'] or dict()
-  method = nms_configs.get('method', None)
-  max_output_size = nms_configs.get('max_output_size', MAX_BOXES_PER_IMAGE)
+  nms_configs = params['nms_configs']
+  method = nms_configs['method']
+  max_output_size = nms_configs['max_output_size']
 
   if method == 'hard' or not method:
     # hard nms.
     sigma = 0.0
-    iou_thresh = nms_configs.get('iou_thresh', 0.5)
-    score_thresh = nms_configs.get('score_thresh', float('-inf'))
+    iou_thresh = nms_configs['iou_thresh'] or 0.5
+    score_thresh = nms_configs['score_thresh'] or float('-inf')
   elif method == 'gaussian':
-    sigma = nms_configs.get('sigma', 0.5)
-    iou_thresh = nms_configs.get('iou_thresh', 0.3)
-    score_thresh = nms_configs.get('score_thresh', 0.001)
+    sigma = nms_configs['sigma'] or 0.5
+    iou_thresh = nms_configs['iou_thresh'] or 0.3
+    score_thresh = nms_configs['score_thresh'] or 0.001
   else:
     raise ValueError('Inference has invalid nms method {}'.format(method))
 
@@ -195,6 +221,8 @@ def postprocess_global(params, cls_outputs, box_outputs, img_scales=None):
   Returns:
     A tuple of batch level (boxes, scores, classess, valid_len) after nms.
   """
+  cls_outputs = to_list(cls_outputs)
+  box_outputs = to_list(box_outputs)
   boxes, scores, classes = pre_nms(params, cls_outputs, box_outputs)
 
   # A list of batched boxes, scores, and classes.
@@ -239,6 +267,8 @@ def postprocess_per_class(params, cls_outputs, box_outputs, img_scales=None):
   Returns:
     A tuple of batch level (boxes, scores, classess, valid_len) after nms.
   """
+  cls_outputs = to_list(cls_outputs)
+  box_outputs = to_list(box_outputs)
   boxes, scores, classes = pre_nms(params, cls_outputs, box_outputs)
 
   nms_boxes_bs, nms_scores_bs, nms_classes_bs, nms_valid_len_bs = [], [], [], []
@@ -248,7 +278,7 @@ def postprocess_per_class(params, cls_outputs, box_outputs, img_scales=None):
     nms_boxes_cls, nms_scores_cls, nms_classes_cls = [], [], []
     nms_valid_len_cls = []
     for cid in range(params['num_classes']):
-      indices = tf.where(classes_i == cid)
+      indices = tf.where(tf.equal(classes_i, cid))
       if indices.shape.as_list() == 0:
         continue
       classes_cls = tf.gather_nd(classes_i, indices)
@@ -262,25 +292,29 @@ def postprocess_per_class(params, cls_outputs, box_outputs, img_scales=None):
       nms_classes_cls.append(nms_classes)
       nms_valid_len_cls.append(nms_valid_len)
 
-    nms_boxes_cls = tf.concat(nms_boxes_cls, 0)
-    nms_scores_cls = tf.concat(nms_scores_cls, 0)
-    nms_classes_cls = tf.concat(nms_classes_cls, 0)
-    nms_valid_len_cls = tf.concat(nms_valid_len_cls, 0)
-    # get top detections and pad to fix size.
+    # Pad zeros and select topk.
     max_output_size = params['nms_configs'].get('max_output_size', 100)
-    max_output_size = tf.math.minimum(max_output_size, nms_scores_cls.shape[-1])
+    nms_boxes_cls = tf.pad(
+        tf.concat(nms_boxes_cls, 0), [[0, max_output_size], [0, 0]])
+    nms_scores_cls = tf.pad(
+        tf.concat(nms_scores_cls, 0), [[0, max_output_size]])
+    nms_classes_cls = tf.pad(
+        tf.concat(nms_classes_cls, 0), [[0, max_output_size]])
+    nms_valid_len_cls = tf.stack(nms_valid_len_cls)
+
     _, indices = tf.math.top_k(nms_scores_cls, k=max_output_size, sorted=True)
 
-    nms_boxes_bs.append(pad_zeros(nms_boxes_cls, max_output_size, indices))
-    nms_scores_bs.append(pad_zeros(nms_scores_cls, max_output_size, indices))
-    nms_classes_bs.append(pad_zeros(nms_classes_cls, max_output_size, indices))
-    nms_valid_len_bs.append(indices.shape[0])
+    nms_boxes_bs.append(tf.gather(nms_boxes_cls, indices))
+    nms_scores_bs.append(tf.gather(nms_scores_cls, indices))
+    nms_classes_bs.append(tf.gather(nms_classes_cls, indices))
+    nms_valid_len_bs.append(
+        tf.minimum(max_output_size, tf.reduce_sum(nms_valid_len_cls)))
 
   nms_scores_bs = tf.stack(nms_scores_bs)
   nms_classes_bs = tf.stack(nms_classes_bs)
   nms_boxes_bs = tf.stack(nms_boxes_bs)
   nms_valid_len_bs = tf.stack(nms_valid_len_bs)
-  if img_scales:
+  if img_scales is not None:
     scales = tf.expand_dims(tf.expand_dims(img_scales, -1), -1)
     nms_boxes_bs = nms_boxes_bs * scales
   return nms_boxes_bs, nms_scores_bs, nms_classes_bs, nms_valid_len_bs

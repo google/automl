@@ -248,7 +248,14 @@ def default_detection_configs():
   h.conv_bn_act_pattern = False
 
   # For post-processing nms, must be a dict.
-  h.nms_configs = {'method': 'hard'}
+  h.nms_configs = {
+      'method': 'hard',
+      'iou_thresh': None,  # use the default value based on method.
+      'score_thresh': None,
+      'sigma': None,
+      'max_nms_inputs': 0,
+      'max_output_size': 100,
+  }
 
   # version.
   h.fpn_name = None

@@ -37,6 +37,11 @@ class PostprocessTest(tf.test.TestCase):
         'data_format': 'channels_last',
         'max_detection_points': 10,
         'nms_configs': {
+            'method': 'hard',
+            'iou_thresh': None,
+            'score_thresh': None,
+            'sigma': None,
+            'max_nms_inputs': 0,
             'max_output_size': 2,
         }
     }
