@@ -31,6 +31,7 @@ import hparams_config
 import iou_utils
 import retinanet_arch
 import utils
+from keras import postprocess
 
 _DEFAULT_BATCH_SIZE = 64
 
@@ -295,6 +296,7 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
   return total_loss, cls_loss, box_loss, box_iou_loss
 
 
+# TODO(tanmingxing): delete this function after clean up inference.py
 def add_metric_fn_inputs(params,
                          cls_outputs,
                          box_outputs,
@@ -362,39 +364,6 @@ def add_metric_fn_inputs(params,
   metric_fn_inputs['classes_all'] = classes
 
 
-def coco_metric_fn(batch_size,
-                   anchor_labeler,
-                   filename=None,
-                   testdev_dir=None,
-                   **kwargs):
-  """Evaluation metric fn. Performed on CPU, do not reference TPU ops."""
-  # add metrics to output
-  detections_bs = []
-  for index in range(batch_size):
-    cls_outputs_per_sample = kwargs['cls_outputs_all'][index]
-    box_outputs_per_sample = kwargs['box_outputs_all'][index]
-    indices_per_sample = kwargs['indices_all'][index]
-    classes_per_sample = kwargs['classes_all'][index]
-    detections = anchor_labeler.generate_detections(
-        cls_outputs_per_sample,
-        box_outputs_per_sample,
-        indices_per_sample,
-        classes_per_sample,
-        tf.slice(kwargs['source_ids'], [index], [1]),
-        tf.slice(kwargs['image_scales'], [index], [1]),
-        nms_configs=kwargs.get('nms_configs', None),
-        disable_pyfun=kwargs.get('disable_pyfun', None),
-    )
-    detections_bs.append(detections)
-
-  if testdev_dir:
-    eval_metric = coco_metric.EvaluationMetric(testdev_dir=testdev_dir)
-    coco_metrics = eval_metric.estimator_metric_fn(detections_bs, tf.zeros([1]))
-  else:
-    eval_metric = coco_metric.EvaluationMetric(filename=filename)
-    coco_metrics = eval_metric.estimator_metric_fn(detections_bs,
-                                                   kwargs['groundtruth_data'])
-  return coco_metrics
 
 
 def reg_l2_loss(weight_decay, regex=r'.*(kernel|weight):0$'):
@@ -535,38 +504,22 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
     def metric_fn(**kwargs):
       """Returns a dictionary that has the evaluation metrics."""
-      batch_size = params['batch_size']
-      if params['strategy'] == 'tpu':
-        batch_size = params['batch_size'] * params['num_shards']
-      eval_anchors = anchors.Anchors(params['min_level'], params['max_level'],
-                                     params['num_scales'],
-                                     params['aspect_ratios'],
-                                     params['anchor_scale'],
-                                     params['image_size'])
-      anchor_labeler = anchors.AnchorLabeler(eval_anchors,
-                                             params['num_classes'])
-      cls_loss = tf.metrics.mean(kwargs['cls_loss_repeat'])
-      box_loss = tf.metrics.mean(kwargs['box_loss_repeat'])
-
       if params.get('testdev_dir', None):
         logging.info('Eval testdev_dir %s', params['testdev_dir'])
-        coco_metrics = coco_metric_fn(
-            batch_size,
-            anchor_labeler,
-            params['val_json_file'],
-            testdev_dir=params['testdev_dir'],
-            nms_configs=params['nms_configs'],
-            **kwargs)
+        eval_metric = coco_metric.EvaluationMetric(
+            testdev_dir=params['testdev_dir'])
+        coco_metrics = eval_metric.estimator_metric_fn(kwargs['detections_bs'],
+                                                       tf.zeros([1]))
       else:
         logging.info('Eval val with groudtruths %s.', params['val_json_file'])
-        coco_metrics = coco_metric_fn(
-            batch_size,
-            anchor_labeler,
-            params['val_json_file'],
-            nms_configs=params['nms_configs'],
-            **kwargs)
+        eval_metric = coco_metric.EvaluationMetric(
+            filename=params['val_json_file'])
+        coco_metrics = eval_metric.estimator_metric_fn(
+            kwargs['detections_bs'], kwargs['groundtruth_data'])
 
       # Add metrics to output.
+      cls_loss = tf.metrics.mean(kwargs['cls_loss_repeat'])
+      box_loss = tf.metrics.mean(kwargs['box_loss_repeat'])
       output_metrics = {
           'cls_loss': cls_loss,
           'box_loss': box_loss,
@@ -582,14 +535,21 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
         tf.tile(tf.expand_dims(box_loss, 0), [
             params['batch_size'],
         ]), [params['batch_size'], 1])
+
+    params['nms_configs']['max_nms_inputs'] = anchors.MAX_DETECTION_POINTS
+    detections_bs = postprocess.generate_detections(params, cls_outputs,
+                                                    box_outputs,
+                                                    labels['image_scales'],
+                                                    labels['source_ids'])
+
     metric_fn_inputs = {
         'cls_loss_repeat': cls_loss_repeat,
         'box_loss_repeat': box_loss_repeat,
         'source_ids': labels['source_ids'],
         'groundtruth_data': labels['groundtruth_data'],
         'image_scales': labels['image_scales'],
+        'detections_bs': detections_bs,
     }
-    add_metric_fn_inputs(params, cls_outputs, box_outputs, metric_fn_inputs)
     eval_metrics = (metric_fn, metric_fn_inputs)
 
   checkpoint = params.get('ckpt') or params.get('backbone_ckpt')
