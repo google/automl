@@ -370,6 +370,7 @@ class InputReader(object):
     dataset = dataset.prefetch(batch_size)
     dataset = dataset.batch(batch_size, drop_remainder=True)
 
+    @tf.autograph.experimental.do_not_convert
     def _process_example(images, cls_targets, box_targets, num_positives,
                          source_ids, image_scales, boxes, is_crowds, areas,
                          classes):
@@ -386,13 +387,13 @@ class InputReader(object):
         images = tf.transpose(images, [0, 3, 1, 2])
 
       for level in range(params['min_level'], params['max_level'] + 1):
+        labels['cls_targets_%d' % level] = cls_targets[level]
+        labels['box_targets_%d' % level] = box_targets[level]
         if params['data_format'] == 'channels_first':
           labels['cls_targets_%d' % level] = tf.transpose(
               labels['cls_targets_%d' % level], [0, 3, 1, 2])
           labels['box_targets_%d' % level] = tf.transpose(
               labels['box_targets_%d' % level], [0, 3, 1, 2])
-        labels['cls_targets_%d' % level] = cls_targets[level]
-        labels['box_targets_%d' % level] = box_targets[level]
       # Concatenate groundtruth annotations to a tensor.
       groundtruth_data = tf.concat([boxes, is_crowds, areas, classes], axis=2)
       labels['source_ids'] = source_ids

@@ -25,6 +25,18 @@ from keras import train_lib
 
 class TrainLibTest(tf.test.TestCase):
 
+  def test_display_callback(self):
+    config = hparams_config.get_detection_config('efficientdet-d0')
+    config.batch_size = 1
+    config.num_examples_per_epoch = 1
+    config.model_dir = tempfile.mkdtemp()
+    sample_image = tf.ones([416, 416, 3])
+    display_callback = train_lib.DisplayCallback(sample_image)
+    model = train_lib.EfficientDetNetTrain(config=config)
+    model.build((1, 512, 512, 3))
+    display_callback.set_model(model)
+    display_callback.on_epoch_end(0, {})
+
   def test_lr_schedule(self):
     stepwise = train_lib.StepwiseLrSchedule(1e-3, 1e-4, 1, 3, 5)
     cosine = train_lib.CosineLrSchedule(1e-3, 1e-4, 1, 5)
@@ -108,9 +120,20 @@ class TrainLibTest(tf.test.TestCase):
 
     # Test single-batch
     outputs = model.train_on_batch(x, labels, return_dict=True)
-    self.assertAllClose(outputs, {'loss': 26278.2539}, rtol=.1, atol=100.)
+    expect_results = {'loss': 26278.25,
+                      'det_loss': 26277.033203125,
+                      'cls_loss': 5060.716796875,
+                      'box_loss': 424.3263244628906,
+                      'box_iou_loss': 0,
+                      'gnorm': 5873.78759765625}
+    self.assertAllClose(outputs, expect_results, rtol=.1, atol=100.)
     outputs = model.test_on_batch(x, labels, return_dict=True)
-    self.assertAllClose(outputs, {'loss': 26061.1582}, rtol=.1, atol=100.)
+    expect_results = {'loss': 26079.712890625,
+                      'det_loss': 26078.49609375,
+                      'cls_loss': 5063.3759765625,
+                      'box_loss': 420.30242919921875,
+                      'box_iou_loss': 0}
+    self.assertAllClose(outputs, expect_results, rtol=.1, atol=100.)
 
     # Test fit.
     hist = model.fit(
@@ -119,8 +142,14 @@ class TrainLibTest(tf.test.TestCase):
         steps_per_epoch=1,
         epochs=1,
         callbacks=train_lib.get_callbacks(params))
+    expect_results = {'loss': [26063.099609375],
+                      'det_loss': [26061.8828125],
+                      'cls_loss': [5058.1337890625],
+                      'box_loss': [420.074951171875],
+                      'box_iou_loss': [0],
+                      'gnorm': [5107.46435546875]}
     self.assertAllClose(
-        hist.history, {'loss': [26061.1582]}, rtol=.1, atol=100.)
+        hist.history, expect_results, rtol=.1, atol=100.)
 
 
 if __name__ == '__main__':
