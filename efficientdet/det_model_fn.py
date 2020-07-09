@@ -140,6 +140,9 @@ def learning_rate_schedule(params, global_step):
                                   params['poly_lr_power'],
                                   params['total_steps'], global_step)
 
+  if lr_decay_method == 'constant':
+    return params['adjusted_learning_rate']
+
   raise ValueError('unknown lr_decay_method: {}'.format(lr_decay_method))
 
 
