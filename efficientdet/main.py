@@ -65,9 +65,8 @@ flags.DEFINE_string('backbone_ckpt', '',
 flags.DEFINE_string('ckpt', None,
                     'Start training from this EfficientDet checkpoint.')
 
-flags.DEFINE_string(
-    'hparams', '', 'Comma separated k=v pairs of hyperparameters or a module'
-    ' containing attributes to use as hyperparameters.')
+flags.DEFINE_string('hparams', '',
+                    'Comma separated k=v pairs of hyperparameters.')
 flags.DEFINE_integer(
     'num_cores', default=8, help='Number of TPU cores for training')
 flags.DEFINE_bool('use_spatial_partition', False, 'Use spatial partition.')
@@ -98,16 +97,13 @@ flags.DEFINE_string('testdev_dir', None,
                     'COCO testdev dir. If not None, ignorer val_json_file.')
 flags.DEFINE_integer('num_examples_per_epoch', 120000,
                      'Number of examples in one epoch')
-flags.DEFINE_integer('num_epochs', None, 'Number of epochs for training')
+flags.DEFINE_integer('num_epochs', 15, 'Number of epochs for training')
 flags.DEFINE_string('mode', 'train',
                     'Mode to run: train or eval (default: train)')
 flags.DEFINE_string('model_name', 'efficientdet-d1',
                     'Model name: retinanet or efficientdet')
 flags.DEFINE_bool('eval_after_training', False, 'Run one eval after the '
                   'training finishes.')
-flags.DEFINE_integer(
-    'tf_random_seed', None, 'Sets the TF graph seed for deterministic execution'
-    ' across runs (for debugging).')
 
 # For Eval mode
 flags.DEFINE_integer('min_eval_interval', 180,
@@ -120,9 +116,7 @@ FLAGS = flags.FLAGS
 
 
 def main(argv):
-  assert len(argv) >= 1
-  if len(argv) > 1:  # Do not accept unknown args.
-    raise ValueError('Received unknown arguments: {}'.format(argv[1:]))
+  del argv  # Unused.
 
   if FLAGS.use_tpu:
     tpu_cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
@@ -146,11 +140,6 @@ def main(argv):
   # Parse and override hparams
   config = hparams_config.get_detection_config(FLAGS.model_name)
   config.override(FLAGS.hparams)
-  if FLAGS.num_epochs:  # NOTE: remove this flag after updating all docs.
-    config.num_epochs = FLAGS.num_epochs
-
-  # Parse image size in case it is in string format.
-  config.image_size = utils.parse_image_size(config.image_size)
 
   # The following is for spatial partitioning. `features` has one tensor while
   # `labels` had 4 + (`max_level` - `min_level` + 1) * 2 tensors. The input
@@ -211,6 +200,7 @@ def main(argv):
   params = dict(
       config.as_dict(),
       model_name=FLAGS.model_name,
+      num_epochs=FLAGS.num_epochs,
 
       iterations_per_loop=FLAGS.iterations_per_loop,
       model_dir=FLAGS.model_dir,
@@ -244,7 +234,6 @@ def main(argv):
       log_step_count_steps=FLAGS.iterations_per_loop,
       session_config=config_proto,
       tpu_config=tpu_config,
-      tf_random_seed=FLAGS.tf_random_seed,
   )
 
   model_fn_instance = det_model_fn.get_model_fn(FLAGS.model_name)
@@ -262,21 +251,21 @@ def main(argv):
         input_fn=dataloader.InputReader(FLAGS.training_file_pattern,
                                         is_training=True,
                                         use_fake_data=FLAGS.use_fake_data),
-        max_steps=int((config.num_epochs * FLAGS.num_examples_per_epoch) /
+        max_steps=int((FLAGS.num_epochs * FLAGS.num_examples_per_epoch) /
                       FLAGS.train_batch_size))
 
     if FLAGS.eval_after_training:
       # Run evaluation after training finishes.
       eval_params = dict(
           params,
-          use_tpu=FLAGS.use_tpu,
+          use_tpu=False,
           input_rand_hflip=False,
           is_training_bn=False,
-          precision=None,
+          use_bfloat16=False,
       )
       eval_estimator = tf.estimator.tpu.TPUEstimator(
           model_fn=model_fn_instance,
-          use_tpu=FLAGS.use_tpu,
+          use_tpu=False,
           train_batch_size=FLAGS.train_batch_size,
           eval_batch_size=FLAGS.eval_batch_size,
           config=run_config,
@@ -293,17 +282,18 @@ def main(argv):
     # Eval only runs on CPU or GPU host with batch_size = 1.
     # Override the default options: disable randomization in the input pipeline
     # and don't run on the TPU.
+    # Also, disable use_bfloat16 for eval on CPU/GPU.
     eval_params = dict(
         params,
-        use_tpu=FLAGS.use_tpu,
+        use_tpu=False,
         input_rand_hflip=False,
         is_training_bn=False,
-        precision=None,
+        use_bfloat16=False,
     )
 
     eval_estimator = tf.estimator.tpu.TPUEstimator(
         model_fn=model_fn_instance,
-        use_tpu=FLAGS.use_tpu,
+        use_tpu=False,
         train_batch_size=FLAGS.train_batch_size,
         eval_batch_size=FLAGS.eval_batch_size,
         config=run_config,
@@ -337,7 +327,7 @@ def main(argv):
           break
 
         utils.archive_ckpt(eval_results, eval_results['AP'], ckpt)
-        total_step = int((config.num_epochs * FLAGS.num_examples_per_epoch) /
+        total_step = int((FLAGS.num_epochs * FLAGS.num_examples_per_epoch) /
                          FLAGS.train_batch_size)
         if current_step >= total_step:
           logging.info('Evaluation finished after training step %d',
@@ -353,7 +343,7 @@ def main(argv):
                      ckpt)
 
   elif FLAGS.mode == 'train_and_eval':
-    for cycle in range(config.num_epochs):
+    for cycle in range(FLAGS.num_epochs):
       logging.info('Starting training cycle, epoch: %d.', cycle)
       train_estimator = tf.estimator.tpu.TPUEstimator(
           model_fn=model_fn_instance,
@@ -371,14 +361,14 @@ def main(argv):
       # Run evaluation after every epoch.
       eval_params = dict(
           params,
-          use_tpu=FLAGS.use_tpu,
+          use_tpu=False,
           input_rand_hflip=False,
           is_training_bn=False,
       )
 
       eval_estimator = tf.estimator.tpu.TPUEstimator(
           model_fn=model_fn_instance,
-          use_tpu=FLAGS.use_tpu,
+          use_tpu=False,
           train_batch_size=FLAGS.train_batch_size,
           eval_batch_size=FLAGS.eval_batch_size,
           config=run_config,
@@ -396,5 +386,5 @@ def main(argv):
 
 
 if __name__ == '__main__':
-  tf.disable_eager_execution()
+  tf.disable_v2_behavior()
   tf.app.run(main)
