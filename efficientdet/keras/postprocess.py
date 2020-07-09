@@ -18,9 +18,10 @@ from typing import List, Tuple
 from absl import logging
 import tensorflow as tf
 
-import anchors as anchors_lib
 import utils
+from keras import anchors
 T = tf.Tensor  # a shortcut for typing check.
+CLASS_OFFSET = 1
 
 
 def to_list(inputs):
@@ -121,7 +122,7 @@ def topk_class_boxes(params, cls_outputs: T,
   return cls_outputs_topk, box_outputs_topk, classes, indices
 
 
-def pre_nms(params, cls_outputs, box_outputs) -> Tuple[T, T, T]:
+def pre_nms(params, cls_outputs, box_outputs, topk=True) -> Tuple[T, T, T]:
   """Detection post processing before nms.
 
   It takes the multi-level class and box predictions from network, merge them
@@ -137,21 +138,24 @@ def pre_nms(params, cls_outputs, box_outputs) -> Tuple[T, T, T]:
   Returns:
     A tuple of (boxes, scores, classes).
   """
+  # get boxes by apply bounding box regression to anchors.
+  eval_anchors = anchors.Anchors(params['min_level'], params['max_level'],
+                                 params['num_scales'], params['aspect_ratios'],
+                                 params['anchor_scale'], params['image_size'])
+
   cls_outputs, box_outputs = merge_class_box_level_outputs(
       params, cls_outputs, box_outputs)
-  cls_outputs, box_outputs, classes, indices = topk_class_boxes(
-      params, cls_outputs, box_outputs)
 
-  # get boxes by apply bounding box regression to anchors.
-  eval_anchors = anchors_lib.Anchors(params['min_level'], params['max_level'],
-                                     params['num_scales'],
-                                     params['aspect_ratios'],
-                                     params['anchor_scale'],
-                                     params['image_size'])
-  anchor_boxes = tf.gather(eval_anchors.boxes, indices)
-  anchor_boxes = tf.cast(anchor_boxes, box_outputs.dtype)
+  if topk:
+    # select topK purely based on scores before NMS, in order to speed up nms.
+    cls_outputs, box_outputs, classes, indices = topk_class_boxes(
+        params, cls_outputs, box_outputs)
+    anchor_boxes = tf.gather(eval_anchors.boxes, indices)
+  else:
+    anchor_boxes = eval_anchors.boxes
+    classes = None
+
   boxes = decode_box_outputs(box_outputs, anchor_boxes)
-
   # convert logits to scores.
   scores = tf.math.sigmoid(cls_outputs)
   return boxes, scores, classes
@@ -200,8 +204,45 @@ def nms(params, boxes: T, scores: T, classes: T,
       soft_nms_sigma=(sigma / 2),
       pad_to_max_output_size=padded)
   nms_boxes = tf.gather(boxes, nms_top_idx)
-  nms_classes = tf.cast(tf.gather(classes, nms_top_idx) + 1, tf.float32)
+  nms_classes = tf.cast(
+      tf.gather(classes, nms_top_idx) + CLASS_OFFSET, tf.float32)
   return nms_boxes, nms_scores, nms_classes, nms_valid_lens
+
+
+def postprocess_combined(params, cls_outputs, box_outputs, img_scales=None):
+  """Post processing with combined NMS.
+
+  Leverage the tf combined NMS. It is fast on TensorRT, but slow on CPU/GPU.
+
+  Args:
+    params: a dict of parameters.
+    cls_outputs: a list of tensors for classes, each tensor denotes a level
+      of logits with shape [N, H, W, num_class * num_anchors].
+    box_outputs: a list of tensors for boxes, each tensor ddenotes a level of
+      boxes with shape [N, H, W, 4 * num_anchors].
+    img_scales: scaling factor or the final image and bounding boxes.
+
+  Returns:
+    A tuple of batch level (boxes, scores, classess, valid_len) after nms.
+  """
+  cls_outputs = to_list(cls_outputs)
+  box_outputs = to_list(box_outputs)
+  # Don't filter any outputs because combine_nms need the raw information.
+  boxes, scores, _ = pre_nms(params, cls_outputs, box_outputs, topk=False)
+
+  max_output_size = params['nms_configs']['max_output_size']
+  score_thresh = params['nms_configs']['score_thresh'] or float('-inf')
+  nms_boxes, nms_scores, nms_classes, nms_valid_len = (
+      tf.image.combined_non_max_suppression(
+          tf.expand_dims(boxes, axis=2),
+          scores,
+          max_output_size,
+          max_output_size,
+          score_threshold=score_thresh,
+          clip_boxes=False))
+  nms_classes += CLASS_OFFSET
+  nms_boxes = clip_boxes(nms_boxes, params['image_size'])
+  return nms_boxes, nms_scores, nms_classes, nms_valid_len
 
 
 def postprocess_global(params, cls_outputs, box_outputs, img_scales=None):

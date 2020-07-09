@@ -17,7 +17,6 @@
 from absl import logging
 import tensorflow as tf
 
-import inference
 from keras import postprocess
 
 
@@ -65,21 +64,9 @@ class PostprocessTest(tf.test.TestCase):
     boxes, scores, classes, valid_len = postprocess.postprocess_global(
         self.params, cls_outputs_list, box_outputs_list, scales)
     self.assertAllClose(valid_len, [2, 2])
-
-    self.params['disable_pyfun'] = True
-    score_thresh = 0.5
-    self.params['batch_size'] = len(scales)
-    max_output_size = self.params['nms_configs']['max_output_size']
-    legacy_detections = inference.det_post_process(self.params, cls_outputs,
-                                                   box_outputs, scales,
-                                                   score_thresh,
-                                                   max_output_size)
-    legacy_boxes = legacy_detections[:, :, 1:5]
-    legacy_scores = legacy_detections[:, :, 5]
-    legacy_classes = legacy_detections[:, :, 6]
-    self.assertAllClose(boxes, legacy_boxes)
-    self.assertAllClose(scores, legacy_scores)
-    self.assertAllClose(classes, legacy_classes)
+    self.assertAllClose(classes.numpy(), [[2., 1.], [1., 2.]])
+    self.assertAllClose(scores.numpy(),
+                        [[0.90157586, 0.88812476], [0.88454413, 0.8158828]])
 
   def test_postprocess_per_class(self):
     """Test postprocess with per class nms."""
@@ -100,16 +87,36 @@ class PostprocessTest(tf.test.TestCase):
     self.params['max_detection_points'] = 10
     outputs = postprocess.generate_detections(self.params, cls_outputs_list,
                                               box_outputs_list, scales, ids)
+    self.assertAllClose(
+        outputs.numpy(),
+        [[[0., -1.177383, 1.793507, 9.518328, 2.624881, 0.901576, 2.],
+          [0., 5.676410, 6.102146, 2.109282, 2.435021, 0.888125, 1.]],
+         [[1., 5.885427, 13.529362, 5.524654, 0.624685, 0.884544, 1.],
+          [1., 8.145872, -9.660868, 6.028101, 20.073238, 0.815883, 2.]]])
 
-    self.params['disable_pyfun'] = False
-    score_thresh = 0.5
-    max_output_size = self.params['nms_configs']['max_output_size']
-    self.params['batch_size'] = len(scales)
-    legacy_outputs = inference.det_post_process(self.params, cls_outputs,
-                                                box_outputs, scales,
-                                                score_thresh, max_output_size)
-    self.assertAllClose(outputs, legacy_outputs)
+  def test_postprocess_combined(self):
+    """Test postprocess with per class nms."""
+    tf.random.set_seed(1111)
+    cls_outputs = {
+        1: tf.random.normal([2, 4, 4, 2]),
+        2: tf.random.normal([2, 2, 2, 2])
+    }
+    box_outputs = {
+        1: tf.random.normal([2, 4, 4, 4]),
+        2: tf.random.normal([2, 2, 2, 4])
+    }
+    cls_outputs_list = [cls_outputs[1], cls_outputs[2]]
+    box_outputs_list = [box_outputs[1], box_outputs[2]]
+    scales = [1.0, 2.0]
+    ids = [0, 1]
 
+    self.params['max_detection_points'] = 10
+    boxes, scores, classes, valid_len = postprocess.postprocess_combined(
+        self.params, cls_outputs_list, box_outputs_list, scales)
+    self.assertAllClose(valid_len, [2, 2])
+    self.assertAllClose(classes.numpy(), [[2., 1.], [1., 2.]])
+    self.assertAllClose(scores.numpy(),
+                        [[0.90157586, 0.88812476], [0.88454413, 0.8158828]])
 
 if __name__ == '__main__':
   logging.set_verbosity(logging.WARNING)
