@@ -477,7 +477,7 @@ def build_feature_network(features, config):
   return new_feats
 
 
-def bifpn_config(weight_method='fastattn',quad_method='sum'):
+def bifpn_config(weight_method='fastattn',quad_method='fastattn'):
   """BiFPN config with sum."""
   p = hparams_config.Config()
   p.weight_method = weight_method or 'fastattn'

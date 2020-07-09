@@ -188,6 +188,7 @@ def default_detection_configs():
   h.fpn_name = None
   h.fpn_weight_method = None
   h.fpn_config = None
+  h.fpn_quad_method = None
 
   # No stochastic depth in default.
   h.survival_prob = None
@@ -242,6 +243,7 @@ efficientdet_model_param_dict = {
             fpn_num_filters=160,
             fpn_cell_repeats=9,
             box_class_repeats=4,
+            fpn_weight_method='sum'  # Use unweighted sum for training stability.
         ),
     'efficientdet-d4':
         dict(
@@ -249,8 +251,9 @@ efficientdet_model_param_dict = {
             backbone_name='efficientnet-b4',
             image_size=1024,
             fpn_num_filters=224,
-            fpn_cell_repeats=7,
+            fpn_cell_repeats=10,
             box_class_repeats=4,
+            fpn_weight_method='sum'  # Use unweighted sum for training stability.
         ),
     'efficientdet-d5':
         dict(
@@ -258,8 +261,9 @@ efficientdet_model_param_dict = {
             backbone_name='efficientnet-b5',
             image_size=1280,
             fpn_num_filters=288,
-            fpn_cell_repeats=7,
+            fpn_cell_repeats=10,
             box_class_repeats=4,
+            fpn_weight_method='sum'  # Use unweighted sum for training stability.
         ),
     'efficientdet-d6':
         dict(
@@ -267,9 +271,9 @@ efficientdet_model_param_dict = {
             backbone_name='efficientnet-b6',
             image_size=1280,
             fpn_num_filters=384,
-            fpn_cell_repeats=8,
+            fpn_cell_repeats=10,
             box_class_repeats=5,
-            fpn_name='bifpn_sum',  # Use unweighted sum for training stability.
+            fpn_weight_method='sum',  # Use unweighted sum for training stability.
         ),
     'efficientdet-d7':
         dict(
@@ -280,7 +284,7 @@ efficientdet_model_param_dict = {
             fpn_cell_repeats=8,
             box_class_repeats=5,
             anchor_scale=5.0,
-            fpn_name='bifpn_sum',  # Use unweighted sum for training stability.
+            fpn_weight_method='sum',  # Use unweighted sum for training stability.
         ),
 }
 
