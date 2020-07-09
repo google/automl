@@ -17,11 +17,14 @@
 import math
 import re
 from absl import logging
+import numpy as np
 import tensorflow as tf
 
 import iou_utils
+import utils
+import inference
 from keras import efficientdet_keras
-
+from concurrent.futures import ThreadPoolExecutor
 
 def update_learning_rate_schedule_parameters(params):
   """Updates params that are related to the learning rate schedule."""
@@ -180,6 +183,42 @@ def get_optimizer(params):
         optimizer, loss_scale='dynamic')
   return optimizer
 
+class DisplayCallback(tf.keras.callbacks.Callback):
+  """Display inference result callback"""
+  def __init__(self, sample_image, update_freq=1):
+    super().__init__()
+    self.sample_image = tf.expand_dims(sample_image, axis=0)
+    self.executor = ThreadPoolExecutor(max_workers=1)
+    self.update_freq = update_freq
+
+  def set_model(self, model: tf.keras.Model):
+    self.train_model = model
+    with tf.device('/cpu:0'):
+      self.model = efficientdet_keras.EfficientDetModel(config=model.config)
+    height, width = utils.parse_image_size(model.config.image_size)
+    self.model.build((1, height, width, 3))
+    self.file_writer = tf.summary.create_file_writer(model.config.model_dir)
+
+  def on_epoch_end(self, epoch, logs=None):
+    if epoch % self.update_freq == 0:
+      with self.executor as executor:
+        executor.submit(self.draw_inference, epoch)
+
+  def draw_inference(self, epoch):
+    self.model.set_weights(self.train_model.get_weights())
+    boxes, scores, classes, valid_len = (
+        self.model(self.sample_image, training=False))
+    length = valid_len[0]
+    image = inference.visualize_image(
+        self.sample_image[0],
+        boxes[0].numpy()[:length],
+        classes[0].numpy().astype(np.int)[:length],
+        scores[0].numpy()[:length],
+        min_score_thresh=self.model.config.nms_configs['score_thresh'],
+        max_boxes_to_draw=self.model.config.nms_configs['max_output_size'])
+
+    with self.file_writer.as_default():
+      tf.summary.image("Test image", tf.expand_dims(image, axis=0), step=epoch)
 
 def get_callbacks(params, profile=False):
   tb_callback = tf.keras.callbacks.TensorBoard(
@@ -298,16 +337,9 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self.step = tf.Variable(
-        0,
-        trainable=False,
-        name='global_step',
-        dtype=tf.int64,
-        aggregation=tf.VariableAggregation.ONLY_FIRST_REPLICA,
-        shape=[])
     if self.config.moving_average_decay:
       self.ema = tf.train.ExponentialMovingAverage(
-          decay=self.config.moving_average_decay, num_updates=self.step)
+          decay=self.config.moving_average_decay)
 
   def freeze_vars(self, pattern):
     """Freeze variables according to pattern.
@@ -427,7 +459,8 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     images, labels = data
     with tf.GradientTape() as tape:
       cls_outputs, box_outputs = self(images, training=True)
-      det_loss, _, _, _ = self._detection_loss(cls_outputs, box_outputs, labels)
+      det_loss, cls_loss, box_loss, box_iou_loss = (
+          self._detection_loss(cls_outputs, box_outputs, labels))
       reg_l2loss = self._reg_l2_loss(self.config.weight_decay)
       total_loss = det_loss + reg_l2loss
       if isinstance(self.optimizer,
@@ -443,14 +476,20 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     else:
       gradients = scaled_gradients
     if self.config.clip_gradients_norm > 0:
-      gradients, _ = tf.clip_by_global_norm(gradients,
-                                            self.config.clip_gradients_norm)
+      gradients, gnorm = tf.clip_by_global_norm(gradients,
+                                                self.config.clip_gradients_norm)
     optimizer_op = self.optimizer.apply_gradients(
         zip(gradients, trainable_vars))
     if self.config.moving_average_decay:
+      self.ema._num_updates = self.optimizer.iterations
       with tf.control_dependencies([optimizer_op]):
         self.ema.apply(self.trainable_variables)
-    return {'loss': total_loss}
+    return {'loss': total_loss,
+            'det_loss': det_loss,
+            'cls_loss': cls_loss,
+            'box_loss': box_loss,
+            'box_iou_loss': box_iou_loss,
+            'gnorm': gnorm}
 
   def test_step(self, data):
     """Test step.
@@ -467,7 +506,12 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     """
     images, labels = data
     cls_outputs, box_outputs = self(images, training=False)
-    det_loss, _, _, _ = self._detection_loss(cls_outputs, box_outputs, labels)
+    det_loss, cls_loss, box_loss, box_iou_loss = (
+        self._detection_loss(cls_outputs, box_outputs, labels))
     reg_l2loss = self._reg_l2_loss(self.config.weight_decay)
     total_loss = det_loss + reg_l2loss
-    return {'loss': total_loss}
+    return {'loss': total_loss,
+            'det_loss': det_loss,
+            'cls_loss': cls_loss,
+            'box_loss': box_loss,
+            'box_iou_loss': box_iou_loss}
