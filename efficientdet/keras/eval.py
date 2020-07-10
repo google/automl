@@ -32,23 +32,16 @@ flags.DEFINE_string('validation_file_pattern', None,
 flags.DEFINE_string(
     'val_json_file', None,
     'COCO validation JSON containing golden bounding boxes.')
+flags.DEFINE_string('checkpoint', None, 'Location of the checkpoint to evaluate.')
 flags.DEFINE_string('model_name', 'efficientdet-d0',
                     'Model name: the efficientdet model to use.')
-flags.DEFINE_string('checkpoint', None, 'Location of the checkpoint to evaluate.')
 
+flags.mark_flag_as_required('validation_file_pattern')
+flags.mark_flag_as_required('val_json_file')
+flags.mark_flag_as_required('checkpoint')
 FLAGS = flags.FLAGS
 
 def main(_):
-  if FLAGS.validation_file_pattern is None:
-    raise RuntimeError('You must specify --validation_file_pattern '
-                        'for evaluation.')
-  if FLAGS.val_json_file is None:
-    raise RuntimeError('You must specify --val_json_file '
-                        'for evaluation.')
-  if FLAGS.checkpoint is None:
-    raise RuntimeError('You must specify --checkpoint '
-                        'for evaluation.')
-
   config = hparams_config.get_efficientdet_config(FLAGS.model_name)
   config.batch_size = 8
   config.val_json_file = FLAGS.val_json_file
