@@ -215,15 +215,15 @@ class EvaluationMetric():
     """
     with tf.name_scope('coco_metric'):
       if self.testdev_dir:
-        update_op = tf.py_func(self.update_state,
-                               [groundtruth_data, detections], [])
-        metrics = tf.py_func(self.result, [], tf.float32)
+        update_op = tf.numpy_function(self.update_state,
+                                      [groundtruth_data, detections], [])
+        metrics = tf.numpy_function(self.result, [], tf.float32)
         metrics_dict = {'AP': (metrics, update_op)}
         return metrics_dict
       else:
-        update_op = tf.py_func(self.update_state,
-                               [groundtruth_data, detections], [])
-        metrics = tf.py_func(self.result, [], tf.float32)
+        update_op = tf.numpy_function(self.update_state,
+                                      [groundtruth_data, detections], [])
+        metrics = tf.numpy_function(self.result, [], tf.float32)
         metrics_dict = {}
         for i, name in enumerate(self.metric_names):
           metrics_dict[name] = (metrics[i], update_op)
