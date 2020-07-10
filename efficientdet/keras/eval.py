@@ -30,14 +30,15 @@ from keras import postprocess
 
 flags.DEFINE_string('validation_file_pattern', None,
                     'Glob for evaluation tfrecords (e.g., COCO val2017 set)')
-flags.DEFINE_string(
-    'val_json_file', None,
-    'COCO validation JSON containing golden bounding boxes.')
-flags.DEFINE_string('checkpoint', None, 'Location of the checkpoint to evaluate.')
+flags.DEFINE_string('val_json_file', None,
+                    'COCO validation JSON containing golden bounding boxes.')
+flags.DEFINE_string('checkpoint', None,
+                    'Location of the checkpoint to evaluate.')
 flags.DEFINE_string('model_name', 'efficientdet-d0',
                     'Model name: the efficientdet model to use.')
 
 FLAGS = flags.FLAGS
+
 
 def main(_):
   config = hparams_config.get_efficientdet_config(FLAGS.model_name)
@@ -60,16 +61,17 @@ def main(_):
   model.build((config.batch_size, height, width, 3))
   model.load_weights(FLAGS.checkpoint)
 
-  evaluator = coco_metric.EvaluationMetric(
-      filename=config.val_json_file)
+  evaluator = coco_metric.EvaluationMetric(filename=config.val_json_file)
   # compute stats for all batches.
   for images, labels in ds:
     cls_outputs, box_outputs = model(images, training=False)
     config.nms_configs.max_nms_inputs = anchors.MAX_DETECTION_POINTS
-    detections = postprocess.generate_detections(config, cls_outputs, box_outputs,
-                                                labels['image_scales'],
-                                                labels['source_ids'])
-    evaluator.update_state(labels['groundtruth_data'].numpy(), detections.numpy())
+    detections = postprocess.generate_detections(config, cls_outputs,
+                                                 box_outputs,
+                                                 labels['image_scales'],
+                                                 labels['source_ids'])
+    evaluator.update_state(labels['groundtruth_data'].numpy(),
+                           detections.numpy())
 
   # compute the final eval results.
   metric_values = evaluator.result()

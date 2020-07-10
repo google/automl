@@ -27,9 +27,11 @@ import inference
 import utils
 from keras import efficientdet_keras
 
-
-flags.DEFINE_string('image_path', None, 'Location of the checkpoint to image to infer.')
-flags.DEFINE_string('output_dir', None, 'Directory to write the images with bounding boxes annotated.')
+flags.DEFINE_string('image_path', None,
+                    'Location of the checkpoint to image to infer.')
+flags.DEFINE_string(
+    'output_dir', None,
+    'Directory to write the images with bounding boxes annotated.')
 flags.DEFINE_string('checkpoint', None, 'Location of the checkpoint to run.')
 
 flags.DEFINE_string('model_name', 'efficientdet-d0',
@@ -39,6 +41,7 @@ flags.DEFINE_string(
     ' containing attributes to use as hyperparameters.')
 
 FLAGS = flags.FLAGS
+
 
 def main(_):
   # pylint: disable=line-too-long
