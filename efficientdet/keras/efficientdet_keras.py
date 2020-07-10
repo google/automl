@@ -728,12 +728,26 @@ class EfficientDetNet(tf.keras.Model):
         strategy=config.strategy,
         data_format=config.data_format)
 
+    if self.config.moving_average_decay is not None:
+      self.ema = tf.train.ExponentialMovingAverage(
+          decay=self.config.moving_average_decay)
+      self.ema_vars = None
+
   def _init_set_name(self, name, zero_based=True):
     """A hack to allow empty model name for legacy checkpoint compitability."""
     if name == '':  # pylint: disable=g-explicit-bool-comparison
       self._name = name
     else:
       self._name = super().__init__(name, zero_based)
+
+  def build(self, input_shape):
+    super().build(input_shape)
+    ema_vars = self.trainable_variables
+    for v in self.variables:
+      # We maintain mva for batch norm moving mean and variance as well.
+      if 'moving_mean' in v.name or 'moving_variance' in v.name:
+        ema_vars.append(v)
+    self.ema_vars = ema_vars
 
   def call(self, inputs, training):
     config = self.config

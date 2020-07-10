@@ -42,7 +42,13 @@ def _get_v(b1_height: FloatType, b1_width: FloatType, b2_height: FloatType,
       gdh = -dv * 8 * arctan * width / (math.pi**2)
       return [gdh, gdw]
 
-    return v, _grad_v
+    def _grad_v_graph(dv, variables):
+      gdw = dv * 8 * arctan * height / (math.pi**2)
+      gdh = -dv * 8 * arctan * width / (math.pi**2)
+      return [gdh, gdw], tf.gradients(v, variables, grad_ys=dv)
+
+    return v, _grad_v if tf.compat.v1.executing_eagerly_outside_functions(
+    ) else _grad_v_graph
 
   return _get_grad_v(b2_height, b2_width)
 

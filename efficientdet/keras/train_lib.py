@@ -26,6 +26,10 @@ import iou_utils
 import utils
 from keras import efficientdet_keras
 
+import anchors
+from object_detection.faster_rcnn_box_coder import FasterRcnnBoxCoder
+from object_detection.box_list import BoxList
+
 
 def update_learning_rate_schedule_parameters(params):
   """Updates params that are related to the learning rate schedule."""
@@ -224,6 +228,7 @@ class DisplayCallback(tf.keras.callbacks.Callback):
       tf.summary.image('Test image', tf.expand_dims(image, axis=0), step=epoch)
 
 
+
 def get_callbacks(params, profile=False):
   tb_callback = tf.keras.callbacks.TensorBoard(
       log_dir=params['model_dir'], profile_batch=2 if profile else 0)
@@ -341,9 +346,13 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    if self.config.moving_average_decay:
-      self.ema = tf.train.ExponentialMovingAverage(
-          decay=self.config.moving_average_decay)
+    self.input_anchors = anchors.Anchors(self.config.min_level,
+                                         self.config.max_level,
+                                         self.config.num_scales,
+                                         self.config.aspect_ratios,
+                                         self.config.anchor_scale,
+                                         self.config.image_size)
+    self.box_coder = FasterRcnnBoxCoder()
 
   def freeze_vars(self, pattern):
     """Freeze variables according to pattern.
@@ -395,7 +404,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     levels = range(len(cls_outputs))
     cls_losses = []
     box_losses = []
-    box_iou_losses = []
+
     for level in levels:
       # Onehot encoding for classification labels.
       cls_targets_at_level = tf.one_hot(labels['cls_targets_%d' % (level + 3)],
@@ -434,14 +443,28 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
             box_loss_layer([num_positives_sum, box_targets_at_level],
                            box_outputs[level]))
 
-      if self.config.iou_loss_type and self.loss.get('box_iou_loss', None):
-        box_iou_loss_layer = self.loss['box_iou_loss']
-        box_iou_losses.append(
-            box_iou_loss_layer([num_positives_sum, box_targets_at_level],
-                               box_outputs[level]))
+    if self.config.iou_loss_type:
+      input_anchors = BoxList(
+          tf.tile(self.input_anchors.boxes, [box_outputs[0].shape[0], 1]))
+      box_outputs = tf.concat([tf.reshape(v, [-1, 4]) for v in box_outputs],
+                              axis=0)
+      box_targets = tf.concat([
+          tf.reshape(labels['box_targets_%d' % (level + 3)], [-1, 4])
+          for level in levels
+      ],
+                              axis=0)
+      box_outputs = self.box_coder.decode(box_outputs, input_anchors)
+      box_targets = self.box_coder.decode(box_targets, input_anchors)
+      box_iou_loss_layer = self.loss['box_iou_loss']
+      box_iou_loss = box_iou_loss_layer(
+          [num_positives_sum, box_targets.data['boxes']],
+          box_outputs.data['boxes'])
+    else:
+      box_iou_loss = 0
+
     cls_loss = tf.add_n(cls_losses) if cls_losses else 0
     box_loss = tf.add_n(box_losses) if box_losses else 0
-    box_iou_loss = tf.add_n(box_iou_losses) if box_iou_losses else 0
+
     total_loss = (
         cls_loss + self.config.box_loss_weight * box_loss +
         self.config.iou_loss_weight * box_iou_loss)
@@ -487,13 +510,15 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     if self.config.moving_average_decay:
       self.ema._num_updates = self.optimizer.iterations  # pylint: disable=protected-access
       with tf.control_dependencies([optimizer_op]):
-        self.ema.apply(self.trainable_variables)
-    return {'loss': total_loss,
-            'det_loss': det_loss,
-            'cls_loss': cls_loss,
-            'box_loss': box_loss,
-            'box_iou_loss': box_iou_loss,
-            'gnorm': gnorm}
+        self.ema.apply(self.ema_vars)
+    return {
+        'loss': total_loss,
+        'det_loss': det_loss,
+        'cls_loss': cls_loss,
+        'box_loss': box_loss,
+        'box_iou_loss': box_iou_loss,
+        'gnorm': gnorm
+    }
 
   def test_step(self, data):
     """Test step.
@@ -514,8 +539,10 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
         self._detection_loss(cls_outputs, box_outputs, labels))
     reg_l2loss = self._reg_l2_loss(self.config.weight_decay)
     total_loss = det_loss + reg_l2loss
-    return {'loss': total_loss,
-            'det_loss': det_loss,
-            'cls_loss': cls_loss,
-            'box_loss': box_loss,
-            'box_iou_loss': box_iou_loss}
+    return {
+        'loss': total_loss,
+        'det_loss': det_loss,
+        'cls_loss': cls_loss,
+        'box_loss': box_loss,
+        'box_iou_loss': box_iou_loss
+    }
