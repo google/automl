@@ -37,9 +37,6 @@ flags.DEFINE_string('checkpoint', None, 'Location of the checkpoint to evaluate.
 flags.DEFINE_string('model_name', 'efficientdet-d0',
                     'Model name: the efficientdet model to use.')
 
-flags.mark_flag_as_required('validation_file_pattern')
-flags.mark_flag_as_required('val_json_file')
-flags.mark_flag_as_required('checkpoint')
 FLAGS = flags.FLAGS
 
 def main(_):
@@ -83,5 +80,8 @@ def main(_):
 
 
 if __name__ == '__main__':
+  flags.mark_flag_as_required('validation_file_pattern')
+  flags.mark_flag_as_required('val_json_file')
+  flags.mark_flag_as_required('checkpoint')
   logging.set_verbosity(logging.WARNING)
   app.run(main)

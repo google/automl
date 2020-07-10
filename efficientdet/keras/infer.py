@@ -38,9 +38,6 @@ flags.DEFINE_string(
     'hparams', '', 'Comma separated k=v pairs of hyperparameters or a module'
     ' containing attributes to use as hyperparameters.')
 
-flags.mark_flag_as_required('image_path')
-flags.mark_flag_as_required('output_dir')
-flags.mark_flag_as_required('checkpoint')
 FLAGS = flags.FLAGS
 
 def main(_):
@@ -91,5 +88,8 @@ def main(_):
 
 
 if __name__ == '__main__':
+  flags.mark_flag_as_required('image_path')
+  flags.mark_flag_as_required('output_dir')
+  flags.mark_flag_as_required('checkpoint')
   logging.set_verbosity(logging.WARNING)
   app.run(main)
