@@ -22,6 +22,7 @@ import tensorflow as tf
 import coco_metric
 import dataloader
 import hparams_config
+import utils
 
 from keras import anchors
 from keras import efficientdet_keras
@@ -55,9 +56,11 @@ def main(_):
       max_instances_per_image=config.max_instances_per_image)(
           config)
 
+  height, width = utils.parse_image_size(config['image_size'])
+
   # Network
   model = efficientdet_keras.EfficientDetNet(config=config)
-  model.build((config.batch_size, 512, 512, 3))
+  model.build((config.batch_size, height, width, 3))
   model.load_weights(FLAGS.checkpoint)
 
   evaluator = coco_metric.EvaluationMetric(
