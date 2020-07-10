@@ -72,7 +72,7 @@ def merge_class_box_level_outputs(params, cls_outputs: List[T],
                                   box_outputs: List[T]) -> Tuple[T, T]:
   """Concatenates class and box of all levels into one tensor."""
   cls_outputs_all, box_outputs_all = [], []
-  batch_size = cls_outputs[0].shape[0]
+  batch_size = tf.shape(cls_outputs[0])[0]
   for level in range(0, params['max_level'] - params['min_level'] + 1):
     if params['data_format'] == 'channels_first':
       cls_outputs[level] = tf.transpose(cls_outputs[level], [0, 2, 3, 1])

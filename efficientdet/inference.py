@@ -238,60 +238,6 @@ def restore_ckpt(sess, ckpt_path, ema_decay=0.9998, export_ckpt=None):
     saver.save(sess, export_ckpt)
 
 
-def det_post_process_combined(params, cls_outputs, box_outputs, scales):
-  """A combined version of det_post_process with dynamic batch size support."""
-  batch_size = tf.shape(list(cls_outputs.values())[0])[0]
-  cls_outputs_all = []
-  box_outputs_all = []
-  # Concatenates class and box of all levels into one tensor.
-  for level in range(params['min_level'], params['max_level'] + 1):
-    if params['data_format'] == 'channels_first':
-      cls_outputs[level] = tf.transpose(cls_outputs[level], [0, 2, 3, 1])
-      box_outputs[level] = tf.transpose(box_outputs[level], [0, 2, 3, 1])
-
-    cls_outputs_all.append(
-        tf.reshape(cls_outputs[level], [batch_size, -1, params['num_classes']]))
-    box_outputs_all.append(tf.reshape(box_outputs[level], [batch_size, -1, 4]))
-  cls_outputs_all = tf.concat(cls_outputs_all, 1)
-  box_outputs_all = tf.concat(box_outputs_all, 1)
-
-  # Create anchor_label for picking top-k predictions.
-  eval_anchors = anchors.Anchors(params['min_level'], params['max_level'],
-                                 params['num_scales'], params['aspect_ratios'],
-                                 params['anchor_scale'], params['image_size'])
-  anchor_boxes = eval_anchors.boxes
-  scores = tf.math.sigmoid(cls_outputs_all)
-  # apply bounding box regression to anchors
-  boxes = postprocess.decode_box_outputs(box_outputs_all, anchor_boxes)
-  boxes = tf.expand_dims(boxes, axis=2)
-  scales = tf.expand_dims(scales, axis=-1)
-  max_output_size = params['nms_configs']['max_output_size']
-  nmsed_boxes, nmsed_scores, nmsed_classes, valid_detections = (
-      tf.image.combined_non_max_suppression(
-          boxes,
-          scores,
-          max_output_size,
-          max_output_size,
-          score_threshold=params['nms_configs']['min_score_thresh'],
-          clip_boxes=False))
-  del valid_detections  # to be used in futue.
-
-  image_ids = tf.cast(
-      tf.tile(
-          tf.expand_dims(tf.range(batch_size), axis=1), [1, max_output_size]),
-      dtype=tf.float32)
-  image_size = utils.parse_image_size(params['image_size'])
-  nmsed_boxes = postprocess.clip_boxes(nmsed_boxes, image_size) * scales
-
-  classes = tf.cast(nmsed_classes + 1, tf.float32)
-  detection_list = [
-      image_ids, nmsed_boxes[..., 0], nmsed_boxes[..., 1], nmsed_boxes[..., 2],
-      nmsed_boxes[..., 3], nmsed_scores, classes
-  ]
-  detections = tf.stack(detection_list, axis=2, name='detections')
-  return detections
-
-
 def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
                      box_outputs: Dict[int, tf.Tensor], scales: List[float]):
   """Post preprocessing the box/class predictions.
@@ -795,8 +741,6 @@ class InferenceDriver(object):
           self.ckpt_path,
           ema_decay=self.params['moving_average_decay'],
           export_ckpt=None)
-      # for postprocessing.
-      params.update(dict(batch_size=len(raw_images)))
 
       # Build postprocessing.
       detections_batch = det_post_process(params, class_outputs, box_outputs,
