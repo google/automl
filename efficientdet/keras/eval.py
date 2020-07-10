@@ -15,6 +15,7 @@
 # ==============================================================================
 """Eval libraries."""
 from absl import app
+from absl import flags
 from absl import logging
 import tensorflow as tf
 
@@ -26,16 +27,36 @@ from keras import anchors
 from keras import efficientdet_keras
 from keras import postprocess
 
+flags.DEFINE_string('validation_file_pattern', None,
+                    'Glob for evaluation tfrecords (e.g., COCO val2017 set)')
+flags.DEFINE_string(
+    'val_json_file', None,
+    'COCO validation JSON containing golden bounding boxes.')
+flags.DEFINE_string('model_name', 'efficientdet-d0',
+                    'Model name: the efficientdet model to use.')
+flags.DEFINE_string('checkpoint', None, 'Location of the checkpoint to evaluate.')
+
+FLAGS = flags.FLAGS
+
 def main(_):
-  config = hparams_config.get_efficientdet_config('efficientdet-d0')
+  if FLAGS.validation_file_pattern is None:
+    raise RuntimeError('You must specify --validation_file_pattern '
+                        'for evaluation.')
+  if FLAGS.val_json_file is None:
+    raise RuntimeError('You must specify --val_json_file '
+                        'for evaluation.')
+  if FLAGS.checkpoint is None:
+    raise RuntimeError('You must specify --checkpoint '
+                        'for evaluation.')
+
+  config = hparams_config.get_efficientdet_config(FLAGS.model_name)
   config.batch_size = 8
-  config.val_json_file = 'tmp/coco/annotations/instances_val2017.json'
+  config.val_json_file = FLAGS.val_json_file
 
   # dataset
-  input_files = 'tmp/coco/val-00000-of-00032.tfrecord'
   is_training = False
   ds = dataloader.InputReader(
-      input_files,
+      FLAGS.validation_file_pattern,
       is_training=is_training,
       use_fake_data=False,
       max_instances_per_image=config.max_instances_per_image)(
@@ -44,7 +65,7 @@ def main(_):
   # Network
   model = efficientdet_keras.EfficientDetNet(config=config)
   model.build((config.batch_size, 512, 512, 3))
-  model.load_weights('tmp/efficientdet-d0/model')
+  model.load_weights(FLAGS.checkpoint)
 
   evaluator = coco_metric.EvaluationMetric(
       filename=config.val_json_file)
