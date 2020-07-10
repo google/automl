@@ -176,7 +176,6 @@ def nms(params, boxes: T, scores: T, classes: T,
     A tuple (boxes, scores, classes, valid_lens), where valid_lens is a scalar
     denoting the valid length of boxes/scores/classes outputs.
   """
-  logging.info('performing per-sample nms')
   nms_configs = params['nms_configs']
   method = nms_configs['method']
   max_output_size = nms_configs['max_output_size']

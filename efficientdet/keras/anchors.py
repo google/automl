@@ -25,6 +25,9 @@ from object_detection import faster_rcnn_box_coder
 from object_detection import region_similarity_calculator
 from object_detection import target_assigner
 
+MAX_DETECTION_POINTS = 5000
+
+
 class Anchors():
   """Multi-scale anchors class."""
 
@@ -42,14 +45,18 @@ class Anchors():
         on each level. For instances, aspect_ratios =
         [(1, 1), (1.4, 0.7), (0.7, 1.4)] adds three anchors on each level.
       anchor_scale: float number representing the scale of size of the base
-        anchor to the feature stride 2^level.
+        anchor to the feature stride 2^level. Or a list, one value per layer.
       image_size: integer number or tuple of integer number of input image size.
     """
     self.min_level = min_level
     self.max_level = max_level
     self.num_scales = num_scales
     self.aspect_ratios = aspect_ratios
-    self.anchor_scale = anchor_scale
+    if isinstance(anchor_scale, (list, tuple)):
+      assert len(anchor_scale) == max_level - min_level + 1
+      self.anchor_scales = anchor_scale
+    else:
+      self.anchor_scales = [anchor_scale] * (max_level - min_level + 1)
     self.image_size = utils.parse_image_size(image_size)
     self.feat_sizes = utils.get_feat_sizes(image_size, max_level)
     self.config = self._generate_configs()
@@ -66,7 +73,8 @@ class Anchors():
           anchor_configs[level].append(
               ((feat_sizes[0]['height'] / float(feat_sizes[level]['height']),
                 feat_sizes[0]['width'] / float(feat_sizes[level]['width'])),
-              scale_octave / float(self.num_scales), aspect))
+               scale_octave / float(self.num_scales), aspect,
+               self.anchor_scales[level - self.min_level]))
     return anchor_configs
 
   def _generate_boxes(self):
@@ -75,9 +83,9 @@ class Anchors():
     for _, configs in self.config.items():
       boxes_level = []
       for config in configs:
-        stride, octave_scale, aspect = config
-        base_anchor_size_x = self.anchor_scale * stride[1] * 2**octave_scale
-        base_anchor_size_y = self.anchor_scale * stride[0] * 2**octave_scale
+        stride, octave_scale, aspect, anchor_scale = config
+        base_anchor_size_x = anchor_scale * stride[1] * 2**octave_scale
+        base_anchor_size_y = anchor_scale * stride[0] * 2**octave_scale
         anchor_size_x_2 = base_anchor_size_x * aspect[0] / 2.0
         anchor_size_y_2 = base_anchor_size_y * aspect[1] / 2.0
 

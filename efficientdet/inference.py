@@ -31,11 +31,11 @@ from PIL import Image
 import tensorflow.compat.v1 as tf
 import yaml
 
-import anchors
 import dataloader
 import det_model_fn
 import hparams_config
 import utils
+from keras import anchors
 from keras import efficientdet_keras
 from keras import postprocess
 from visualize import vis_utils

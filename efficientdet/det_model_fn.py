@@ -24,13 +24,13 @@ from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
 
-import anchors
 import coco_metric
 import efficientdet_arch
 import hparams_config
 import iou_utils
 import retinanet_arch
 import utils
+from keras import anchors
 from keras import postprocess
 
 _DEFAULT_BATCH_SIZE = 64

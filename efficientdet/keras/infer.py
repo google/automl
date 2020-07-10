@@ -42,6 +42,7 @@ def main(_):
   config.image_size = '1920x1280'
   config.nms_configs.score_thresh = nms_score_thresh
   config.nms_configs.max_output_size = nms_max_output_size
+  config.anchor_scale = [1.0, 1.0, 1.0, 1.0, 1.0]
 
   # Use 'mixed_float16' if running on GPUs.
   policy = tf.keras.mixed_precision.experimental.Policy('float32')

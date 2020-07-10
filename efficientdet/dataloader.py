@@ -16,8 +16,8 @@
 from absl import logging
 import tensorflow as tf
 
-import anchors
 import utils
+from keras import anchors
 from object_detection import preprocessor
 from object_detection import tf_example_decoder
 
