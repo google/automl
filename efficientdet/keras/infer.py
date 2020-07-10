@@ -16,6 +16,7 @@
 """A simple example on how to use keras model for inference."""
 import os
 from absl import app
+from absl import flags
 from absl import logging
 import numpy as np
 from PIL import Image
@@ -23,8 +24,24 @@ import tensorflow as tf
 
 import hparams_config
 import inference
+import utils
 from keras import efficientdet_keras
 
+
+flags.DEFINE_string('image_path', None, 'Location of the checkpoint to image to infer.')
+flags.DEFINE_string('output_dir', None, 'Directory to write the images with bounding boxes annotated.')
+flags.DEFINE_string('checkpoint', None, 'Location of the checkpoint to run.')
+
+flags.DEFINE_string('model_name', 'efficientdet-d0',
+                    'Model name: the efficientdet model to use.')
+flags.DEFINE_string(
+    'hparams', '', 'Comma separated k=v pairs of hyperparameters or a module'
+    ' containing attributes to use as hyperparameters.')
+
+flags.mark_flag_as_required('image_path')
+flags.mark_flag_as_required('output_dir')
+flags.mark_flag_as_required('checkpoint')
+FLAGS = flags.FLAGS
 
 def main(_):
   # pylint: disable=line-too-long
@@ -33,13 +50,13 @@ def main(_):
   # !wget https://user-images.githubusercontent.com/11736571/77320690-099af300-6d37-11ea-9d86-24f14dc2d540.png -O tmp/img.png
   # !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz -O tmp/efficientdet-d0.tar.gz
   # !tar zxf tmp/efficientdet-d0.tar.gz -C tmp
-  imgs = [np.array(Image.open('tmp/img.png'))]
+  imgs = [np.array(Image.open(FLAGS.image_path))]
   nms_score_thresh, nms_max_output_size = 0.4, 100
 
   # Create model config.
-  config = hparams_config.get_efficientdet_config('efficientdet-d0')
+  config = hparams_config.get_efficientdet_config(FLAGS.model_name)
+  config.override(FLAGS.hparams)
   config.is_training_bn = False
-  config.image_size = '1920x1280'
   config.nms_configs.score_thresh = nms_score_thresh
   config.nms_configs.max_output_size = nms_max_output_size
   config.anchor_scale = [1.0, 1.0, 1.0, 1.0, 1.0]
@@ -48,10 +65,12 @@ def main(_):
   policy = tf.keras.mixed_precision.experimental.Policy('float32')
   tf.keras.mixed_precision.experimental.set_policy(policy)
 
+  height, width = utils.parse_image_size(config['image_size'])
+
   # Create and run the model.
   model = efficientdet_keras.EfficientDetModel(config=config)
-  model.build((1, 1280, 1920, 3))
-  model.load_weights('tmp/efficientdet-d0/model')
+  model.build((1, height, width, 3))
+  model.load_weights(FLAGS.checkpoint)
   boxes, scores, classes, valid_len = model(
       imgs, training=False, post_mode='global')
   model.summary()
@@ -66,7 +85,7 @@ def main(_):
         scores[i].numpy()[:length],
         min_score_thresh=nms_score_thresh,
         max_boxes_to_draw=nms_max_output_size)
-    output_image_path = os.path.join('tmp/', str(i) + '.jpg')
+    output_image_path = os.path.join(FLAGS.output_dir, str(i) + '.jpg')
     Image.fromarray(img).save(output_image_path)
     print('writing annotated image to %s', output_image_path)
 
