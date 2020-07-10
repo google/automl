@@ -315,12 +315,12 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
     # Use combined version for dynamic batch size.
     nms_boxes, nms_scores, nms_classes, _ = postprocess.postprocess_combined(
         params, cls_outputs, box_outputs, scales)
-    batch_size = tf.shape(list(cls_outputs.values())[0])[0]
+    batch_size = list(cls_outputs.values())[0].shape[0]
   else:
     nms_boxes, nms_scores, nms_classes, _ = postprocess.postprocess_global(
         params, cls_outputs, box_outputs, scales)
 
-  img_ids = tf.range(0, batch_size, dtype=nms_scores.dtype)
+  img_ids = tf.range(0, batch_size.value, dtype=nms_scores.dtype)
   detections = [
       img_ids * tf.ones_like(nms_scores),
       nms_boxes[:, :, 0],
