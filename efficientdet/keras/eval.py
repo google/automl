@@ -15,47 +15,63 @@
 # ==============================================================================
 """Eval libraries."""
 from absl import app
+from absl import flags
 from absl import logging
 import tensorflow as tf
 
 import coco_metric
 import dataloader
 import hparams_config
+import utils
 
 from keras import anchors
 from keras import efficientdet_keras
 from keras import postprocess
 
+flags.DEFINE_string('validation_file_pattern', None,
+                    'Glob for evaluation tfrecords (e.g., COCO val2017 set)')
+flags.DEFINE_string('val_json_file', None,
+                    'COCO validation JSON containing golden bounding boxes.')
+flags.DEFINE_string('checkpoint', None,
+                    'Location of the checkpoint to evaluate.')
+flags.DEFINE_string('model_name', 'efficientdet-d0',
+                    'Model name: the efficientdet model to use.')
+
+FLAGS = flags.FLAGS
+
+
 def main(_):
-  config = hparams_config.get_efficientdet_config('efficientdet-d0')
+  config = hparams_config.get_efficientdet_config(FLAGS.model_name)
   config.batch_size = 8
-  config.val_json_file = 'tmp/coco/annotations/instances_val2017.json'
+  config.val_json_file = FLAGS.val_json_file
 
   # dataset
-  input_files = 'tmp/coco/val-00000-of-00032.tfrecord'
   is_training = False
   ds = dataloader.InputReader(
-      input_files,
+      FLAGS.validation_file_pattern,
       is_training=is_training,
       use_fake_data=False,
       max_instances_per_image=config.max_instances_per_image)(
           config)
 
+  height, width = utils.parse_image_size(config['image_size'])
+
   # Network
   model = efficientdet_keras.EfficientDetNet(config=config)
-  model.build((config.batch_size, 512, 512, 3))
-  model.load_weights('tmp/efficientdet-d0/model')
+  model.build((config.batch_size, height, width, 3))
+  model.load_weights(FLAGS.checkpoint)
 
-  evaluator = coco_metric.EvaluationMetric(
-      filename=config.val_json_file)
+  evaluator = coco_metric.EvaluationMetric(filename=config.val_json_file)
   # compute stats for all batches.
   for images, labels in ds:
     cls_outputs, box_outputs = model(images, training=False)
     config.nms_configs.max_nms_inputs = anchors.MAX_DETECTION_POINTS
-    detections = postprocess.generate_detections(config, cls_outputs, box_outputs,
-                                                labels['image_scales'],
-                                                labels['source_ids'])
-    evaluator.update_state(labels['groundtruth_data'].numpy(), detections.numpy())
+    detections = postprocess.generate_detections(config, cls_outputs,
+                                                 box_outputs,
+                                                 labels['image_scales'],
+                                                 labels['source_ids'])
+    evaluator.update_state(labels['groundtruth_data'].numpy(),
+                           detections.numpy())
 
   # compute the final eval results.
   metric_values = evaluator.result()
@@ -66,5 +82,8 @@ def main(_):
 
 
 if __name__ == '__main__':
+  flags.mark_flag_as_required('validation_file_pattern')
+  flags.mark_flag_as_required('val_json_file')
+  flags.mark_flag_as_required('checkpoint')
   logging.set_verbosity(logging.WARNING)
   app.run(main)
