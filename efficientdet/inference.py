@@ -35,7 +35,6 @@ import dataloader
 import det_model_fn
 import hparams_config
 import utils
-from keras import anchors
 from keras import efficientdet_keras
 from keras import postprocess
 from visualize import vis_utils
@@ -295,10 +294,10 @@ def visualize_image(image,
     boxes: a box prediction with shape [N, 4] ordered [ymin, xmin, ymax, xmax].
     classes: a class prediction with shape [N].
     scores: A list of float value with shape [N].
+    id_mapping: a dictionary from class id to name.
     min_score_thresh: minimal score for showing. If claass probability is below
       this threshold, then the object will not show up.
     max_boxes_to_draw: maximum bounding box to draw.
-    id_mapping: a dictionary from class id to name.
     line_thickness: how thick is the bounding box line.
     **kwargs: extra parameters.
 
@@ -465,6 +464,8 @@ class ServingDriver(object):
     self.sess = None
     self.use_xla = use_xla
 
+    self.min_score_thresh = min_score_thresh
+    self.max_boxes_to_draw = max_boxes_to_draw
     self.line_thickness = line_thickness
 
   def __del__(self):
@@ -741,7 +742,6 @@ class InferenceDriver(object):
           self.ckpt_path,
           ema_decay=self.params['moving_average_decay'],
           export_ckpt=None)
-
       # Build postprocessing.
       detections_batch = det_post_process(params, class_outputs, box_outputs,
                                           scales)

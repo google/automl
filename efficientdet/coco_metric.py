@@ -44,7 +44,7 @@ class EvaluationMetric():
   This class cannot inherit from tf.keras.metrics.Metric due to numpy.
   """
 
-  def __init__(self, filename=None, testdev_dir=None, **kwargs):
+  def __init__(self, filename=None, testdev_dir=None):
     """Constructs COCO evaluation class.
 
     The class provides the interface to metrics_fn in TPUEstimator. The
@@ -141,10 +141,10 @@ class EvaluationMetric():
     evaluation.
 
     Args:
-      detections: Detection results in a tensor with each row representing
-        [image_id, x, y, width, height, score, class].
       groundtruth_data: Groundtruth annotations in a tensor with each row
         representing [y1, x1, y2, x2, is_crowd, area, class].
+      detections: Detection results in a tensor with each row representing
+        [image_id, x, y, width, height, score, class].
     """
     for i in range(len(detections)):
       # Filter out detections with predicted class label = -1.

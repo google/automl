@@ -37,16 +37,9 @@ try:
 except ImportError:
   from tensorflow.contrib import image as image_ops  # pylint: disable=g-import-not-at-top
 
-try:
-  # tensorflow_probability are recommended, but they only support tf2.
-  from tensorflow_probability import distributions  # pylint: disable=g-import-not-at-top
-except ImportError:
-  import tensorflow.distributions as distributions  # pylint: disable=g-import-not-at-top
-
 # This signifies the max integer that the controller RNN could predict for the
 # augmentation scheme.
 _MAX_LEVEL = 10.
-
 
 # Represents an invalid bounding box that is used for checking for padding
 # lists of bounding box coordinates for a few augmentation operations
@@ -1565,8 +1558,9 @@ def select_and_apply_random_policy_augmix(policies,
   policy_to_select = tf.random_uniform([], maxval=len(policies), dtype=tf.int32)
   # Note that using tf.case instead of tf.conds would result in significantly
   # larger graphs and would even break export for some larger policies.
-  ws = distributions.Dirichlet([alpha] * mixture_width).sample()
-  m = distributions.Beta(alpha, alpha).sample()
+  import tensorflow_probability as tfp
+  ws = tfp.distributions.Dirichlet([alpha] * mixture_width).sample()
+  m = tfp.distributions.Beta(alpha, alpha).sample()
   mix = tf.zeros_like(image, dtype=tf.float32)
   for j in range(mixture_width):
     aug_image = image

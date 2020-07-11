@@ -61,7 +61,7 @@ class PostprocessTest(tf.test.TestCase):
     scales = [1.0, 2.0]
 
     self.params['max_detection_points'] = 10
-    boxes, scores, classes, valid_len = postprocess.postprocess_global(
+    _, scores, classes, valid_len = postprocess.postprocess_global(
         self.params, cls_outputs_list, box_outputs_list, scales)
     self.assertAllClose(valid_len, [2, 2])
     self.assertAllClose(classes.numpy(), [[2., 1.], [1., 2.]])
@@ -108,10 +108,9 @@ class PostprocessTest(tf.test.TestCase):
     cls_outputs_list = [cls_outputs[1], cls_outputs[2]]
     box_outputs_list = [box_outputs[1], box_outputs[2]]
     scales = [1.0, 2.0]
-    ids = [0, 1]
 
     self.params['max_detection_points'] = 10
-    boxes, scores, classes, valid_len = postprocess.postprocess_combined(
+    _, scores, classes, valid_len = postprocess.postprocess_combined(
         self.params, cls_outputs_list, box_outputs_list, scales)
     self.assertAllClose(valid_len, [2, 2])
     self.assertAllClose(classes.numpy(), [[2., 1.], [1., 2.]])

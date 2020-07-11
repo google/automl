@@ -437,18 +437,35 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
     def metric_fn(**kwargs):
       """Returns a dictionary that has the evaluation metrics."""
+      nms_boxes, nms_scores, nms_classes, _ = postprocess.per_class_nms(
+          params, kwargs['boxes'], kwargs['scores'], kwargs['classes'],
+          kwargs['image_scales'])
+      img_ids = tf.cast(
+          tf.expand_dims(kwargs['source_ids'], -1), nms_scores.dtype)
+      detections = [
+          img_ids * tf.ones_like(nms_scores),
+          nms_boxes[:, :, 1],
+          nms_boxes[:, :, 0],
+          nms_boxes[:, :, 3] - nms_boxes[:, :, 1],
+          nms_boxes[:, :, 2] - nms_boxes[:, :, 0],
+          nms_scores,
+          nms_classes,
+      ]
+      detections = tf.stack(detections, axis=-1, name='detnections')
+      kwargs['detections_bs'] = detections
+
       if params.get('testdev_dir', None):
         logging.info('Eval testdev_dir %s', params['testdev_dir'])
         eval_metric = coco_metric.EvaluationMetric(
             testdev_dir=params['testdev_dir'])
-        coco_metrics = eval_metric.estimator_metric_fn(kwargs['detections_bs'],
+        coco_metrics = eval_metric.estimator_metric_fn(detections,
                                                        tf.zeros([1]))
       else:
         logging.info('Eval val with groudtruths %s.', params['val_json_file'])
         eval_metric = coco_metric.EvaluationMetric(
             filename=params['val_json_file'])
         coco_metrics = eval_metric.estimator_metric_fn(
-            kwargs['detections_bs'], kwargs['groundtruth_data'])
+            detections, kwargs['groundtruth_data'])
 
       # Add metrics to output.
       cls_loss = tf.metrics.mean(kwargs['cls_loss_repeat'])
@@ -469,19 +486,20 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
             params['batch_size'],
         ]), [params['batch_size'], 1])
 
+    cls_outputs = postprocess.to_list(cls_outputs)
+    box_outputs = postprocess.to_list(box_outputs)
     params['nms_configs']['max_nms_inputs'] = anchors.MAX_DETECTION_POINTS
-    detections_bs = postprocess.generate_detections(params, cls_outputs,
-                                                    box_outputs,
-                                                    labels['image_scales'],
-                                                    labels['source_ids'])
-
+    boxes, scores, classes = postprocess.pre_nms(params, cls_outputs,
+                                                 box_outputs)
     metric_fn_inputs = {
         'cls_loss_repeat': cls_loss_repeat,
         'box_loss_repeat': box_loss_repeat,
         'source_ids': labels['source_ids'],
         'groundtruth_data': labels['groundtruth_data'],
         'image_scales': labels['image_scales'],
-        'detections_bs': detections_bs,
+        'boxes': boxes,
+        'scores': scores,
+        'classes': classes,
     }
     eval_metrics = (metric_fn, metric_fn_inputs)
 

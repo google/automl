@@ -27,19 +27,11 @@ import inference
 import utils
 from keras import efficientdet_keras
 
-flags.DEFINE_string('image_path', None,
-                    'Location of the checkpoint to image to infer.')
-flags.DEFINE_string(
-    'output_dir', None,
-    'Directory to write the images with bounding boxes annotated.')
+flags.DEFINE_string('image_path', None, 'Location of test image.')
+flags.DEFINE_string('output_dir', None, 'Directory of annotated output images.')
 flags.DEFINE_string('checkpoint', None, 'Location of the checkpoint to run.')
-
-flags.DEFINE_string('model_name', 'efficientdet-d0',
-                    'Model name: the efficientdet model to use.')
-flags.DEFINE_string(
-    'hparams', '', 'Comma separated k=v pairs of hyperparameters or a module'
-    ' containing attributes to use as hyperparameters.')
-
+flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model name to use.')
+flags.DEFINE_string('hparams', '', 'Comma separated k=v pairs or a yaml file')
 FLAGS = flags.FLAGS
 
 
@@ -54,9 +46,9 @@ def main(_):
   nms_score_thresh, nms_max_output_size = 0.4, 100
 
   # Create model config.
-  config = hparams_config.get_efficientdet_config(FLAGS.model_name)
-  config.override(FLAGS.hparams)
+  config = hparams_config.get_efficientdet_config('efficientdet-d0')
   config.is_training_bn = False
+  config.image_size = '1920x1280'
   config.nms_configs.score_thresh = nms_score_thresh
   config.nms_configs.max_output_size = nms_max_output_size
   config.anchor_scale = [1.0, 1.0, 1.0, 1.0, 1.0]
@@ -65,10 +57,9 @@ def main(_):
   policy = tf.keras.mixed_precision.experimental.Policy('float32')
   tf.keras.mixed_precision.experimental.set_policy(policy)
 
-  height, width = utils.parse_image_size(config['image_size'])
-
   # Create and run the model.
   model = efficientdet_keras.EfficientDetModel(config=config)
+  height, width = utils.parse_image_size(config['image_size'])
   model.build((1, height, width, 3))
   model.load_weights(FLAGS.checkpoint)
   boxes, scores, classes, valid_len = model(

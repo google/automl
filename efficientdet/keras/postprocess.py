@@ -47,7 +47,7 @@ def decode_box_outputs(pred_boxes, anchor_boxes):
 
   Args:
     pred_boxes: predicted box regression targets.
-    anchor_boxess: anchors on all feature levels.
+    anchor_boxes: anchors on all feature levels.
   Returns:
     outputs: bounding boxes.
   """
@@ -122,7 +122,7 @@ def topk_class_boxes(params, cls_outputs: T,
   return cls_outputs_topk, box_outputs_topk, classes, indices
 
 
-def pre_nms(params, cls_outputs, box_outputs, topk=True) -> Tuple[T, T, T]:
+def pre_nms(params, cls_outputs, box_outputs, topk=True):
   """Detection post processing before nms.
 
   It takes the multi-level class and box predictions from network, merge them
@@ -134,6 +134,7 @@ def pre_nms(params, cls_outputs, box_outputs, topk=True) -> Tuple[T, T, T]:
       of logits with shape [N, H, W, num_class * num_anchors].
     box_outputs: a list of tensors for boxes, each tensor ddenotes a level of
       boxes with shape [N, H, W, 4 * num_anchors].
+    topk: if True, select topk before nms (mainly to speed up nms).
 
   Returns:
     A tuple of (boxes, scores, classes).
@@ -202,13 +203,14 @@ def nms(params, boxes: T, scores: T, classes: T,
       score_threshold=score_thresh,
       soft_nms_sigma=(sigma / 2),
       pad_to_max_output_size=padded)
+
   nms_boxes = tf.gather(boxes, nms_top_idx)
   nms_classes = tf.cast(
       tf.gather(classes, nms_top_idx) + CLASS_OFFSET, tf.float32)
   return nms_boxes, nms_scores, nms_classes, nms_valid_lens
 
 
-def postprocess_combined(params, cls_outputs, box_outputs, img_scales=None):
+def postprocess_combined(params, cls_outputs, box_outputs, image_scales=None):
   """Post processing with combined NMS.
 
   Leverage the tf combined NMS. It is fast on TensorRT, but slow on CPU/GPU.
@@ -219,7 +221,7 @@ def postprocess_combined(params, cls_outputs, box_outputs, img_scales=None):
       of logits with shape [N, H, W, num_class * num_anchors].
     box_outputs: a list of tensors for boxes, each tensor ddenotes a level of
       boxes with shape [N, H, W, 4 * num_anchors].
-    img_scales: scaling factor or the final image and bounding boxes.
+    image_scales: scaling factor or the final image and bounding boxes.
 
   Returns:
     A tuple of batch level (boxes, scores, classess, valid_len) after nms.
@@ -240,11 +242,14 @@ def postprocess_combined(params, cls_outputs, box_outputs, img_scales=None):
           score_threshold=score_thresh,
           clip_boxes=False))
   nms_classes += CLASS_OFFSET
+  if image_scales is not None:
+    scales = tf.expand_dims(tf.expand_dims(image_scales, -1), -1)
+    nms_boxes = nms_boxes * tf.cast(scales, nms_boxes.dtype)
   nms_boxes = clip_boxes(nms_boxes, params['image_size'])
   return nms_boxes, nms_scores, nms_classes, nms_valid_len
 
 
-def postprocess_global(params, cls_outputs, box_outputs, img_scales=None):
+def postprocess_global(params, cls_outputs, box_outputs, image_scales=None):
   """Post processing with global NMS.
 
   A fast but less accurate version of NMS. The idea is to treat the scores for
@@ -256,7 +261,7 @@ def postprocess_global(params, cls_outputs, box_outputs, img_scales=None):
       of logits with shape [N, H, W, num_class * num_anchors].
     box_outputs: a list of tensors for boxes, each tensor ddenotes a level of
       boxes with shape [N, H, W, 4 * num_anchors].
-    img_scales: scaling factor or the final image and bounding boxes.
+    image_scales: scaling factor or the final image and bounding boxes.
 
   Returns:
     A tuple of batch level (boxes, scores, classess, valid_len) after nms.
@@ -272,7 +277,6 @@ def postprocess_global(params, cls_outputs, box_outputs, img_scales=None):
     padded = batch_size > 1  # only pad if batch size > 1 for simplicity.
     nms_boxes, nms_scores, nms_classes, nms_valid_len = nms(
         params, boxes[i], scores[i], classes[i], padded)
-    nms_boxes = clip_boxes(nms_boxes, params['image_size'])
 
     nms_boxes_bs.append(nms_boxes)
     nms_scores_bs.append(nms_scores)
@@ -283,34 +287,15 @@ def postprocess_global(params, cls_outputs, box_outputs, img_scales=None):
   nms_scores_bs = tf.stack(nms_scores_bs)
   nms_classes_bs = tf.stack(nms_classes_bs)
   nms_valid_len_bs = tf.stack(nms_valid_len_bs)
-  if img_scales is not None:
-    scales = tf.expand_dims(tf.expand_dims(img_scales, -1), -1)
-    scales = tf.cast(scales, nms_boxes_bs.dtype)
-    nms_boxes_bs = nms_boxes_bs * scales
+  if image_scales is not None:
+    scales = tf.expand_dims(tf.expand_dims(image_scales, -1), -1)
+    nms_boxes_bs = nms_boxes_bs * tf.cast(scales, nms_boxes_bs.dtype)
+  nms_boxes_bs = clip_boxes(nms_boxes_bs, params['image_size'])
   return nms_boxes_bs, nms_scores_bs, nms_classes_bs, nms_valid_len_bs
 
 
-def postprocess_per_class(params, cls_outputs, box_outputs, img_scales=None):
-  """Post processing with per class NMS.
-
-  An accurate but relatively slow version of NMS. The idea is to perform NMS for
-  each class, and then combine them.
-
-  Args:
-    params: a dict of parameters.
-    cls_outputs: a list of tensors for classes, each tensor denotes a level
-      of logits with shape [N, H, W, num_class * num_anchors].
-    box_outputs: a list of tensors for boxes, each tensor ddenotes a level of
-      boxes with shape [N, H, W, 4 * num_anchors].
-    img_scales: scaling factor or the final image and bounding boxes.
-
-  Returns:
-    A tuple of batch level (boxes, scores, classess, valid_len) after nms.
-  """
-  cls_outputs = to_list(cls_outputs)
-  box_outputs = to_list(box_outputs)
-  boxes, scores, classes = pre_nms(params, cls_outputs, box_outputs)
-
+def per_class_nms(params, boxes, scores, classes, image_scales=None):
+  """Perform per-class nms."""
   nms_boxes_bs, nms_scores_bs, nms_classes_bs, nms_valid_len_bs = [], [], [], []
   batch_size = boxes.shape[0]
   for i in range(batch_size):
@@ -354,20 +339,44 @@ def postprocess_per_class(params, cls_outputs, box_outputs, img_scales=None):
   nms_classes_bs = tf.stack(nms_classes_bs)
   nms_boxes_bs = tf.stack(nms_boxes_bs)
   nms_valid_len_bs = tf.stack(nms_valid_len_bs)
-  if img_scales is not None:
-    scales = tf.expand_dims(tf.expand_dims(img_scales, -1), -1)
-    nms_boxes_bs = nms_boxes_bs * scales
+  if image_scales is not None:
+    scales = tf.expand_dims(tf.expand_dims(image_scales, -1), -1)
+    nms_boxes_bs = nms_boxes_bs * tf.cast(scales, nms_boxes_bs.dtype)
   return nms_boxes_bs, nms_scores_bs, nms_classes_bs, nms_valid_len_bs
 
 
-def generate_detections(params, cls_outputs, box_outputs, img_scales, img_ids):
+def postprocess_per_class(params, cls_outputs, box_outputs, image_scales=None):
+  """Post processing with per class NMS.
+
+  An accurate but relatively slow version of NMS. The idea is to perform NMS for
+  each class, and then combine them.
+
+  Args:
+    params: a dict of parameters.
+    cls_outputs: a list of tensors for classes, each tensor denotes a level
+      of logits with shape [N, H, W, num_class * num_anchors].
+    box_outputs: a list of tensors for boxes, each tensor ddenotes a level of
+      boxes with shape [N, H, W, 4 * num_anchors].
+    image_scales: scaling factor or the final image and bounding boxes.
+
+  Returns:
+    A tuple of batch level (boxes, scores, classess, valid_len) after nms.
+  """
+  cls_outputs = to_list(cls_outputs)
+  box_outputs = to_list(box_outputs)
+  boxes, scores, classes = pre_nms(params, cls_outputs, box_outputs)
+  return per_class_nms(boxes, scores, classes, image_scales)
+
+
+def generate_detections(params, cls_outputs, box_outputs, image_scales,
+                        image_ids):
   """A legacy interface for generating [id, x, y, w, h, score, class]."""
   nms_boxes_bs, nms_scores_bs, nms_classes_bs, _ = postprocess_per_class(
-      params, cls_outputs, box_outputs, img_scales)
+      params, cls_outputs, box_outputs, image_scales)
 
-  img_ids_bs = tf.cast(tf.expand_dims(img_ids, -1), nms_scores_bs.dtype)
+  image_ids_bs = tf.cast(tf.expand_dims(image_ids, -1), nms_scores_bs.dtype)
   detections_bs = [
-      img_ids_bs * tf.ones_like(nms_scores_bs),
+      image_ids_bs * tf.ones_like(nms_scores_bs),
       nms_boxes_bs[:, :, 1],
       nms_boxes_bs[:, :, 0],
       nms_boxes_bs[:, :, 3] - nms_boxes_bs[:, :, 1],

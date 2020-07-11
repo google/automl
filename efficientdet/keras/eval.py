@@ -17,26 +17,21 @@
 from absl import app
 from absl import flags
 from absl import logging
-import tensorflow as tf
 
 import coco_metric
 import dataloader
 import hparams_config
-import utils
 
 from keras import anchors
 from keras import efficientdet_keras
 from keras import postprocess
 
-flags.DEFINE_string('validation_file_pattern', None,
-                    'Glob for evaluation tfrecords (e.g., COCO val2017 set)')
+flags.DEFINE_string('val_file_pattern', None,
+                    'Glob for eval tfrecords, e.g. coco/val-*.tfrecord.')
 flags.DEFINE_string('val_json_file', None,
-                    'COCO validation JSON containing golden bounding boxes.')
-flags.DEFINE_string('checkpoint', None,
-                    'Location of the checkpoint to evaluate.')
-flags.DEFINE_string('model_name', 'efficientdet-d0',
-                    'Model name: the efficientdet model to use.')
-
+                    'Groudtruth file, e.g. annotations/instances_val2017.json.')
+flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model name to use.')
+flags.DEFINE_string('checkpoint', None, 'Location of the checkpoint to run.')
 FLAGS = flags.FLAGS
 
 
@@ -54,14 +49,14 @@ def main(_):
       max_instances_per_image=config.max_instances_per_image)(
           config)
 
-  height, width = utils.parse_image_size(config['image_size'])
-
   # Network
   model = efficientdet_keras.EfficientDetNet(config=config)
-  model.build((config.batch_size, height, width, 3))
+  model.build((config.batch_size, 512, 512, 3))
   model.load_weights(FLAGS.checkpoint)
 
-  evaluator = coco_metric.EvaluationMetric(filename=config.val_json_file)
+  evaluator = coco_metric.EvaluationMetric(
+      filename=config.val_json_file)
+
   # compute stats for all batches.
   for images, labels in ds:
     cls_outputs, box_outputs = model(images, training=False)
@@ -82,7 +77,7 @@ def main(_):
 
 
 if __name__ == '__main__':
-  flags.mark_flag_as_required('validation_file_pattern')
+  flags.mark_flag_as_required('val_file_pattern')
   flags.mark_flag_as_required('val_json_file')
   flags.mark_flag_as_required('checkpoint')
   logging.set_verbosity(logging.WARNING)

@@ -14,17 +14,18 @@
 # limitations under the License.
 # ==============================================================================
 """Training related libraries."""
+from concurrent import futures
 import math
 import re
 from absl import logging
 import numpy as np
 import tensorflow as tf
 
+import inference
 import iou_utils
 import utils
-import inference
 from keras import efficientdet_keras
-from concurrent.futures import ThreadPoolExecutor
+
 
 def update_learning_rate_schedule_parameters(params):
   """Updates params that are related to the learning rate schedule."""
@@ -183,12 +184,14 @@ def get_optimizer(params):
         optimizer, loss_scale='dynamic')
   return optimizer
 
+
 class DisplayCallback(tf.keras.callbacks.Callback):
-  """Display inference result callback"""
+  """Display inference result callback."""
+
   def __init__(self, sample_image, update_freq=1):
     super().__init__()
     self.sample_image = tf.expand_dims(sample_image, axis=0)
-    self.executor = ThreadPoolExecutor(max_workers=1)
+    self.executor = futures.ThreadPoolExecutor(max_workers=1)
     self.update_freq = update_freq
 
   def set_model(self, model: tf.keras.Model):
@@ -218,7 +221,8 @@ class DisplayCallback(tf.keras.callbacks.Callback):
         max_boxes_to_draw=self.model.config.nms_configs['max_output_size'])
 
     with self.file_writer.as_default():
-      tf.summary.image("Test image", tf.expand_dims(image, axis=0), step=epoch)
+      tf.summary.image('Test image', tf.expand_dims(image, axis=0), step=epoch)
+
 
 def get_callbacks(params, profile=False):
   tb_callback = tf.keras.callbacks.TensorBoard(
@@ -481,7 +485,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     optimizer_op = self.optimizer.apply_gradients(
         zip(gradients, trainable_vars))
     if self.config.moving_average_decay:
-      self.ema._num_updates = self.optimizer.iterations
+      self.ema._num_updates = self.optimizer.iterations  # pylint: disable=protected-access
       with tf.control_dependencies([optimizer_op]):
         self.ema.apply(self.trainable_variables)
     return {'loss': total_loss,
