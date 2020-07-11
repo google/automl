@@ -324,15 +324,26 @@ class BoxLoss(tf.keras.losses.Loss):
 class BoxIouLoss(tf.keras.losses.Loss):
   """Box iou loss."""
 
-  def __init__(self, iou_loss_type, **kwargs):
+  def __init__(self, iou_loss_type, min_level, max_level, num_scales,
+               aspect_ratios, anchor_scale, image_size, **kwargs):
     super().__init__(**kwargs)
     self.iou_loss_type = iou_loss_type
+    self.input_anchors = anchors.Anchors(min_level, max_level, num_scales,
+                                         aspect_ratios, anchor_scale,
+                                         image_size)
+    self.box_coder = FasterRcnnBoxCoder()
 
   @tf.autograph.experimental.do_not_convert
   def call(self, y_true, box_outputs):
+    input_anchors = BoxList(
+        tf.tile(self.input_anchors.boxes,
+                [box_outputs.shape[0] // self.input_anchors.boxes.shape[0], 1]))
     num_positives, box_targets = y_true
+    box_outputs = self.box_coder.decode(box_outputs, input_anchors)
+    box_targets = self.box_coder.decode(box_targets, input_anchors)
     normalizer = num_positives * 4.0
-    box_iou_loss = iou_utils.iou_loss(box_outputs, box_targets,
+    box_iou_loss = iou_utils.iou_loss(box_outputs.data['boxes'],
+                                      box_targets.data['boxes'],
                                       self.iou_loss_type)
     box_iou_loss = tf.reduce_sum(box_iou_loss) / normalizer
     return box_iou_loss
@@ -343,16 +354,6 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
 
   see https://www.tensorflow.org/guide/keras/customizing_what_happens_in_fit
   """
-
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-    self.input_anchors = anchors.Anchors(self.config.min_level,
-                                         self.config.max_level,
-                                         self.config.num_scales,
-                                         self.config.aspect_ratios,
-                                         self.config.anchor_scale,
-                                         self.config.image_size)
-    self.box_coder = FasterRcnnBoxCoder()
 
   def freeze_vars(self, pattern):
     """Freeze variables according to pattern.
@@ -444,8 +445,6 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
                            box_outputs[level]))
 
     if self.config.iou_loss_type:
-      input_anchors = BoxList(
-          tf.tile(self.input_anchors.boxes, [box_outputs[0].shape[0], 1]))
       box_outputs = tf.concat([tf.reshape(v, [-1, 4]) for v in box_outputs],
                               axis=0)
       box_targets = tf.concat([
@@ -453,12 +452,9 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
           for level in levels
       ],
                               axis=0)
-      box_outputs = self.box_coder.decode(box_outputs, input_anchors)
-      box_targets = self.box_coder.decode(box_targets, input_anchors)
       box_iou_loss_layer = self.loss['box_iou_loss']
-      box_iou_loss = box_iou_loss_layer(
-          [num_positives_sum, box_targets.data['boxes']],
-          box_outputs.data['boxes'])
+      box_iou_loss = box_iou_loss_layer([num_positives_sum, box_targets],
+                                        box_outputs)
     else:
       box_iou_loss = 0
 

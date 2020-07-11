@@ -127,6 +127,7 @@ def main(_):
     hvd.init()
     os.environ['CUDA_VISIBLE_DEVICES'] = str(hvd.local_rank())
   import tensorflow.compat.v1 as tf  # pylint: disable=g-import-not-at-top
+  tf.enable_v2_tensorshape()
   tf.disable_eager_execution()
 
   if FLAGS.strategy == 'tpu':
