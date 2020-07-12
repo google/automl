@@ -88,6 +88,7 @@ class EvaluationMetric():
     if self.filename:
       self.coco_gt = COCO(self.filename)
     else:
+      self.coco_gt = COCO()
       self.coco_gt.dataset = self.dataset
       self.coco_gt.createIndex()
 
