@@ -24,6 +24,7 @@ import tensorflow as tf
 import inference
 import iou_utils
 import utils
+
 from keras import efficientdet_keras
 
 import anchors
@@ -183,6 +184,12 @@ def get_optimizer(params):
     optimizer = tf.keras.optimizers.Adam(learning_rate)
   else:
     raise ValueError('optimizers should be adam or sgd')
+  moving_average_decay = params['moving_average_decay']
+  if moving_average_decay:
+    # Only work on tfa-nightly
+    import tensorflow_addons as tfa
+    optimizer = tfa.optimizers.MovingAverage(
+        optimizer, average_decay=moving_average_decay, dynamic_decay=True)
   if params['mixed_precision']:
     optimizer = tf.keras.mixed_precision.experimental.LossScaleOptimizer(
         optimizer, loss_scale='dynamic')
@@ -226,7 +233,6 @@ class DisplayCallback(tf.keras.callbacks.Callback):
 
     with self.file_writer.as_default():
       tf.summary.image('Test image', tf.expand_dims(image, axis=0), step=epoch)
-
 
 
 def get_callbacks(params, profile=False):
@@ -501,12 +507,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     if self.config.clip_gradients_norm > 0:
       gradients, gnorm = tf.clip_by_global_norm(gradients,
                                                 self.config.clip_gradients_norm)
-    optimizer_op = self.optimizer.apply_gradients(
-        zip(gradients, trainable_vars))
-    if self.config.moving_average_decay:
-      self.ema._num_updates = self.optimizer.iterations  # pylint: disable=protected-access
-      with tf.control_dependencies([optimizer_op]):
-        self.ema.apply(self.ema_vars)
+    self.optimizer.apply_gradients(zip(gradients, trainable_vars))
     return {
         'loss': total_loss,
         'det_loss': det_loss,
