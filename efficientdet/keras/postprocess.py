@@ -355,19 +355,32 @@ def postprocess_per_class(params, cls_outputs, box_outputs, image_scales=None):
 
 
 def generate_detections(params, cls_outputs, box_outputs, image_scales,
-                        image_ids):
+                        image_ids, flip = False):
   """A legacy interface for generating [id, x, y, w, h, score, class]."""
   nms_boxes_bs, nms_scores_bs, nms_classes_bs, _ = postprocess_per_class(
       params, cls_outputs, box_outputs, image_scales)
 
   image_ids_bs = tf.cast(tf.expand_dims(image_ids, -1), nms_scores_bs.dtype)
-  detections_bs = [
-      image_ids_bs * tf.ones_like(nms_scores_bs),
-      nms_boxes_bs[:, :, 1],
-      nms_boxes_bs[:, :, 0],
-      nms_boxes_bs[:, :, 3] - nms_boxes_bs[:, :, 1],
-      nms_boxes_bs[:, :, 2] - nms_boxes_bs[:, :, 0],
-      nms_scores_bs,
-      nms_classes_bs,
-  ]
-  return tf.stack(detections_bs, axis=-1, name='detections')
+  if flip:
+    _, width = utils.parse_image_size(params['image_size'])
+
+    detections_bs = [
+        image_ids_bs * tf.ones_like(nms_scores_bs),
+        tf.expand_dims(image_scales, -1) * width - nms_boxes_bs[:, :, 3],
+        nms_boxes_bs[:, :, 0],
+        nms_boxes_bs[:, :, 3] - nms_boxes_bs[:, :, 1],
+        nms_boxes_bs[:, :, 2] - nms_boxes_bs[:, :, 0],
+        nms_scores_bs,
+        nms_classes_bs,
+    ]
+  else:
+    detections_bs = [
+        image_ids_bs * tf.ones_like(nms_scores_bs),
+        nms_boxes_bs[:, :, 1],
+        nms_boxes_bs[:, :, 0],
+        nms_boxes_bs[:, :, 3] - nms_boxes_bs[:, :, 1],
+        nms_boxes_bs[:, :, 2] - nms_boxes_bs[:, :, 0],
+        nms_scores_bs,
+        nms_classes_bs,
+    ]
+  return tf.stack(detections_bs, axis=-1, name='detnections')

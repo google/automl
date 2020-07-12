@@ -30,8 +30,9 @@ import tensorflow as tf
 
 flags.DEFINE_string('val_file_pattern', None,
                     'Glob for eval tfrecords, e.g. coco/val-*.tfrecord.')
-flags.DEFINE_string('val_json_file', None,
-                    'Groudtruth file, e.g. annotations/instances_val2017.json.')
+flags.DEFINE_string(
+    'val_json_file', None,
+    'Groudtruth file, e.g. annotations/instances_val2017.json.')
 flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model name to use.')
 flags.DEFINE_string('model_dir', None, 'Location of the checkpoint to run.')
 flags.DEFINE_integer('batch_size', 8, 'Batch size.')
@@ -58,17 +59,19 @@ def main(_):
   model.build((config.batch_size, 512, 512, 3))
   model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
 
-  evaluator = coco_metric.EvaluationMetric(
-      filename=config.val_json_file)
+  evaluator = coco_metric.EvaluationMetric(filename=config.val_json_file)
 
   # compute stats for all batches.
+  FLIP = False
   for images, labels in ds:
+    if FLIP:
+      images = tf.image.flip_left_right(images)
     cls_outputs, box_outputs = model(images, training=False)
     config.nms_configs.max_nms_inputs = anchors.MAX_DETECTION_POINTS
     detections = postprocess.generate_detections(config, cls_outputs,
                                                  box_outputs,
                                                  labels['image_scales'],
-                                                 labels['source_ids'])
+                                                 labels['source_ids'], FLIP)
     evaluator.update_state(labels['groundtruth_data'].numpy(),
                            detections.numpy())
 
