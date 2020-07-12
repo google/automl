@@ -17,6 +17,8 @@
 from absl import app
 from absl import flags
 from absl import logging
+
+import os
 import tensorflow as tf
 
 import dataloader
@@ -191,6 +193,12 @@ def main(_):
             'box_iou_loss':
                 train_lib.BoxIouLoss(
                     params['iou_loss_type'],
+                    params['min_level'],
+                    params['max_level'],
+                    params['num_scales'],
+                    params['aspect_ratios'],
+                    params['anchor_scale'],
+                    params['image_size'],
                     reduction=tf.keras.losses.Reduction.NONE),
             'class_loss':
                 train_lib.FocalLoss(
@@ -209,7 +217,7 @@ def main(_):
       callbacks=train_lib.get_callbacks(params, FLAGS.profile),
       validation_data=get_dataset(False, params=params),
       validation_steps=FLAGS.eval_samples)
-  model.save_weights(FLAGS.model_dir)
+  model.save_weights(os.path.join(FLAGS.model_dir, 'model'))
 
 
 if __name__ == '__main__':

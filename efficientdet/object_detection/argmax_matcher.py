@@ -174,7 +174,7 @@ class ArgMaxMatcher(matcher.Matcher):
         return matches
 
     if similarity_matrix.shape.is_fully_defined():
-      if similarity_matrix.shape[0].value == 0:
+      if similarity_matrix.shape[0] == 0:
         return _match_when_rows_are_empty()
       else:
         return _match_when_rows_are_non_empty()

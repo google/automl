@@ -32,6 +32,8 @@ import retinanet_arch
 import utils
 from keras import anchors
 from keras import postprocess
+from object_detection.faster_rcnn_box_coder import FasterRcnnBoxCoder
+from object_detection.box_list import BoxList
 
 _DEFAULT_BATCH_SIZE = 64
 
@@ -239,7 +241,7 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
 
   cls_losses = []
   box_losses = []
-  box_iou_losses = []
+
   for level in levels:
     # Onehot encoding for classification labels.
     cls_targets_at_level = tf.one_hot(labels['cls_targets_%d' % level],
@@ -282,15 +284,32 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
               num_positives_sum,
               delta=params['delta']))
 
-    if params['iou_loss_type']:
-      box_iou_losses.append(
-          _box_iou_loss(box_outputs[level], box_targets_at_level,
-                        num_positives_sum, params['iou_loss_type']))
+  if params['iou_loss_type']:
+    input_anchors = anchors.Anchors(params['min_level'], params['max_level'],
+                                    params['num_scales'],
+                                    params['aspect_ratios'],
+                                    params['anchor_scale'],
+                                    params['image_size'])
+    box_coder = FasterRcnnBoxCoder()
+    input_anchors = BoxList(
+        tf.tile(input_anchors.boxes, [params['batch_size'], 1]))
+    box_outputs = tf.concat([tf.reshape(v, [-1, 4])
+                             for v in list(box_outputs.values())], axis=0)
+    box_targets = tf.concat(
+        [tf.reshape(labels['box_targets_%d' % level], [-1, 4])
+         for level in levels], axis=0)
+    box_outputs = box_coder.decode(box_outputs, input_anchors)
+    box_targets = box_coder.decode(box_targets, input_anchors)
+    box_iou_loss = _box_iou_loss(box_outputs.data['boxes'],
+                                 box_targets.data['boxes'],
+                                 num_positives_sum, params['iou_loss_type'])
+  else:
+    box_iou_loss = 0
 
   # Sum per level losses to total loss.
   cls_loss = tf.add_n(cls_losses)
   box_loss = tf.add_n(box_losses) if box_losses else 0
-  box_iou_loss = tf.add_n(box_iou_losses) if box_iou_losses else 0
+
   total_loss = (
       cls_loss +
       params['box_loss_weight'] * box_loss +

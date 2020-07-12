@@ -24,7 +24,12 @@ import tensorflow as tf
 import inference
 import iou_utils
 import utils
+
 from keras import efficientdet_keras
+
+import anchors
+from object_detection.faster_rcnn_box_coder import FasterRcnnBoxCoder
+from object_detection.box_list import BoxList
 
 
 def update_learning_rate_schedule_parameters(params):
@@ -179,6 +184,12 @@ def get_optimizer(params):
     optimizer = tf.keras.optimizers.Adam(learning_rate)
   else:
     raise ValueError('optimizers should be adam or sgd')
+  moving_average_decay = params['moving_average_decay']
+  if moving_average_decay:
+    # Only work on tfa-nightly
+    import tensorflow_addons as tfa
+    optimizer = tfa.optimizers.MovingAverage(
+        optimizer, average_decay=moving_average_decay, dynamic_decay=True)
   if params['mixed_precision']:
     optimizer = tf.keras.mixed_precision.experimental.LossScaleOptimizer(
         optimizer, loss_scale='dynamic')
@@ -319,15 +330,26 @@ class BoxLoss(tf.keras.losses.Loss):
 class BoxIouLoss(tf.keras.losses.Loss):
   """Box iou loss."""
 
-  def __init__(self, iou_loss_type, **kwargs):
+  def __init__(self, iou_loss_type, min_level, max_level, num_scales,
+               aspect_ratios, anchor_scale, image_size, **kwargs):
     super().__init__(**kwargs)
     self.iou_loss_type = iou_loss_type
+    self.input_anchors = anchors.Anchors(min_level, max_level, num_scales,
+                                         aspect_ratios, anchor_scale,
+                                         image_size)
+    self.box_coder = FasterRcnnBoxCoder()
 
   @tf.autograph.experimental.do_not_convert
   def call(self, y_true, box_outputs):
+    input_anchors = BoxList(
+        tf.tile(self.input_anchors.boxes,
+                [box_outputs.shape[0] // self.input_anchors.boxes.shape[0], 1]))
     num_positives, box_targets = y_true
+    box_outputs = self.box_coder.decode(box_outputs, input_anchors)
+    box_targets = self.box_coder.decode(box_targets, input_anchors)
     normalizer = num_positives * 4.0
-    box_iou_loss = iou_utils.iou_loss(box_outputs, box_targets,
+    box_iou_loss = iou_utils.iou_loss(box_outputs.data['boxes'],
+                                      box_targets.data['boxes'],
                                       self.iou_loss_type)
     box_iou_loss = tf.reduce_sum(box_iou_loss) / normalizer
     return box_iou_loss
@@ -338,12 +360,6 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
 
   see https://www.tensorflow.org/guide/keras/customizing_what_happens_in_fit
   """
-
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-    if self.config.moving_average_decay:
-      self.ema = tf.train.ExponentialMovingAverage(
-          decay=self.config.moving_average_decay)
 
   def freeze_vars(self, pattern):
     """Freeze variables according to pattern.
@@ -395,7 +411,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     levels = range(len(cls_outputs))
     cls_losses = []
     box_losses = []
-    box_iou_losses = []
+
     for level in levels:
       # Onehot encoding for classification labels.
       cls_targets_at_level = tf.one_hot(labels['cls_targets_%d' % (level + 3)],
@@ -434,14 +450,23 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
             box_loss_layer([num_positives_sum, box_targets_at_level],
                            box_outputs[level]))
 
-      if self.config.iou_loss_type and self.loss.get('box_iou_loss', None):
-        box_iou_loss_layer = self.loss['box_iou_loss']
-        box_iou_losses.append(
-            box_iou_loss_layer([num_positives_sum, box_targets_at_level],
-                               box_outputs[level]))
+    if self.config.iou_loss_type:
+      box_outputs = tf.concat([tf.reshape(v, [-1, 4]) for v in box_outputs],
+                              axis=0)
+      box_targets = tf.concat([
+          tf.reshape(labels['box_targets_%d' % (level + 3)], [-1, 4])
+          for level in levels
+      ],
+                              axis=0)
+      box_iou_loss_layer = self.loss['box_iou_loss']
+      box_iou_loss = box_iou_loss_layer([num_positives_sum, box_targets],
+                                        box_outputs)
+    else:
+      box_iou_loss = 0
+
     cls_loss = tf.add_n(cls_losses) if cls_losses else 0
     box_loss = tf.add_n(box_losses) if box_losses else 0
-    box_iou_loss = tf.add_n(box_iou_losses) if box_iou_losses else 0
+
     total_loss = (
         cls_loss + self.config.box_loss_weight * box_loss +
         self.config.iou_loss_weight * box_iou_loss)
@@ -482,18 +507,15 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     if self.config.clip_gradients_norm > 0:
       gradients, gnorm = tf.clip_by_global_norm(gradients,
                                                 self.config.clip_gradients_norm)
-    optimizer_op = self.optimizer.apply_gradients(
-        zip(gradients, trainable_vars))
-    if self.config.moving_average_decay:
-      self.ema._num_updates = self.optimizer.iterations  # pylint: disable=protected-access
-      with tf.control_dependencies([optimizer_op]):
-        self.ema.apply(self.trainable_variables)
-    return {'loss': total_loss,
-            'det_loss': det_loss,
-            'cls_loss': cls_loss,
-            'box_loss': box_loss,
-            'box_iou_loss': box_iou_loss,
-            'gnorm': gnorm}
+    self.optimizer.apply_gradients(zip(gradients, trainable_vars))
+    return {
+        'loss': total_loss,
+        'det_loss': det_loss,
+        'cls_loss': cls_loss,
+        'box_loss': box_loss,
+        'box_iou_loss': box_iou_loss,
+        'gnorm': gnorm
+    }
 
   def test_step(self, data):
     """Test step.
@@ -514,8 +536,10 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
         self._detection_loss(cls_outputs, box_outputs, labels))
     reg_l2loss = self._reg_l2_loss(self.config.weight_decay)
     total_loss = det_loss + reg_l2loss
-    return {'loss': total_loss,
-            'det_loss': det_loss,
-            'cls_loss': cls_loss,
-            'box_loss': box_loss,
-            'box_iou_loss': box_iou_loss}
+    return {
+        'loss': total_loss,
+        'det_loss': det_loss,
+        'cls_loss': cls_loss,
+        'box_loss': box_loss,
+        'box_iou_loss': box_iou_loss
+    }

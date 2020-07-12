@@ -485,5 +485,6 @@ def main(_):
 
 if __name__ == '__main__':
   logging.set_verbosity(logging.WARNING)
+  tf.enable_v2_tensorshape()
   tf.disable_eager_execution()
   app.run(main)
