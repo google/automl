@@ -1558,7 +1558,7 @@ def select_and_apply_random_policy_augmix(policies,
   policy_to_select = tf.random_uniform([], maxval=len(policies), dtype=tf.int32)
   # Note that using tf.case instead of tf.conds would result in significantly
   # larger graphs and would even break export for some larger policies.
-  import tensorflow_probability as tfp
+  import tensorflow_probability as tfp  # pylint: disable=g-import-not-at-top
   ws = tfp.distributions.Dirichlet([alpha] * mixture_width).sample()
   m = tfp.distributions.Beta(alpha, alpha).sample()
   mix = tf.zeros_like(image, dtype=tf.float32)

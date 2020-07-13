@@ -32,19 +32,21 @@ flags.DEFINE_string('val_json_file', None,
                     'Groudtruth file, e.g. annotations/instances_val2017.json.')
 flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model name to use.')
 flags.DEFINE_string('checkpoint', None, 'Location of the checkpoint to run.')
+flags.DEFINE_integer('batch_size', 8, 'Batch size.')
+flags.DEFINE_string('hparams', '', 'Comma separated k=v pairs or a yaml file'
 FLAGS = flags.FLAGS
 
 
 def main(_):
   config = hparams_config.get_efficientdet_config(FLAGS.model_name)
-  config.batch_size = 8
+  config.override(FLAGS.hparams)
+  config.batch_size = FLAGS.batch_size
   config.val_json_file = FLAGS.val_json_file
 
   # dataset
-  is_training = False
   ds = dataloader.InputReader(
-      FLAGS.validation_file_pattern,
-      is_training=is_training,
+      FLAGS.val_file_pattern,
+      is_training=False,
       use_fake_data=False,
       max_instances_per_image=config.max_instances_per_image)(
           config)

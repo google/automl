@@ -77,6 +77,7 @@ class EvaluationMetric():
     self.annotation_id = 1
     self.category_ids = []
     self.metric_values = None
+    self.coco_gt = None
 
   def evaluate(self):
     """Evaluates with detections from all images with COCO API.
@@ -148,19 +149,19 @@ class EvaluationMetric():
         [image_id, x, y, width, height, score, class].
     """
     for i in range(len(detections)):
+      detections_i = detections[i]
       # Filter out detections with predicted class label = -1.
-
-      indices = np.where(detections[i, :, -1] > -1)[0]
-      detections[i] = detections[i, indices]
-      if detections[i].shape[0] == 0:
+      indices = np.where(detections_i[:, -1] > -1)[0]
+      detections_i = detections_i[indices]
+      if detections_i.shape[0] == 0:
         continue
       # Append groundtruth annotations to create COCO dataset object.
       # Add images.
-      image_id = detections[i][0, 0]
+      image_id = detections_i[0, 0]
       if image_id == -1:
         image_id = self.image_id
-      detections[i][:, 0] = image_id
-      self.detections.extend(detections[i])
+      detections_i[:, 0] = image_id
+      self.detections.extend(detections_i)
 
       if self.testdev_dir:
         # Skip annotation for test-dev case.

@@ -250,6 +250,9 @@ class InputReader(object):
 
     Args:
       value: a single serialized tf.Example string.
+      example_decoder: TF example decoder.
+      anchor_labeler: anchor box labeler.
+      params: a dict of extra parameters.
 
     Returns:
       image: Image tensor that is preprocessed to have normalized value and
@@ -339,9 +342,9 @@ class InputReader(object):
               image_scale, boxes, is_crowds, areas, classes)
 
   @tf.autograph.experimental.do_not_convert
-  def process_example(self, images, cls_targets, box_targets, num_positives,
-                      source_ids, image_scales, boxes, is_crowds, areas,
-                      classes, batch_size, params):
+  def process_example(self, params, batch_size, images, cls_targets,
+                      box_targets, num_positives, source_ids, image_scales,
+                      boxes, is_crowds, areas, classes):
     """Processes one batch of data."""
     labels = {}
     # Count num_positives in a batch.
@@ -397,10 +400,14 @@ class InputReader(object):
       dataset = dataset.shuffle(64)
 
     # Parse the fetched records to input tensors for model function.
-    dataset = dataset.map(lambda value: self.dataset_parser(value, example_decoder, anchor_labeler, params), num_parallel_calls=64)
+    dataset = dataset.map(
+        lambda value: self.dataset_parser(  # pylint: disable=g-long-lambda
+            value, example_decoder, anchor_labeler, params),
+        num_parallel_calls=64)
     dataset = dataset.prefetch(batch_size)
     dataset = dataset.batch(batch_size, drop_remainder=True)
-    dataset = dataset.map(lambda *args: self.process_example(*args, batch_size, params))
+    dataset = dataset.map(
+        lambda *args: self.process_example(params, batch_size, *args))
     dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
     if self._use_fake_data:
       # Turn this dataset into a semi-fake dataset which always loop at the

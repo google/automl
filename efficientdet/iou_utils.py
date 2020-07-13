@@ -38,17 +38,20 @@ def _get_v(b1_height: FloatType, b1_width: FloatType, b2_height: FloatType,
     v = 4 * ((arctan / math.pi)**2)
 
     def _grad_v(dv):
+      """Grad for eager mode."""
       gdw = dv * 8 * arctan * height / (math.pi**2)
       gdh = -dv * 8 * arctan * width / (math.pi**2)
       return [gdh, gdw]
 
     def _grad_v_graph(dv, variables):
+      """Grad for graph mode."""
       gdw = dv * 8 * arctan * height / (math.pi**2)
       gdh = -dv * 8 * arctan * width / (math.pi**2)
       return [gdh, gdw], tf.gradients(v, variables, grad_ys=dv)
 
-    return v, _grad_v if tf.compat.v1.executing_eagerly_outside_functions(
-    ) else _grad_v_graph
+    if tf.compat.v1.executing_eagerly():
+      return v, _grad_v
+    return  _grad_v_graph
 
   return _get_grad_v(b2_height, b2_width)
 
@@ -175,12 +178,14 @@ def iou_loss(pred_boxes: FloatType,
 
     # Compute mask.
     t_ymin, t_xmin, t_ymax, t_xmax = target_boxes
-    mask = tf.not_equal((t_ymax - t_ymin) * (t_xmax - t_xmin), 0)
+    mask = tf.math.logical_and(t_ymax > t_ymin, t_xmax > t_xmin)
     mask = tf.cast(mask, t_ymin.dtype)
     # Loss should be mask * (1 - iou) = mask - masked_iou.
     pred_boxes = [b * mask for b in pred_boxes]
+    target_boxes = [b * mask for b in target_boxes]
     iou_loss_list.append(
-        mask - tf.squeeze(_iou_per_anchor(pred_boxes, target_boxes, iou_type)))
+        mask *
+        (1 - tf.squeeze(_iou_per_anchor(pred_boxes, target_boxes, iou_type))))
   if len(iou_loss_list) == 1:
     return iou_loss_list[0]
   return tf.reduce_sum(tf.stack(iou_loss_list), 0)
