@@ -458,7 +458,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
         detections_bs = []
         for index in range(kwargs['boxes'].shape[0]):
           nms_configs = params['nms_configs']
-          detections = tf.py_func(
+          detections = tf.numpy_function(
               functools.partial(nms_np.per_class_nms, nms_configs=nms_configs),
               [
                   kwargs['boxes'][index],
