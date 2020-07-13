@@ -77,7 +77,6 @@ class EvaluationMetric():
     self.annotation_id = 1
     self.category_ids = []
     self.metric_values = None
-    self.coco_gt = None
 
   def evaluate(self):
     """Evaluates with detections from all images with COCO API.
@@ -87,11 +86,11 @@ class EvaluationMetric():
         coco-style evaluation metrics.
     """
     if self.filename:
-      self.coco_gt = COCO(self.filename)
+      coco_gt = COCO(self.filename)
     else:
-      self.coco_gt = COCO()
-      self.coco_gt.dataset = self.dataset
-      self.coco_gt.createIndex()
+      coco_gt = COCO()
+      coco_gt.dataset = self.dataset
+      coco_gt.createIndex()
 
     if self.testdev_dir:
       # Run on test-dev dataset.
@@ -111,16 +110,13 @@ class EvaluationMetric():
       logging.info('Writing output json file to: %s', output_path)
       with tf.io.gfile.GFile(output_path, 'w') as fid:
         json.dump(box_result_list, fid)
-      zip_path = os.path.join(self.testdev_dir, fname + '.zip')
-      with zipfile.ZipFile(zip_path, 'w') as zf:
-        zf.writestr(fname + '.json', json.dumps(box_result_list))
       return np.array([0.], dtype=np.float32)
     else:
       # Run on validation dataset.
       detections = np.array(self.detections)
       image_ids = list(set(detections[:, 0]))
-      coco_dt = self.coco_gt.loadRes(detections)
-      coco_eval = COCOeval(self.coco_gt, coco_dt, iouType='bbox')
+      coco_dt = coco_gt.loadRes(detections)
+      coco_eval = COCOeval(coco_gt, coco_dt, iouType='bbox')
       coco_eval.params.imgIds = image_ids
       coco_eval.evaluate()
       coco_eval.accumulate()
@@ -148,54 +144,53 @@ class EvaluationMetric():
       detections: Detection results in a tensor with each row representing
         [image_id, x, y, width, height, score, class].
     """
-    for i in range(len(detections)):
-      detections_i = detections[i]
+    for i, det in enumerate(detections):
       # Filter out detections with predicted class label = -1.
-      indices = np.where(detections_i[:, -1] > -1)[0]
-      detections_i = detections_i[indices]
-      if detections_i.shape[0] == 0:
+      indices = np.where(det[:, -1] > -1)[0]
+      det = det[indices]
+      if det.shape[0] == 0:
         continue
       # Append groundtruth annotations to create COCO dataset object.
       # Add images.
-      image_id = detections_i[0, 0]
+      image_id = det[0, 0]
       if image_id == -1:
         image_id = self.image_id
-      detections_i[:, 0] = image_id
-      self.detections.extend(detections_i)
+      det[:, 0] = image_id
+      self.detections.extend(det)
 
-      if self.testdev_dir:
-        # Skip annotation for test-dev case.
-        self.image_id += 1
-        continue
-
-      self.dataset['images'].append({
-          'id': int(image_id),
-      })
-
-      # Add annotations.
-      indices = np.where(groundtruth_data[i, :, -1] > -1)[0]
-      for data in groundtruth_data[i, indices]:
-        box = data[0:4]
-        is_crowd = data[4]
-        area = (box[3] - box[1]) * (box[2] - box[0])
-        category_id = data[6]
-        if category_id < 0:
-          break
-        self.dataset['annotations'].append({
-            'id': int(self.annotation_id),
-            'image_id': int(image_id),
-            'category_id': int(category_id),
-            'bbox': [box[1], box[0], box[3] - box[1], box[2] - box[0]],
-            'area': area,
-            'iscrowd': int(is_crowd)
+      if not self.filename and not self.testdev_dir:
+        # process groudtruth data only if filename is empty and no test_dev.
+        self.dataset['images'].append({
+            'id': int(image_id),
         })
-        self.annotation_id += 1
-        self.category_ids.append(category_id)
+
+        # Add annotations.
+        indices = np.where(groundtruth_data[i, :, -1] > -1)[0]
+        for data in groundtruth_data[i, indices]:
+          box = data[0:4]
+          is_crowd = data[4]
+          area = (box[3] - box[1]) * (box[2] - box[0])
+          category_id = data[6]
+          if category_id < 0:
+            break
+          self.dataset['annotations'].append({
+              'id': int(self.annotation_id),
+              'image_id': int(image_id),
+              'category_id': int(category_id),
+              'bbox': [box[1], box[0], box[3] - box[1], box[2] - box[0]],
+              'area': area,
+              'iscrowd': int(is_crowd)
+          })
+          self.annotation_id += 1
+          self.category_ids.append(category_id)
+
       self.image_id += 1
-    self.category_ids = list(set(self.category_ids))
-    self.dataset['categories'] = [
-        {'id': int(category_id)} for category_id in self.category_ids
-    ]
+
+    if not self.filename:
+      self.category_ids = list(set(self.category_ids))
+      self.dataset['categories'] = [
+          {'id': int(category_id)} for category_id in self.category_ids
+      ]
 
   def estimator_metric_fn(self, detections, groundtruth_data):
     """Constructs the metric function for tf.TPUEstimator.
