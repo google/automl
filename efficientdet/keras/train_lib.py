@@ -341,10 +341,6 @@ class BoxIouLoss(tf.keras.losses.Loss):
         self.input_anchors.boxes,
         [box_outputs.shape[0] // self.input_anchors.boxes.shape[0], 1])
     num_positives, box_targets = y_true
-    print('box_outputs=', box_outputs.shape)
-    print('box_targets', box_targets.shape)
-    print('anchor_boxes', anchor_boxes.shape)
-    print('self.input_anchors', self.input_anchors.boxes.shape)
     box_outputs = anchors.decode_box_outputs(box_outputs, anchor_boxes)
     box_targets = anchors.decode_box_outputs(box_targets, anchor_boxes)
     normalizer = num_positives * 4.0

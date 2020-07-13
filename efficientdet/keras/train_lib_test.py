@@ -81,7 +81,6 @@ class TrainLibTest(tf.test.TestCase):
     #                             'ciou'),
     #     box_iou_loss([num_positives, box_targets], box_outputs))
     iou_loss = box_iou_loss([num_positives, box_targets], box_outputs)
-    print(iou_loss)
     self.assertAlmostEqual(iou_loss.numpy(), 4.507848)
 
   def test_predict(self):
