@@ -565,7 +565,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
           ckpt_path=checkpoint,
           ckpt_scope=ckpt_scope,
           var_scope=var_scope,
-          var_exclude_expr=params.get('var_exclude_expr', None))
+          skip_mismatch=params['skip_mismatch'])
 
       tf.train.init_from_checkpoint(checkpoint, var_map)
 

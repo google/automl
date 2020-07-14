@@ -33,7 +33,7 @@ flags.DEFINE_string('val_json_file', None,
 flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model name to use.')
 flags.DEFINE_string('checkpoint', None, 'Location of the checkpoint to run.')
 flags.DEFINE_integer('batch_size', 8, 'Batch size.')
-flags.DEFINE_string('hparams', '', 'Comma separated k=v pairs or a yaml file'
+flags.DEFINE_string('hparams', '', 'Comma separated k=v pairs or a yaml file')
 FLAGS = flags.FLAGS
 
 
