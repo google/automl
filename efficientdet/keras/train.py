@@ -14,11 +14,10 @@
 # limitations under the License.
 # ==============================================================================
 """The main training script."""
+import os
 from absl import app
 from absl import flags
 from absl import logging
-
-import os
 import tensorflow as tf
 
 import dataloader

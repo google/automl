@@ -97,8 +97,7 @@ class ModelInspectTest(tf.test.TestCase):
     self.assertEqual(out // 1000000, 167)
 
   def test_saved_model(self):
-    # TODO(tanmingxing): enable this test after tflite bug fix.
-    if tf.__version__ >= '2.3.0-dev20200521' and False:
+    if tf.__version__ >= '2.3.0-dev20200521':
       self.params['tflite_path'] = os.path.join(self.savedmodel_dir, 'x.tflite')
     inspector = model_inspect.ModelInspector(**self.params)
     self.assertFalse(

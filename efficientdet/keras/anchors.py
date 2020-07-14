@@ -28,6 +28,36 @@ from object_detection import target_assigner
 MAX_DETECTION_POINTS = 5000
 
 
+def decode_box_outputs(pred_boxes, anchor_boxes):
+  """Transforms relative regression coordinates to absolute positions.
+
+  Network predictions are normalized and relative to a given anchor; this
+  reverses the transformation and outputs absolute coordinates for the input
+  image.
+
+  Args:
+    pred_boxes: predicted box regression targets.
+    anchor_boxes: anchors on all feature levels.
+  Returns:
+    outputs: bounding boxes.
+  """
+  ycenter_a = (anchor_boxes[..., 0] + anchor_boxes[..., 2]) / 2
+  xcenter_a = (anchor_boxes[..., 1] + anchor_boxes[..., 3]) / 2
+  ha = anchor_boxes[..., 2] - anchor_boxes[..., 0]
+  wa = anchor_boxes[..., 3] - anchor_boxes[..., 1]
+  ty, tx, th, tw = tf.unstack(pred_boxes, num=4, axis=-1)
+
+  w = tf.math.exp(tw) * wa
+  h = tf.math.exp(th) * ha
+  ycenter = ty * ha + ycenter_a
+  xcenter = tx * wa + xcenter_a
+  ymin = ycenter - h / 2.
+  xmin = xcenter - w / 2.
+  ymax = ycenter + h / 2.
+  xmax = xcenter + w / 2.
+  return tf.stack([ymin, xmin, ymax, xmax], axis=-1)
+
+
 class Anchors():
   """Multi-scale anchors class."""
 

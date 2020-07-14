@@ -24,12 +24,8 @@ import tensorflow as tf
 import inference
 import iou_utils
 import utils
-
+from keras import anchors
 from keras import efficientdet_keras
-
-import anchors
-from object_detection.faster_rcnn_box_coder import FasterRcnnBoxCoder
-from object_detection.box_list import BoxList
 
 
 def update_learning_rate_schedule_parameters(params):
@@ -184,12 +180,13 @@ def get_optimizer(params):
     optimizer = tf.keras.optimizers.Adam(learning_rate)
   else:
     raise ValueError('optimizers should be adam or sgd')
+
   moving_average_decay = params['moving_average_decay']
   if moving_average_decay:
-    # Only work on tfa-nightly
-    import tensorflow_addons as tfa
+    # TODO(tanmingxing): potentially add dynamic_decay for new tfa release.
+    import tensorflow_addons as tfa  # pylint: disable=g-import-not-at-top
     optimizer = tfa.optimizers.MovingAverage(
-        optimizer, average_decay=moving_average_decay, dynamic_decay=True)
+        optimizer, average_decay=moving_average_decay)
   if params['mixed_precision']:
     optimizer = tf.keras.mixed_precision.experimental.LossScaleOptimizer(
         optimizer, loss_scale='dynamic')
@@ -337,19 +334,17 @@ class BoxIouLoss(tf.keras.losses.Loss):
     self.input_anchors = anchors.Anchors(min_level, max_level, num_scales,
                                          aspect_ratios, anchor_scale,
                                          image_size)
-    self.box_coder = FasterRcnnBoxCoder()
 
   @tf.autograph.experimental.do_not_convert
   def call(self, y_true, box_outputs):
-    input_anchors = BoxList(
-        tf.tile(self.input_anchors.boxes,
-                [box_outputs.shape[0] // self.input_anchors.boxes.shape[0], 1]))
+    anchor_boxes = tf.tile(
+        self.input_anchors.boxes,
+        [box_outputs.shape[0] // self.input_anchors.boxes.shape[0], 1])
     num_positives, box_targets = y_true
-    box_outputs = self.box_coder.decode(box_outputs, input_anchors)
-    box_targets = self.box_coder.decode(box_targets, input_anchors)
+    box_outputs = anchors.decode_box_outputs(box_outputs, anchor_boxes)
+    box_targets = anchors.decode_box_outputs(box_targets, anchor_boxes)
     normalizer = num_positives * 4.0
-    box_iou_loss = iou_utils.iou_loss(box_outputs.data['boxes'],
-                                      box_targets.data['boxes'],
+    box_iou_loss = iou_utils.iou_loss(box_outputs, box_targets,
                                       self.iou_loss_type)
     box_iou_loss = tf.reduce_sum(box_iou_loss) / normalizer
     return box_iou_loss
@@ -411,7 +406,6 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     levels = range(len(cls_outputs))
     cls_losses = []
     box_losses = []
-
     for level in levels:
       # Onehot encoding for classification labels.
       cls_targets_at_level = tf.one_hot(labels['cls_targets_%d' % (level + 3)],
@@ -466,7 +460,6 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
 
     cls_loss = tf.add_n(cls_losses) if cls_losses else 0
     box_loss = tf.add_n(box_losses) if box_losses else 0
-
     total_loss = (
         cls_loss + self.config.box_loss_weight * box_loss +
         self.config.iou_loss_weight * box_iou_loss)
@@ -508,14 +501,12 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       gradients, gnorm = tf.clip_by_global_norm(gradients,
                                                 self.config.clip_gradients_norm)
     self.optimizer.apply_gradients(zip(gradients, trainable_vars))
-    return {
-        'loss': total_loss,
-        'det_loss': det_loss,
-        'cls_loss': cls_loss,
-        'box_loss': box_loss,
-        'box_iou_loss': box_iou_loss,
-        'gnorm': gnorm
-    }
+    return {'loss': total_loss,
+            'det_loss': det_loss,
+            'cls_loss': cls_loss,
+            'box_loss': box_loss,
+            'box_iou_loss': box_iou_loss,
+            'gnorm': gnorm}
 
   def test_step(self, data):
     """Test step.

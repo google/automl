@@ -28,12 +28,11 @@ import coco_metric
 import efficientdet_arch
 import hparams_config
 import iou_utils
+import nms_np
 import retinanet_arch
 import utils
 from keras import anchors
 from keras import postprocess
-from object_detection.faster_rcnn_box_coder import FasterRcnnBoxCoder
-from object_detection.box_list import BoxList
 
 _DEFAULT_BATCH_SIZE = 64
 
@@ -241,7 +240,6 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
 
   cls_losses = []
   box_losses = []
-
   for level in levels:
     # Onehot encoding for classification labels.
     cls_targets_at_level = tf.one_hot(labels['cls_targets_%d' % level],
@@ -290,19 +288,19 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
                                     params['aspect_ratios'],
                                     params['anchor_scale'],
                                     params['image_size'])
-    box_coder = FasterRcnnBoxCoder()
-    input_anchors = BoxList(
-        tf.tile(input_anchors.boxes, [params['batch_size'], 1]))
-    box_outputs = tf.concat([tf.reshape(v, [-1, 4])
-                             for v in list(box_outputs.values())], axis=0)
-    box_targets = tf.concat(
-        [tf.reshape(labels['box_targets_%d' % level], [-1, 4])
-         for level in levels], axis=0)
-    box_outputs = box_coder.decode(box_outputs, input_anchors)
-    box_targets = box_coder.decode(box_targets, input_anchors)
-    box_iou_loss = _box_iou_loss(box_outputs.data['boxes'],
-                                 box_targets.data['boxes'],
-                                 num_positives_sum, params['iou_loss_type'])
+    box_output_list = [tf.reshape(box_outputs[i], [-1, 4]) for i in levels]
+    box_outputs = tf.concat(box_output_list, axis=0)
+    box_target_list = [
+        tf.reshape(labels['box_targets_%d' % level], [-1, 4])
+        for level in levels
+    ]
+    box_targets = tf.concat(box_target_list, axis=0)
+    anchor_boxes = tf.tile(input_anchors.boxes, [params['batch_size'], 1])
+    box_outputs = anchors.decode_box_outputs(box_outputs, anchor_boxes)
+    box_targets = anchors.decode_box_outputs(box_targets, anchor_boxes)
+    box_iou_loss = _box_iou_loss(box_outputs, box_targets, num_positives_sum,
+                                 params['iou_loss_type'])
+
   else:
     box_iou_loss = 0
 
@@ -456,35 +454,53 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
     def metric_fn(**kwargs):
       """Returns a dictionary that has the evaluation metrics."""
-      nms_boxes, nms_scores, nms_classes, _ = postprocess.per_class_nms(
-          params, kwargs['boxes'], kwargs['scores'], kwargs['classes'],
-          kwargs['image_scales'])
-      img_ids = tf.cast(
-          tf.expand_dims(kwargs['source_ids'], -1), nms_scores.dtype)
-      detections = [
-          img_ids * tf.ones_like(nms_scores),
-          nms_boxes[:, :, 1],
-          nms_boxes[:, :, 0],
-          nms_boxes[:, :, 3] - nms_boxes[:, :, 1],
-          nms_boxes[:, :, 2] - nms_boxes[:, :, 0],
-          nms_scores,
-          nms_classes,
-      ]
-      detections = tf.stack(detections, axis=-1, name='detnections')
-      kwargs['detections_bs'] = detections
+      if params['nms_configs'].get('pyfunc', True):
+        detections_bs = []
+        for index in range(kwargs['boxes'].shape[0]):
+          nms_configs = params['nms_configs']
+          detections = tf.numpy_function(
+              functools.partial(nms_np.per_class_nms, nms_configs=nms_configs),
+              [
+                  kwargs['boxes'][index],
+                  kwargs['scores'][index],
+                  kwargs['classes'][index],
+                  tf.slice(kwargs['image_ids'], [index], [1]),
+                  tf.slice(kwargs['image_scales'], [index], [1]),
+                  params['num_classes'],
+                  nms_configs['max_output_size'],
+              ], tf.float32)
+          detections_bs.append(detections)
+      else:
+        # These two branches should be equivalent, but currently they are not.
+        # TODO(tanmingxing): enable the non_pyfun path after bug fix.
+        nms_boxes, nms_scores, nms_classes, _ = postprocess.per_class_nms(
+            params, kwargs['boxes'], kwargs['scores'], kwargs['classes'],
+            kwargs['image_scales'])
+        img_ids = tf.cast(
+            tf.expand_dims(kwargs['image_ids'], -1), nms_scores.dtype)
+        detections_bs = [
+            img_ids * tf.ones_like(nms_scores),
+            nms_boxes[:, :, 1],
+            nms_boxes[:, :, 0],
+            nms_boxes[:, :, 3] - nms_boxes[:, :, 1],
+            nms_boxes[:, :, 2] - nms_boxes[:, :, 0],
+            nms_scores,
+            nms_classes,
+        ]
+        detections_bs = tf.stack(detections_bs, axis=-1, name='detnections')
 
       if params.get('testdev_dir', None):
         logging.info('Eval testdev_dir %s', params['testdev_dir'])
         eval_metric = coco_metric.EvaluationMetric(
             testdev_dir=params['testdev_dir'])
-        coco_metrics = eval_metric.estimator_metric_fn(detections,
+        coco_metrics = eval_metric.estimator_metric_fn(detections_bs,
                                                        tf.zeros([1]))
       else:
         logging.info('Eval val with groudtruths %s.', params['val_json_file'])
         eval_metric = coco_metric.EvaluationMetric(
             filename=params['val_json_file'])
         coco_metrics = eval_metric.estimator_metric_fn(
-            detections, kwargs['groundtruth_data'])
+            detections_bs, kwargs['groundtruth_data'])
 
       # Add metrics to output.
       cls_loss = tf.metrics.mean(kwargs['cls_loss_repeat'])
@@ -513,7 +529,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     metric_fn_inputs = {
         'cls_loss_repeat': cls_loss_repeat,
         'box_loss_repeat': box_loss_repeat,
-        'source_ids': labels['source_ids'],
+        'image_ids': labels['source_ids'],
         'groundtruth_data': labels['groundtruth_data'],
         'image_scales': labels['image_scales'],
         'boxes': boxes,
