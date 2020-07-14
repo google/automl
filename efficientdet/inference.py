@@ -265,7 +265,7 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
     nms_boxes, nms_scores, nms_classes, _ = postprocess.postprocess_global(
         params, cls_outputs, box_outputs, scales)
 
-  img_ids = tf.range(0, batch_size, dtype=nms_scores.dtype)
+  img_ids = tf.expand_dims(tf.range(0, batch_size, dtype=nms_scores.dtype), -1)
   detections = [
       img_ids * tf.ones_like(nms_scores),
       nms_boxes[:, :, 0],
