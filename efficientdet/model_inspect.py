@@ -90,7 +90,8 @@ class ModelInspector(object):
                saved_model_dir: Text = None,
                tflite_path: Text = None,
                batch_size: int = 1,
-               hparams: Text = ''):
+               hparams: Text = '',
+               **kwargs):
     self.model_name = model_name
     self.logdir = logdir
     self.tensorrt = tensorrt
@@ -108,6 +109,12 @@ class ModelInspector(object):
     # If batch size is 0, then build a graph with dynamic batch size.
     self.batch_size = batch_size or None
     self.labels_shape = [batch_size, model_config.num_classes]
+
+    # A hack to make flag consistent with nms configs.
+    if kwargs.get('score_thresh', None):
+      model_config.nms_configs.score_thresh = kwargs['score_thresh']
+    if kwargs.get('max_output_size', None):
+      model_config.nms_configs.max_output_size = kwargs['max_output_size']
 
     height, width = model_config.image_size
     if model_config.data_format == 'channels_first':
@@ -468,7 +475,9 @@ def main(_):
       saved_model_dir=FLAGS.saved_model_dir,
       tflite_path=FLAGS.tflite_path,
       batch_size=FLAGS.batch_size,
-      hparams=FLAGS.hparams)
+      hparams=FLAGS.hparams,
+      score_thresh=FLAGS.min_score_thresh,
+      max_output_size=FLAGS.max_boxes_to_draw)
   inspector.run_model(
       FLAGS.runmode,
       input_image=FLAGS.input_image,
