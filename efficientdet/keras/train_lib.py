@@ -34,6 +34,7 @@ def update_learning_rate_schedule_parameters(params):
   # Learning rate is proportional to the batch size
   params['adjusted_learning_rate'] = (params['learning_rate'] * batch_size / 64)
   steps_per_epoch = params['num_examples_per_epoch'] / batch_size
+  params['steps_per_epoch'] = steps_per_epoch
   params['lr_warmup_step'] = int(params['lr_warmup_epoch'] * steps_per_epoch)
   params['first_lr_drop_step'] = int(params['first_lr_drop_epoch'] *
                                      steps_per_epoch)
@@ -98,7 +99,7 @@ class CosineLrSchedule(tf.optimizers.schedules.LearningRateSchedule):
     self.adjusted_lr = adjusted_lr
     self.lr_warmup_init = lr_warmup_init
     self.lr_warmup_step = lr_warmup_step
-    self.total_steps = total_steps
+    self.decay_steps = tf.cast(total_steps - lr_warmup_step, tf.float32)
 
   def __call__(self, step):
 
@@ -107,7 +108,7 @@ class CosineLrSchedule(tf.optimizers.schedules.LearningRateSchedule):
         (tf.cast(step, dtype=tf.float32) / self.lr_warmup_step *
          (self.adjusted_lr - self.lr_warmup_init)))
     cosine_lr = 0.5 * self.adjusted_lr * (
-        1 + tf.cos(math.pi * tf.cast(step, tf.float32) / self.total_steps))
+        1 + tf.cos(math.pi * tf.cast(step, tf.float32) / self.decay_steps))
     return tf.where(step < self.lr_warmup_step, linear_warmup, cosine_lr)
 
 

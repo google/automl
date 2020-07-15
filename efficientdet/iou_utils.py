@@ -51,7 +51,7 @@ def _get_v(b1_height: FloatType, b1_width: FloatType, b2_height: FloatType,
 
     if tf.compat.v1.executing_eagerly_outside_functions():
       return v, _grad_v
-    return  v, _grad_v_graph
+    return v, _grad_v_graph
 
   return _get_grad_v(b2_height, b2_width)
 

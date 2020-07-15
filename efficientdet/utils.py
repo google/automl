@@ -78,9 +78,7 @@ def get_ckpt_var_map(ckpt_path, ckpt_scope, var_scope, skip_mismatch=None):
     ckpt_path: string. A pretrained checkpoint path.
     ckpt_scope: string. Scope name for checkpoint variables.
     var_scope: string. Scope name for model variables.
-    var_exclude_expr: string. A regex for excluding variables.
-      This is useful for finetuning with different classes, where
-      var_exclude_expr='.*class-predict.*' can be used.
+    skip_mismatch: skip variables if shape mismatch.
 
   Returns:
     var_map: a dictionary from checkpoint name to model variables.
@@ -114,8 +112,7 @@ def get_ckpt_var_map(ckpt_path, ckpt_scope, var_scope, skip_mismatch=None):
         # Skip optimizer variables.
         continue
       if skip_mismatch:
-        logging.info('skip {} ({}) -- not in ckpt'.format(
-            v.op.name, ckpt_var))
+        logging.info('skip {} ({}) -- not in ckpt'.format(v.op.name, ckpt_var))
         continue
       raise ValueError('{} is not in ckpt {}'.format(v.op, ckpt_path))
 
