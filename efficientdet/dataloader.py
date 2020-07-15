@@ -393,9 +393,10 @@ class InputReader(object):
       dataset = tf.data.TFRecordDataset(filename).prefetch(1)
       return dataset
 
-    dataset = dataset.interleave(_prefetch_dataset, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    dataset = dataset.interleave(
+      _prefetch_dataset, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     options = tf.data.Options()
-    options.experimental_deterministic= not self._is_training
+    options.experimental_deterministic = not self._is_training
     dataset = dataset.with_options(options)
     if self._is_training:
       dataset = dataset.shuffle(64)
