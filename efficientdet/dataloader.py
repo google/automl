@@ -393,9 +393,10 @@ class InputReader(object):
       dataset = tf.data.TFRecordDataset(filename).prefetch(1)
       return dataset
 
-    dataset = dataset.apply(
-        tf.data.experimental.parallel_interleave(
-            _prefetch_dataset, cycle_length=32, sloppy=self._is_training))
+    dataset = dataset.interleave(_prefetch_dataset, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    options = tf.data.Options()
+    options.experimental_deterministic= not self._is_training
+    dataset = dataset.with_options(options)
     if self._is_training:
       dataset = dataset.shuffle(64)
 
@@ -403,7 +404,7 @@ class InputReader(object):
     dataset = dataset.map(
         lambda value: self.dataset_parser(  # pylint: disable=g-long-lambda
             value, example_decoder, anchor_labeler, params),
-        num_parallel_calls=64)
+        num_parallel_calls=tf.data.experimental.AUTOTUNE)
     dataset = dataset.prefetch(batch_size)
     dataset = dataset.batch(batch_size, drop_remainder=True)
     dataset = dataset.map(
