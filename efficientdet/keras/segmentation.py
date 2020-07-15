@@ -1,4 +1,5 @@
 from keras.efficientdet_keras import EfficientDetNet
+from utils import activation_fn
 import tensorflow as tf
 
 NUM_CLASSES = 3
@@ -51,9 +52,8 @@ class EfficientDetSegmentation(EfficientDetNet):
     for con2d_t, bn, skip in zip(self.con2d_ts, self.bns, skips):
       x = con2d_t(x)
       x = bn(x)
-      x = tf.nn.relu(x)
-      concat = tf.keras.layers.Concatenate()
-      x = concat([x, skip])
+      x = activation_fn(x, self.config.act_type)
+      x = tf.concat([x, skip], axis=-1)
 
     # This is the last layer of the model
     return self.last(x)  # 64x64 -> 128x128
