@@ -1,62 +1,5 @@
 from keras.efficientdet_keras import EfficientDetNet
-from utils import activation_fn
 import tensorflow as tf
-
-NUM_CLASSES = 3
-
-
-class EfficientDetSegmentation(EfficientDetNet):
-
-  def build(self, input_shape):
-    self.con2d_ts = []
-    self.bns = []
-    for _ in range(self.config.max_level - self.config.min_level):
-      self.con2d_ts.append(
-          tf.keras.layers.Conv2DTranspose(
-              self.config.fpn_num_filters,
-              3,
-              strides=2,
-              padding='same',
-              use_bias=False))
-      self.bns.append(
-          tf.keras.layers.BatchNormalization(momentum=self.config.momentum))
-
-    self.last = tf.keras.layers.Conv2DTranspose(
-        NUM_CLASSES, 3, strides=2, padding='same')
-    super().build(input_shape)
-
-  def call(self, inputs, training):
-    config = self.config
-    # call backbone network.
-    self.backbone(inputs, training=training, features_only=True)
-    all_feats = [
-        inputs,
-        self.backbone.endpoints['reduction_1'],
-        self.backbone.endpoints['reduction_2'],
-        self.backbone.endpoints['reduction_3'],
-        self.backbone.endpoints['reduction_4'],
-        self.backbone.endpoints['reduction_5'],
-    ]
-    feats = all_feats[config.min_level:config.max_level + 1]
-
-    # Build additional input features that are not from backbone.
-    for resample_layer in self.resample_layers:
-      feats.append(resample_layer(feats[-1], training))
-
-    # call feature network.
-    feats = self.fpn_cells(feats, training)
-
-    x = feats[-1]
-    skips = list(reversed(feats[:-1]))
-
-    for con2d_t, bn, skip in zip(self.con2d_ts, self.bns, skips):
-      x = con2d_t(x)
-      x = bn(x)
-      x = activation_fn(x, self.config.act_type)
-      x = tf.concat([x, skip], axis=-1)
-
-    # This is the last layer of the model
-    return self.last(x)  # 64x64 -> 128x128
 
 
 def create_mask(pred_mask):
@@ -111,8 +54,8 @@ train_dataset = train_dataset.prefetch(
     buffer_size=tf.data.experimental.AUTOTUNE)
 test_dataset = test.batch(BATCH_SIZE)
 
-model = EfficientDetSegmentation('efficientdet-d0')
-model.build((BATCH_SIZE, 512, 512, 3))
+model = EfficientDetNet('efficientdet-d0')
+model.build((1, 512, 512, 3))
 model.compile(
     optimizer='adam',
     loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
