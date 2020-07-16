@@ -73,14 +73,14 @@ def bifpn_config(min_level, max_level, weight_method):
   return p
 
 
-def qufpn_config(min_level, max_level, weight_method=None, quad_method=None):
+def qufpn_config(min_level, max_level, weight_method=None):
   """A dynamic quad fpn config that can adapt to different min/max levels."""
   # It extends the idea of BiFPN, and has four paths:
   #   (up_down -> bottom_up) + (bottom_up -> up_down).
   # See test for an example for level 2 and 7.
   p = hparams_config.Config()
   p.weight_method = weight_method or 'fastattn'
-  p.quad_method = quad_method or p.weight_method
+  p.quad_method = 'fastattn'
   num_levels = max_level - min_level + 1
   node_ids = {min_level + i: [i] for i in range(num_levels)}
   level_last_id = lambda level: node_ids[level][-1]
