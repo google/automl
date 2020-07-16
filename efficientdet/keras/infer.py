@@ -32,6 +32,7 @@ flags.DEFINE_string('output_dir', None, 'Directory of annotated output images.')
 flags.DEFINE_string('checkpoint', None, 'Location of the checkpoint to run.')
 flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model name to use.')
 flags.DEFINE_string('hparams', '', 'Comma separated k=v pairs or a yaml file')
+flags.DEFINE_bool('debug', False, 'If true, run function in eager for debug.')
 FLAGS = flags.FLAGS
 
 
@@ -51,20 +52,24 @@ def main(_):
   config.image_size = '1920x1280'
   config.nms_configs.score_thresh = nms_score_thresh
   config.nms_configs.max_output_size = nms_max_output_size
-  config.anchor_scale = [1.0, 1.0, 1.0, 1.0, 1.0]
 
   # Use 'mixed_float16' if running on GPUs.
   policy = tf.keras.mixed_precision.experimental.Policy('float32')
   tf.keras.mixed_precision.experimental.set_policy(policy)
+  tf.config.experimental_run_functions_eagerly(FLAGS.debug)
 
   # Create and run the model.
   model = efficientdet_keras.EfficientDetModel(config=config)
   height, width = utils.parse_image_size(config['image_size'])
   model.build((1, height, width, 3))
   model.load_weights(FLAGS.checkpoint)
-  boxes, scores, classes, valid_len = model(
-      imgs, training=False, post_mode='global')
   model.summary()
+
+  @tf.function
+  def f(imgs):
+    return model(imgs, training=False, post_mode='global')
+
+  boxes, scores, classes, valid_len = f(imgs)
 
   # Visualize results.
   for i, img in enumerate(imgs):
@@ -78,7 +83,7 @@ def main(_):
         max_boxes_to_draw=nms_max_output_size)
     output_image_path = os.path.join(FLAGS.output_dir, str(i) + '.jpg')
     Image.fromarray(img).save(output_image_path)
-    print('writing annotated image to %s', output_image_path)
+    print('writing annotated image to ', output_image_path)
 
 
 if __name__ == '__main__':
