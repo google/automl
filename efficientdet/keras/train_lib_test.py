@@ -81,7 +81,7 @@ class TrainLibTest(tf.test.TestCase):
     #                             'ciou'),
     #     box_iou_loss([num_positives, box_targets], box_outputs))
     iou_loss = box_iou_loss([num_positives, box_targets], box_outputs)
-    self.assertAlmostEqual(iou_loss.numpy(), 4.507848)
+    self.assertAlmostEqual(iou_loss.numpy(), 4.507848, places=5)
 
   def test_predict(self):
     x = np.random.random((1, 512, 512, 3)).astype(np.float32)
@@ -159,14 +159,13 @@ class TrainLibTest(tf.test.TestCase):
         steps_per_epoch=1,
         epochs=1,
         callbacks=train_lib.get_callbacks(params))
-    expect_results = {'loss': [26063.099609375],
-                      'det_loss': [26061.8828125],
-                      'cls_loss': [5058.1337890625],
-                      'box_loss': [420.074951171875],
-                      'box_iou_loss': [0],
-                      'gnorm': [5216.858887]}
-    self.assertAllClose(
-        hist.history, expect_results, rtol=.1, atol=100.)
+
+    self.assertAllClose(hist.history['loss'], [26063.], rtol=.1, atol=10.)
+    self.assertAllClose(hist.history['det_loss'], [26061.], rtol=.1, atol=10.)
+    self.assertAllClose(hist.history['cls_loss'], [5058.], rtol=.1, atol=10.)
+    self.assertAllClose(hist.history['box_loss'], [420.], rtol=.1, atol=100.)
+    self.assertAllClose(hist.history['box_iou_loss'], [0])
+    # skip gnorm test because it is flaky.
 
 
 if __name__ == '__main__':

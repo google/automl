@@ -1,3 +1,4 @@
+# Lint as: python3
 # Copyright 2020 Google Research. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,7 +26,6 @@ from __future__ import print_function
 
 import json
 import os
-import zipfile
 from absl import flags
 from absl import logging
 

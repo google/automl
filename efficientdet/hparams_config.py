@@ -249,7 +249,7 @@ def default_detection_configs():
 
   # For post-processing nms, must be a dict.
   h.nms_configs = {
-      'method': 'hard',
+      'method': 'gaussian',
       'iou_thresh': None,  # use the default value based on method.
       'score_thresh': None,
       'sigma': None,

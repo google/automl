@@ -53,6 +53,7 @@ def update_learning_rate_schedule_parameters(params):
   params['second_lr_drop_step'] = int(params['second_lr_drop_epoch'] *
                                       steps_per_epoch)
   params['total_steps'] = int(params['num_epochs'] * steps_per_epoch)
+  params['steps_per_epoch'] = steps_per_epoch
 
 
 def stepwise_lr_schedule(adjusted_learning_rate, lr_warmup_init, lr_warmup_step,
@@ -75,35 +76,15 @@ def stepwise_lr_schedule(adjusted_learning_rate, lr_warmup_init, lr_warmup_step,
   return learning_rate
 
 
-def cosine_lr_schedule_tf2(adjusted_lr, lr_warmup_init, lr_warmup_step,
-                           total_steps, step):
-  """TF2 friendly cosine learning rate schedule."""
-  logging.info('LR schedule method: cosine')
-
-  def warmup_lr(step):
-    return lr_warmup_init + (adjusted_lr - lr_warmup_init) * (
-        tf.cast(step, tf.float32) / tf.cast(lr_warmup_step, tf.float32))
-
-  def cosine_lr(step):
-    decay_steps = tf.cast(total_steps - lr_warmup_step, tf.float32)
-    step = tf.cast(step - lr_warmup_step, tf.float32)
-    cosine_decay = 0.5 * (1 + tf.cos(np.pi * step / decay_steps))
-    alpha = 0.0
-    decayed = (1 - alpha) * cosine_decay + alpha
-    return adjusted_lr * tf.cast(decayed, tf.float32)
-
-  return tf.cond(step <= lr_warmup_step, lambda: warmup_lr(step),
-                 lambda: cosine_lr(step))
-
-
 def cosine_lr_schedule(adjusted_lr, lr_warmup_init, lr_warmup_step, total_steps,
                        step):
   logging.info('LR schedule method: cosine')
   linear_warmup = (
       lr_warmup_init + (tf.cast(step, dtype=tf.float32) / lr_warmup_step *
                         (adjusted_lr - lr_warmup_init)))
+  decay_steps = tf.cast(total_steps - lr_warmup_step, tf.float32)
   cosine_lr = 0.5 * adjusted_lr * (
-      1 + tf.cos(np.pi * tf.cast(step, tf.float32) / total_steps))
+      1 + tf.cos(np.pi * tf.cast(step, tf.float32) / decay_steps))
   return tf.where(step < lr_warmup_step, linear_warmup, cosine_lr)
 
 
@@ -394,6 +375,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     utils.scalar('trainloss/loss', total_loss)
     if params['iou_loss_type']:
       utils.scalar('trainloss/box_iou_loss', box_iou_loss)
+    train_epochs = tf.cast(global_step, tf.float32) / params['steps_per_epoch']
+    utils.scalar('train_epochs', train_epochs)
 
   moving_average_decay = params['moving_average_decay']
   if moving_average_decay:
