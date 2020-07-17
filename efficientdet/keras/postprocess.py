@@ -370,4 +370,4 @@ def generate_detections(params, cls_outputs, box_outputs, image_scales,
       nms_scores_bs,
       nms_classes_bs,
   ]
-  return tf.stack(detections_bs, axis=-1, name='detnections')
+  return tf.stack(detections_bs, axis=-1, name='detections')
