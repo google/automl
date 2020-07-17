@@ -31,6 +31,7 @@ class EfficientDetKerasTest(tf.test.TestCase):
   def test_model_output(self):
     inputs_shape = [1, 512, 512, 3]
     config = hparams_config.get_efficientdet_config('efficientdet-d0')
+    config.heads = ['object_detection', 'segmentation']
     tmp_ckpt = os.path.join(tempfile.mkdtemp(), 'ckpt')
     with tf.Session(graph=tf.Graph()) as sess:
       feats = tf.ones(inputs_shape)
@@ -38,7 +39,7 @@ class EfficientDetKerasTest(tf.test.TestCase):
       model = efficientdet_keras.EfficientDetNet(config=config)
       outputs = model(feats, True)
       sess.run(tf.global_variables_initializer())
-      keras_class_out, keras_box_out = sess.run(outputs)
+      keras_class_out, keras_box_out, keras_seg_out = sess.run(outputs)
       model.save_weights(tmp_ckpt)
     with tf.Session(graph=tf.Graph()) as sess:
       feats = tf.ones(inputs_shape)
@@ -55,12 +56,14 @@ class EfficientDetKerasTest(tf.test.TestCase):
     feats = tf.ones(inputs_shape)
     model = efficientdet_keras.EfficientDetNet(config=config)
     model.load_weights(tmp_ckpt)
-    eager_class_out, eager_box_out = model(feats, True)
+    eager_class_out, eager_box_out, eager_seg_out = model(feats, True)
     for i in range(3, 8):
       self.assertAllClose(
           eager_class_out[i - 3], legacy_class_out[i], rtol=1e-4, atol=1e-4)
       self.assertAllClose(
           eager_box_out[i - 3], legacy_box_out[i], rtol=1e-4, atol=1e-4)
+    self.assertAllClose(
+        eager_seg_out, keras_seg_out, rtol=1e-4, atol=1e-4)
 
   def test_build_feature_network(self):
     config = hparams_config.get_efficientdet_config('efficientdet-d0')
