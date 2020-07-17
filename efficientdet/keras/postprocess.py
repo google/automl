@@ -214,10 +214,10 @@ def postprocess_combined(params, cls_outputs, box_outputs, image_scales=None):
           score_threshold=score_thresh,
           clip_boxes=False))
   nms_classes += CLASS_OFFSET
+  nms_boxes = clip_boxes(nms_boxes, params['image_size'])
   if image_scales is not None:
     scales = tf.expand_dims(tf.expand_dims(image_scales, -1), -1)
     nms_boxes = nms_boxes * tf.cast(scales, nms_boxes.dtype)
-  nms_boxes = clip_boxes(nms_boxes, params['image_size'])
   return nms_boxes, nms_scores, nms_classes, nms_valid_len
 
 
@@ -260,10 +260,10 @@ def postprocess_global(params, cls_outputs, box_outputs, image_scales=None):
   nms_scores_bs = tf.stack(nms_scores_bs)
   nms_classes_bs = tf.stack(nms_classes_bs)
   nms_valid_len_bs = tf.stack(nms_valid_len_bs)
+  nms_boxes_bs = clip_boxes(nms_boxes_bs, params['image_size'])
   if image_scales is not None:
     scales = tf.expand_dims(tf.expand_dims(image_scales, -1), -1)
     nms_boxes_bs = nms_boxes_bs * tf.cast(scales, nms_boxes_bs.dtype)
-  nms_boxes_bs = clip_boxes(nms_boxes_bs, params['image_size'])
   return nms_boxes_bs, nms_scores_bs, nms_classes_bs, nms_valid_len_bs
 
 
