@@ -358,7 +358,7 @@ def generate_detections(params, cls_outputs, box_outputs, image_scales,
                         image_ids, flip = False):
   """A legacy interface for generating [id, x, y, w, h, score, class]."""
   nms_boxes_bs, nms_scores_bs, nms_classes_bs, _ = postprocess_per_class(
-      params, cls_outputs, box_outputs, image_scales)
+      params, cls_outputs, box_outputs, img_scales)
 
   image_ids_bs = tf.cast(tf.expand_dims(image_ids, -1), nms_scores_bs.dtype)
   if flip:
