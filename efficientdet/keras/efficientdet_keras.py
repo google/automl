@@ -567,7 +567,7 @@ class BoxNet(tf.keras.layers.Layer):
     return box_outputs
 
 
-class SegmentationNet(tf.keras.layers.Layer):
+class SegmentationHead(tf.keras.layers.Layer):
 
   def __init__(self,
                num_classes,
@@ -580,7 +580,7 @@ class SegmentationNet(tf.keras.layers.Layer):
                strategy,
                name='segmentation_net',
                **kwargs):
-    """Initialize SegmentationNet.
+    """Initialize SegmentationHead.
 
     Args:
       num_classes: number of classes.
@@ -793,7 +793,7 @@ class EfficientDetNet(tf.keras.Model):
             data_format=config.data_format)
 
       if head == 'segmentation':
-        self.seg_net = SegmentationNet(
+        self.seg_head = SegmentationHead(
             num_classes=config.seg_num_classes,
             num_filters=num_filters,
             min_level=config.min_level,
@@ -841,7 +841,7 @@ class EfficientDetNet(tf.keras.Model):
         outputs.append(box_outputs)
 
       if head == 'segmentation':
-        seg_outputs = self.seg_net(feats, training)
+        seg_outputs = self.seg_head(feats, training)
         outputs.append(seg_outputs)
 
     return tuple(outputs)
