@@ -41,6 +41,7 @@ flags.DEFINE_integer('batch_size', 8, 'Batch size.')
 flags.DEFINE_string('hparams', '', 'Comma separated k=v pairs or a yaml file')
 FLAGS = flags.FLAGS
 
+
 def main(_):
   config = hparams_config.get_efficientdet_config(FLAGS.model_name)
   config.override(FLAGS.hparams)
@@ -71,6 +72,7 @@ def main(_):
                                                  box_outputs,
                                                  labels['image_scales'],
                                                  labels['source_ids'], False)
+
     images_flipped = tf.image.flip_left_right(images)
     cls_outputs_flipped, box_outputs_flipped = model(
         images_flipped, training=False)
@@ -79,19 +81,12 @@ def main(_):
         labels['image_scales'], labels['source_ids'], True)
 
     for d, df in zip(detections, detections_flipped):
-      combined_detections = wbf.ensemble_boxes(config, tf.concat([d, df], 0))
+      combined_detections = wbf.ensemble_detections(config, tf.concat([d, df],
+                                                                      0))
       combined_detections = tf.stack([combined_detections])
-      evaluator.update_state(labels['groundtruth_data'].numpy(),
-                             combined_detections.numpy())
-
-    # print(len(detections[0]))
-    # print()
-
-    # for d in detections[0][:10]:
-    #   print(d[5].numpy(), d[6].numpy())
-
-    # print()
-    # break
+      evaluator.update_state(
+          labels['groundtruth_data'].numpy(),
+          postprocess.transform_detections(combined_detections).numpy())
 
   # compute the final eval results.
   metric_values = evaluator.result()

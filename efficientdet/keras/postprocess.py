@@ -65,17 +65,15 @@ def topk_class_boxes(params, cls_outputs: T,
     # Due to some issues, top_k is currently slow in graph model.
     logging.info('use max_nms_inputs for pre-nms topk.')
     cls_outputs_reshape = tf.reshape(cls_outputs, [batch_size, -1])
-    _, cls_topk_indices = tf.math.top_k(cls_outputs_reshape,
-                                        k=max_nms_inputs,
-                                        sorted=False)
+    _, cls_topk_indices = tf.math.top_k(
+        cls_outputs_reshape, k=max_nms_inputs, sorted=False)
     indices = cls_topk_indices // num_classes
     classes = cls_topk_indices % num_classes
     cls_indices = tf.stack([indices, classes], axis=2)
 
     cls_outputs_topk = tf.gather_nd(cls_outputs, cls_indices, batch_dims=1)
-    box_outputs_topk = tf.gather_nd(box_outputs,
-                                    tf.expand_dims(indices, 2),
-                                    batch_dims=1)
+    box_outputs_topk = tf.gather_nd(
+        box_outputs, tf.expand_dims(indices, 2), batch_dims=1)
   else:
     logging.info('use max_reduce for pre-nms topk.')
     # Keep all anchors, but for each anchor, just keep the max probablity for
@@ -84,8 +82,8 @@ def topk_class_boxes(params, cls_outputs: T,
     num_anchors = cls_outputs.shape[1]
 
     classes = cls_outputs_idx
-    indices = tf.tile(tf.expand_dims(tf.range(num_anchors), axis=0),
-                      [batch_size, 1])
+    indices = tf.tile(
+        tf.expand_dims(tf.range(num_anchors), axis=0), [batch_size, 1])
     cls_outputs_topk = tf.reduce_max(cls_outputs, -1)
     box_outputs_topk = box_outputs
 
@@ -354,11 +352,15 @@ def postprocess_per_class(params, cls_outputs, box_outputs, image_scales=None):
   return per_class_nms(params, boxes, scores, classes, image_scales)
 
 
-def generate_detections(params, cls_outputs, box_outputs, image_scales,
-                        image_ids, flip = False):
+def generate_detections(params,
+                        cls_outputs,
+                        box_outputs,
+                        image_scales,
+                        image_ids,
+                        flip=False):
   """A legacy interface for generating [id, x, y, w, h, score, class]."""
   nms_boxes_bs, nms_scores_bs, nms_classes_bs, _ = postprocess_per_class(
-      params, cls_outputs, box_outputs, img_scales)
+      params, cls_outputs, box_outputs, image_scales)
 
   image_ids_bs = tf.cast(tf.expand_dims(image_ids, -1), nms_scores_bs.dtype)
   if flip:
@@ -368,8 +370,8 @@ def generate_detections(params, cls_outputs, box_outputs, image_scales,
         image_ids_bs * tf.ones_like(nms_scores_bs),
         tf.expand_dims(image_scales, -1) * width - nms_boxes_bs[:, :, 3],
         nms_boxes_bs[:, :, 0],
-        nms_boxes_bs[:, :, 3] - nms_boxes_bs[:, :, 1],
-        nms_boxes_bs[:, :, 2] - nms_boxes_bs[:, :, 0],
+        tf.expand_dims(image_scales, -1) * width - nms_boxes_bs[:, :, 1],
+        nms_boxes_bs[:, :, 2],
         nms_scores_bs,
         nms_classes_bs,
     ]
@@ -378,9 +380,23 @@ def generate_detections(params, cls_outputs, box_outputs, image_scales,
         image_ids_bs * tf.ones_like(nms_scores_bs),
         nms_boxes_bs[:, :, 1],
         nms_boxes_bs[:, :, 0],
-        nms_boxes_bs[:, :, 3] - nms_boxes_bs[:, :, 1],
-        nms_boxes_bs[:, :, 2] - nms_boxes_bs[:, :, 0],
+        nms_boxes_bs[:, :, 3],
+        nms_boxes_bs[:, :, 2],
         nms_scores_bs,
         nms_classes_bs,
     ]
   return tf.stack(detections_bs, axis=-1, name='detnections')
+
+
+def transform_detections(detections):
+  """A transforms detections in [id, x1, y1, x2, y2, score, class] form to [id, x, y, w, h, score, class]."""
+  return tf.stack([
+      detections[:, :, 0],
+      detections[:, :, 1],
+      detections[:, :, 2],
+      detections[:, :, 3] - detections[:, :, 1],
+      detections[:, :, 4] - detections[:, :, 2],
+      detections[:, :, 5],
+      detections[:, :, 6],
+  ],
+                  axis=-1)
