@@ -78,6 +78,7 @@ def stepwise_lr_schedule(adjusted_learning_rate, lr_warmup_init, lr_warmup_step,
 
 def cosine_lr_schedule(adjusted_lr, lr_warmup_init, lr_warmup_step, total_steps,
                        step):
+  """Cosine learning rate scahedule."""
   logging.info('LR schedule method: cosine')
   linear_warmup = (
       lr_warmup_init + (tf.cast(step, dtype=tf.float32) / lr_warmup_step *
@@ -164,7 +165,7 @@ def focal_loss(y_pred, y_true, alpha, gamma, normalizer, label_smoothing=0.0):
     ce = tf.nn.sigmoid_cross_entropy_with_logits(labels=y_true, logits=y_pred)
 
     # compute the final loss and return
-    return alpha_factor * modulating_factor * ce / normalizer
+    return (1 / normalizer) * alpha_factor * modulating_factor * ce
 
 
 def _box_loss(box_outputs, box_targets, num_positives, delta=0.1):

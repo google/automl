@@ -94,7 +94,7 @@ class ModelInspectTest(tf.test.TestCase):
     self.assertTrue(os.path.exists(os.path.join(outdir, '0.jpg')))
 
     out = np.sum(np.array(Image.open(os.path.join(outdir, '0.jpg'))))
-    self.assertEqual(out // 1000000, 167)
+    self.assertEqual(out // 10000000, 16)
 
   def test_saved_model(self):
     if tf.__version__ >= '2.3.0-dev20200521':
@@ -137,7 +137,7 @@ class ModelInspectTest(tf.test.TestCase):
     self.assertTrue(os.path.exists(os.path.join(outdir, '0.jpg')))
 
     out = np.sum(np.array(Image.open(os.path.join(outdir, '0.jpg'))))
-    self.assertEqual(out // 1000000, 167)
+    self.assertEqual(out // 10000000, 16)
 
   def test_saved_model_infer_dynamic_batch(self):
     # Build saved model with dynamic batch size.
@@ -191,7 +191,7 @@ class ModelInspectTest(tf.test.TestCase):
     self.assertTrue(os.path.exists(os.path.join(outdir, '0.jpg')))
 
     out = np.sum(np.array(Image.open(os.path.join(outdir, '0.jpg'))))
-    self.assertEqual(out // 1000000, 167)
+    self.assertEqual(out // 10000000, 16)
 
 
 if __name__ == '__main__':

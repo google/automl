@@ -362,6 +362,18 @@ efficientdet_model_param_dict = {
             anchor_scale=5.0,
             fpn_weight_method='sum',  # Use unweighted sum for stability.
         ),
+    'efficientdet-d7x':
+        dict(
+            name='efficientdet-d7x',
+            backbone_name='efficientnet-b7',
+            image_size=1536,
+            fpn_num_filters=384,
+            fpn_cell_repeats=8,
+            box_class_repeats=5,
+            anchor_scale=4.0,
+            max_level=8,
+            fpn_weight_method='sum',  # Use unweighted sum for stability.
+        ),
 }
 
 efficientdet_lite_param_dict = {

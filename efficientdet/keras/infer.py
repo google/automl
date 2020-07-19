@@ -44,14 +44,13 @@ def main(_):
   # !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz -O tmp/efficientdet-d0.tar.gz
   # !tar zxf tmp/efficientdet-d0.tar.gz -C tmp
   imgs = [np.array(Image.open(FLAGS.image_path))]
-  nms_score_thresh, nms_max_output_size = 0.4, 100
-
   # Create model config.
   config = hparams_config.get_efficientdet_config('efficientdet-d0')
   config.is_training_bn = False
   config.image_size = '1920x1280'
-  config.nms_configs.score_thresh = nms_score_thresh
-  config.nms_configs.max_output_size = nms_max_output_size
+  config.nms_configs.score_thresh = 0.4
+  config.nms_configs.max_output_size = 100
+  config.override(FLAGS.hparams)
 
   # Use 'mixed_float16' if running on GPUs.
   policy = tf.keras.mixed_precision.experimental.Policy('float32')
@@ -79,8 +78,8 @@ def main(_):
         boxes[i].numpy()[:length],
         classes[i].numpy().astype(np.int)[:length],
         scores[i].numpy()[:length],
-        min_score_thresh=nms_score_thresh,
-        max_boxes_to_draw=nms_max_output_size)
+        min_score_thresh=config.nms_configs.score_thresh,
+        max_boxes_to_draw=config.nms_configs.max_output_size)
     output_image_path = os.path.join(FLAGS.output_dir, str(i) + '.jpg')
     Image.fromarray(img).save(output_image_path)
     print('writing annotated image to ', output_image_path)

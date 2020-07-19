@@ -568,6 +568,7 @@ class BoxNet(tf.keras.layers.Layer):
 
 
 class SegmentationHead(tf.keras.layers.Layer):
+  """Keras layer for semantic segmentation head."""
 
   def __init__(self,
                num_classes,
@@ -578,7 +579,6 @@ class SegmentationHead(tf.keras.layers.Layer):
                is_training_bn,
                act_type,
                strategy,
-               name='segmentation_net',
                **kwargs):
     """Initialize SegmentationHead.
 
@@ -587,14 +587,13 @@ class SegmentationHead(tf.keras.layers.Layer):
       num_filters: number of filters for "intermediate" layers.
       min_level: minimum level for features.
       max_level: maximum level for features.
+      data_format: string of 'channel_first' or 'channels_last'.
       is_training_bn: True if we train the BatchNorm.
       act_type: String of the activation used.
       strategy: string to specify training strategy for TPU/GPU/CPU.
-      data_format: string of 'channel_first' or 'channels_last'.
-      name: Name of the layer.
       **kwargs: other parameters.
     """
-    super().__init__(name=name, **kwargs)
+    super().__init__(**kwargs)
     self.act_type = act_type
     self.con2d_ts = []
     self.con2d_t_bns = []
@@ -831,19 +830,15 @@ class EfficientDetNet(tf.keras.Model):
     # call feature network.
     feats = self.fpn_cells(feats, training)
 
-    # call class/box output network.
+    # call class/box/seg output network.
     outputs = []
-    for head in config.heads:
-      if head == 'object_detection':
-        class_outputs = self.class_net(feats, training)
-        box_outputs = self.box_net(feats, training)
-        outputs.append(class_outputs)
-        outputs.append(box_outputs)
-
-      if head == 'segmentation':
-        seg_outputs = self.seg_head(feats, training)
-        outputs.append(seg_outputs)
-
+    if 'object_detection' in config.heads:
+      class_outputs = self.class_net(feats, training)
+      box_outputs = self.box_net(feats, training)
+      outputs.extend([class_outputs, box_outputs])
+    if 'segmentation' in config.heads:
+      seg_outputs = self.seg_head(feats, training)
+      outputs.append(seg_outputs)
     return tuple(outputs)
 
 
@@ -907,6 +902,11 @@ class EfficientDetModel(EfficientDetNet):
     # preprocess.
     inputs, scales = self._preprocessing(inputs, config.image_size, pre_mode)
     # network.
-    cls_outputs, box_outputs = super().call(inputs, training)
-    # postprocess.
-    return self._postprocess(cls_outputs, box_outputs, scales, post_mode)
+    outputs = super().call(inputs, training)
+
+    if 'object_detection' in config.heads and post_mode:
+      # postprocess for detection
+      det_outputs = self._postprocess(outputs[0], outputs[1], scales, post_mode)
+      outputs = det_outputs + outputs[2:]
+
+    return outputs
