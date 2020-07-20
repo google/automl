@@ -349,6 +349,5 @@ Then train the model:
 For more instructions about training on TPUs, please refer to the following tutorials:
 
   * EfficientNet tutorial: https://cloud.google.com/tpu/docs/tutorials/efficientnet
-  * RetinaNet tutorial: https://cloud.google.com/tpu/docs/tutorials/retinanet
 
 NOTE: this is not an official Google product.

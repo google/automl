@@ -29,7 +29,6 @@ import efficientdet_arch
 import hparams_config
 import iou_utils
 import nms_np
-import retinanet_arch
 import utils
 from keras import anchors
 from keras import postprocess
@@ -591,19 +590,6 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
       training_hooks=training_hooks)
 
 
-def retinanet_model_fn(features, labels, mode, params):
-  """RetinaNet model."""
-  variable_filter_fn = functools.partial(
-      retinanet_arch.remove_variables, resnet_depth=params['resnet_depth'])
-  return _model_fn(
-      features,
-      labels,
-      mode,
-      params,
-      model=retinanet_arch.retinanet,
-      variable_filter_fn=variable_filter_fn)
-
-
 def efficientdet_model_fn(features, labels, mode, params):
   """EfficientDet model."""
   variable_filter_fn = functools.partial(
@@ -619,9 +605,6 @@ def efficientdet_model_fn(features, labels, mode, params):
 
 def get_model_arch(model_name='efficientdet-d0'):
   """Get model architecture for a given model name."""
-  if 'retinanet' in model_name:
-    return retinanet_arch.retinanet
-
   if 'efficientdet' in model_name:
     return efficientdet_arch.efficientdet
 
@@ -630,9 +613,6 @@ def get_model_arch(model_name='efficientdet-d0'):
 
 def get_model_fn(model_name='efficientdet-d0'):
   """Get model fn for a given model name."""
-  if 'retinanet' in model_name:
-    return retinanet_model_fn
-
   if 'efficientdet' in model_name:
     return efficientdet_model_fn
 

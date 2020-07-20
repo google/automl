@@ -281,7 +281,7 @@ def default_detection_configs():
   # A temporary flag to switch between legacy and keras models.
   h.use_keras_model = None
 
-  # RetinaNet.
+  # unused.
   h.resnet_depth = 50
   return h
 
@@ -444,33 +444,8 @@ def get_efficientdet_config(model_name='efficientdet-d1'):
   return h
 
 
-retinanet_model_param_dict = {
-    'retinanet-50':
-        dict(name='retinanet-50', backbone_name='resnet50', resnet_depth=50),
-    'retinanet-101':
-        dict(name='retinanet-101', backbone_name='resnet101', resnet_depth=101),
-}
-
-
-def get_retinanet_config(model_name='retinanet-50'):
-  """Get the default config for EfficientDet based on model name."""
-  h = default_detection_configs()
-  h.override(dict(
-      retinanet_model_param_dict[model_name],
-      ckpt_var_scope='',
-  ))
-  # cosine + ema often cause NaN for RetinaNet, so we use the default
-  # stepwise without ema used in the original RetinaNet implementation.
-  h.lr_decay_method = 'stepwise'
-  h.moving_average_decay = 0
-
-  return h
-
-
 def get_detection_config(model_name):
   if model_name.startswith('efficientdet'):
     return get_efficientdet_config(model_name)
-  elif model_name.startswith('retinanet'):
-    return get_retinanet_config(model_name)
   else:
-    raise ValueError('model name must start with efficientdet or retinanet.')
+    raise ValueError('model name must start with efficientdet.')

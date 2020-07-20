@@ -12,5 +12,3 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-# Object detection data loaders and libraries are mostly based on RetinaNet:
-# https://github.com/tensorflow/tpu/tree/master/models/official/retinanet
