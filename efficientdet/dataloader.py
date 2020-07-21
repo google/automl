@@ -20,6 +20,7 @@ import utils
 from keras import anchors
 from object_detection import preprocessor
 from object_detection import tf_example_decoder
+from keras.mosaic import mosaic
 
 
 class InputProcessor(object):
@@ -126,6 +127,7 @@ class InputProcessor(object):
 
   def resize_and_crop_image(self, method=tf.image.ResizeMethod.BILINEAR):
     """Resize input image and crop it to the self._output dimension."""
+
     scaled_image = tf.image.resize(
         self._image, [self._scaled_height, self._scaled_width], method=method)
     scaled_image = scaled_image[self._crop_offset_y:self._crop_offset_y +
@@ -282,20 +284,49 @@ class InputReader(object):
         to the fixed dimension [self._max_instances_per_image].
     """
     with tf.name_scope('parser'):
-      data = example_decoder.decode(value)
-      source_id = data['source_id']
-      image = data['image']
-      boxes = data['groundtruth_boxes']
-      classes = data['groundtruth_classes']
-      classes = tf.reshape(tf.cast(classes, dtype=tf.float32), [-1, 1])
-      areas = data['groundtruth_area']
-      is_crowds = data['groundtruth_is_crowd']
-      classes = tf.reshape(tf.cast(classes, dtype=tf.float32), [-1, 1])
+      if self._is_training and params['use_mosaic']:
+        images = []
+        boxes = []
+        classes = []
+        for i in range(4):
+          data = example_decoder.decode(value[i])
+          image = data['image']
+          image = tf.cast(tf.compat.v1.image.resize_image_with_pad(image,
+                                          *utils.parse_image_size(params['image_size'])),
+                          tf.uint8)
+          images.append(image)
+          image_shape = tf.cast(tf.shape(image), tf.float32)
+          ymin = data['groundtruth_boxes'][:, 0] * image_shape[0]
+          xmin = data['groundtruth_boxes'][:, 1] * image_shape[1]
+          ymax = data['groundtruth_boxes'][:, 2] * image_shape[0]
+          xmax = data['groundtruth_boxes'][:, 3] * image_shape[1]
+          boxes.append(tf.cast(tf.stack([ymin, xmin, ymax, xmax], axis=1), tf.int32))
+          classes.append(tf.reshape(tf.cast(data['groundtruth_classes'], dtype=tf.float32), [-1, 1]))
 
-      if params['skip_crowd_during_training'] and self._is_training:
-        indices = tf.where(tf.logical_not(data['groundtruth_is_crowd']))
-        classes = tf.gather_nd(classes, indices)
-        boxes = tf.gather_nd(boxes, indices)
+        areas = [0.]
+        is_crowds = [False]
+        source_id = ""
+        image_size = [*utils.parse_image_size(params['image_size']),3]
+        image, boxes, classes = mosaic(images, boxes, classes, image_size)
+        ymin = boxes[:, 0] / image_size[0]
+        xmin = boxes[:, 1] / image_size[1]
+        ymax = boxes[:, 2] / image_size[0]
+        xmax = boxes[:, 3] / image_size[1]
+        boxes = tf.cast(tf.stack([ymin, xmin, ymax, xmax], axis=1), tf.float32)
+      else:
+        data = example_decoder.decode(value)
+        source_id = data['source_id']
+        image = data['image']
+        boxes = data['groundtruth_boxes']
+        classes = data['groundtruth_classes']
+        classes = tf.reshape(tf.cast(classes, dtype=tf.float32), [-1, 1])
+        areas = data['groundtruth_area']
+        is_crowds = data['groundtruth_is_crowd']
+
+        if params['skip_crowd_during_training'] and self._is_training:
+          indices = tf.where(tf.logical_not(data['groundtruth_is_crowd']))
+          classes = tf.gather_nd(classes, indices)
+          boxes = tf.gather_nd(boxes, indices)
 
       # NOTE: The autoaugment method works best when used alongside the
       # standard horizontal flipping of images along with size jittering
@@ -402,6 +433,8 @@ class InputReader(object):
       dataset = dataset.shuffle(64)
 
     # Parse the fetched records to input tensors for model function.
+    if self._is_training and params['use_mosaic']:
+      dataset = dataset.batch(4, drop_remainder=True)
     dataset = dataset.map(
         lambda value: self.dataset_parser(  # pylint: disable=g-long-lambda
             value, example_decoder, anchor_labeler, params),
