@@ -26,12 +26,14 @@ from keras import anchors
 from keras import efficientdet_keras
 from keras import postprocess
 
+import tensorflow as tf
+
 flags.DEFINE_string('val_file_pattern', None,
                     'Glob for eval tfrecords, e.g. coco/val-*.tfrecord.')
 flags.DEFINE_string('val_json_file', None,
                     'Groudtruth file, e.g. annotations/instances_val2017.json.')
 flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model name to use.')
-flags.DEFINE_string('checkpoint', None, 'Location of the checkpoint to run.')
+flags.DEFINE_string('model_dir', None, 'Location of the checkpoint to run.')
 flags.DEFINE_integer('batch_size', 8, 'Batch size.')
 flags.DEFINE_string('hparams', '', 'Comma separated k=v pairs or a yaml file')
 FLAGS = flags.FLAGS
@@ -54,7 +56,7 @@ def main(_):
   # Network
   model = efficientdet_keras.EfficientDetNet(config=config)
   model.build((config.batch_size, 512, 512, 3))
-  model.load_weights(FLAGS.checkpoint)
+  model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
 
   evaluator = coco_metric.EvaluationMetric(
       filename=config.val_json_file)
