@@ -205,16 +205,17 @@ def main(_):
                     label_smoothing=params['label_smoothing'],
                     reduction=tf.keras.losses.Reduction.NONE)
         })
-  ckpt_path = tf.train.latest_checkpoint(FLAGS.model_dir)
-  if ckpt_path:
-    model.load_weights(ckpt_path)
-  model.freeze_vars(params['var_freeze_expr'])
-  model.fit(
-      get_dataset(True, params=params),
-      steps_per_epoch=FLAGS.num_examples_per_epoch,
-      callbacks=train_lib.get_callbacks(params, FLAGS.profile),
-      validation_data=get_dataset(False, params=params),
-      validation_steps=FLAGS.eval_samples)
+    ckpt_path = tf.train.latest_checkpoint(FLAGS.model_dir)
+    if ckpt_path:
+      model.load_weights(ckpt_path)
+    model.freeze_vars(params['var_freeze_expr'])
+    model.fit(
+        get_dataset(True, params=params),
+        epochs=params['num_epochs'],
+        steps_per_epoch=FLAGS.num_examples_per_epoch,
+        callbacks=train_lib.get_callbacks(params, FLAGS.profile),
+        validation_data=get_dataset(False, params=params),
+        validation_steps=FLAGS.eval_samples)
   model.save_weights(os.path.join(FLAGS.model_dir, 'model'))
 
 
