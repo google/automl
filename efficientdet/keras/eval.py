@@ -39,6 +39,8 @@ flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model name to use.')
 flags.DEFINE_string('model_dir', None, 'Location of the checkpoint to run.')
 flags.DEFINE_integer('batch_size', 8, 'Batch size.')
 flags.DEFINE_string('hparams', '', 'Comma separated k=v pairs or a yaml file')
+flags.DEFINE_boolean('enable_tta', False,
+                     'Use test time augmentation (slower, but more accurate).')
 FLAGS = flags.FLAGS
 
 
@@ -73,20 +75,25 @@ def main(_):
                                                  labels['image_scales'],
                                                  labels['source_ids'], False)
 
-    images_flipped = tf.image.flip_left_right(images)
-    cls_outputs_flipped, box_outputs_flipped = model(
-        images_flipped, training=False)
-    detections_flipped = postprocess.generate_detections(
-        config, cls_outputs_flipped, box_outputs_flipped,
-        labels['image_scales'], labels['source_ids'], True)
+    if FLAGS.enable_tta:
+      images_flipped = tf.image.flip_left_right(images)
+      cls_outputs_flipped, box_outputs_flipped = model(
+          images_flipped, training=False)
+      detections_flipped = postprocess.generate_detections(
+          config, cls_outputs_flipped, box_outputs_flipped,
+          labels['image_scales'], labels['source_ids'], True)
 
-    for d, df in zip(detections, detections_flipped):
-      combined_detections = wbf.ensemble_detections(config, tf.concat([d, df],
-                                                                      0))
-      combined_detections = tf.stack([combined_detections])
+      for d, df in zip(detections, detections_flipped):
+        combined_detections = wbf.ensemble_detections(config,
+                                                      tf.concat([d, df], 0))
+        combined_detections = tf.stack([combined_detections])
+        evaluator.update_state(
+            labels['groundtruth_data'].numpy(),
+            postprocess.transform_detections(combined_detections).numpy())
+    else:
       evaluator.update_state(
           labels['groundtruth_data'].numpy(),
-          postprocess.transform_detections(combined_detections).numpy())
+          postprocess.transform_detections(detections).numpy())
 
   # compute the final eval results.
   metric_values = evaluator.result()

@@ -366,11 +366,16 @@ def generate_detections(params,
   if flip:
     _, width = utils.parse_image_size(params['image_size'])
 
+    original_image_widths = tf.expand_dims(image_scales, -1) * width
     detections_bs = [
         image_ids_bs * tf.ones_like(nms_scores_bs),
-        tf.expand_dims(image_scales, -1) * width - nms_boxes_bs[:, :, 3],
+        # the mirrored location of the left edge is the image width 
+        # minus the position of the right edge
+        original_image_widths - nms_boxes_bs[:, :, 3],
         nms_boxes_bs[:, :, 0],
-        tf.expand_dims(image_scales, -1) * width - nms_boxes_bs[:, :, 1],
+        # the mirrored location of the right edge is the image width 
+        # minus the position of the left edge
+        original_image_widths - nms_boxes_bs[:, :, 1],
         nms_boxes_bs[:, :, 2],
         nms_scores_bs,
         nms_classes_bs,
