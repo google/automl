@@ -88,6 +88,6 @@ def main(_):
 if __name__ == '__main__':
   flags.mark_flag_as_required('image_path')
   flags.mark_flag_as_required('output_dir')
-  flags.mark_flag_as_required('checkpoint')
+  flags.mark_flag_as_required('model_dir')
   logging.set_verbosity(logging.WARNING)
   app.run(main)
