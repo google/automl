@@ -89,6 +89,33 @@ class PostprocessTest(tf.test.TestCase):
                                               box_outputs_list, scales, ids)
     self.assertAllClose(
         outputs.numpy(),
+        [[[0., -1.177383, 1.793507, 8.340945, 4.418388, 0.901576, 2.],
+          [0., 5.676410, 6.102146, 7.785691, 8.537168, 0.888125, 1.]],
+         [[1., 5.885427, 13.529362, 11.410081, 14.154047, 0.884544, 1.],
+          [1., 8.145872, -9.660868, 14.173973, 10.41237, 0.815883, 2.]]])
+
+    outputs_flipped = postprocess.generate_detections(self.params,
+                                                      cls_outputs_list,
+                                                      box_outputs_list, scales,
+                                                      ids, True)
+    self.assertAllClose(
+        outputs_flipped.numpy(),
+        [[[0., -0.340945, 1.793507, 9.177383, 4.418388, 0.901576, 2.],
+          [0., 0.214309, 6.102146, 2.32359, 8.537168, 0.888125, 1.]],
+         [[1., 4.589919, 13.529362, 10.114573, 14.154047, 0.884544, 1.],
+          [1., 1.826027, -9.660868, 7.854128, 10.41237, 0.815883, 2.]]])
+
+  def test_transform_detections(self):
+    corners = tf.constant(
+        [[[0., -1.177383, 1.793507, 8.340945, 4.418388, 0.901576, 2.],
+          [0., 5.676410, 6.102146, 7.785691, 8.537168, 0.888125, 1.]],
+         [[1., 5.885427, 13.529362, 11.410081, 14.154047, 0.884544, 1.],
+          [1., 8.145872, -9.660868, 14.173973, 10.41237, 0.815883, 2.]]])
+
+    corner_plus_area = postprocess.transform_detections(corners)
+
+    self.assertAllClose(
+        corner_plus_area.numpy(),
         [[[0., -1.177383, 1.793507, 9.518328, 2.624881, 0.901576, 2.],
           [0., 5.676410, 6.102146, 2.109282, 2.435021, 0.888125, 1.]],
          [[1., 5.885427, 13.529362, 5.524654, 0.624685, 0.884544, 1.],
@@ -116,6 +143,7 @@ class PostprocessTest(tf.test.TestCase):
     self.assertAllClose(classes.numpy(), [[2., 1.], [1., 2.]])
     self.assertAllClose(scores.numpy(),
                         [[0.90157586, 0.88812476], [0.88454413, 0.8158828]])
+
 
 if __name__ == '__main__':
   logging.set_verbosity(logging.WARNING)
