@@ -67,8 +67,6 @@ flags.DEFINE_string(
     'hparams', '', 'Comma separated k=v pairs of hyperparameters or a module'
     ' containing attributes to use as hyperparameters.')
 flags.DEFINE_integer('batch_size', 64, 'training batch size')
-flags.DEFINE_integer('eval_samples', 5000, 'The number of samples for '
-                     'evaluation.')
 flags.DEFINE_integer('iterations_per_loop', 100,
                      'Number of iterations per TPU training loop')
 flags.DEFINE_string(
@@ -149,12 +147,13 @@ def main(_):
       raise RuntimeError('You must specify --validation_file_pattern '
                          'for evaluation.')
 
+  steps_per_epoch = FLAGS.num_examples_per_epoch // FLAGS.batch_size
   params = dict(
       config.as_dict(),
       model_name=FLAGS.model_name,
       iterations_per_loop=FLAGS.iterations_per_loop,
       model_dir=FLAGS.model_dir,
-      num_examples_per_epoch=FLAGS.num_examples_per_epoch,
+      steps_per_epoch=steps_per_epoch,
       strategy=FLAGS.strategy,
       batch_size=FLAGS.batch_size // ds_strategy.num_replicas_in_sync,
       num_shards=ds_strategy.num_replicas_in_sync,
@@ -176,10 +175,10 @@ def main(_):
         is_training=is_training,
         use_fake_data=FLAGS.use_fake_data,
         max_instances_per_image=config.max_instances_per_image)(
-            params)
+            params) if file_pattern else None
 
   with ds_strategy.scope():
-    model = train_lib.EfficientDetNetTrain(params['model_name'], config)
+    model = train_lib.EfficientDetNetTrain(params['var_freeze_expr'], params['model_name'], config)
     height, width = utils.parse_image_size(params['image_size'])
     model.build((params['batch_size'], height, width, 3))
     model.compile(
@@ -208,14 +207,12 @@ def main(_):
     ckpt_path = tf.train.latest_checkpoint(FLAGS.model_dir)
     if ckpt_path:
       model.load_weights(ckpt_path)
-    model.freeze_vars(params['var_freeze_expr'])
     model.fit(
         get_dataset(True, params=params),
         epochs=params['num_epochs'],
-        steps_per_epoch=FLAGS.num_examples_per_epoch,
+        steps_per_epoch=steps_per_epoch,
         callbacks=train_lib.get_callbacks(params, FLAGS.profile),
-        validation_data=get_dataset(False, params=params),
-        validation_steps=FLAGS.eval_samples)
+        validation_data=get_dataset(False, params=params))
   model.save_weights(os.path.join(FLAGS.model_dir, 'model'))
 
 

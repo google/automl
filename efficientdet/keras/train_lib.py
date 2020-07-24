@@ -33,8 +33,7 @@ def update_learning_rate_schedule_parameters(params):
   batch_size = params['batch_size'] * params['num_shards']
   # Learning rate is proportional to the batch size
   params['adjusted_learning_rate'] = (params['learning_rate'] * batch_size / 64)
-  steps_per_epoch = params['num_examples_per_epoch'] / batch_size
-  params['steps_per_epoch'] = steps_per_epoch
+  steps_per_epoch = params['steps_per_epoch']
   params['lr_warmup_step'] = int(params['lr_warmup_epoch'] * steps_per_epoch)
   params['first_lr_drop_step'] = int(params['first_lr_drop_epoch'] *
                                      steps_per_epoch)
@@ -357,16 +356,19 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
   see https://www.tensorflow.org/guide/keras/customizing_what_happens_in_fit
   """
 
-  def freeze_vars(self, pattern):
+  def __init__(self, pattern, *args, **kwargs):
     """Freeze variables according to pattern.
 
     Args:
       pattern: a reg experession such as ".*(efficientnet|fpn_cells).*".
     """
-    if pattern:
-      for v in self.trainable_variables:
-        if re.match(pattern, v.name):
-          v.trainable = False
+    super().__init__(*args, **kwargs)
+    self.pattern = pattern
+
+  def _freeze_vars(self):
+    if self.pattern:
+      return [v for v in self.trainable_variables if not re.match(self.pattern, v.name)]
+    return self.trainable_variables
 
   def _reg_l2_loss(self, weight_decay, regex=r'.*(kernel|weight):0$'):
     """Return regularization l2 loss loss."""
@@ -491,7 +493,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
         scaled_loss = self.optimizer.get_scaled_loss(total_loss)
       else:
         scaled_loss = total_loss
-    trainable_vars = self.trainable_variables
+    trainable_vars = self._freeze_vars()
     scaled_gradients = tape.gradient(scaled_loss, trainable_vars)
     if isinstance(self.optimizer,
                   tf.keras.mixed_precision.experimental.LossScaleOptimizer):
