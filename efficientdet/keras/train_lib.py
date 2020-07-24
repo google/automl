@@ -367,7 +367,10 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
 
   def _freeze_vars(self):
     if self.pattern:
-      return [v for v in self.trainable_variables if not re.match(self.pattern, v.name)]
+      return [
+          v for v in self.trainable_variables
+          if not re.match(self.pattern, v.name)
+      ]
     return self.trainable_variables
 
   def _reg_l2_loss(self, weight_decay, regex=r'.*(kernel|weight):0$'):
@@ -379,7 +382,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
         if var_match.match(v.name)
     ])
 
-  def _detection_loss(self, cls_outputs, box_outputs, labels):
+  def _detection_loss(self, cls_outputs, box_outputs, labels, loss_vals):
     """Computes total detection loss.
 
     Computes total detection loss including box and class loss from all levels.
@@ -458,6 +461,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       box_iou_loss_layer = self.loss['box_iou_loss']
       box_iou_loss = box_iou_loss_layer([num_positives_sum, box_targets],
                                         box_outputs)
+      loss_vals['box_iou_loss'] = box_iou_loss
     else:
       box_iou_loss = 0
 
@@ -466,6 +470,9 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     total_loss = (
         cls_loss + self.config.box_loss_weight * box_loss +
         self.config.iou_loss_weight * box_iou_loss)
+    loss_vals['det_loss'] = total_loss
+    loss_vals['cls_loss'] = cls_loss
+    loss_vals['box_loss'] = box_loss
     return total_loss, cls_loss, box_loss, box_iou_loss
 
   def train_step(self, data):
@@ -483,16 +490,30 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     """
     images, labels = data
     with tf.GradientTape() as tape:
-      cls_outputs, box_outputs = self(images, training=True)
-      det_loss, cls_loss, box_loss, box_iou_loss = (
-          self._detection_loss(cls_outputs, box_outputs, labels))
+      if len(self.config.heads) == 2:
+        cls_outputs, box_outputs, seg_outputs = self(images, training=True)
+      elif 'object_detection' in self.config.heads:
+        cls_outputs, box_outputs = self(images, training=True)
+      elif 'segmentation' in self.config.heads:
+        seg_outputs = self(images, training=True)
       reg_l2loss = self._reg_l2_loss(self.config.weight_decay)
-      total_loss = det_loss + reg_l2loss
+      total_loss = reg_l2loss
+      loss_vals = {}
+      if 'object_detection' in self.config.heads:
+        det_loss = (
+            self._detection_loss(cls_outputs, box_outputs, labels, loss_vals))
+        total_loss += det_loss
+      if 'segmentation' in self.config.heads:
+        seg_loss_layer = self.loss['seg_loss']
+        seg_loss = seg_loss_layer(seg_outputs, labels['image_masks'])
+        total_loss += seg_loss
+        loss_vals['seg_loss'] = seg_loss
       if isinstance(self.optimizer,
                     tf.keras.mixed_precision.experimental.LossScaleOptimizer):
         scaled_loss = self.optimizer.get_scaled_loss(total_loss)
       else:
         scaled_loss = total_loss
+    loss_vals['loss'] = total_loss
     trainable_vars = self._freeze_vars()
     scaled_gradients = tape.gradient(scaled_loss, trainable_vars)
     if isinstance(self.optimizer,
@@ -503,13 +524,9 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     if self.config.clip_gradients_norm > 0:
       gradients, gnorm = tf.clip_by_global_norm(gradients,
                                                 self.config.clip_gradients_norm)
+      loss_vals['gnorm'] = gnorm
     self.optimizer.apply_gradients(zip(gradients, trainable_vars))
-    return {'loss': total_loss,
-            'det_loss': det_loss,
-            'cls_loss': cls_loss,
-            'box_loss': box_loss,
-            'box_iou_loss': box_iou_loss,
-            'gnorm': gnorm}
+    return loss_vals
 
   def test_step(self, data):
     """Test step.
@@ -525,15 +542,22 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       A dict record loss info.
     """
     images, labels = data
-    cls_outputs, box_outputs = self(images, training=False)
-    det_loss, cls_loss, box_loss, box_iou_loss = (
-        self._detection_loss(cls_outputs, box_outputs, labels))
+    if len(self.config.heads) == 2:
+      cls_outputs, box_outputs, seg_outputs = self(images, training=True)
+    elif 'object_detection' in self.config.heads:
+      cls_outputs, box_outputs = self(images, training=True)
+    elif 'segmentation' in self.config.heads:
+      seg_outputs = self(images, training=True)
     reg_l2loss = self._reg_l2_loss(self.config.weight_decay)
-    total_loss = det_loss + reg_l2loss
-    return {
-        'loss': total_loss,
-        'det_loss': det_loss,
-        'cls_loss': cls_loss,
-        'box_loss': box_loss,
-        'box_iou_loss': box_iou_loss
-    }
+    total_loss = reg_l2loss
+    loss_vals = {}
+    if 'object_detection' in self.config.heads:
+      det_loss = (
+          self._detection_loss(cls_outputs, box_outputs, labels, loss_vals))
+      total_loss += det_loss
+    if 'segmentation' in self.config.heads:
+      seg_loss_layer = self.loss['seg_loss']
+      seg_loss = seg_loss_layer(seg_outputs, labels['image_masks'])
+      total_loss += seg_loss
+      loss_vals['seg_loss'] = seg_loss
+    return loss_vals
