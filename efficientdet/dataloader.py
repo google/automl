@@ -290,6 +290,7 @@ class InputReader(object):
       classes = tf.reshape(tf.cast(classes, dtype=tf.float32), [-1, 1])
       areas = data['groundtruth_area']
       is_crowds = data['groundtruth_is_crowd']
+      image_masks = data.get('groundtruth_instance_masks', [])
       classes = tf.reshape(tf.cast(classes, dtype=tf.float32), [-1, 1])
 
       if params['skip_crowd_during_training'] and self._is_training:
@@ -339,12 +340,12 @@ class InputReader(object):
       classes = pad_to_fixed_size(classes, -1,
                                   [self._max_instances_per_image, 1])
       return (image, cls_targets, box_targets, num_positives, source_id,
-              image_scale, boxes, is_crowds, areas, classes)
+              image_scale, boxes, is_crowds, areas, classes, image_masks)
 
   @tf.autograph.experimental.do_not_convert
   def process_example(self, params, batch_size, images, cls_targets,
                       box_targets, num_positives, source_ids, image_scales,
-                      boxes, is_crowds, areas, classes):
+                      boxes, is_crowds, areas, classes, image_masks):
     """Processes one batch of data."""
     labels = {}
     # Count num_positives in a batch.
@@ -370,6 +371,7 @@ class InputReader(object):
     labels['source_ids'] = source_ids
     labels['groundtruth_data'] = groundtruth_data
     labels['image_scales'] = image_scales
+    labels['image_masks'] = image_masks
     return images, labels
 
   def __call__(self, params):
@@ -380,7 +382,9 @@ class InputReader(object):
                                     params['image_size'])
     anchor_labeler = anchors.AnchorLabeler(input_anchors, params['num_classes'])
     example_decoder = tf_example_decoder.TfExampleDecoder(
-        regenerate_source_id=params['regenerate_source_id'])
+        include_mask='segmentation' in params['heads'],
+        regenerate_source_id=params['regenerate_source_id']
+    )
 
     batch_size = params['batch_size']
     dataset = tf.data.Dataset.list_files(

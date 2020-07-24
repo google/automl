@@ -203,7 +203,9 @@ def main(_):
                     params['alpha'],
                     params['gamma'],
                     label_smoothing=params['label_smoothing'],
-                    reduction=tf.keras.losses.Reduction.NONE)
+                    reduction=tf.keras.losses.Reduction.NONE),
+            'seg_loss':
+                tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
         })
     ckpt_path = tf.train.latest_checkpoint(FLAGS.model_dir)
     if ckpt_path:
