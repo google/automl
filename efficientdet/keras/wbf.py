@@ -31,15 +31,18 @@ def find_matching_cluster(clusters, detection):
   return tf.argmax(ious)
 
 
+def weighted_average(samples, weights):
+  return tf.math.reduce_sum(samples * weights) / tf.math.reduce_sum(weights)
+
 def average_detections(detections):
   """Takes a list of detections and returns the average, both in box co-ordinates and confidence."""
   detections = tf.stack(detections)
   return [
       detections[0][0],
-      tf.math.reduce_mean(detections[:, 1]),
-      tf.math.reduce_mean(detections[:, 2]),
-      tf.math.reduce_mean(detections[:, 3]),
-      tf.math.reduce_mean(detections[:, 4]),
+      weighted_average(detections[:, 1], detections[:, 5]),
+      weighted_average(detections[:, 2], detections[:, 5]),
+      weighted_average(detections[:, 3], detections[:, 5]),
+      weighted_average(detections[:, 4], detections[:, 5]),
       tf.math.reduce_mean(detections[:, 5]),
       detections[0][6],
   ]

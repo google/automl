@@ -83,17 +83,35 @@ class WbfTest(tf.test.TestCase):
 
     self.assertAllClose(cluster_index, 1)
 
+  def test_weighted_average(self):
+    samples = tf.constant([1, 3], dtype=tf.float32)
+
+    weights1 = tf.constant([0.5, 0.5], dtype=tf.float32)
+    weighted_average1 = wbf.weighted_average(samples, weights1)
+    
+    self.assertAllClose(weighted_average1, 2)
+
+    weights2 = tf.constant([1, 0], dtype=tf.float32)
+    weighted_average2 = wbf.weighted_average(samples, weights2)
+    
+    self.assertAllClose(weighted_average2, 1)
+
+    weights3 = tf.constant([1, 2], dtype=tf.float32)
+    weighted_average3 = wbf.weighted_average(samples, weights3)
+    
+    self.assertAllClose(weighted_average3, 7.0/3.0)
+
   def test_average_detections(self):
-    d1 = tf.constant([1, 1, 1, 2, 2, 0.5, 1], dtype=tf.float32)
-    d2 = tf.constant([1, 3, 3, 4, 4, 1, 1], dtype=tf.float32)
+    d1 = tf.constant([1, 1, 1, 2, 2, 0.3, 1], dtype=tf.float32)
+    d2 = tf.constant([1, 3, 3, 4, 4, 0.7, 1], dtype=tf.float32)
 
     averaged = wbf.average_detections((d1, d2))
 
-    self.assertAllClose(averaged, [1, 2, 2, 3, 3, 0.75, 1])
+    self.assertAllClose(averaged, [1, 2.4, 2.4, 3.4, 3.4, 0.5, 1])
 
   def test_ensemble_boxes(self):
-    d1 = tf.constant([1, 2, 1, 10, 1, 0.5, 1], dtype=tf.float32)
-    d2 = tf.constant([1, 3, 1, 10, 1, 1, 1], dtype=tf.float32)
+    d1 = tf.constant([1, 2, 1, 10, 1, 0.75, 1], dtype=tf.float32)
+    d2 = tf.constant([1, 3, 1, 10, 1, 0.75, 1], dtype=tf.float32)
     d3 = tf.constant([1, 3, 1, 10, 1, 1, 2], dtype=tf.float32)
 
     ensembled = wbf.ensemble_detections({'num_classes': 3},
