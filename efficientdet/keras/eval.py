@@ -62,17 +62,22 @@ def main(_):
 
   evaluator = coco_metric.EvaluationMetric(filename=config.val_json_file)
 
+  config.nms_configs.max_nms_inputs = anchors.MAX_DETECTION_POINTS
+  detections_per_source = dict()
+
   # compute stats for all batches.
   for images, labels in ds:
-    config.nms_configs.max_nms_inputs = anchors.MAX_DETECTION_POINTS
-
     cls_outputs, box_outputs = model(images, training=False)
     detections = postprocess.generate_detections(config, cls_outputs,
                                                  box_outputs,
                                                  labels['image_scales'],
                                                  labels['source_ids'], False)
 
-    if FLAGS.enable_tta:
+    for id, d in zip(labels['source_ids'], detections):
+      detections_per_source[id.numpy()] = d
+
+  if FLAGS.enable_tta:
+    for images, labels in ds:
       images_flipped = tf.image.flip_left_right(images)
       cls_outputs_flipped, box_outputs_flipped = model(
           images_flipped, training=False)
@@ -80,17 +85,15 @@ def main(_):
           config, cls_outputs_flipped, box_outputs_flipped,
           labels['image_scales'], labels['source_ids'], True)
 
-      for d, df in zip(detections, detections_flipped):
-        combined_detections = wbf.ensemble_detections(config,
-                                                      tf.concat([d, df], 0))
-        combined_detections = tf.stack([combined_detections])
-        evaluator.update_state(
-            labels['groundtruth_data'].numpy(),
-            postprocess.transform_detections(combined_detections).numpy())
-    else:
-      evaluator.update_state(
-          labels['groundtruth_data'].numpy(),
-          postprocess.transform_detections(detections).numpy())
+      for id, d in zip(labels['source_ids'], detections_flipped):
+        detections_per_source[id.numpy()] = tf.concat([d, detections_per_source[id.numpy()]], 0)
+
+  for d in detections_per_source.values():
+    if FLAGS.enable_tta:
+      d = wbf.ensemble_detections(config, d)
+    evaluator.update_state(
+        labels['groundtruth_data'].numpy(),
+        postprocess.transform_detections(tf.stack([d])).numpy())
 
   # compute the final eval results.
   metric_values = evaluator.result()
