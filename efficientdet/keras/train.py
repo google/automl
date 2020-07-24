@@ -178,7 +178,8 @@ def main(_):
             params) if file_pattern else None
 
   with ds_strategy.scope():
-    model = train_lib.EfficientDetNetTrain(params['var_freeze_expr'], params['model_name'], config)
+    model = train_lib.EfficientDetNetTrain(params['var_freeze_expr'],
+                                           params['model_name'], config)
     height, width = utils.parse_image_size(params['image_size'])
     model.build((params['batch_size'], height, width, 3))
     model.compile(
