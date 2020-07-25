@@ -21,6 +21,7 @@ import tensorflow as tf
 import coco_metric
 import dataloader
 import hparams_config
+import utils
 
 from keras import anchors
 from keras import efficientdet_keras
@@ -46,48 +47,51 @@ def main(_):
   config.override(FLAGS.hparams)
   config.batch_size = FLAGS.batch_size
   config.val_json_file = FLAGS.val_json_file
-
-  # dataset
-  ds = dataloader.InputReader(
-      FLAGS.val_file_pattern,
-      is_training=False,
-      use_fake_data=False,
-      max_instances_per_image=config.max_instances_per_image)(
-          config)
+  config.nms_configs.max_nms_inputs = anchors.MAX_DETECTION_POINTS
+  height, width = utils.parse_image_size(config['image_size'])
 
   # Network
   model = efficientdet_keras.EfficientDetNet(config=config)
   model.build((config.batch_size, None, None, 3))
   model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
 
-  evaluator = coco_metric.EvaluationMetric(filename=config.val_json_file)
-
-  config.nms_configs.max_nms_inputs = anchors.MAX_DETECTION_POINTS
-  detections_per_source = dict()
-
-  # compute stats for all batches.
-  for images, labels in ds:
-    cls_outputs, box_outputs = model(images, training=False)
-    detections = postprocess.generate_detections(config, cls_outputs,
-                                                 box_outputs,
-                                                 labels['image_scales'],
-                                                 labels['source_ids'], False)
-
-    for id, d in zip(labels['source_ids'], detections):
-      detections_per_source[id.numpy()] = d
-
+  augmentations = [] 
   if FLAGS.enable_tta:
+    for size_offset in (-128, 0, 128):
+      for flip in (False, True):
+        augmentations.append((height + size_offset, width + size_offset, flip))
+  else:
+    augmentations.append((height, width, False))
+
+  detections_per_source = dict()
+  for height, width, flip in augmentations:
+    config.image_size = (height, width)
+    # dataset
+    ds = dataloader.InputReader(
+        FLAGS.val_file_pattern,
+        is_training=False,
+        use_fake_data=False,
+        max_instances_per_image=config.max_instances_per_image)(
+            config)
+
+    # compute stats for all batches.
     for images, labels in ds:
-      images_flipped = tf.image.flip_left_right(images)
-      cls_outputs_flipped, box_outputs_flipped = model(
-          images_flipped, training=False)
-      detections_flipped = postprocess.generate_detections(
-          config, cls_outputs_flipped, box_outputs_flipped,
-          labels['image_scales'], labels['source_ids'], True)
+      if flip:
+        images = tf.image.flip_left_right(images)
+      cls_outputs, box_outputs = model(images, training=False)
+      detections = postprocess.generate_detections(config, cls_outputs,
+                                                  box_outputs,
+                                                  labels['image_scales'],
+                                                  labels['source_ids'], flip)
 
-      for id, d in zip(labels['source_ids'], detections_flipped):
-        detections_per_source[id.numpy()] = tf.concat([d, detections_per_source[id.numpy()]], 0)
+      for id, d in zip(labels['source_ids'], detections):
+        if id.numpy() in detections_per_source:
+          detections_per_source[id.numpy()] = tf.concat([d, detections_per_source[id.numpy()]], 0)
+        else:
+          detections_per_source[id.numpy()] = d
 
+
+  evaluator = coco_metric.EvaluationMetric(filename=config.val_json_file)
   for d in detections_per_source.values():
     if FLAGS.enable_tta:
       d = wbf.ensemble_detections(config, d)
