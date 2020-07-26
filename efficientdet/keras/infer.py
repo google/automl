@@ -59,8 +59,7 @@ def main(_):
 
   # Create and run the model.
   model = efficientdet_keras.EfficientDetModel(config=config)
-  height, width = utils.parse_image_size(config['image_size'])
-  model.build((1, height, width, 3))
+  model.build((1, None, None, 3))
   model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
   model.summary()
 

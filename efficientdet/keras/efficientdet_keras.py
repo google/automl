@@ -664,9 +664,6 @@ class FPNCells(tf.keras.layers.Layer):
             feats.append(cell_feats[-1 - i])
             break
 
-      utils.verify_feats_size(feats, self.feat_sizes, min_level, max_level,
-                              self.config.data_format)
-
     return feats
 
 

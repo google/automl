@@ -60,7 +60,7 @@ def main(_):
 
   # Network
   model = efficientdet_keras.EfficientDetNet(config=config)
-  model.build((config.batch_size, 512, 512, 3))
+  model.build((config.batch_size, None, None, 3))
   model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
 
   evaluator = coco_metric.EvaluationMetric(filename=config.val_json_file)
