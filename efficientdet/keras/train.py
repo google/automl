@@ -170,16 +170,18 @@ def main(_):
     file_pattern = (
         FLAGS.training_file_pattern
         if is_training else FLAGS.validation_file_pattern)
+    if not file_pattern:
+      raise ValueError('No matching files.')
+
     return dataloader.InputReader(
         file_pattern,
         is_training=is_training,
         use_fake_data=FLAGS.use_fake_data,
         max_instances_per_image=config.max_instances_per_image)(
-            params) if file_pattern else None
+            params)
 
   with ds_strategy.scope():
-    model = train_lib.EfficientDetNetTrain(params['var_freeze_expr'],
-                                           params['model_name'], config)
+    model = train_lib.EfficientDetNetTrain(params['model_name'], config)
     height, width = utils.parse_image_size(params['image_size'])
     model.build((params['batch_size'], height, width, 3))
     model.compile(

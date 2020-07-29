@@ -24,7 +24,6 @@ import tensorflow as tf
 
 import hparams_config
 import inference
-import utils
 from keras import efficientdet_keras
 
 flags.DEFINE_string('image_path', None, 'Location of test image.')

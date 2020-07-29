@@ -13,9 +13,11 @@
 # limitations under the License.
 # ==============================================================================
 """A demo script to show to train a segmentation model."""
-
-from keras.efficientdet_keras import EfficientDetNet
+from absl import app
+from absl import logging
 import tensorflow as tf
+import tensorflow_datasets as tfds
+from keras import efficientdet_keras
 
 
 def create_mask(pred_mask):
@@ -24,7 +26,6 @@ def create_mask(pred_mask):
   return pred_mask[0]
 
 
-import tensorflow_datasets as tfds
 dataset, info = tfds.load('oxford_iiit_pet:3.*.*', with_info=True)
 
 
@@ -35,6 +36,7 @@ def normalize(input_image, input_mask):
 
 
 def load_image_train(datapoint):
+  """Load images for training."""
   input_image = tf.image.resize(datapoint['image'], (512, 512))
   input_mask = tf.image.resize(datapoint['segmentation_mask'], (128, 128))
 
@@ -56,40 +58,42 @@ def load_image_test(datapoint):
   return input_image, input_mask
 
 
-TRAIN_LENGTH = info.splits['train'].num_examples
-BATCH_SIZE = 8
-BUFFER_SIZE = 1000
-STEPS_PER_EPOCH = TRAIN_LENGTH // BATCH_SIZE
+def main(_):
+  train_examples = info.splits['train'].num_examples
+  batch_size = 8
+  steps_per_epoch = train_examples // batch_size
 
-train = dataset['train'].map(
-    load_image_train, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-test = dataset['test'].map(load_image_test)
+  train = dataset['train'].map(
+      load_image_train, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+  test = dataset['test'].map(load_image_test)
 
-train_dataset = train.cache().shuffle(BUFFER_SIZE).batch(BATCH_SIZE).repeat()
-train_dataset = train_dataset.prefetch(
-    buffer_size=tf.data.experimental.AUTOTUNE)
-test_dataset = test.batch(BATCH_SIZE)
+  train_dataset = train.cache().shuffle(1000).batch(batch_size).repeat()
+  train_dataset = train_dataset.prefetch(
+      buffer_size=tf.data.experimental.AUTOTUNE)
+  test_dataset = test.batch(batch_size)
 
-model = EfficientDetNet('efficientdet-d0')
-model.build((1, 512, 512, 3))
-model.compile(
-    optimizer='adam',
-    loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-    metrics=['accuracy'])
+  model = efficientdet_keras.EfficientDetNet('efficientdet-d0')
+  model.build((1, 512, 512, 3))
+  model.compile(
+      optimizer='adam',
+      loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+      metrics=['accuracy'])
 
-EPOCHS = 20
-VAL_SUBSPLITS = 5
-VALIDATION_STEPS = info.splits[
-    'test'].num_examples // BATCH_SIZE // VAL_SUBSPLITS
+  val_subsplits = 5
+  val_steps = info.splits['test'].num_examples // batch_size // val_subsplits
+  model.fit(
+      train_dataset,
+      epochs=20,
+      steps_per_epoch=steps_per_epoch,
+      validation_steps=val_steps,
+      validation_data=test_dataset,
+      callbacks=[])
 
-model_history = model.fit(
-    train_dataset,
-    epochs=EPOCHS,
-    steps_per_epoch=STEPS_PER_EPOCH,
-    validation_steps=VALIDATION_STEPS,
-    validation_data=test_dataset,
-    callbacks=[])
+  model.save_weights('./test/segmentation')
 
-model.save_weights("./test/segmentation")
+  print(create_mask(model(tf.ones((1, 512, 512, 3)), False)))
 
-print(create_mask(model(tf.ones((1, 512, 512, 3)), False)))
+
+if __name__ == '__main__':
+  logging.set_verbosity(logging.WARNING)
+  app.run(main)

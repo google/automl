@@ -13,21 +13,21 @@
 # limitations under the License.
 # ==============================================================================
 """Data loader and processing test cases."""
-from keras import anchors
-import dataloader
-import tempfile
-import hparams_config
 import os
+import tempfile
 import tensorflow as tf
 
+import dataloader
+import hparams_config
 from dataset import tfrecord_util
+from keras import anchors
 from object_detection import tf_example_decoder
 
 
 class DataloaderTest(tf.test.TestCase):
 
   def _make_fake_tfrecord(self):
-    tfrecord_path = os.path.join(tempfile.gettempdir(), 'test.tfrecords')
+    tfrecord_path = os.path.join(tempfile.mkdtemp(), 'test.tfrecords')
     writer = tf.io.TFRecordWriter(tfrecord_path)
     encoded_jpg = tf.io.encode_jpeg(tf.ones([512, 512, 3], dtype=tf.uint8))
     example = tf.train.Example(
@@ -87,7 +87,7 @@ class DataloaderTest(tf.test.TestCase):
     reader = dataloader.InputReader(tfrecord_path, True)
     result = reader.dataset_parser(value, example_decoder, anchor_labeler,
                                    params)
-    self.assertEqual(len(result), 10)
+    self.assertEqual(len(result), 11)
 
 
 if __name__ == '__main__':

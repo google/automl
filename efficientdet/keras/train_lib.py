@@ -356,17 +356,8 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
   see https://www.tensorflow.org/guide/keras/customizing_what_happens_in_fit
   """
 
-  def __init__(self, pattern, *args, **kwargs):
-    """Freeze variables according to pattern.
-
-    Args:
-      pattern: a reg experession such as ".*(efficientnet|fpn_cells).*".
-    """
-    super().__init__(*args, **kwargs)
-    self.pattern = pattern
-
-  def _freeze_vars(self):
-    if self.pattern:
+  def _freeze_vars(self, pattern):
+    if pattern:
       return [
           v for v in self.trainable_variables
           if not re.match(self.pattern, v.name)
@@ -394,6 +385,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
         num_anchors * 4].
       labels: the dictionary that returned from dataloader that includes
         groundtruth targets.
+      loss_vals: A dict of loss values.
 
     Returns:
       total_loss: an integer tensor representing total loss reducing from
@@ -514,7 +506,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       else:
         scaled_loss = total_loss
     loss_vals['loss'] = total_loss
-    trainable_vars = self._freeze_vars()
+    trainable_vars = self._freeze_vars(self.config.var_freeze_expr)
     scaled_gradients = tape.gradient(scaled_loss, trainable_vars)
     if isinstance(self.optimizer,
                   tf.keras.mixed_precision.experimental.LossScaleOptimizer):

@@ -30,6 +30,7 @@ class TrainLibTest(tf.test.TestCase):
     config.batch_size = 1
     config.num_examples_per_epoch = 1
     config.model_dir = tempfile.mkdtemp()
+    config.steps_per_epoch = 1
     sample_image = tf.ones([416, 416, 3])
     display_callback = train_lib.DisplayCallback(sample_image)
     model = train_lib.EfficientDetNetTrain(config=config)
@@ -96,6 +97,7 @@ class TrainLibTest(tf.test.TestCase):
     config.batch_size = 1
     config.num_examples_per_epoch = 1
     config.model_dir = tempfile.mkdtemp()
+    config.steps_per_epoch = 1
     x = tf.ones((1, 512, 512, 3))
     labels = {
         'box_targets_%d' % i: tf.ones((1, 512 // 2**i, 512 // 2**i, 36))
@@ -137,19 +139,20 @@ class TrainLibTest(tf.test.TestCase):
 
     # Test single-batch
     outputs = model.train_on_batch(x, labels, return_dict=True)
-    expect_results = {'loss': 26278.25,
-                      'det_loss': 26277.033203125,
-                      'cls_loss': 5060.716796875,
-                      'box_loss': 424.3263244628906,
-                      'box_iou_loss': 0,
-                      'gnorm': 5873.78759765625}
+    expect_results = {
+        'loss': [26278.3, 5061.9, 425.5, 1.217],
+        'det_loss': 26277.033203125,
+        'cls_loss': 5060.716796875,
+        'box_loss': 424.3263244628906,
+        'gnorm': 5873.78759765625
+    }
     self.assertAllClose(outputs, expect_results, rtol=.1, atol=100.)
     outputs = model.test_on_batch(x, labels, return_dict=True)
-    expect_results = {'loss': 26079.712890625,
-                      'det_loss': 26078.49609375,
-                      'cls_loss': 5063.3759765625,
-                      'box_loss': 420.30242919921875,
-                      'box_iou_loss': 0}
+    expect_results = {
+        'det_loss': 26078.49609375,
+        'cls_loss': 5063.3759765625,
+        'box_loss': 420.30242919921875
+    }
     self.assertAllClose(outputs, expect_results, rtol=.1, atol=100.)
 
     # Test fit.
@@ -160,11 +163,11 @@ class TrainLibTest(tf.test.TestCase):
         epochs=1,
         callbacks=train_lib.get_callbacks(params))
 
-    self.assertAllClose(hist.history['loss'], [26063.], rtol=.1, atol=10.)
+    self.assertAllClose(
+        hist.history['loss'], [[26067, 5057.5, 421.4, 1.2]], rtol=.1, atol=10.)
     self.assertAllClose(hist.history['det_loss'], [26061.], rtol=.1, atol=10.)
     self.assertAllClose(hist.history['cls_loss'], [5058.], rtol=.1, atol=10.)
     self.assertAllClose(hist.history['box_loss'], [420.], rtol=.1, atol=100.)
-    self.assertAllClose(hist.history['box_iou_loss'], [0])
     # skip gnorm test because it is flaky.
 
 
