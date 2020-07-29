@@ -98,8 +98,8 @@ def pre_nms(params, cls_outputs, box_outputs, topk=True):
 
   Args:
     params: a dict of parameters.
-    cls_outputs: a list of tensors for classes, each tensor denotes a level
-      of logits with shape [N, H, W, num_class * num_anchors].
+    cls_outputs: a list of tensors for classes, each tensor denotes a level of
+      logits with shape [N, H, W, num_class * num_anchors].
     box_outputs: a list of tensors for boxes, each tensor ddenotes a level of
       boxes with shape [N, H, W, 4 * num_anchors].
     topk: if True, select topk before nms (mainly to speed up nms).
@@ -136,8 +136,8 @@ def nms(params, boxes: T, scores: T, classes: T,
 
   Args:
     params: a dict of parameters.
-    boxes: a tensor with shape [N, 4], where N is the number of boxes.
-      Box format is [y_min, x_min, y_max, x_max].
+    boxes: a tensor with shape [N, 4], where N is the number of boxes. Box
+      format is [y_min, x_min, y_max, x_max].
     scores: a tensor with shape [N].
     classes: a tensor with shape [N].
     padded: a bool vallue indicating whether the results are padded.
@@ -186,11 +186,11 @@ def postprocess_combined(params, cls_outputs, box_outputs, image_scales=None):
 
   Args:
     params: a dict of parameters.
-    cls_outputs: a list of tensors for classes, each tensor denotes a level
-      of logits with shape [N, H, W, num_class * num_anchors].
+    cls_outputs: a list of tensors for classes, each tensor denotes a level of
+      logits with shape [N, H, W, num_class * num_anchors].
     box_outputs: a list of tensors for boxes, each tensor ddenotes a level of
-      boxes with shape [N, H, W, 4 * num_anchors]. Each box format is
-      [y_min, x_min, y_max, x_man].
+      boxes with shape [N, H, W, 4 * num_anchors]. Each box format is [y_min,
+      x_min, y_max, x_man].
     image_scales: scaling factor or the final image and bounding boxes.
 
   Returns:
@@ -227,11 +227,11 @@ def postprocess_global(params, cls_outputs, box_outputs, image_scales=None):
 
   Args:
     params: a dict of parameters.
-    cls_outputs: a list of tensors for classes, each tensor denotes a level
-      of logits with shape [N, H, W, num_class * num_anchors].
+    cls_outputs: a list of tensors for classes, each tensor denotes a level of
+      logits with shape [N, H, W, num_class * num_anchors].
     box_outputs: a list of tensors for boxes, each tensor ddenotes a level of
-      boxes with shape [N, H, W, 4 * num_anchors]. Each box format is
-      [y_min, x_min, y_max, x_man].
+      boxes with shape [N, H, W, 4 * num_anchors]. Each box format is [y_min,
+      x_min, y_max, x_man].
     image_scales: scaling factor or the final image and bounding boxes.
 
   Returns:
@@ -336,11 +336,11 @@ def postprocess_per_class(params, cls_outputs, box_outputs, image_scales=None):
 
   Args:
     params: a dict of parameters.
-    cls_outputs: a list of tensors for classes, each tensor denotes a level
-      of logits with shape [N, H, W, num_class * num_anchors].
+    cls_outputs: a list of tensors for classes, each tensor denotes a level of
+      logits with shape [N, H, W, num_class * num_anchors].
     box_outputs: a list of tensors for boxes, each tensor ddenotes a level of
-      boxes with shape [N, H, W, 4 * num_anchors]. Each box format is
-      [y_min, x_min, y_max, x_man].
+      boxes with shape [N, H, W, 4 * num_anchors]. Each box format is [y_min,
+      x_min, y_max, x_man].
     image_scales: scaling factor or the final image and bounding boxes.
 
   Returns:
@@ -369,11 +369,11 @@ def generate_detections(params,
     original_image_widths = tf.expand_dims(image_scales, -1) * width
     detections_bs = [
         image_ids_bs * tf.ones_like(nms_scores_bs),
-        # the mirrored location of the left edge is the image width 
+        # the mirrored location of the left edge is the image width
         # minus the position of the right edge
         original_image_widths - nms_boxes_bs[:, :, 3],
         nms_boxes_bs[:, :, 0],
-        # the mirrored location of the right edge is the image width 
+        # the mirrored location of the right edge is the image width
         # minus the position of the left edge
         original_image_widths - nms_boxes_bs[:, :, 1],
         nms_boxes_bs[:, :, 2],

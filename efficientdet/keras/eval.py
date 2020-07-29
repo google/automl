@@ -28,8 +28,6 @@ from keras import efficientdet_keras
 from keras import postprocess
 from keras import wbf
 
-import tensorflow as tf
-
 flags.DEFINE_string('val_file_pattern', None,
                     'Glob for eval tfrecords, e.g. coco/val-*.tfrecord.')
 flags.DEFINE_string(

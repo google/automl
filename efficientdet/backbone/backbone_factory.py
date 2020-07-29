@@ -26,7 +26,7 @@ def get_model_builder(model_name):
   """Get the model_builder module for a given model name."""
   if model_name.startswith('efficientnet-lite'):
     return efficientnet_lite_builder
-  elif model_name.startswith('efficientnet-b'):
+  elif model_name.startswith('efficientnet-'):
     return efficientnet_builder
   else:
     raise ValueError('Unknown model name {}'.format(model_name))
@@ -58,7 +58,7 @@ def get_model(model_name, override_params=None, model_dir=None):
 
   if model_name.startswith('efficientnet-lite'):
     builder = efficientnet_lite_builder
-  elif model_name.startswith('efficientnet-b'):
+  elif model_name.startswith('efficientnet-'):
     builder = efficientnet_builder
   else:
     raise ValueError('Unknown model name {}'.format(model_name))
