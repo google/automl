@@ -17,11 +17,6 @@
 efficientnet-litex (x=0,1,2,3,4) checkpoints are located in:
   https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/lite/efficientnet-litex.tar.gz
 """
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import os
 from absl import logging
 import tensorflow.compat.v1 as tf

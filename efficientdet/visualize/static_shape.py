@@ -12,15 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-
 """Helper functions to access TensorShape values.
 
 The rank 4 tensor_shape must be of the form [batch_size, height, width, depth].
 """
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 
 def get_dim_as_int(dim):

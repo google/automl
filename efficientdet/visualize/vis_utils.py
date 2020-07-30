@@ -16,12 +16,7 @@
 
 These functions often receive an image, perform some visualization on the image.
 The functions do not return a value, instead they modify the image itself.
-
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import abc
 import collections
 import matplotlib
@@ -1101,7 +1096,7 @@ class EvalMetricOpsVisualization(six.with_metaclass(abc.ABCMeta, object)):
           lambda: tf.constant(''))
 
     if tf.executing_eagerly():
-      update_op = self.add_images([[images[0]]])
+      update_op = self.add_images([[images[0]]])  # pylint: disable=assignment-from-none
       image_tensors = get_images()
     else:
       update_op = tf.py_func(self.add_images, [[images[0]]], [])

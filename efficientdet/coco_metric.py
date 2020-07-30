@@ -1,4 +1,3 @@
-# Lint as: python3
 # Copyright 2020 Google Research. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,14 +15,8 @@
 """COCO-style evaluation metrics.
 
 Implements the interface of COCO API and metric_fn in tf.TPUEstimator.
-
 COCO API: github.com/cocodataset/cocoapi/
 """
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import json
 import os
 from absl import flags

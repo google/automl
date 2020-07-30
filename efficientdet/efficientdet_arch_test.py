@@ -13,11 +13,6 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for efficientdet_arch."""
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from absl import logging
 import tensorflow.compat.v1 as tf
 

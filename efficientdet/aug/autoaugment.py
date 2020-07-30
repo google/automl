@@ -17,12 +17,6 @@
 [1] Barret, et al. Learning Data Augmentation Strategies for Object Detection.
     Arxiv: https://arxiv.org/abs/1906.11172
 """
-
-from __future__ import absolute_import
-from __future__ import division
-# gtype import
-from __future__ import print_function
-
 import inspect
 import math
 from absl import logging

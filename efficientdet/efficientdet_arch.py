@@ -18,11 +18,6 @@
     EfficientDet: Scalable and Efficient Object Detection.
     CVPR 2020, https://arxiv.org/abs/1911.09070
 """
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import functools
 import re
 

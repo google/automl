@@ -18,10 +18,6 @@ Example usage:
     python create_pascal_tfrecord.py  --data_dir=/tmp/VOCdevkit  \
         --year=VOC2012  --output_path=/tmp/pascal
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import hashlib
 import io
 import json
