@@ -13,13 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for utils."""
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import os
-
 from absl import logging
 import tensorflow.compat.v1 as tf
 

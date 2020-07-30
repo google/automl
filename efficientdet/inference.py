@@ -13,18 +13,11 @@
 # limitations under the License.
 # ==============================================================================
 r"""Inference related utilities."""
-
-from __future__ import absolute_import
-from __future__ import division
-# gtype import
-from __future__ import print_function
-
 import copy
 import functools
 import os
 import time
 from typing import Text, Dict, Any, List, Tuple, Union
-
 from absl import logging
 import numpy as np
 from PIL import Image

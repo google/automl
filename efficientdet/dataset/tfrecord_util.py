@@ -13,10 +13,6 @@
 # limitations under the License.
 # ==============================================================================
 r"""TFRecord related utilities."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from six.moves import range
 import tensorflow.compat.v1 as tf
 

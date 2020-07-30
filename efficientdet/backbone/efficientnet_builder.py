@@ -17,17 +17,11 @@
 efficientnet-bx (x=0,1,2,3,4,5,6,7) checkpoints are located in:
   https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/ckptsaug/efficientnet-bx.tar.gz
 """
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import functools
 import os
 import re
 from absl import logging
 import numpy as np
-import six
 import tensorflow.compat.v1 as tf
 
 import utils
@@ -57,10 +51,7 @@ class BlockDecoder(object):
 
   def _decode_block_string(self, block_string):
     """Gets a block through a string notation of arguments."""
-    if six.PY2:
-      assert isinstance(block_string, (str, unicode))
-    else:
-      assert isinstance(block_string, str)
+    assert isinstance(block_string, str)
     ops = block_string.split('_')
     options = {}
     for op in ops:

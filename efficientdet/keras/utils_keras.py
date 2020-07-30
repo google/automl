@@ -1,4 +1,3 @@
-# Lint as: python3
 # Copyright 2020 Google Research. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,8 +13,6 @@
 # limitations under the License.
 # ==============================================================================
 """Common keras utils."""
-# gtype import
-
 from typing import Text
 import tensorflow as tf
 

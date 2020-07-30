@@ -13,11 +13,6 @@
 # limitations under the License.
 # ==============================================================================
 """Model function definition, including both architecture and loss."""
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import functools
 import re
 from absl import logging
