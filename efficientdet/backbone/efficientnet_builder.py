@@ -22,7 +22,7 @@ import os
 import re
 from absl import logging
 import numpy as np
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 
 import utils
 from backbone import efficientnet_model
@@ -264,10 +264,10 @@ def build_model(images,
 
   if model_dir:
     param_file = os.path.join(model_dir, 'model_params.txt')
-    if not tf.gfile.Exists(param_file):
-      if not tf.gfile.Exists(model_dir):
-        tf.gfile.MakeDirs(model_dir)
-      with tf.gfile.GFile(param_file, 'w') as f:
+    if not tf.io.gfile.exists(param_file):
+      if not tf.io.gfile.exists(model_dir):
+        tf.io.gfile.makedirs(model_dir)
+      with tf.io.gfile.GFile(param_file, 'w') as f:
         logging.info('writing to %s', param_file)
         f.write('model_name= %s\n\n' % model_name)
         f.write('global_params= %s\n\n' % str(global_params))

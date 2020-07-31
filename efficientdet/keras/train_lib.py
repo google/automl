@@ -16,6 +16,7 @@
 from concurrent import futures
 import math
 import re
+import os
 from absl import logging
 import numpy as np
 import tensorflow as tf
@@ -195,11 +196,14 @@ def get_optimizer(params):
 class DisplayCallback(tf.keras.callbacks.Callback):
   """Display inference result callback."""
 
-  def __init__(self, sample_image, update_freq=1):
+  def __init__(self, sample_image, output_dir, update_freq=1):
     super().__init__()
-    self.sample_image = tf.expand_dims(sample_image, axis=0)
+    image_file = tf.io.read_file(sample_image)
+    self.sample_image = tf.expand_dims(
+      tf.image.decode_jpeg(image_file, channels=3), axis=0)
     self.executor = futures.ThreadPoolExecutor(max_workers=1)
     self.update_freq = update_freq
+    self.output_dir = output_dir
 
   def set_model(self, model: tf.keras.Model):
     self.train_model = model
@@ -207,25 +211,29 @@ class DisplayCallback(tf.keras.callbacks.Callback):
       self.model = efficientdet_keras.EfficientDetModel(config=model.config)
     height, width = utils.parse_image_size(model.config.image_size)
     self.model.build((1, height, width, 3))
-    self.file_writer = tf.summary.create_file_writer(model.config.model_dir)
+    self.file_writer = tf.summary.create_file_writer(self.output_dir)
+    self.min_score_thresh = self.model.config.nms_configs['score_thresh'] or 0.4
+    self.max_boxes_to_draw = self.model.config.nms_configs['max_output_size'] or 100
 
   def on_epoch_end(self, epoch, logs=None):
     if epoch % self.update_freq == 0:
-      with self.executor as executor:
-        executor.submit(self.draw_inference, epoch)
+      self.executor.submit(self.draw_inference, epoch)
+
+  @tf.function
+  def inference(self):
+    return self.model(self.sample_image, training=False)
 
   def draw_inference(self, epoch):
     self.model.set_weights(self.train_model.get_weights())
-    boxes, scores, classes, valid_len = (
-        self.model(self.sample_image, training=False))
+    boxes, scores, classes, valid_len = self.inference()
     length = valid_len[0]
     image = inference.visualize_image(
         self.sample_image[0],
         boxes[0].numpy()[:length],
         classes[0].numpy().astype(np.int)[:length],
         scores[0].numpy()[:length],
-        min_score_thresh=self.model.config.nms_configs['score_thresh'],
-        max_boxes_to_draw=self.model.config.nms_configs['max_output_size'])
+        min_score_thresh=self.min_score_thresh,
+        max_boxes_to_draw=self.max_boxes_to_draw)
 
     with self.file_writer.as_default():
       tf.summary.image('Test image', tf.expand_dims(image, axis=0), step=epoch)
@@ -238,8 +246,11 @@ def get_callbacks(params, profile=False):
       params['model_dir'], verbose=1, save_weights_only=True)
   early_stopping = tf.keras.callbacks.EarlyStopping(
       monitor='val_loss', min_delta=0, patience=10, verbose=1)
-  return [tb_callback, ckpt_callback, early_stopping]
-
+  callbacks = [tb_callback, ckpt_callback, early_stopping]
+  if params.get('sample_image', None):
+    callbacks.append(DisplayCallback(params.get('sample_image', None),
+                                     os.path.join(params['model_dir'], 'train')))
+  return callbacks
 
 class FocalLoss(tf.keras.losses.Loss):
   """Compute the focal loss between `logits` and the golden `target` values.
@@ -354,12 +365,11 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
 
   see https://www.tensorflow.org/guide/keras/customizing_what_happens_in_fit
   """
-
-  def _freeze_vars(self, pattern):
-    if pattern:
+  def _freeze_vars(self):
+    if self.config.var_freeze_expr:
       return [
           v for v in self.trainable_variables
-          if not re.match(self.pattern, v.name)
+          if not re.match(self.config.var_freeze_expr, v.name)
       ]
     return self.trainable_variables
 
@@ -505,7 +515,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       else:
         scaled_loss = total_loss
     loss_vals['loss'] = total_loss
-    trainable_vars = self._freeze_vars(self.config.var_freeze_expr)
+    trainable_vars = self._freeze_vars()
     scaled_gradients = tape.gradient(scaled_loss, trainable_vars)
     if isinstance(self.optimizer,
                   tf.keras.mixed_precision.experimental.LossScaleOptimizer):
@@ -551,4 +561,5 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       seg_loss = seg_loss_layer(seg_outputs, labels['image_masks'])
       total_loss += seg_loss
       loss_vals['seg_loss'] = seg_loss
+    loss_vals['loss'] = total_loss
     return loss_vals

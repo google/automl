@@ -27,7 +27,7 @@ from absl import logging
 import numpy as np
 import six
 from six.moves import xrange
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 
 import utils
 
@@ -70,7 +70,7 @@ def conv_kernel_initializer(shape, dtype=None, partition_info=None):
   del partition_info
   kernel_height, kernel_width, _, out_filters = shape
   fan_out = int(kernel_height * kernel_width * out_filters)
-  return tf.random_normal(
+  return tf.random.normal(
       shape, mean=0.0, stddev=np.sqrt(2.0 / fan_out), dtype=dtype)
 
 
@@ -92,7 +92,7 @@ def dense_kernel_initializer(shape, dtype=None, partition_info=None):
   """
   del partition_info
   init_range = 1.0 / np.sqrt(shape[1])
-  return tf.random_uniform(shape, -init_range, init_range, dtype=dtype)
+  return tf.random.uniform(shape, -init_range, init_range, dtype=dtype)
 
 
 def superpixel_kernel_initializer(shape, dtype='float32', partition_info=None):
