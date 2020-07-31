@@ -57,7 +57,7 @@ def main(_):
 
   augmentations = [] 
   if FLAGS.enable_tta:
-    for size_offset in (-128, 0, 128):
+    for size_offset in (0, 128, 256):
       for flip in (False, True):
         augmentations.append((height + size_offset, width + size_offset, flip))
   else:
