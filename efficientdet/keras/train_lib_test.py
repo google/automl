@@ -29,9 +29,11 @@ class TrainLibTest(tf.test.TestCase):
     config.batch_size = 1
     config.num_examples_per_epoch = 1
     config.model_dir = tempfile.mkdtemp()
-    config.steps_per_epoch = 1
-    sample_image = tf.ones([416, 416, 3])
-    display_callback = train_lib.DisplayCallback(sample_image)
+    fake_image = tf.ones([512, 512, 3], dtype=tf.uint8)
+    fake_jpeg = tf.image.encode_jpeg(fake_image)
+    sample_image = 'ram://fake_image.jpg'
+    tf.io.write_file(sample_image, fake_jpeg)
+    display_callback = train_lib.DisplayCallback(sample_image, config.model_dir)
     model = train_lib.EfficientDetNetTrain(config=config)
     model.build((1, 512, 512, 3))
     display_callback.set_model(model)

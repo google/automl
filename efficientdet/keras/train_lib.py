@@ -246,9 +246,11 @@ def get_callbacks(params, profile=False):
       params['model_dir'], verbose=1, save_weights_only=True)
   early_stopping = tf.keras.callbacks.EarlyStopping(
       monitor='val_loss', min_delta=0, patience=10, verbose=1)
-  display_callback = DisplayCallback('./testdata/img1.jpg', os.path.join(params['model_dir'], 'train'))
-  return [tb_callback, ckpt_callback, early_stopping, display_callback]
-
+  callbacks = [tb_callback, ckpt_callback, early_stopping]
+  if params.get('sample_image', None):
+    callbacks.append(DisplayCallback(params.get('sample_image', None),
+                                     os.path.join(params['model_dir'], 'train')))
+  return callbacks
 
 class FocalLoss(tf.keras.losses.Loss):
   """Compute the focal loss between `logits` and the golden `target` values.
@@ -363,9 +365,17 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
 
   see https://www.tensorflow.org/guide/keras/customizing_what_happens_in_fit
   """
+  def __init__(self, pattern=None, *args, **kwargs):
+    """Freeze variables according to pattern.
 
-  def _freeze_vars(self, pattern):
-    if pattern:
+    Args:
+      pattern: a reg experession such as ".*(efficientnet|fpn_cells).*".
+    """
+    super().__init__(*args, **kwargs)
+    self.pattern = pattern
+
+  def _freeze_vars(self):
+    if self.pattern:
       return [
           v for v in self.trainable_variables
           if not re.match(self.pattern, v.name)

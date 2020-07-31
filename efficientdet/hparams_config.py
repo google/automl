@@ -181,6 +181,7 @@ def default_detection_configs():
   h.use_augmix = False
   # mixture_width, mixture_depth, alpha
   h.augmix_params = (3, -1, 1)
+  h.sample_image = None
 
   # dataset specific parameters
   # TODO(tanmingxing): update this to be 91 for COCO, and 21 for pascal.
