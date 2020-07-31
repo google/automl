@@ -365,20 +365,11 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
 
   see https://www.tensorflow.org/guide/keras/customizing_what_happens_in_fit
   """
-  def __init__(self, pattern=None, *args, **kwargs):
-    """Freeze variables according to pattern.
-
-    Args:
-      pattern: a reg experession such as ".*(efficientnet|fpn_cells).*".
-    """
-    super().__init__(*args, **kwargs)
-    self.pattern = pattern
-
   def _freeze_vars(self):
-    if self.pattern:
+    if self.config.var_freeze_expr:
       return [
           v for v in self.trainable_variables
-          if not re.match(self.pattern, v.name)
+          if not re.match(self.config.var_freeze_expr, v.name)
       ]
     return self.trainable_variables
 
