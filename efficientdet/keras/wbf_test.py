@@ -120,9 +120,17 @@ class WbfTest(tf.test.TestCase):
     d1 = tf.constant([1, 1, 1, 2, 2, 0.3, 1], dtype=tf.float32)
     d2 = tf.constant([1, 3, 3, 4, 4, 0.7, 1], dtype=tf.float32)
 
-    averaged = wbf.average_detections((d1, d2))
+    averaged_single_model = wbf.average_detections((d1, d2), 1)
 
-    self.assertAllClose(averaged, [1, 2.4, 2.4, 3.4, 3.4, 0.5, 1])
+    self.assertAllClose(averaged_single_model, [1, 2.4, 2.4, 3.4, 3.4, 0.5, 1])
+
+    averaged_multi_model = wbf.average_detections((d1, d2), 3)
+
+    self.assertAllClose(averaged_multi_model, [1, 2.4, 2.4, 3.4, 3.4, 0.333333, 1])
+
+    averaged_single_detection = wbf.average_detections((d2,), 2)
+
+    self.assertAllClose(averaged_single_detection, [1, 3, 3, 4, 4, 0.35, 1])
 
   def test_ensemble_boxes(self):
     d1 = tf.constant([1, 2, 1, 10, 1, 0.75, 1], dtype=tf.float32)
@@ -130,10 +138,10 @@ class WbfTest(tf.test.TestCase):
     d3 = tf.constant([1, 3, 1, 10, 1, 1, 2], dtype=tf.float32)
 
     ensembled = wbf.ensemble_detections({'num_classes': 3},
-                                        tf.stack([d1, d2, d3]))
+                                        tf.stack([d1, d2, d3]), 2)
 
     self.assertAllClose(ensembled,
-                        [[1, 3, 1, 10, 1, 1, 2], [1, 2.5, 1, 10, 1, 0.75, 1]])
+                        [[1, 2.5, 1, 10, 1, 0.75, 1], [1, 3, 1, 10, 1, 0.5, 2]])
 
 
 if __name__ == '__main__':

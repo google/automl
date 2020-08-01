@@ -38,6 +38,8 @@ def vectorized_iou(clusters, detection):
 
 def find_matching_cluster(clusters, detection):
   """Returns the index of the highest iou matching cluster for detection."""
+  if len(clusters) == 0:
+    return -1
   ious = vectorized_iou(tf.stack(clusters), detection)
   ious = tf.reshape(ious, [len(clusters)])
   if tf.math.reduce_max(ious) < 0.55:
@@ -50,8 +52,9 @@ def weighted_average(samples, weights):
   return tf.math.reduce_sum(samples * weights) / tf.math.reduce_sum(weights)
 
 
-def average_detections(detections):
+def average_detections(detections, num_models):
   """Takes a list of detections and returns the average, both in box co-ordinates and confidence."""
+  num_detections = len(detections)
   detections = tf.stack(detections)
   return [
       detections[0][0],
@@ -59,12 +62,12 @@ def average_detections(detections):
       weighted_average(detections[:, 2], detections[:, 5]),
       weighted_average(detections[:, 3], detections[:, 5]),
       weighted_average(detections[:, 4], detections[:, 5]),
-      tf.math.reduce_mean(detections[:, 5]),
+      tf.math.reduce_mean(detections[:, 5]) * min(1, num_detections/num_models),
       detections[0][6],
   ]
 
 
-def ensemble_detections(params, detections):
+def ensemble_detections(params, detections, num_models):
   """Ensembles a group of detections by clustering the detections and returning the average of the clusters."""
   all_clusters = []
 
@@ -74,17 +77,17 @@ def ensemble_detections(params, detections):
       continue
     class_detections = tf.gather_nd(detections, indices)
 
-    clusters = [[class_detections[0]]]
-    cluster_averages = [class_detections[0]]
-    for d in class_detections[1:]:
+    clusters = []
+    cluster_averages = []
+    for d in class_detections:
       cluster_index = find_matching_cluster(cluster_averages, d)
       if cluster_index == -1:
         clusters.append([d])
-        cluster_averages.append(d)
+        cluster_averages.append(average_detections([d], num_models))
       else:
         clusters[cluster_index].append(d)
         cluster_averages[cluster_index] = average_detections(
-            clusters[cluster_index])
+            clusters[cluster_index], num_models)
 
     all_clusters.extend(cluster_averages)
 

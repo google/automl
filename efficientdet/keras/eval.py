@@ -48,20 +48,20 @@ def main(_):
   config.batch_size = FLAGS.batch_size
   config.val_json_file = FLAGS.val_json_file
   config.nms_configs.max_nms_inputs = anchors.MAX_DETECTION_POINTS
-  height, width = utils.parse_image_size(config['image_size'])
+  base_height, base_width = utils.parse_image_size(config['image_size'])
 
   # Network
   model = efficientdet_keras.EfficientDetNet(config=config)
-  model.build((config.batch_size, None, None, 3))
+  model.build((config.batch_size, base_height, base_width, 3))
   model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
 
   augmentations = [] 
   if FLAGS.enable_tta:
     for size_offset in (0, 128, 256):
       for flip in (False, True):
-        augmentations.append((height + size_offset, width + size_offset, flip))
+        augmentations.append((base_height + size_offset, base_width + size_offset, flip))
   else:
-    augmentations.append((height, width, False))
+    augmentations.append((base_height, base_width, False))
 
   detections_per_source = dict()
   for height, width, flip in augmentations:
@@ -94,7 +94,7 @@ def main(_):
   evaluator = coco_metric.EvaluationMetric(filename=config.val_json_file)
   for d in detections_per_source.values():
     if FLAGS.enable_tta:
-      d = wbf.ensemble_detections(config, d)
+      d = wbf.ensemble_detections(config, d, len(augmentations))
     evaluator.update_state(
         labels['groundtruth_data'].numpy(),
         postprocess.transform_detections(tf.stack([d])).numpy())
