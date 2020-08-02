@@ -851,19 +851,17 @@ class EfficientDetModel(EfficientDetNet):
       # We only support inference for now.
       raise ValueError('preprocessing must be infer or empty')
 
-    scales, images = [], []
-    if isinstance(raw_images, tf.Tensor):
-      batch_size = raw_images.shape[0]
-    else:
-      batch_size = len(raw_images)
-    for i in range(batch_size):
+    def map_fn(image):
       input_processor = dataloader.DetectionInputProcessor(
-          raw_images[i], image_size)
+          image, image_size)
       input_processor.normalize_image()
       input_processor.set_scale_factors_to_output_size()
-      images.append(input_processor.resize_and_crop_image())
-      scales.append(input_processor.image_scale_to_original)
-    return tf.stack(images), tf.stack(scales)
+      image = input_processor.resize_and_crop_image()
+      image_scale = input_processor.image_scale_to_original
+      return image, image_scale
+
+    return tf.map_fn(
+        map_fn, raw_images, dtype=(tf.float32, tf.float32), back_prop=False)
 
   def _postprocess(self, cls_outputs, box_outputs, scales, mode='global'):
     if not mode:
