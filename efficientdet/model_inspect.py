@@ -314,12 +314,34 @@ class ModelInspector(object):
         saver = tf.train.Saver()
         saver.restore(sess, checkpoint)
 
+      # export frozen graph.
       output_node_names = [node.op.name for node in outputs]
       graphdef = tf.graph_util.convert_variables_to_constants(
           sess, sess.graph_def, output_node_names)
 
       tf_graph = os.path.join(self.logdir, self.model_name + '_frozen.pb')
       tf.io.gfile.GFile(tf_graph, 'wb').write(graphdef.SerializeToString())
+
+      # export savaed model.
+      output_dict = {'class_predict_%d' % i: outputs[i] for i in range(5)}
+      output_dict.update({'box_predict_%d' % i: outputs[5+i] for i in range(5)})
+      signature_def_map = {
+          'serving_default':
+              tf.saved_model.predict_signature_def(
+                  {'input': inputs},
+                  output_dict,
+              )
+      }
+      output_dir = os.path.join(self.logdir, 'savedmodel')
+      b = tf.saved_model.Builder(output_dir)
+      b.add_meta_graph_and_variables(
+          sess,
+          tags=['serve'],
+          signature_def_map=signature_def_map,
+          assets_collection=tf.get_collection(tf.GraphKeys.ASSET_FILEPATHS),
+          clear_devices=True)
+      b.save()
+      logging.info('Model saved at %s', output_dir)
 
     return graphdef
 
