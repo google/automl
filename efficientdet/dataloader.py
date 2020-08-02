@@ -314,7 +314,7 @@ class InputReader(object):
         input_processor.random_horizontal_flip()
       if self._is_training:
         input_processor.set_training_random_scale_factors(
-            params['train_scale_min'], params['train_scale_max'],
+            params['jitter_min'], params['jitter_max'],
             params.get('target_size', None))
       else:
         input_processor.set_scale_factors_to_output_size()

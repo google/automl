@@ -175,12 +175,11 @@ def build_model(model_name: Text, inputs: tf.Tensor, **kwargs):
         box_outputs[i] = box_out_list[i - config.min_level]
       return cls_outputs, box_outputs
 
-    cls_outputs, box_outputs = utils.build_model_with_precision(
-        precision, model_arch, inputs, False, model_name, **kwargs)
   else:
     model_arch = det_model_fn.get_model_arch(model_name)
-    cls_outputs, box_outputs = utils.build_model_with_precision(
-        precision, model_arch, inputs, False, model_name, **kwargs)
+
+  cls_outputs, box_outputs = utils.build_model_with_precision(
+      precision, model_arch, inputs, False, model_name, **kwargs)
 
   if mixed_precision:
     # Post-processing has multiple places with hard-coded float32.

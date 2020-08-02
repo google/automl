@@ -26,6 +26,7 @@ import iou_utils
 import nms_np
 import utils
 from keras import anchors
+from keras import efficientdet_keras
 from keras import postprocess
 
 _DEFAULT_BATCH_SIZE = 64
@@ -327,13 +328,21 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   utils.image('input_image', features)
   training_hooks = []
 
-  def _model_outputs(inputs):
-    # Convert params (dict) to Config for easier access.
-    return model(inputs, config=hparams_config.Config(params))
+  if params['use_keras_model']:
+    def model_fn(inputs):
+      model = efficientdet_keras.EfficientDetNet(
+          config=hparams_config.Config(params))
+      cls_out_list, box_out_list = model(inputs, params['is_training_bn'])
+      for i in range(params['min_level'], params['max_level'] + 1):
+        cls_outputs[i] = cls_out_list[i - params['min_level']]
+        box_outputs[i] = box_out_list[i - params['min_level']]
+      return cls_outputs, box_outputs
+  else:
+    model_fn = functools.partial(model, config=hparams_config.Config(params))
 
   precision = utils.get_precision(params['strategy'], params['mixed_precision'])
   cls_outputs, box_outputs = utils.build_model_with_precision(
-      precision, _model_outputs, features, params['is_training_bn'])
+      precision, model_fn, features, params['is_training_bn'])
 
   levels = cls_outputs.keys()
   for level in levels:

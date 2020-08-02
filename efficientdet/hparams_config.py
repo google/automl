@@ -175,8 +175,8 @@ def default_detection_configs():
   h.image_size = 640  # An integer or a string WxH such as 640x320.
   h.target_size = None
   h.input_rand_hflip = True
-  h.train_scale_min = 0.1
-  h.train_scale_max = 2.0
+  h.jitter_min = 0.1
+  h.jitter_max = 2.0
   h.autoaugment_policy = None
   h.use_augmix = False
   # mixture_width, mixture_depth, alpha

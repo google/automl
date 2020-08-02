@@ -25,7 +25,7 @@ If you see NaN, you can check the followings:
 
   - Is my batch size too small? It usually needs to be >=8.
   - Should I clip my gradient? How about h.clip_gradients_norm=5.0?
-  - Should I use smaller jitter? How about train_scale_min=0.8 and train_scale_max=1.2?
+  - Should I use smaller jitter? How about jitter_min=0.8 and jitter_max=1.2?
 
 If you want to debug it, you can use these tools:
 
