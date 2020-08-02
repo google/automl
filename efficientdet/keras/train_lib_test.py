@@ -150,6 +150,7 @@ class TrainLibTest(tf.test.TestCase):
     self.assertAllClose(outputs, expect_results, rtol=.1, atol=100.)
     outputs = model.test_on_batch(x, labels, return_dict=True)
     expect_results = {
+        'loss': [26278.3, 5061.9, 425.5, 1.217],
         'det_loss': 26078.49609375,
         'cls_loss': 5063.3759765625,
         'box_loss': 420.30242919921875

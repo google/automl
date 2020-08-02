@@ -15,8 +15,8 @@
 """Training related libraries."""
 from concurrent import futures
 import math
-import re
 import os
+import re
 from absl import logging
 import numpy as np
 import tensorflow as tf
@@ -200,7 +200,7 @@ class DisplayCallback(tf.keras.callbacks.Callback):
     super().__init__()
     image_file = tf.io.read_file(sample_image)
     self.sample_image = tf.expand_dims(
-      tf.image.decode_jpeg(image_file, channels=3), axis=0)
+        tf.image.decode_jpeg(image_file, channels=3), axis=0)
     self.executor = futures.ThreadPoolExecutor(max_workers=1)
     self.update_freq = update_freq
     self.output_dir = output_dir
@@ -213,7 +213,8 @@ class DisplayCallback(tf.keras.callbacks.Callback):
     self.model.build((1, height, width, 3))
     self.file_writer = tf.summary.create_file_writer(self.output_dir)
     self.min_score_thresh = self.model.config.nms_configs['score_thresh'] or 0.4
-    self.max_boxes_to_draw = self.model.config.nms_configs['max_output_size'] or 100
+    self.max_boxes_to_draw = (
+        self.model.config.nms_configs['max_output_size'] or 100)
 
   def on_epoch_end(self, epoch, logs=None):
     if epoch % self.update_freq == 0:
@@ -240,6 +241,7 @@ class DisplayCallback(tf.keras.callbacks.Callback):
 
 
 def get_callbacks(params, profile=False):
+  """Get callbacks for given params."""
   tb_callback = tf.keras.callbacks.TensorBoard(
       log_dir=params['model_dir'], profile_batch=2 if profile else 0)
   ckpt_callback = tf.keras.callbacks.ModelCheckpoint(
@@ -248,9 +250,12 @@ def get_callbacks(params, profile=False):
       monitor='val_loss', min_delta=0, patience=10, verbose=1)
   callbacks = [tb_callback, ckpt_callback, early_stopping]
   if params.get('sample_image', None):
-    callbacks.append(DisplayCallback(params.get('sample_image', None),
-                                     os.path.join(params['model_dir'], 'train')))
+    display_callback = DisplayCallback(
+        params.get('sample_image', None),
+        os.path.join(params['model_dir'], 'train'))
+    callbacks.append(display_callback)
   return callbacks
+
 
 class FocalLoss(tf.keras.losses.Loss):
   """Compute the focal loss between `logits` and the golden `target` values.
@@ -365,6 +370,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
 
   see https://www.tensorflow.org/guide/keras/customizing_what_happens_in_fit
   """
+
   def _freeze_vars(self):
     if self.config.var_freeze_expr:
       return [
