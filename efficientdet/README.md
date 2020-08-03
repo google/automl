@@ -88,7 +88,8 @@ Run the following command line to export models:
     !rm  -rf savedmodeldir
     !python model_inspect.py --runmode=saved_model --model_name=efficientdet-d0 \
       --ckpt_path=efficientdet-d0 --saved_model_dir=savedmodeldir \
-      --tensorrt=FP32  --tflite_path=efficientdet-d0.tflite
+      --tensorrt=FP32  --tflite_path=efficientdet-d0.tflite \ 
+      --hparams=voc_config.yaml
 
 Then you will get:
 
@@ -122,6 +123,7 @@ use the following command:
     !rm  -rf /tmp/benchmark/
     !python model_inspect.py --runmode=saved_model --model_name=efficientdet-d0 \
       --ckpt_path=efficientdet-d0 --saved_model_dir=/tmp/benchmark/ \
+      --hparams=voc_config.yaml
 
     !python model_inspect.py --runmode=saved_model_benchmark \
       --saved_model_dir=/tmp/benchmark/efficientdet-d0_frozen.pb \
@@ -202,7 +204,7 @@ You can run inference for a video and show the results online:
     # step 1: export saved model.
     !python model_inspect.py --runmode=saved_model \
       --model_name=efficientdet-d0 --ckpt_path=efficientdet-d0 \
-      --saved_model_dir=/tmp/savedmodel
+      --saved_model_dir=/tmp/savedmodel --hparams=voc_config.yaml
 
     # step 2: inference video using saved_model_video.
     !python model_inspect.py --runmode=saved_model_video \
