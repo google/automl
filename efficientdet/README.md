@@ -128,7 +128,7 @@ use the following command:
     !python model_inspect.py --runmode=saved_model_benchmark \
       --saved_model_dir=/tmp/benchmark/efficientdet-d0_frozen.pb \
       --model_name=efficientdet-d0  --input_image=testdata/img1.jpg  \
-      --output_image_dir=/tmp/  \ 
+      --output_image_dir=/tmp/  \
 
 On single Tesla V100 without using TensorRT, our end-to-end
 latency and throughput are:
@@ -204,7 +204,7 @@ You can run inference for a video and show the results online:
     # step 1: export saved model.
     !python model_inspect.py --runmode=saved_model \
       --model_name=efficientdet-d0 --ckpt_path=efficientdet-d0 \
-      --saved_model_dir=/tmp/savedmodel \ --hparams=voc_config.yaml
+      --saved_model_dir=/tmp/savedmodel --hparams=voc_config.yaml
 
     # step 2: inference video using saved_model_video.
     !python model_inspect.py --runmode=saved_model_video \
