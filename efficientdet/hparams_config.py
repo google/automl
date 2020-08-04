@@ -18,7 +18,7 @@ import collections
 import copy
 from typing import Any, Dict, Text
 import six
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 import yaml
 
 
@@ -113,7 +113,7 @@ class Config(object):
 
   def save_to_yaml(self, yaml_file_path):
     """Write a dictionary into a yaml file."""
-    with tf.gfile.Open(yaml_file_path, 'w') as f:
+    with tf.io.gfile.GFile(yaml_file_path, 'w') as f:
       yaml.dump(self.as_dict(), f, default_flow_style=False)
 
   def parse_from_str(self, config_str: Text) -> Dict[Any, Any]:
