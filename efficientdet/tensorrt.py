@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Simple tools for TensorRT.
+r"""Simple tools for TensorRT.
 
 Example usage:
 
@@ -27,11 +27,12 @@ from absl import app
 from absl import flags
 import numpy as np
 import tensorflow.compat.v1 as tf
+# pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.compiler.tensorrt import trt_convert as trt
 
 flags.DEFINE_string('tf_savedmodel_dir', None, 'TensorFlow saved model dir.')
 flags.DEFINE_string('trt_savedmodel_dir', None, 'TensorRT saved model dir.')
-FLAGS = flags.FLAG
+FLAGS = flags.FLAGS
 
 
 def convert2trt(tf_savedmodel_dir: str, trt_savedmodel_dir: str):
