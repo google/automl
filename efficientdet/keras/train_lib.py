@@ -502,7 +502,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       elif 'object_detection' in self.config.heads:
         cls_outputs, box_outputs = self(images, training=True)
       elif 'segmentation' in self.config.heads:
-        seg_outputs = self(images, training=True)
+        seg_outputs, = self(images, training=True)
       reg_l2loss = self._reg_l2_loss(self.config.weight_decay)
       total_loss = reg_l2loss
       loss_vals = {}
