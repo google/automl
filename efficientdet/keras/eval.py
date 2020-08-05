@@ -55,6 +55,7 @@ def main(_):
   model.build((config.batch_size, base_height, base_width, 3))
   model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
 
+  # in format (height, width, flip)
   augmentations = [] 
   if FLAGS.enable_tta:
     for size_offset in (0, 128, 256):
