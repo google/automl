@@ -178,7 +178,7 @@ class TrainLibTest(tf.test.TestCase):
     self.assertAllClose(hist.history['det_loss'], [26061.], rtol=.1, atol=10.)
     self.assertAllClose(hist.history['cls_loss'], [5058.], rtol=.1, atol=10.)
     self.assertAllClose(hist.history['box_loss'], [420.], rtol=.1, atol=100.)
-    self.assertAllClose(hist.history['seg_loss'], [1.2299377918243408], rtol=.1, atol=100.)
+    self.assertAllClose(hist.history['seg_loss'], [1.2299], rtol=.1, atol=100.)
     # skip gnorm test because it is flaky.
 
 
