@@ -17,7 +17,7 @@ from absl.testing import parameterized
 import tensorflow as tf
 
 import utils
-from keras import utils_keras
+from keras import util_keras
 
 
 class KerasUtilTest(tf.test.TestCase, parameterized.TestCase):
@@ -31,7 +31,7 @@ class KerasUtilTest(tf.test.TestCase, parameterized.TestCase):
         inputs, is_training, None, strategy=strategy)
 
     # Call batch norm layer with is_training parameter.
-    bn_layer = utils_keras.build_batch_norm(is_training, strategy=strategy)
+    bn_layer = util_keras.build_batch_norm(is_training, strategy=strategy)
     self.assertAllClose(expect_results, bn_layer(inputs, is_training))
 
 

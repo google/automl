@@ -372,7 +372,7 @@ def drop_connect(inputs, is_training, survival_prob):
   # Unlike conventional way that multiply survival_prob at test time, here we
   # divide survival_prob at training time, such that no addition compute is
   # needed at test time.
-  output = tf.div(inputs, survival_prob) * binary_tensor
+  output = inputs / survival_prob * binary_tensor
   return output
 
 

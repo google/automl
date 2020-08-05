@@ -25,7 +25,7 @@ from backbone import backbone_factory
 from backbone import efficientnet_builder
 from keras import fpn_configs
 from keras import postprocess
-from keras import utils_keras
+from keras import util_keras
 # pylint: disable=arguments-differ  # fo keras layers.
 
 
@@ -209,7 +209,7 @@ class OpAfterCombine(tf.keras.layers.Layer):
         use_bias=not self.conv_bn_act_pattern,
         data_format=self.data_format,
         name='conv')
-    self.bn = utils_keras.build_batch_norm(
+    self.bn = util_keras.build_batch_norm(
         is_training_bn=self.is_training_bn,
         data_format=self.data_format,
         strategy=self.strategy,
@@ -252,7 +252,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
         padding='same',
         data_format=self.data_format,
         name='conv2d')
-    self.bn = utils_keras.build_batch_norm(
+    self.bn = util_keras.build_batch_norm(
         is_training_bn=self.is_training_bn,
         data_format=self.data_format,
         strategy=self.strategy,
@@ -397,7 +397,7 @@ class ClassNet(tf.keras.layers.Layer):
       bn_per_level = []
       for level in range(self.min_level, self.max_level + 1):
         bn_per_level.append(
-            utils_keras.build_batch_norm(
+            util_keras.build_batch_norm(
                 is_training_bn=self.is_training_bn,
                 strategy=self.strategy,
                 data_format=self.data_format,
@@ -516,7 +516,7 @@ class BoxNet(tf.keras.layers.Layer):
       bn_per_level = []
       for level in range(self.min_level, self.max_level + 1):
         bn_per_level.append(
-            utils_keras.build_batch_norm(
+            util_keras.build_batch_norm(
                 is_training_bn=self.is_training_bn,
                 strategy=self.strategy,
                 data_format=self.data_format,
@@ -606,7 +606,7 @@ class SegmentationHead(tf.keras.layers.Layer):
               data_format=data_format,
               use_bias=False))
       self.con2d_t_bns.append(
-          utils_keras.build_batch_norm(
+          util_keras.build_batch_norm(
               is_training_bn=is_training_bn,
               data_format=data_format,
               strategy=strategy,

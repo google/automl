@@ -417,9 +417,16 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
       with tf.name_scope('clip'):
         grads = [gv[0] for gv in grads_and_vars]
         tvars = [gv[1] for gv in grads_and_vars]
-        clipped_grads, gnorm = tf.clip_by_global_norm(
-            grads, params['clip_gradients_norm'])
-        utils.scalar('gnorm', gnorm)
+        if params['clip_gradients_norm'] > 0:
+          clipped_grads, _ = tf.clip_by_global_norm(
+              grads, params['clip_gradients_norm'])
+        elif params['clip_gradients_norm'] < 0:
+          # An experimental hack for local clip_by_norm.
+          clip_norm = -params['clip_gradients_norm']
+          clipped_grads = [tf.clip_by_norm(g, clip_norm) for g in grads]
+        else:
+          clipped_grads = grads
+        utils.scalar('gradient_norm', tf.linalg.global_norm(clipped_grads))
         grads_and_vars = list(zip(clipped_grads, tvars))
 
       with tf.control_dependencies(update_ops):
