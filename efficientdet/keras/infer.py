@@ -65,7 +65,7 @@ def main(_):
   def f(imgs):
     return model(imgs, training=False, post_mode='global')
 
-  boxes, scores, classes, valid_len = f(imgs)
+  boxes, scores, classes, valid_len = f(tf.convert_to_tensor(imgs, dtype=tf.uint8))
 
   # Visualize results.
   for i, img in enumerate(imgs):
