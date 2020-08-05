@@ -502,7 +502,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       elif 'object_detection' in self.config.heads:
         cls_outputs, box_outputs = self(images, training=True)
       elif 'segmentation' in self.config.heads:
-        seg_outputs = self(images, training=True)
+        seg_outputs, = self(images, training=True)
       reg_l2loss = self._reg_l2_loss(self.config.weight_decay)
       total_loss = reg_l2loss
       loss_vals = {}
@@ -512,7 +512,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
         total_loss += det_loss
       if 'segmentation' in self.config.heads:
         seg_loss_layer = self.loss['seg_loss']
-        seg_loss = seg_loss_layer(seg_outputs, labels['image_masks'])
+        seg_loss = seg_loss_layer(labels['image_masks'], seg_outputs)
         total_loss += seg_loss
         loss_vals['seg_loss'] = seg_loss
       if isinstance(self.optimizer,
@@ -554,7 +554,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     elif 'object_detection' in self.config.heads:
       cls_outputs, box_outputs = self(images, training=True)
     elif 'segmentation' in self.config.heads:
-      seg_outputs = self(images, training=True)
+      seg_outputs, = self(images, training=True)
     reg_l2loss = self._reg_l2_loss(self.config.weight_decay)
     total_loss = reg_l2loss
     loss_vals = {}
@@ -564,7 +564,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       total_loss += det_loss
     if 'segmentation' in self.config.heads:
       seg_loss_layer = self.loss['seg_loss']
-      seg_loss = seg_loss_layer(seg_outputs, labels['image_masks'])
+      seg_loss = seg_loss_layer(labels['image_masks'], seg_outputs)
       total_loss += seg_loss
       loss_vals['seg_loss'] = seg_loss
     loss_vals['loss'] = total_loss
