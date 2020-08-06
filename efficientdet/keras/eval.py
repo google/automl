@@ -21,6 +21,7 @@ import tensorflow as tf
 import coco_metric
 import dataloader
 import hparams_config
+import utils
 
 from keras import anchors
 from keras import efficientdet_keras
@@ -46,51 +47,58 @@ def main(_):
   config.override(FLAGS.hparams)
   config.batch_size = FLAGS.batch_size
   config.val_json_file = FLAGS.val_json_file
-
-  # dataset
-  ds = dataloader.InputReader(
-      FLAGS.val_file_pattern,
-      is_training=False,
-      use_fake_data=False,
-      max_instances_per_image=config.max_instances_per_image)(
-          config)
+  config.nms_configs.max_nms_inputs = anchors.MAX_DETECTION_POINTS
+  base_height, base_width = utils.parse_image_size(config['image_size'])
 
   # Network
   model = efficientdet_keras.EfficientDetNet(config=config)
-  model.build((config.batch_size, None, None, 3))
+  model.build((config.batch_size, base_height, base_width, 3))
   model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
 
+  # in format (height, width, flip)
+  augmentations = [] 
+  if FLAGS.enable_tta:
+    for size_offset in (0, 128, 256):
+      for flip in (False, True):
+        augmentations.append((base_height + size_offset, base_width + size_offset, flip))
+  else:
+    augmentations.append((base_height, base_width, False))
+
+  detections_per_source = dict()
+  for height, width, flip in augmentations:
+    config.image_size = (height, width)
+    # dataset
+    ds = dataloader.InputReader(
+        FLAGS.val_file_pattern,
+        is_training=False,
+        use_fake_data=False,
+        max_instances_per_image=config.max_instances_per_image)(
+            config)
+
+    # compute stats for all batches.
+    for images, labels in ds:
+      if flip:
+        images = tf.image.flip_left_right(images)
+      cls_outputs, box_outputs = model(images, training=False)
+      detections = postprocess.generate_detections(config, cls_outputs,
+                                                  box_outputs,
+                                                  labels['image_scales'],
+                                                  labels['source_ids'], flip)
+
+      for id, d in zip(labels['source_ids'], detections):
+        if id.numpy() in detections_per_source:
+          detections_per_source[id.numpy()] = tf.concat([d, detections_per_source[id.numpy()]], 0)
+        else:
+          detections_per_source[id.numpy()] = d
+
+
   evaluator = coco_metric.EvaluationMetric(filename=config.val_json_file)
-
-  # compute stats for all batches.
-  for images, labels in ds:
-    config.nms_configs.max_nms_inputs = anchors.MAX_DETECTION_POINTS
-
-    cls_outputs, box_outputs = model(images, training=False)
-    detections = postprocess.generate_detections(config, cls_outputs,
-                                                 box_outputs,
-                                                 labels['image_scales'],
-                                                 labels['source_ids'], False)
-
+  for d in detections_per_source.values():
     if FLAGS.enable_tta:
-      images_flipped = tf.image.flip_left_right(images)
-      cls_outputs_flipped, box_outputs_flipped = model(
-          images_flipped, training=False)
-      detections_flipped = postprocess.generate_detections(
-          config, cls_outputs_flipped, box_outputs_flipped,
-          labels['image_scales'], labels['source_ids'], True)
-
-      for d, df in zip(detections, detections_flipped):
-        combined_detections = wbf.ensemble_detections(config,
-                                                      tf.concat([d, df], 0))
-        combined_detections = tf.stack([combined_detections])
-        evaluator.update_state(
-            labels['groundtruth_data'].numpy(),
-            postprocess.transform_detections(combined_detections).numpy())
-    else:
-      evaluator.update_state(
-          labels['groundtruth_data'].numpy(),
-          postprocess.transform_detections(detections).numpy())
+      d = wbf.ensemble_detections(config, d, len(augmentations))
+    evaluator.update_state(
+        labels['groundtruth_data'].numpy(),
+        postprocess.transform_detections(tf.stack([d])).numpy())
 
   # compute the final eval results.
   metric_values = evaluator.result()
