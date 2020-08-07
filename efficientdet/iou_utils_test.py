@@ -35,11 +35,11 @@ class IouUtilsTest(tf.test.TestCase):
 
   def test_ciou(self):
     self.assertAllClose(
-        iou_utils.iou_loss(self.pb, self.tb, 'ciou'), [1.408893, 1.548753])
+        iou_utils.iou_loss(self.pb, self.tb, 'ciou'), [0.99931306, 1.6415315])
 
   def test_diou(self):
     self.assertAllClose(
-        iou_utils.iou_loss(self.pb, self.tb, 'diou'), [1.406532, 1.531532])
+        iou_utils.iou_loss(self.pb, self.tb, 'diou'), [0.9969512, 1.6243094])
 
   def test_giou(self):
     self.assertAllClose(
