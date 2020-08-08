@@ -72,8 +72,8 @@ class IouUtilsTest(tf.test.TestCase):
       tape.watch([pb, tb])
       loss = iou_utils.iou_loss(pb, tb, 'ciou')
     grad = tape.gradient(loss, [tb, pb])
-    self.assertAlmostEqual(tf.reduce_sum(grad[0]).numpy(), 0.16687772)
-    self.assertAlmostEqual(tf.reduce_sum(grad[1]).numpy(), -0.16687769)
+    self.assertAlmostEqual(tf.reduce_sum(grad[0]).numpy(), 0.1476393)
+    self.assertAlmostEqual(tf.reduce_sum(grad[1]).numpy(), -0.14763935)
 
 
 if __name__ == '__main__':

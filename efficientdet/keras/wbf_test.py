@@ -121,15 +121,13 @@ class WbfTest(tf.test.TestCase):
     d2 = tf.constant([1, 3, 3, 4, 4, 0.7, 1], dtype=tf.float32)
 
     averaged_single_model = wbf.average_detections((d1, d2), 1)
-
     self.assertAllClose(averaged_single_model, [1, 2.4, 2.4, 3.4, 3.4, 0.5, 1])
 
     averaged_multi_model = wbf.average_detections((d1, d2), 3)
-
-    self.assertAllClose(averaged_multi_model, [1, 2.4, 2.4, 3.4, 3.4, 0.333333, 1])
+    self.assertAllClose(averaged_multi_model,
+                        [1, 2.4, 2.4, 3.4, 3.4, 0.333333, 1])
 
     averaged_single_detection = wbf.average_detections((d2,), 2)
-
     self.assertAllClose(averaged_single_detection, [1, 3, 3, 4, 4, 0.35, 1])
 
   def test_ensemble_boxes(self):
