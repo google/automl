@@ -68,7 +68,8 @@ def benchmark(trt_savedmodel_dir: str, warmup_runs: int = 5, bm_runs: int = 20):
     for _ in range(bm_runs):
       sess.run(outputs, feed_dict={'input:0': x})
     e = time.perf_counter()
-    print('Benchmark latency=%.4f  FPS=%.2f', (e - s) / 20, 20 / (e - s))
+    print('Benchmark latency=%.4f  FPS=%.2f', (e - s) / bm_runs,
+          bm_runs / (e - s))
 
 
 def main(_):

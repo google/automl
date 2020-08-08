@@ -27,6 +27,13 @@ SEED = 111111
 
 class EfficientDetKerasTest(tf.test.TestCase):
 
+  def test_irregular_shape(self):
+    config = hparams_config.get_efficientdet_config('efficientdet-d0')
+    config.image_size = '896x1600'
+    model = efficientdet_keras.EfficientDetNet(config=config)
+    model(tf.ones([1, 896, 1600, 3]), False)
+    model(tf.ones([1, 499, 333, 3]), False)
+
   def test_model_output(self):
     inputs_shape = [1, 512, 512, 3]
     config = hparams_config.get_efficientdet_config('efficientdet-d0')
@@ -137,13 +144,13 @@ class EfficientDetKerasTest(tf.test.TestCase):
             tf.random.set_random_seed(SEED)
             resample_layer = efficientdet_keras.ResampleFeatureMap(
                 name='resample_p0',
-                target_height=8,
-                target_width=8,
+                feat_level=0,
                 target_num_channels=64,
                 apply_bn=apply_bn,
                 is_training_bn=training,
                 strategy=strategy)
-            actual_result = resample_layer(feat, training)
+            all_feats = [tf.ones([1, 8, 8, 64])]
+            actual_result = resample_layer(feat, training, all_feats)
             self.assertAllCloseAccordingToType(expect_result, actual_result)
 
   def test_resample_var_names(self):
@@ -151,10 +158,10 @@ class EfficientDetKerasTest(tf.test.TestCase):
       feat = tf.random.uniform([1, 16, 16, 320])
       resample_layer = efficientdet_keras.ResampleFeatureMap(
           name='resample_p0',
-          target_height=8,
-          target_width=8,
+          feat_level=0,
           target_num_channels=64)
-      resample_layer(feat, True)
+      all_feats = [tf.ones([1, 8, 8, 64])]
+      resample_layer(feat, True, all_feats)
       vars1 = sorted([var.name for var in tf.trainable_variables()])
 
     with tf.Graph().as_default():

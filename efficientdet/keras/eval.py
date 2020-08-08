@@ -56,11 +56,12 @@ def main(_):
   model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
 
   # in format (height, width, flip)
-  augmentations = [] 
+  augmentations = []
   if FLAGS.enable_tta:
     for size_offset in (0, 128, 256):
       for flip in (False, True):
-        augmentations.append((base_height + size_offset, base_width + size_offset, flip))
+        augmentations.append(
+            (base_height + size_offset, base_width + size_offset, flip))
   else:
     augmentations.append((base_height, base_width, False))
 
@@ -81,24 +82,24 @@ def main(_):
         images = tf.image.flip_left_right(images)
       cls_outputs, box_outputs = model(images, training=False)
       detections = postprocess.generate_detections(config, cls_outputs,
-                                                  box_outputs,
-                                                  labels['image_scales'],
-                                                  labels['source_ids'], flip)
+                                                   box_outputs,
+                                                   labels['image_scales'],
+                                                   labels['source_ids'], flip)
 
-      for id, d in zip(labels['source_ids'], detections):
-        if id.numpy() in detections_per_source:
-          detections_per_source[id.numpy()] = tf.concat([d, detections_per_source[id.numpy()]], 0)
+      for img_id, d in zip(labels['source_ids'], detections):
+        if img_id.numpy() in detections_per_source:
+          detections_per_source[img_id.numpy()] = tf.concat(
+              [d, detections_per_source[img_id.numpy()]], 0)
         else:
-          detections_per_source[id.numpy()] = d
+          detections_per_source[img_id.numpy()] = d
 
-
-  evaluator = coco_metric.EvaluationMetric(filename=config.val_json_file)
-  for d in detections_per_source.values():
-    if FLAGS.enable_tta:
-      d = wbf.ensemble_detections(config, d, len(augmentations))
-    evaluator.update_state(
-        labels['groundtruth_data'].numpy(),
-        postprocess.transform_detections(tf.stack([d])).numpy())
+      evaluator = coco_metric.EvaluationMetric(filename=config.val_json_file)
+      for d in detections_per_source.values():
+        if FLAGS.enable_tta:
+          d = wbf.ensemble_detections(config, d, len(augmentations))
+        evaluator.update_state(
+            labels['groundtruth_data'].numpy(),
+            postprocess.transform_detections(tf.stack([d])).numpy())
 
   # compute the final eval results.
   metric_values = evaluator.result()

@@ -38,7 +38,7 @@ def vectorized_iou(clusters, detection):
 
 def find_matching_cluster(clusters, detection):
   """Returns the index of the highest iou matching cluster for detection."""
-  if len(clusters) == 0:
+  if not clusters:
     return -1
   ious = vectorized_iou(tf.stack(clusters), detection)
   ious = tf.reshape(ious, [len(clusters)])
