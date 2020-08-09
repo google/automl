@@ -299,7 +299,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
       target_height, target_width, _ = [target_feat_shape[i] for i in hwc_idx]
     else:
       # Default to downsampling if all_feats is empty.
-      target_height, target_width = height // 2, width // 2
+      target_height, target_width = (height + 1) // 2, (width + 1) // 2
 
     # If conv_after_downsample is True, when downsampling, apply 1x1 after
     # downsampling for efficiency.
