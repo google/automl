@@ -274,7 +274,7 @@ def default_detection_configs():
   h.var_freeze_expr = None
 
   # A temporary flag to switch between legacy and keras models.
-  h.use_keras_model = None
+  h.use_keras_model = True
 
   # unused.
   h.resnet_depth = 50

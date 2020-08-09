@@ -333,6 +333,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
       model = efficientdet_keras.EfficientDetNet(
           config=hparams_config.Config(params))
       cls_out_list, box_out_list = model(inputs, params['is_training_bn'])
+      cls_outputs, box_outputs = {}, {}
       for i in range(params['min_level'], params['max_level'] + 1):
         cls_outputs[i] = cls_out_list[i - params['min_level']]
         box_outputs[i] = box_out_list[i - params['min_level']]
@@ -411,21 +412,16 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     if variable_filter_fn:
       var_list = variable_filter_fn(var_list)
 
-    if params.get('clip_gradients_norm', 0) > 0:
+    if params.get('clip_gradients_norm', None):
       logging.info('clip gradients norm by %f', params['clip_gradients_norm'])
       grads_and_vars = optimizer.compute_gradients(total_loss, var_list)
       with tf.name_scope('clip'):
         grads = [gv[0] for gv in grads_and_vars]
         tvars = [gv[1] for gv in grads_and_vars]
-        if params['clip_gradients_norm'] > 0:
-          clipped_grads, _ = tf.clip_by_global_norm(
-              grads, params['clip_gradients_norm'])
-        elif params['clip_gradients_norm'] < 0:
-          # An experimental hack for local clip_by_norm.
-          clip_norm = -params['clip_gradients_norm']
-          clipped_grads = [tf.clip_by_norm(g, clip_norm) for g in grads]
-        else:
-          clipped_grads = grads
+        # First clip each variable's norm, then clip global norm.
+        clip_norm = abs(params['clip_gradients_norm'])
+        clipped_grads = [tf.clip_by_norm(g, clip_norm) for g in grads]
+        clipped_grads, _ = tf.clip_by_global_norm(clipped_grads, clip_norm)
         utils.scalar('gradient_norm', tf.linalg.global_norm(clipped_grads))
         grads_and_vars = list(zip(clipped_grads, tvars))
 
