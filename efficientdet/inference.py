@@ -247,16 +247,15 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
     detections_batch: a batch of detection results. Each detection is a tensor
       with each row as [image_id, ymin, xmin, ymax, xmax, score, class].
   """
-  batch_size = cls_outputs[params['min_level']].shape[0]
-  if not batch_size:
+  if params.get('combined_nms', None):
     # Use combined version for dynamic batch size.
     nms_boxes, nms_scores, nms_classes, _ = postprocess.postprocess_combined(
         params, cls_outputs, box_outputs, scales)
-    batch_size = tf.shape(list(cls_outputs.values())[0])[0]
   else:
     nms_boxes, nms_scores, nms_classes, _ = postprocess.postprocess_global(
         params, cls_outputs, box_outputs, scales)
 
+  batch_size = tf.shape(cls_outputs[params['min_level']])[0]
   img_ids = tf.expand_dims(tf.range(0, batch_size, dtype=nms_scores.dtype), -1)
   detections = [
       img_ids * tf.ones_like(nms_scores),

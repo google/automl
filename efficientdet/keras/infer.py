@@ -41,7 +41,7 @@ def main(_):
   # !wget https://user-images.githubusercontent.com/11736571/77320690-099af300-6d37-11ea-9d86-24f14dc2d540.png -O tmp/img.png
   # !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz -O tmp/efficientdet-d0.tar.gz
   # !tar zxf tmp/efficientdet-d0.tar.gz -C tmp
-  imgs = [np.array(Image.open(FLAGS.image_path))]
+  imgs = [np.array(Image.open(FLAGS.image_path))] * 2
   # Create model config.
   config = hparams_config.get_efficientdet_config('efficientdet-d0')
   config.is_training_bn = False
@@ -57,7 +57,7 @@ def main(_):
 
   # Create and run the model.
   model = efficientdet_keras.EfficientDetModel(config=config)
-  model.build((1, None, None, 3))
+  model.build((None, None, None, 3))
   model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
   model.summary()
 
@@ -65,7 +65,8 @@ def main(_):
   def f(imgs):
     return model(imgs, training=False, post_mode='global')
 
-  boxes, scores, classes, valid_len = f(tf.convert_to_tensor(imgs, dtype=tf.uint8))
+  imgs = tf.convert_to_tensor(imgs, dtype=tf.uint8)
+  boxes, scores, classes, valid_len = f(imgs)
 
   # Visualize results.
   for i, img in enumerate(imgs):
@@ -86,5 +87,5 @@ if __name__ == '__main__':
   flags.mark_flag_as_required('image_path')
   flags.mark_flag_as_required('output_dir')
   flags.mark_flag_as_required('model_dir')
-  logging.set_verbosity(logging.WARNING)
+  # logging.set_verbosity(logging.WARNING)
   app.run(main)

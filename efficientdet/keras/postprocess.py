@@ -55,7 +55,7 @@ def merge_class_box_level_outputs(params, cls_outputs: List[T],
 def topk_class_boxes(params, cls_outputs: T,
                      box_outputs: T) -> Tuple[T, T, T, T]:
   """Pick the topk class and box outputs."""
-  batch_size = cls_outputs.shape[0]
+  batch_size = tf.shape(cls_outputs)[0]
   num_classes = params['num_classes']
 
   max_nms_inputs = params['nms_configs'].get('max_nms_inputs', 0)
@@ -78,7 +78,7 @@ def topk_class_boxes(params, cls_outputs: T,
     # Keep all anchors, but for each anchor, just keep the max probablity for
     # each class.
     cls_outputs_idx = tf.math.argmax(cls_outputs, axis=-1, output_type=tf.int32)
-    num_anchors = cls_outputs.shape[1]
+    num_anchors = tf.shape(cls_outputs)[1]
 
     classes = cls_outputs_idx
     indices = tf.tile(
@@ -240,28 +240,19 @@ def postprocess_global(params, cls_outputs, box_outputs, image_scales=None):
   box_outputs = to_list(box_outputs)
   boxes, scores, classes = pre_nms(params, cls_outputs, box_outputs)
 
-  # A list of batched boxes, scores, and classes.
-  nms_boxes_bs, nms_scores_bs, nms_classes_bs, nms_valid_len_bs = [], [], [], []
-  batch_size = boxes.shape[0]
-  for i in range(batch_size):
-    padded = batch_size > 1  # only pad if batch size > 1 for simplicity.
-    nms_boxes, nms_scores, nms_classes, nms_valid_len = nms(
-        params, boxes[i], scores[i], classes[i], padded)
+  def single_batch_fn(element):
+    return nms(params, element[0], element[1], element[2], True)
 
-    nms_boxes_bs.append(nms_boxes)
-    nms_scores_bs.append(nms_scores)
-    nms_classes_bs.append(nms_classes)
-    nms_valid_len_bs.append(nms_valid_len)
-
-  nms_boxes_bs = tf.stack(nms_boxes_bs)
-  nms_scores_bs = tf.stack(nms_scores_bs)
-  nms_classes_bs = tf.stack(nms_classes_bs)
-  nms_valid_len_bs = tf.stack(nms_valid_len_bs)
-  nms_boxes_bs = clip_boxes(nms_boxes_bs, params['image_size'])
+  dtype = scores.dtype
+  nms_boxes, nms_scores, nms_classes, nms_valid_len = tf.map_fn(
+      single_batch_fn,
+      [boxes, scores, classes],
+      fn_output_signature=(dtype, dtype, dtype, tf.int32))
+  nms_boxes = clip_boxes(nms_boxes, params['image_size'])
   if image_scales is not None:
     scales = tf.expand_dims(tf.expand_dims(image_scales, -1), -1)
-    nms_boxes_bs = nms_boxes_bs * tf.cast(scales, nms_boxes_bs.dtype)
-  return nms_boxes_bs, nms_scores_bs, nms_classes_bs, nms_valid_len_bs
+    nms_boxes = nms_boxes * tf.cast(scales, nms_boxes.dtype)
+  return nms_boxes, nms_scores, nms_classes, nms_valid_len
 
 
 def per_class_nms(params, boxes, scores, classes, image_scales=None):
@@ -278,10 +269,9 @@ def per_class_nms(params, boxes, scores, classes, image_scales=None):
   Returns:
     A tuple of batch level (boxes, scores, classess, valid_len) after nms.
   """
-  nms_boxes_bs, nms_scores_bs, nms_classes_bs, nms_valid_len_bs = [], [], [], []
-  batch_size = boxes.shape[0]
-  for i in range(batch_size):
-    boxes_i, scores_i, classes_i = boxes[i], scores[i], classes[i]
+  def single_batch_fn(element):
+    """A mapping function for a single batch."""
+    boxes_i, scores_i, classes_i = element[0], element[1], element[2]
     nms_boxes_cls, nms_scores_cls, nms_classes_cls = [], [], []
     nms_valid_len_cls = []
     for cid in range(params['num_classes']):
@@ -311,20 +301,22 @@ def per_class_nms(params, boxes, scores, classes, image_scales=None):
 
     _, indices = tf.math.top_k(nms_scores_cls, k=max_output_size, sorted=True)
 
-    nms_boxes_bs.append(tf.gather(nms_boxes_cls, indices))
-    nms_scores_bs.append(tf.gather(nms_scores_cls, indices))
-    nms_classes_bs.append(tf.gather(nms_classes_cls, indices))
-    nms_valid_len_bs.append(
-        tf.minimum(max_output_size, tf.reduce_sum(nms_valid_len_cls)))
+    return tuple((
+        tf.gather(nms_boxes_cls, indices),
+        tf.gather(nms_scores_cls, indices),
+        tf.gather(nms_classes_cls, indices),
+        tf.minimum(max_output_size, tf.reduce_sum(nms_valid_len_cls))))
+    # end of single_batch_fn
 
-  nms_scores_bs = tf.stack(nms_scores_bs)
-  nms_classes_bs = tf.stack(nms_classes_bs)
-  nms_boxes_bs = tf.stack(nms_boxes_bs)
-  nms_valid_len_bs = tf.stack(nms_valid_len_bs)
+  dtype = scores.dtype
+  nms_boxes, nms_scores, nms_classes, nms_valid_len = tf.map_fn(
+      single_batch_fn,
+      [boxes, scores, classes],
+      fn_output_signature=(dtype, dtype, dtype, tf.int32))
   if image_scales is not None:
     scales = tf.expand_dims(tf.expand_dims(image_scales, -1), -1)
-    nms_boxes_bs = nms_boxes_bs * tf.cast(scales, nms_boxes_bs.dtype)
-  return nms_boxes_bs, nms_scores_bs, nms_classes_bs, nms_valid_len_bs
+    nms_boxes = nms_boxes * tf.cast(scales, nms_boxes.dtype)
+  return nms_boxes, nms_scores, nms_classes, nms_valid_len
 
 
 def postprocess_per_class(params, cls_outputs, box_outputs, image_scales=None):
