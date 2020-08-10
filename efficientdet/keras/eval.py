@@ -105,7 +105,12 @@ def main(_):
   metric_values = evaluator.result()
   metric_dict = {}
   for i, metric_value in enumerate(metric_values):
-    metric_dict[evaluator.metric_names[i]] = metric_value
+    if i < len(evaluator.metric_names):
+      metric_dict[evaluator.metric_names[i]] = metric_value
+    else:
+      # Per-class AP.
+      name = 'AP_/class%d' % (i - len(evaluator.metric_names))
+      metric_dict[name] = metric_value
   print(metric_dict)
 
 
