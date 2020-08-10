@@ -103,7 +103,7 @@ class EvaluationMetric():
       logging.info('Writing output json file to: %s', output_path)
       with tf.io.gfile.GFile(output_path, 'w') as fid:
         json.dump(box_result_list, fid)
-      return np.array([0.], dtype=np.float32)
+      return np.array([-1.], dtype=np.float32)
     else:
       # Run on validation dataset.
       detections = np.array(self.detections)
@@ -115,6 +115,20 @@ class EvaluationMetric():
       coco_eval.accumulate()
       coco_eval.summarize()
       coco_metrics = coco_eval.stats
+
+      # Get per_class AP, see pycocotools/cocoeval.py:334
+      # TxRxKxAxM: iouThrs x recThrs x catIds x areaRng x maxDets
+      # Use areaRng_id=0 ('all') and maxDets_id=-1 (200) in default
+      precision = coco_eval.eval['precision'][:, :, :, 0, -1]
+      ap_perclass = []
+      for c in range(precision.shape[-1]):  # iterate over all classes
+        precision_c = precision[:, :, c]
+        # Only consider values if > -1.
+        precision_c = precision_c[precision_c > -1]
+        ap_c = np.mean(precision_c) if precision_c.size else -1.
+        ap_perclass.append(ap_c)
+        print('AP_class%d = %.3f' % (c, ap_c))
+      coco_metrics = np.concatenate((coco_metrics, ap_perclass))
       return np.array(coco_metrics, dtype=np.float32)
 
   def result(self):
@@ -185,7 +199,7 @@ class EvaluationMetric():
           {'id': int(category_id)} for category_id in self.category_ids
       ]
 
-  def estimator_metric_fn(self, detections, groundtruth_data):
+  def estimator_metric_fn(self, detections, groundtruth_data, num_classes=None):
     """Constructs the metric function for tf.TPUEstimator.
 
     For each metric, we return the evaluation op and an update op; the update op
@@ -198,6 +212,7 @@ class EvaluationMetric():
         [image_id, x, y, width, height, score, class]
       groundtruth_data: Groundtruth annotations in a tensor with each row
         representing [y1, x1, y2, x2, is_crowd, area, class].
+      num_classes: optional, used for per-class eval metrics.
     Returns:
       metrics_dict: A dictionary mapping from evaluation name to a tuple of
         operations (`metric_op`, `update_op`). `update_op` appends the
@@ -217,4 +232,8 @@ class EvaluationMetric():
         metrics_dict = {}
         for i, name in enumerate(self.metric_names):
           metrics_dict[name] = (metrics[i], update_op)
+        metrics_perclass = metrics[len(self.metric_names):]
+        if num_classes:
+          for i in range(num_classes):
+            metrics_dict['AP_/class%d' % i] = (metrics_perclass[i], update_op)
         return metrics_dict
