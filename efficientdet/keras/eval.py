@@ -57,6 +57,13 @@ def main(_):
   model.build((config.batch_size, base_height, base_width, 3))
   model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
 
+  @tf.function
+  def f(imgs, labels, flip):
+    cls_outputs, box_outputs = model(imgs, training=False)
+    return postprocess.generate_detections(config, cls_outputs, box_outputs,
+                                           labels['image_scales'],
+                                           labels['source_ids'], flip)
+
   # in format (height, width, flip)
   augmentations = []
   if FLAGS.enable_tta:
@@ -80,17 +87,16 @@ def main(_):
             config)
 
     # compute stats for all batches.
+    total_steps = FLAGS.eval_samples // FLAGS.batch_size
+    progress = tf.keras.utils.Progbar(total_steps)
     for i, (images, labels) in enumerate(ds):
-      if i > FLAGS.eval_samples // FLAGS.batch_size:
+      progress.update(i, values=None)
+      if i > total_steps:
         break
 
       if flip:
         images = tf.image.flip_left_right(images)
-      cls_outputs, box_outputs = model(images, training=False)
-      detections = postprocess.generate_detections(config, cls_outputs,
-                                                   box_outputs,
-                                                   labels['image_scales'],
-                                                   labels['source_ids'], flip)
+      detections = f(images, labels, flip)
 
       for img_id, d in zip(labels['source_ids'], detections):
         if img_id.numpy() in detections_per_source:
