@@ -490,8 +490,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
         eval_metric = coco_metric.EvaluationMetric(
             filename=params['val_json_file'])
         coco_metrics = eval_metric.estimator_metric_fn(
-            detections_bs, kwargs['groundtruth_data'],
-            min(80, params['num_classes']))  # coco has at most 80 classes.
+            detections_bs, kwargs['groundtruth_data'], params['label_map'])
 
       # Add metrics to output.
       cls_loss = tf.metrics.mean(kwargs['cls_loss_repeat'])

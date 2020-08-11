@@ -190,7 +190,7 @@ def default_detection_configs():
   h.heads = ['object_detection']  # 'object_detection', 'segmentation'
 
   h.skip_crowd_during_training = True
-  h.label_id_mapping = None
+  h.label_map = 'coco'  # a dict or a string of 'coco'/'voc'.
   h.max_instances_per_image = 100  # Default to 100 for COCO.
   h.regenerate_source_id = False
 

@@ -25,6 +25,7 @@ import utils
 
 from keras import anchors
 from keras import efficientdet_keras
+from keras import label_util
 from keras import postprocess
 from keras import wbf
 
@@ -36,6 +37,7 @@ flags.DEFINE_string(
 flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model name to use.')
 flags.DEFINE_string('model_dir', None, 'Location of the checkpoint to run.')
 flags.DEFINE_integer('batch_size', 8, 'Batch size.')
+flags.DEFINE_integer('eval_samples', 8, 'Batch size.')
 flags.DEFINE_string('hparams', '', 'Comma separated k=v pairs or a yaml file')
 flags.DEFINE_boolean('enable_tta', False,
                      'Use test time augmentation (slower, but more accurate).')
@@ -65,6 +67,7 @@ def main(_):
   else:
     augmentations.append((base_height, base_width, False))
 
+  evaluator = None
   detections_per_source = dict()
   for height, width, flip in augmentations:
     config.image_size = (height, width)
@@ -77,7 +80,10 @@ def main(_):
             config)
 
     # compute stats for all batches.
-    for images, labels in ds:
+    for i, (images, labels) in enumerate(ds):
+      if i > FLAGS.eval_samples // FLAGS.batch_size:
+        break
+
       if flip:
         images = tf.image.flip_left_right(images)
       cls_outputs, box_outputs = model(images, training=False)
@@ -102,16 +108,18 @@ def main(_):
             postprocess.transform_detections(tf.stack([d])).numpy())
 
   # compute the final eval results.
-  metric_values = evaluator.result()
-  metric_dict = {}
-  for i, metric_value in enumerate(metric_values):
-    if i < len(evaluator.metric_names):
-      metric_dict[evaluator.metric_names[i]] = metric_value
-    else:
-      # Per-class AP.
-      name = 'AP_/class%d' % (i - len(evaluator.metric_names))
-      metric_dict[name] = metric_value
-  print(metric_dict)
+  if evaluator:
+    metrics = evaluator.result()
+    metric_dict = {}
+    for i, name in enumerate(evaluator.metric_names):
+      metric_dict[name] = metrics[i]
+
+    label_map = label_util.get_label_map(config.label_map)
+    if label_map:
+      for i, cid in enumerate(sorted(label_map.keys())):
+        name = 'AP_/%s' % label_map[cid]
+        metric_dict[name] = metrics[i - len(evaluator.metric_names)]
+    print(metric_dict)
 
 
 if __name__ == '__main__':
