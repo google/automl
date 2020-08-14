@@ -859,9 +859,10 @@ class EfficientDetModel(EfficientDetNet):
       return image, image_scale
 
     return tf.map_fn(
-        map_fn, raw_images, fn_output_signature=(tf.float32, tf.float32))
+        map_fn, raw_images, dtype=(tf.float32, tf.float32))
 
   def _postprocess(self, cls_outputs, box_outputs, scales, mode='global'):
+    """Postprocess class and box predictions."""
     if not mode:
       return cls_outputs, box_outputs
 

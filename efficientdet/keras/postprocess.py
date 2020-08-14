@@ -247,7 +247,7 @@ def postprocess_global(params, cls_outputs, box_outputs, image_scales=None):
   nms_boxes, nms_scores, nms_classes, nms_valid_len = tf.map_fn(
       single_batch_fn,
       [boxes, scores, classes],
-      fn_output_signature=(dtype, dtype, dtype, tf.int32))
+      dtype=(dtype, dtype, dtype, tf.int32))
   nms_boxes = clip_boxes(nms_boxes, params['image_size'])
   if image_scales is not None:
     scales = tf.expand_dims(tf.expand_dims(image_scales, -1), -1)
@@ -312,7 +312,7 @@ def per_class_nms(params, boxes, scores, classes, image_scales=None):
   nms_boxes, nms_scores, nms_classes, nms_valid_len = tf.map_fn(
       single_batch_fn,
       [boxes, scores, classes],
-      fn_output_signature=(dtype, dtype, dtype, tf.int32))
+      dtype=(dtype, dtype, dtype, tf.int32))
   if image_scales is not None:
     scales = tf.expand_dims(tf.expand_dims(image_scales, -1), -1)
     nms_boxes = nms_boxes * tf.cast(scales, nms_boxes.dtype)

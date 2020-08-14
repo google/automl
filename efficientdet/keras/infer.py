@@ -16,7 +16,6 @@
 import os
 from absl import app
 from absl import flags
-from absl import logging
 import numpy as np
 from PIL import Image
 import tensorflow as tf
@@ -76,6 +75,7 @@ def main(_):
         boxes[i].numpy()[:length],
         classes[i].numpy().astype(np.int)[:length],
         scores[i].numpy()[:length],
+        label_map=config.label_map,
         min_score_thresh=config.nms_configs.score_thresh,
         max_boxes_to_draw=config.nms_configs.max_output_size)
     output_image_path = os.path.join(FLAGS.output_dir, str(i) + '.jpg')

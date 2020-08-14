@@ -233,6 +233,7 @@ class DisplayCallback(tf.keras.callbacks.Callback):
         boxes[0].numpy()[:length],
         classes[0].numpy().astype(np.int)[:length],
         scores[0].numpy()[:length],
+        label_map=self.model.config.label_map,
         min_score_thresh=self.min_score_thresh,
         max_boxes_to_draw=self.max_boxes_to_draw)
 
