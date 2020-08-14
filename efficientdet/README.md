@@ -98,7 +98,9 @@ Then you will get:
  - TensorRT saved model under `savedmodeldir/tensorrt_fp32/`
  - tflite file with name `efficientdet-d0.tflite`
 
-Notably, --tflite_path only works after 2.3.0-dev20200521
+Notably, 
+ --tflite_path only works after 2.3.0-dev20200521 ,
+ --ckpt_path=xx/archive is the folder for exporting the best model.
 
 
 ## 4. Benchmark model latency.
