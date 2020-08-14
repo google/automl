@@ -251,13 +251,13 @@ def _load_caption_annotations(caption_annotations_file):
   return img_to_caption_annotation
 
 
-def _load_images_info(images_info_file):
-  with tf.gfile.GFile(images_info_file, 'r') as fid:
+def _load_images_info(image_info_file):
+  with tf.gfile.GFile(image_info_file, 'r') as fid:
     info_dict = json.load(fid)
   return info_dict['images']
 
 
-def _create_tf_record_from_coco_annotations(images_info_file,
+def _create_tf_record_from_coco_annotations(image_info_file,
                                             image_dir,
                                             output_path,
                                             num_shards,
@@ -267,7 +267,7 @@ def _create_tf_record_from_coco_annotations(images_info_file,
   """Loads COCO annotation json files and converts to tf.Record format.
 
   Args:
-    images_info_file: JSON file containing image info. The number of tf.Examples
+    image_info_file: JSON file containing image info. The number of tf.Examples
       in the output tf Record files is exactly equal to the number of image info
       entries in this file. This can be any of train/val/test annotation json
       files Eg. 'image_info_test-dev2017.json',
@@ -287,7 +287,7 @@ def _create_tf_record_from_coco_annotations(images_info_file,
       tf.python_io.TFRecordWriter(output_path + '-%05d-of-%05d.tfrecord' %
                                   (i, num_shards)) for i in range(num_shards)
   ]
-  images = _load_images_info(images_info_file)
+  images = _load_images_info(image_info_file)
 
   img_to_obj_annotation = None
   img_to_caption_annotation = None
@@ -341,17 +341,17 @@ def main(_):
           FLAGS.caption_annotations_file), ('All annotation files are '
                                             'missing.')
   if FLAGS.image_info_file:
-    images_info_file = FLAGS.image_info_file
+    image_info_file = FLAGS.image_info_file
   elif FLAGS.object_annotations_file:
-    images_info_file = FLAGS.object_annotations_file
+    image_info_file = FLAGS.object_annotations_file
   else:
-    images_info_file = FLAGS.caption_annotations_file
+    image_info_file = FLAGS.caption_annotations_file
 
   directory = os.path.dirname(FLAGS.output_file_prefix)
   if not tf.gfile.IsDirectory(directory):
     tf.gfile.MakeDirs(directory)
 
-  _create_tf_record_from_coco_annotations(images_info_file, FLAGS.image_dir,
+  _create_tf_record_from_coco_annotations(image_info_file, FLAGS.image_dir,
                                           FLAGS.output_file_prefix,
                                           FLAGS.num_shards,
                                           FLAGS.object_annotations_file,
