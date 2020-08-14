@@ -562,7 +562,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     if 'object_detection' in self.config.heads:
       det_loss = (
           self._detection_loss(cls_outputs, box_outputs, labels, loss_vals))
-      total_loss += det_loss
+      total_loss += det_loss[0]
     if 'segmentation' in self.config.heads:
       seg_loss_layer = self.loss['seg_loss']
       seg_loss = seg_loss_layer(labels['image_masks'], seg_outputs)
