@@ -858,7 +858,13 @@ class EfficientDetModel(EfficientDetNet):
       image_scale = input_processor.image_scale_to_original
       return image, image_scale
 
-    return tf.map_fn(
+    if raw_images.shape.as_list()[0]:  # fixed batch size.
+      batch_size = raw_images.shape.as_list()[0]
+      outputs = [map_fn(raw_images[i]) for i in range(batch_size)]
+      return [tf.stack(y) for y in zip(*outputs)]
+
+    # otherwise treat it as dynamic batch size.
+    return postprocess.batch_map_fn(
         map_fn, raw_images, dtype=(tf.float32, tf.float32))
 
   def _postprocess(self, cls_outputs, box_outputs, scales, mode='global'):

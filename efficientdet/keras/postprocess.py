@@ -31,6 +31,23 @@ def to_list(inputs):
   raise ValueError('Unrecognized inputs : {}'.format(inputs))
 
 
+def batch_map_fn(map_fn, inputs, *args, **kwargs):
+  """Apply map_fn at batch dimension."""
+  if isinstance(inputs[0], (list, tuple)):
+    batch_size = len(inputs[0])
+  else:
+    batch_size = inputs[0].shape.as_list()[0]
+
+  if not batch_size:
+    # use tf.map_fn to handle dynamic batch_size.
+    return tf.map_fn(map_fn, inputs, *args, **kwargs)
+
+  outputs = []
+  for i in range(batch_size):
+    outputs.append(map_fn([x[i] for x in inputs]))
+  return [tf.stack(y) for y in zip(*outputs)]
+
+
 def clip_boxes(boxes: T, image_size: int) -> T:
   """Clip boxes to fit the image size."""
   image_size = utils.parse_image_size(image_size) * 2
@@ -244,7 +261,7 @@ def postprocess_global(params, cls_outputs, box_outputs, image_scales=None):
     return nms(params, element[0], element[1], element[2], True)
 
   dtype = scores.dtype
-  nms_boxes, nms_scores, nms_classes, nms_valid_len = tf.map_fn(
+  nms_boxes, nms_scores, nms_classes, nms_valid_len = batch_map_fn(
       single_batch_fn,
       [boxes, scores, classes],
       dtype=(dtype, dtype, dtype, tf.int32))
@@ -309,7 +326,7 @@ def per_class_nms(params, boxes, scores, classes, image_scales=None):
     # end of single_batch_fn
 
   dtype = scores.dtype
-  nms_boxes, nms_scores, nms_classes, nms_valid_len = tf.map_fn(
+  nms_boxes, nms_scores, nms_classes, nms_valid_len = batch_map_fn(
       single_batch_fn,
       [boxes, scores, classes],
       dtype=(dtype, dtype, dtype, tf.int32))
