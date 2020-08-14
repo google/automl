@@ -329,7 +329,8 @@ def main(_):
   elif FLAGS.mode == 'train_and_eval':
     for cycle in range(config.num_epochs):
       logging.info('Starting training cycle, epoch: %d.', cycle)
-      _train(FLAGS.num_examples_per_epoch // FLAGS.train_batch_size)
+      _train(
+          (cycle + 1) * FLAGS.num_examples_per_epoch // FLAGS.train_batch_size)
       logging.info('Starting evaluation cycle, epoch: %d.', cycle)
       eval_results = _eval(eval_steps)
       ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
