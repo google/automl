@@ -327,11 +327,11 @@ def main(_):
         logging.info('Checkpoint %s no longer exists, skipping.', ckpt)
 
   elif FLAGS.mode == 'train_and_eval':
-    for cycle in range(config.num_epochs):
-      logging.info('Starting training cycle, epoch: %d.', cycle)
-      _train(
-          (cycle + 1) * FLAGS.num_examples_per_epoch // FLAGS.train_batch_size)
-      logging.info('Starting evaluation cycle, epoch: %d.', cycle)
+    epochs_per_cycle = 1  # higher number has less graph construction overhead.
+    for e in range(1, config.num_epochs + 1, epochs_per_cycle):
+      logging.info('Starting training, epoch: %d.', e)
+      _train(e * FLAGS.num_examples_per_epoch // FLAGS.train_batch_size)
+      logging.info('Starting evaluation, epoch: %d.', )
       eval_results = _eval(eval_steps)
       ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
       utils.archive_ckpt(eval_results, eval_results['AP'], ckpt)
