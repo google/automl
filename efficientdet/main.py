@@ -331,7 +331,7 @@ def main(_):
     for e in range(1, config.num_epochs + 1, epochs_per_cycle):
       logging.info('Starting training, epoch: %d.', e)
       _train(e * FLAGS.num_examples_per_epoch // FLAGS.train_batch_size)
-      logging.info('Starting evaluation, epoch: %d.', )
+      logging.info('Starting evaluation, epoch: %d.', e)
       eval_results = _eval(eval_steps)
       ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
       utils.archive_ckpt(eval_results, eval_results['AP'], ckpt)
