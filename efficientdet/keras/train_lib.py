@@ -481,7 +481,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     loss_vals['det_loss'] = total_loss
     loss_vals['cls_loss'] = cls_loss
     loss_vals['box_loss'] = box_loss
-    return total_loss, cls_loss, box_loss, box_iou_loss
+    return total_loss
 
   def train_step(self, data):
     """Train step.
@@ -508,8 +508,8 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       total_loss = reg_l2loss
       loss_vals = {}
       if 'object_detection' in self.config.heads:
-        det_loss = (
-            self._detection_loss(cls_outputs, box_outputs, labels, loss_vals))
+        det_loss = self._detection_loss(cls_outputs, box_outputs, labels,
+                                        loss_vals)
         total_loss += det_loss
       if 'segmentation' in self.config.heads:
         seg_loss_layer = self.loss['seg_loss']
@@ -560,8 +560,8 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     total_loss = reg_l2loss
     loss_vals = {}
     if 'object_detection' in self.config.heads:
-      det_loss = (
-          self._detection_loss(cls_outputs, box_outputs, labels, loss_vals))
+      det_loss = self._detection_loss(cls_outputs, box_outputs, labels,
+                                      loss_vals)
       total_loss += det_loss
     if 'segmentation' in self.config.heads:
       seg_loss_layer = self.loss['seg_loss']
