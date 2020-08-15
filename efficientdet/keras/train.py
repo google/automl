@@ -211,8 +211,9 @@ def main(_):
             'seg_loss':
                 tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
         })
-    ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)
-    if ckpt_path:
+
+    if FLAGS.pretrained_ckpt:
+      ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)
       model.load_weights(ckpt_path)
     os.makedirs(FLAGS.model_dir, exist_ok=True)
     model.fit(
