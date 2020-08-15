@@ -296,6 +296,8 @@ Finetune needs to use --ckpt rather than --backbone_ckpt.
         --num_examples_per_epoch=5717 --num_epochs=50  \
         --hparams=voc_config.yaml
 
+If you want to continue to train the model, simply re-run the above command because the `num_epochs` is a maximum number of epochs. For example, to reproduce the result of efficientdet-d0, set `--num_epochs=300` then run the command multiple times until the training is finished.
+
 If you want to do inference for custom data, you can run
 
     # Setting hparams-flag is needed sometimes.
