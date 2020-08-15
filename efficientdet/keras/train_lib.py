@@ -246,10 +246,14 @@ def get_callbacks(params, profile=False):
   tb_callback = tf.keras.callbacks.TensorBoard(
       log_dir=params['model_dir'], profile_batch=2 if profile else 0)
   ckpt_callback = tf.keras.callbacks.ModelCheckpoint(
-      params['model_dir'], verbose=1, save_weights_only=True)
+      f"{params['model_dir']}/ckpt", verbose=1, save_weights_only=True)
   early_stopping = tf.keras.callbacks.EarlyStopping(
       monitor='val_loss', min_delta=0, patience=10, verbose=1)
-  callbacks = [tb_callback, ckpt_callback, early_stopping]
+  callbacks = [
+    tb_callback,
+    ckpt_callback,
+    early_stopping,
+  ]
   if params.get('sample_image', None):
     display_callback = DisplayCallback(
         params.get('sample_image', None),
@@ -481,7 +485,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     loss_vals['det_loss'] = total_loss
     loss_vals['cls_loss'] = cls_loss
     loss_vals['box_loss'] = box_loss
-    return total_loss, cls_loss, box_loss, box_iou_loss
+    return total_loss
 
   def train_step(self, data):
     """Train step.
@@ -508,8 +512,8 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       total_loss = reg_l2loss
       loss_vals = {}
       if 'object_detection' in self.config.heads:
-        det_loss = (
-            self._detection_loss(cls_outputs, box_outputs, labels, loss_vals))
+        det_loss = self._detection_loss(cls_outputs, box_outputs, labels,
+                                        loss_vals)
         total_loss += det_loss
       if 'segmentation' in self.config.heads:
         seg_loss_layer = self.loss['seg_loss']
@@ -560,8 +564,8 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     total_loss = reg_l2loss
     loss_vals = {}
     if 'object_detection' in self.config.heads:
-      det_loss = (
-          self._detection_loss(cls_outputs, box_outputs, labels, loss_vals))
+      det_loss = self._detection_loss(cls_outputs, box_outputs, labels,
+                                      loss_vals)
       total_loss += det_loss
     if 'segmentation' in self.config.heads:
       seg_loss_layer = self.loss['seg_loss']

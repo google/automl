@@ -62,6 +62,9 @@ flags.DEFINE_bool(
     'and this flag has no effect.')
 flags.DEFINE_string('model_dir', None, 'Location of model_dir')
 
+flags.DEFINE_string('pretrained_ckpt', None,
+                    'Start training from this EfficientDet checkpoint.')
+
 flags.DEFINE_string(
     'hparams', '', 'Comma separated k=v pairs of hyperparameters or a module'
     ' containing attributes to use as hyperparameters.')
@@ -208,16 +211,18 @@ def main(_):
             'seg_loss':
                 tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
         })
-    ckpt_path = tf.train.latest_checkpoint(FLAGS.model_dir)
-    if ckpt_path:
+
+    if FLAGS.pretrained_ckpt:
+      ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)
       model.load_weights(ckpt_path)
+    os.makedirs(FLAGS.model_dir, exist_ok=True)
     model.fit(
         get_dataset(True, params=params),
         epochs=params['num_epochs'],
         steps_per_epoch=steps_per_epoch,
         callbacks=train_lib.get_callbacks(params, FLAGS.profile),
         validation_data=get_dataset(False, params=params))
-  model.save_weights(os.path.join(FLAGS.model_dir, 'model'))
+  model.save_weights(os.path.join(FLAGS.model_dir, 'ckpt-final'))
 
 
 if __name__ == '__main__':
