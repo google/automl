@@ -68,7 +68,7 @@ We have provided a list of EfficientDet checkpoints and results as follows:
 
 <sup><em>val</em> denotes validation results, <em>test-dev</em> denotes test-dev2017 results. AP<sup>val</sup> is for validation accuracy, all other AP results in the table are for COCO test-dev2017. All accuracy numbers are for single-model single-scale without ensemble or test-time augmentation.  EfficientDet-D0 to D6 are trained for 300 epochs and D7/D7x are trained for 600 epochs.</sup>
 
-In addition, the following table includes a list of models trained with fixed 640x640 image sizes (see appendix of [this paer](https://arxiv.org/abs/1911.09070)):
+In addition, the following table includes a list of models trained with fixed 640x640 image sizes (see appendix of [this paper](https://arxiv.org/abs/1911.09070)):
 
 
 |       Model    |   mAP | Latency |
