@@ -38,7 +38,7 @@ tf.debugging.disable_check_numerics() # for TensorFlow 2.x
 
 The current code assume class 0 is always reserved for background, so you if you K classes, then you should set num_classes=K+1.
 
-See #391 and #398 for more discussion.
+See [#391](https://github.com/google/automl/issues/391) and [#398](https://github.com/google/automl/issues/398) for more discussion.
 
 ### 1.4 Why my input pipeline has assert failure?
 
