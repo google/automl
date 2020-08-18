@@ -45,7 +45,7 @@ See [#391](https://github.com/google/automl/issues/391) and [#398](https://githu
 This is most likely that your dataset has some images with many objects (more
 than the 100 limit for COCO), you should set --hparams="max_instances_per_image=200" or larger.
 
-See https://github.com/google/automl/issues/93 for more discussion.
+See [#93](https://github.com/google/automl/issues/93) for more discussion.
 
 
 ## 2. For Developers
