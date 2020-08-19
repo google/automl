@@ -47,9 +47,9 @@ def freeze_vars(variables, pattern):
     _variables = [v for v in variables if not re.match(pattern, v.name)]
     if len(_variables) == len(variables):
         logging.warning(f'{pattern} pattern didnt match with any variable in the model.Please use compatible pattern. i.e "(efficientnet)"')
-
-  return _variables
-
+    return _variables
+  else:
+    return variables
 
 def resize_bilinear(images, size, output_type):
   """Returns resized images as output_type."""
