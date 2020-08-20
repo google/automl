@@ -38,6 +38,15 @@ class MosaicTest(tf.test.TestCase):
     mosaic_image, mosaic_boxes = self.mosaic(images, bboxes)
     self.assertEqual(bboxes.shape[0], len(mosaic_boxes))
 
+  def test_mosaic_tiny_images(self):
+    # A very simple test to verify moisac num of boxes are valid and syntax check.
+    # tiny  4x4 four images
+    images = tf.zeros(shape=(4, 4, 4, 3))
+    bboxes = tf.random.uniform(
+        shape=(4, 2, 4), minval=1, maxval=511, dtype=tf.int32)
+    mosaic_image, mosaic_boxes = self.mosaic(images, bboxes)
+    self.assertEqual(bboxes.shape[0], len(mosaic_boxes))
+
 
 if __name__ == "__main__":
   logging.set_verbosity(logging.WARNING)
