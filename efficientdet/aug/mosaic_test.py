@@ -16,8 +16,7 @@
 Mosaic Augmentation simple test.
 """
 from absl import logging
-import tensorflow as tf
-
+import tensorflow.compat.v1 as tf
 from aug.mosaic import Mosaic
 
 
@@ -27,35 +26,21 @@ class MosaicTest(tf.test.TestCase):
         super().__init__(*args,**kwargs)
         self.output_size = (512,512)
         self.mosaic = Mosaic(out_size=self.output_size)
-        tf.random.set_seed(111111)
-
-    def test_mosaic_image(self):
-        # A very simple test to verify moisac image is excepted with output_size.
-        # random four images
-        images = tf.random.uniform(
-            shape=(4, 512, 512, 3), minval=0, maxval=255, dtype=tf.float32
-        )
-        bboxes = tf.random.uniform(
-            shape=(4, 5, 4), minval=1, maxval=511, dtype=tf.int32
-        )
-        mosaic_image, mosaic_boxes = self.mosaic(images, bboxes)
-        mosaic_height = mosaic_image.shape[0]
-        mosaic_width= mosaic_image.shape[1]
-        self.assertEqual(mosaic_height,self.output_size[0])
-        self.assertEqual(mosaic_width,self.output_size[1])
+        tf.random.set_random_seed(111111)
 
     def test_mosaic_boxes(self):
-        # A very simple test to verify moisac num of boxes are valid.
+        # A very simple test to verify moisac num of boxes are valid and syntax check.
         # random four images
         images = tf.random.uniform(
             shape=(4, 512, 512, 3), minval=0, maxval=255, dtype=tf.float32
         )
         bboxes = tf.random.uniform(
-            shape=(4, 5, 4), minval=1, maxval=511, dtype=tf.int32
+            shape=(4, 2, 4), minval=1, maxval=511, dtype=tf.int32
         )
         mosaic_image, mosaic_boxes = self.mosaic(images, bboxes)
         self.assertEqual(bboxes.shape[0],len(mosaic_boxes))
 
 if __name__ == "__main__":
     logging.set_verbosity(logging.WARNING)
+    tf.disable_eager_execution()
     tf.test.main()

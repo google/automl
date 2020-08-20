@@ -22,7 +22,7 @@ class Mosaic:
     """Mosaic.
         Mosaic Augmentation class.
         Notes:- 1. Mosaic sub images will not be preserving aspect ratio of original images passed.
-                2. Tested on eager tensor for now, future will make compatible with static graphs too.
+                2. Tested on static graphs and eager  execution.
                 3. This Implementation of mosaic augmentation is tested in tf2.x.
     """
     def __init__(
@@ -103,13 +103,12 @@ class Mosaic:
 
         """
         return [
-            box[0] * mosaic_image.shape[1] / image.shape[1],
-            box[1] * mosaic_image.shape[0] / image.shape[0],
-            box[2] * mosaic_image.shape[1] / image.shape[1],
-            box[-1] * mosaic_image.shape[0] / image.shape[0],
+            box[0] * tf.shape(mosaic_image)[1] / tf.shape(image)[1],
+            box[1] * tf.shape(mosaic_image)[0] / tf.shape(image)[0],
+            box[2] * tf.shape(mosaic_image)[1] / tf.shape(image)[1],
+            box[-1] * tf.shape(mosaic_image)[0] / tf.shape(image)[0],
         ]
 
-    @tf.function
     def _scale_images(self, images, mosaic_divide_points: Tuple) -> Tuple:
         """_mosaic.
             Scale Sub Images.
@@ -135,6 +134,7 @@ class Mosaic:
             mosaic_image_bottomright,
         )
 
+    @tf.function
     def _mosaic(self, images, boxes, mosaic_divide_points):
         """_mosaic.
             Builds mosaic of provided images.
@@ -178,8 +178,8 @@ class Mosaic:
         _num_boxes = boxes[1].shape[0]
         idx_tp = tf.constant([[1], [3]])
         update_tp = [
-            [mosaic_image_topleft.shape[0]] * _num_boxes,
-            [mosaic_image_topleft.shape[0]] * _num_boxes,
+            [tf.shape(mosaic_image_topleft)[0]] * _num_boxes,
+            [tf.shape(mosaic_image_topleft)[0]] * _num_boxes,
         ]
         mosaic_box_topright = tf.transpose(
             tf.tensor_scatter_nd_add(mosaic_box_topright, idx_tp, update_tp)
@@ -193,11 +193,12 @@ class Mosaic:
             ),
             boxes[2],
         )
+
         _num_boxes = boxes[2].shape[0]
         idx_bl = tf.constant([[0], [2]])
         update_bl = [
-            [mosaic_image_topleft.shape[1]] * _num_boxes,
-            [mosaic_image_topleft.shape[1]] * _num_boxes,
+            [tf.shape(mosaic_image_topleft)[1]] * _num_boxes,
+            [tf.shape(mosaic_image_topleft)[1]] * _num_boxes,
         ]
         mosaic_box_bottomleft = tf.transpose(
             tf.tensor_scatter_nd_add(mosaic_box_bottomleft, idx_bl, update_bl)
@@ -211,13 +212,14 @@ class Mosaic:
             ),
             boxes[3],
         )
+
         _num_boxes = boxes[3].shape[0]
         idx_br = tf.constant([[0], [2], [1], [3]])
         update_br = [
-            [mosaic_image_topright.shape[1]] * _num_boxes,
-            [mosaic_image_topright.shape[1]] * _num_boxes,
-            [mosaic_image_bottomleft.shape[0]] * _num_boxes,
-            [mosaic_image_bottomleft.shape[0]] * _num_boxes,
+            [tf.shape(mosaic_image_topright)[1]] * _num_boxes,
+            [tf.shape(mosaic_image_topright)[1]] * _num_boxes,
+            [tf.shape(mosaic_image_bottomleft)[0]] * _num_boxes,
+            [tf.shape(mosaic_image_bottomleft)[0]] * _num_boxes,
         ]
         mosaic_box_bottomright = tf.transpose(
             tf.tensor_scatter_nd_add(mosaic_box_bottomright, idx_br, update_br)
@@ -241,16 +243,10 @@ class Mosaic:
 
     def __call__(self, images, boxes):
 
-        if len(images) != 4:
+        if images.shape[0] != 4:
             _err_msg = "Currently Exact 4 Images are supported by Mosaic Augmentation."
             logging.error(_err_msg)
             raise Exception(_err_msg)
-
-        if len(images) != len(boxes):
-            _err_msg = "Each Image should have atleast one bbox."
-            logging.error(_err_msg)
-            raise Exception(_err_msg)
-
 
         """Builds mosaic with given images , boxes"""
         x, y = self._mosaic_divide_points()
@@ -262,3 +258,4 @@ class Mosaic:
         _lower_stack = tf.concat([_mosaic_sub_images[2], _mosaic_sub_images[3]], axis=0)
         _mosaic_image = tf.concat([_upper_stack, _lower_stack], axis=1)
         return _mosaic_image, _mosaic_boxes
+
