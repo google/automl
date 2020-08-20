@@ -22,11 +22,15 @@ from aug.mosaic import Mosaic
 
 
 class MosaicTest(tf.test.TestCase):
+
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.output_size = (512,512)
+        self.mosaic = Mosaic(out_size=self.output_size)
+        tf.random.set_seed(111111)
+
     def test_mosaic_image(self):
         # A very simple test to verify moisac image is excepted with output_size.
-        tf.random.set_seed(111111)
-        output_size = (512, 512)
-        mosaic = Mosaic(out_size=output_size)
         # random four images
         images = tf.random.uniform(
             shape=(4, 512, 512, 3), minval=0, maxval=255, dtype=tf.float32
@@ -34,13 +38,23 @@ class MosaicTest(tf.test.TestCase):
         bboxes = tf.random.uniform(
             shape=(4, 5, 4), minval=1, maxval=511, dtype=tf.int32
         )
-        mosaic_image, mosaic_boxes = mosaic(images, bboxes)
+        mosaic_image, mosaic_boxes = self.mosaic(images, bboxes)
         mosaic_height = mosaic_image.shape[0]
         mosaic_width= mosaic_image.shape[1]
-        self.assertEqual(mosaic_height,output_size[0])
-        self.assertEqual(mosaic_width,output_size[1])
+        self.assertEqual(mosaic_height,self.output_size[0])
+        self.assertEqual(mosaic_width,self.output_size[1])
 
-
+    def test_mosaic_boxes(self):
+        # A very simple test to verify moisac num of boxes are valid.
+        # random four images
+        images = tf.random.uniform(
+            shape=(4, 512, 512, 3), minval=0, maxval=255, dtype=tf.float32
+        )
+        bboxes = tf.random.uniform(
+            shape=(4, 5, 4), minval=1, maxval=511, dtype=tf.int32
+        )
+        mosaic_image, mosaic_boxes = self.mosaic(images, bboxes)
+        self.assertEqual(bboxes.shape[0],len(mosaic_boxes))
 
 if __name__ == "__main__":
     logging.set_verbosity(logging.WARNING)
