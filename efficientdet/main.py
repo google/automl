@@ -220,7 +220,7 @@ def main(_):
     config_proto.gpu_options.allow_growth = True
 
   tpu_config = tf.estimator.tpu.TPUConfig(
-      FLAGS.iterations_per_loop,
+      FLAGS.iterations_per_loop if FLAGS.strategy == 'tpu' else 1,
       num_cores_per_replica=num_cores_per_replica,
       input_partition_dims=input_partition_dims,
       per_host_input_for_training=tf.estimator.tpu.InputPipelineConfig

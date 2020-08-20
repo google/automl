@@ -587,6 +587,17 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
     training_hooks.append(OomReportingHook())
 
+    logging_hook = tf.train.LoggingTensorHook(
+        {
+            "step": global_step,
+            "det_loss": det_loss,
+            "cls_loss": cls_loss,
+            "box_loss": box_loss,
+        },
+        every_n_iter=params.get('iterations_per_loop', 100),
+    )
+    training_hooks.append(logging_hook)
+
   return tf.estimator.tpu.TPUEstimatorSpec(
       mode=mode,
       loss=total_loss,
