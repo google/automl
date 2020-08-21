@@ -14,17 +14,20 @@
 # ==============================================================================
 
 from functools import partial
-import tensorflow as tf
 from typing import Tuple
 from absl import logging
+
+import tensorflow as tf
 
 
 class Mosaic:
   """Mosaic.
         Mosaic Augmentation class.
-        Notes:- 1. Mosaic sub images will not be preserving aspect ratio of original images passed.
+        Notes:- 1. Mosaic sub images will not be preserving aspect ratio of
+                   original images passed.
                 2. Tested on static graphs and eager  execution.
-                3. This Implementation of mosaic augmentation is tested in tf2.x.
+                3. This Implementation of mosaic augmentation is tested in
+                   tf2.x.
     """
 
   def __init__(
@@ -38,7 +41,10 @@ class Mosaic:
         Args:
             out_size: output mosaic image size.
             n_images: number images to make mosaic
-            _minimum_mosaic_image_dim: minimum percentage of out_size dimension should the mosaic be. i.e if out_size is (680,680) and _minimum_mosaic_image_dim is 25 , minimum mosaic sub images dimension will be 25 % of 680
+            _minimum_mosaic_image_dim: minimum percentage of out_size dimension
+            should the mosaic be. i.e if out_size is (680,680) and
+            _minimum_mosaic_image_dim is 25 , minimum mosaic sub images
+            dimension will be 25 % of 680.
         """
     # TODO #MED #use n_images to build mosaic.
     self._n_images = n_images
@@ -93,7 +99,8 @@ class Mosaic:
   @staticmethod
   def _scale_box(box, image, mosaic_image):
     """_scale_box.
-            static bounding boxes scaling methods which scales the boxes with mosaic sub image.
+            static bounding boxes scaling methods which scales the boxes with
+            mosaic sub image.
 
         Args:
             box: mosaic image box.
@@ -116,7 +123,8 @@ class Mosaic:
 
         Args:
             images: original single images to make mosaic.
-            mosaic_divide_points: Points to build mosaic around on given output size.
+            mosaic_divide_points: Points to build mosaic around on given
+            output size.
         Returns:
             (tuple)
             Scaled Mosaic sub images.
@@ -144,7 +152,8 @@ class Mosaic:
         Args:
             images: original single images to make mosaic.
             boxes: corresponding bounding boxes to images.
-            mosaic_divide_points: Points to build mosaic around on given output size.
+            mosaic_divide_points: Points to build mosaic around on given
+            output size.
         Returns:
             (tuple)
             Mosaic Image, Mosaic Boxes merged.
@@ -244,19 +253,20 @@ class Mosaic:
     return mosaic_images, mosaic_boxes
 
   def __call__(self, images, boxes):
+    """Builds mosaic with given images , boxes"""
 
     if images.shape[0] != 4:
-      _err_msg = "Currently Exact 4 Images are supported by Mosaic Augmentation."
-      logging.error(_err_msg)
-      raise Exception(_err_msg)
-    """Builds mosaic with given images , boxes"""
+      err_msg = "Currently Exact 4 Images are supported by Mosaic Aug."
+      logging.error(err_msg)
+      raise Exception(err_msg)
+
     x, y = self._mosaic_divide_points()
-    _mosaic_sub_images, _mosaic_boxes = self._mosaic(
+    mosaic_sub_images, mosaic_boxes = self._mosaic(
         images, boxes, mosaic_divide_points=(x, y))
 
-    _upper_stack = tf.concat([_mosaic_sub_images[0], _mosaic_sub_images[1]],
+    upper_stack = tf.concat([mosaic_sub_images[0], mosaic_sub_images[1]],
                              axis=0)
-    _lower_stack = tf.concat([_mosaic_sub_images[2], _mosaic_sub_images[3]],
+    lower_stack = tf.concat([mosaic_sub_images[2], mosaic_sub_images[3]],
                              axis=0)
-    _mosaic_image = tf.concat([_upper_stack, _lower_stack], axis=1)
-    return _mosaic_image, _mosaic_boxes
+    mosaic_image = tf.concat([upper_stack, lower_stack], axis=1)
+    return mosaic_image, mosaic_boxes
