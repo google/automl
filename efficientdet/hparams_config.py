@@ -276,7 +276,7 @@ def default_detection_configs():
   # A temporary flag to switch between legacy and keras models.
   h.use_keras_model = True
 
-  # in case of RAM memory leak bug try with True
+  # in case of CPU memory leak bug try with True
   h.each_epoch_in_separate_process = False
 
   # unused.

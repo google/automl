@@ -105,7 +105,7 @@ flags.DEFINE_integer(
 # for train_and_eval mode
 flags.DEFINE_bool(
     'each_epoch_in_separate_process', False,
-    'This option helps to rectify RAM memory leak. If set to True then every '
+    'This option helps to rectify CPU memory leak. If set to True then every '
     'epoch iteration is run in a separate process '
     'for train_and_eval mode and the memory is cleared after each epoch.\n'
     'Drawback: you need to kill 2 processes instead of one if '
