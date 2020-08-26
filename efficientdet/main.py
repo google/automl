@@ -104,7 +104,7 @@ flags.DEFINE_integer(
 
 # for train_and_eval mode
 flags.DEFINE_bool(
-    'each_epoch_in_separate_process', False,
+    'run_epoch_in_child_process', False,
     'This option helps to rectify CPU memory leak. If set to True then every '
     'epoch iteration is run in a separate process '
     'for train_and_eval mode and the memory is cleared after each epoch.\n'
@@ -358,7 +358,7 @@ def main(_):
       ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
       utils.archive_ckpt(eval_results, eval_results['AP'], ckpt)
     for e in range(current_epoch + 1, config.num_epochs + 1, epochs_per_cycle):
-      if FLAGS.each_epoch_in_separate_process:
+      if FLAGS.run_epoch_in_child_process:
         p = multiprocessing.Process(target=lambda: run_train_and_eval(e))
         p.start()
         p.join()

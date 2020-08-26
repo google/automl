@@ -277,7 +277,7 @@ def default_detection_configs():
   h.use_keras_model = True
 
   # rectifies CPU memory leak
-  h.each_epoch_in_separate_process = True
+  h.run_epoch_in_child_process = True
 
   # unused.
   h.resnet_depth = 50
