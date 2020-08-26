@@ -104,7 +104,7 @@ flags.DEFINE_integer(
 
 # for train_and_eval mode
 flags.DEFINE_bool(
-    'run_epoch_in_child_process', False,
+    'run_epoch_in_child_process', True,
     'This option helps to rectify CPU memory leak. If set to True then every '
     'epoch iteration is run in a separate process '
     'for train_and_eval mode and the memory is cleared after each epoch.\n'
@@ -361,6 +361,7 @@ def main(_):
       if FLAGS.run_epoch_in_child_process:
         p = multiprocessing.Process(target=lambda: run_train_and_eval(e))
         p.start()
+        # p.close()
         p.join()
       else:
         run_train_and_eval(e)
