@@ -14,6 +14,7 @@
 # ==============================================================================
 """The main training script."""
 import os
+import multiprocessing
 from absl import app
 from absl import flags
 from absl import logging
@@ -100,6 +101,15 @@ flags.DEFINE_integer('min_eval_interval', 180,
 flags.DEFINE_integer(
     'eval_timeout', None,
     'Maximum seconds between checkpoints before evaluation terminates.')
+
+# for train_and_eval mode
+flags.DEFINE_bool(
+    'each_epoch_in_separate_process', False,
+    'this helps with RAM memory leak as inside the epoch loop it runs every'
+    'train_and_eval function in a separate process and clears memory after'
+    'the process end.\n'
+    'Drawback: you need to kill 2 processes instead of one if '
+    'you want to interrupt training')
 
 FLAGS = flags.FLAGS
 
@@ -338,7 +348,7 @@ def main(_):
       current_epoch = 0
 
     epochs_per_cycle = 1  # higher number has less graph construction overhead.
-    for e in range(current_epoch + 1, config.num_epochs + 1, epochs_per_cycle):
+    def run_train_and_eval(e):
       print('-----------------------------------------------------\n'
             '=====> Starting training, epoch: %d.' % e)
       _train(e * FLAGS.num_examples_per_epoch // FLAGS.train_batch_size)
@@ -347,6 +357,13 @@ def main(_):
       eval_results = _eval(eval_steps)
       ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
       utils.archive_ckpt(eval_results, eval_results['AP'], ckpt)
+    for e in range(current_epoch + 1, config.num_epochs + 1, epochs_per_cycle):
+      if FLAGS.each_epoch_in_separate_process:
+        p = multiprocessing.Process(target=lambda: run_train_and_eval(e))
+        p.start()
+        p.join()
+      else:
+        run_train_and_eval(e)
 
   else:
     logging.info('Invalid mode: %s', FLAGS.mode)
