@@ -30,10 +30,12 @@ flags.DEFINE_string('model_dir', None, 'Location of the checkpoint to run.')
 flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model name to use.')
 flags.DEFINE_string('hparams', '', 'Comma separated k=v pairs or a yaml file')
 flags.DEFINE_bool('debug', False, 'If true, run function in eager for debug.')
+flags.DEFINE_string('saved_model_dir', None, 'If true, run function in eager for debug.')
 FLAGS = flags.FLAGS
 
 
 def main(_):
+
   # pylint: disable=line-too-long
   # Prepare images and checkpoints: please run these commands in shell.
   # !mkdir tmp
@@ -60,12 +62,25 @@ def main(_):
   model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
   model.summary()
 
-  @tf.function
-  def f(imgs):
-    return model(imgs, training=False, post_mode='global')
+  class ExportModel(tf.Module):
+    def __init__(self, model):
+      super().__init__()
+      self.model = model
+
+    @tf.function
+    def f(self, imgs):
+      return model(imgs, training=False, post_mode='global')
 
   imgs = tf.convert_to_tensor(imgs, dtype=tf.uint8)
-  boxes, scores, classes, valid_len = f(imgs)
+  export_model = ExportModel(model)
+  if FLAGS.saved_model_dir:
+    tf.saved_model.save(
+      export_model, FLAGS.saved_model_dir,
+      signatures=export_model.f.get_concrete_function(
+        tf.TensorSpec(shape=(None, None, None, 3), dtype=tf.uint8)))
+    export_model = tf.saved_model.load(FLAGS.saved_model_dir)
+
+  boxes, scores, classes, valid_len = export_model.f(imgs)
 
   # Visualize results.
   for i, img in enumerate(imgs):

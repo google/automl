@@ -162,13 +162,14 @@ def build_model(images,
       training=training,
       features_only=features_only,
       pooled_features_only=pooled_features_only)
+  features, endpoints = outputs[0], outputs[1:]
   if features_only:
-    outputs = tf.identity(outputs, 'features')
+    features = tf.identity(features, 'features')
   elif pooled_features_only:
-    outputs = tf.identity(outputs, 'pooled_features')
+    features = tf.identity(features, 'pooled_features')
   else:
-    outputs = tf.identity(outputs, 'logits')
-  return outputs, model.endpoints
+    features = tf.identity(features, 'logits')
+  return features, endpoints
 
 
 def build_model_base(images, model_name, training, override_params=None):

@@ -164,14 +164,15 @@ class FNode(tf.keras.layers.Layer):
 
   def call(self, feats, training):
     nodes = []
+    append_feats = []
     for i, input_offset in enumerate(self.inputs_offsets):
       input_node = feats[input_offset]
       input_node = self.resample_layers[i](input_node, training, feats)
       nodes.append(input_node)
     new_node = self.fuse_features(nodes)
     new_node = self.op_after_combine(new_node)
-    feats.append(new_node)
-    return feats
+    append_feats.append(new_node)
+    return feats + append_feats
 
 
 class OpAfterCombine(tf.keras.layers.Layer):
@@ -806,15 +807,7 @@ class EfficientDetNet(tf.keras.Model):
   def call(self, inputs, training):
     config = self.config
     # call backbone network.
-    self.backbone(inputs, training=training, features_only=True)
-    all_feats = [
-        inputs,
-        self.backbone.endpoints['reduction_1'],
-        self.backbone.endpoints['reduction_2'],
-        self.backbone.endpoints['reduction_3'],
-        self.backbone.endpoints['reduction_4'],
-        self.backbone.endpoints['reduction_5'],
-    ]
+    all_feats = self.backbone(inputs, training=training, features_only=True)
     feats = all_feats[config.min_level:config.max_level + 1]
 
     # Build additional input features that are not from backbone.
@@ -822,16 +815,16 @@ class EfficientDetNet(tf.keras.Model):
       feats.append(resample_layer(feats[-1], training, None))
 
     # call feature network.
-    feats = self.fpn_cells(feats, training)
+    fpn_feats = self.fpn_cells(feats, training)
 
     # call class/box/seg output network.
     outputs = []
     if 'object_detection' in config.heads:
-      class_outputs = self.class_net(feats, training)
-      box_outputs = self.box_net(feats, training)
+      class_outputs = self.class_net(fpn_feats, training)
+      box_outputs = self.box_net(fpn_feats, training)
       outputs.extend([class_outputs, box_outputs])
     if 'segmentation' in config.heads:
-      seg_outputs = self.seg_head(feats, training)
+      seg_outputs = self.seg_head(fpn_feats, training)
       outputs.append(seg_outputs)
     return tuple(outputs)
 

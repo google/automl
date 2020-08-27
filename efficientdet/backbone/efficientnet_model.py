@@ -752,4 +752,10 @@ class Model(tf.keras.Model):
       outputs = self._head(outputs, training, pooled_features_only)
       self.endpoints.update(self._head.endpoints)
 
-    return outputs
+    return [outputs] + [
+      self.endpoints['reduction_1'],
+      self.endpoints['reduction_2'],
+      self.endpoints['reduction_3'],
+      self.endpoints['reduction_4'],
+      self.endpoints['reduction_5'],
+    ]
