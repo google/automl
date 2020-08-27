@@ -16,6 +16,7 @@
 import os
 from absl import app
 from absl import flags
+from absl import logging
 import numpy as np
 from PIL import Image
 import tensorflow as tf
@@ -30,7 +31,7 @@ flags.DEFINE_string('model_dir', None, 'Location of the checkpoint to run.')
 flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model name to use.')
 flags.DEFINE_string('hparams', '', 'Comma separated k=v pairs or a yaml file')
 flags.DEFINE_bool('debug', False, 'If true, run function in eager for debug.')
-flags.DEFINE_string('saved_model_dir', None, 'If true, run function in eager for debug.')
+flags.DEFINE_string('saved_model_dir', None, 'Saved model directory')
 FLAGS = flags.FLAGS
 
 
@@ -69,7 +70,7 @@ def main(_):
 
     @tf.function
     def f(self, imgs):
-      return model(imgs, training=False, post_mode='global')
+      return self.model(imgs, training=False, post_mode='global')
 
   imgs = tf.convert_to_tensor(imgs, dtype=tf.uint8)
   export_model = ExportModel(model)
@@ -95,12 +96,12 @@ def main(_):
         max_boxes_to_draw=config.nms_configs.max_output_size)
     output_image_path = os.path.join(FLAGS.output_dir, str(i) + '.jpg')
     Image.fromarray(img).save(output_image_path)
-    print('writing annotated image to ', output_image_path)
+    logging.info('writing annotated image to ', output_image_path)
 
 
 if __name__ == '__main__':
   flags.mark_flag_as_required('image_path')
   flags.mark_flag_as_required('output_dir')
   flags.mark_flag_as_required('model_dir')
-  # logging.set_verbosity(logging.WARNING)
+  logging.set_verbosity(logging.ERROR)
   app.run(main)
