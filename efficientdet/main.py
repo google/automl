@@ -14,6 +14,8 @@
 # ==============================================================================
 """The main training script."""
 import os
+import multiprocessing
+from functools import partial
 from absl import app
 from absl import flags
 from absl import logging
@@ -25,16 +27,19 @@ import hparams_config
 import utils
 
 flags.DEFINE_string(
-    'tpu', default=None,
+    'tpu',
+    default=None,
     help='The Cloud TPU to use for training. This should be either the name '
     'used when creating the Cloud TPU, or a grpc://ip.address.of.tpu:8470 '
     'url.')
 flags.DEFINE_string(
-    'gcp_project', default=None,
+    'gcp_project',
+    default=None,
     help='Project name for the Cloud TPU-enabled project. If not specified, we '
     'will attempt to automatically detect the GCE project from metadata.')
 flags.DEFINE_string(
-    'tpu_zone', default=None,
+    'tpu_zone',
+    default=None,
     help='GCE zone where the Cloud TPU is located in. If not specified, we '
     'will attempt to automatically detect the GCE project from metadata.')
 flags.DEFINE_string('eval_name', default=None, help='Eval job name')
@@ -47,9 +52,9 @@ flags.DEFINE_bool(
     'Use XLA even if strategy is not tpu. If strategy is tpu, always use XLA, '
     'and this flag has no effect.')
 flags.DEFINE_string('model_dir', None, 'Location of model_dir')
-flags.DEFINE_string('backbone_ckpt', '',
-                    'Location of the ResNet50 checkpoint to use for model '
-                    'initialization.')
+flags.DEFINE_string(
+    'backbone_ckpt', '', 'Location of the ResNet50 checkpoint to use for model '
+    'initialization.')
 flags.DEFINE_string('ckpt', None,
                     'Start training from this EfficientDet checkpoint.')
 
@@ -60,7 +65,9 @@ flags.DEFINE_integer(
     'num_cores', default=8, help='Number of TPU cores for training')
 flags.DEFINE_bool('use_spatial_partition', False, 'Use spatial partition.')
 flags.DEFINE_integer(
-    'num_cores_per_replica', default=8, help='Number of TPU cores per'
+    'num_cores_per_replica',
+    default=8,
+    help='Number of TPU cores per'
     'replica when using spatial partition.')
 flags.DEFINE_multi_integer(
     'input_partition_dims', [1, 4, 2, 1],
@@ -101,6 +108,15 @@ flags.DEFINE_integer(
     'eval_timeout', None,
     'Maximum seconds between checkpoints before evaluation terminates.')
 
+# for train_and_eval mode
+flags.DEFINE_bool(
+    'run_epoch_in_child_process', True,
+    'This option helps to rectify CPU memory leak. If set to True then every '
+    'epoch iteration is run in a separate process '
+    'for train_and_eval mode and the memory is cleared after each epoch.\n'
+    'Drawback: you need to kill 2 processes instead of one if '
+    'you want to interrupt training')
+
 FLAGS = flags.FLAGS
 
 
@@ -117,9 +133,7 @@ def main(_):
 
   if FLAGS.strategy == 'tpu':
     tpu_cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
-        FLAGS.tpu,
-        zone=FLAGS.tpu_zone,
-        project=FLAGS.gcp_project)
+        FLAGS.tpu, zone=FLAGS.tpu_zone, project=FLAGS.gcp_project)
     tpu_grpc_url = tpu_cluster_resolver.get_master()
     tf.Session.reset(tpu_grpc_url)
   else:
@@ -328,6 +342,8 @@ def main(_):
 
   elif FLAGS.mode == 'train_and_eval':
     ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
+    if not ckpt:
+      ckpt = tf.train.latest_checkpoint(FLAGS.ckpt)
     try:
       step = int(os.path.basename(ckpt).split("-")[1])
       current_epoch = (
@@ -338,7 +354,8 @@ def main(_):
       current_epoch = 0
 
     epochs_per_cycle = 1  # higher number has less graph construction overhead.
-    for e in range(current_epoch + 1, config.num_epochs + 1, epochs_per_cycle):
+
+    def run_train_and_eval(e):
       print('-----------------------------------------------------\n'
             '=====> Starting training, epoch: %d.' % e)
       _train(e * FLAGS.num_examples_per_epoch // FLAGS.train_batch_size)
@@ -347,6 +364,14 @@ def main(_):
       eval_results = _eval(eval_steps)
       ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
       utils.archive_ckpt(eval_results, eval_results['AP'], ckpt)
+
+    for e in range(current_epoch + 1, config.num_epochs + 1, epochs_per_cycle):
+      if FLAGS.run_epoch_in_child_process:
+        p = multiprocessing.Process(target=partial(run_train_and_eval, e=e))
+        p.start()
+        p.join()
+      else:
+        run_train_and_eval(e)
 
   else:
     logging.info('Invalid mode: %s', FLAGS.mode)
