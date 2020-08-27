@@ -276,9 +276,6 @@ def default_detection_configs():
   # A temporary flag to switch between legacy and keras models.
   h.use_keras_model = True
 
-  # rectifies CPU memory leak
-  h.run_epoch_in_child_process = True
-
   # unused.
   h.resnet_depth = 50
   return h
