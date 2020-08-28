@@ -1,0 +1,515 @@
+2020-08-27 12:11:08.984528: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudart.so.10.1
+WARNING:tensorflow:From main.py:236: The name tf.estimator.tpu.TPUConfig is deprecated. Please use tf.compat.v1.estimator.tpu.TPUConfig instead.
+
+W0827 12:11:09.828594 139844883078208 module_wrapper.py:136] From main.py:236: The name tf.estimator.tpu.TPUConfig is deprecated. Please use tf.compat.v1.estimator.tpu.TPUConfig instead.
+
+WARNING:tensorflow:From main.py:240: The name tf.estimator.tpu.InputPipelineConfig is deprecated. Please use tf.compat.v1.estimator.tpu.InputPipelineConfig instead.
+
+W0827 12:11:09.828748 139844883078208 module_wrapper.py:136] From main.py:240: The name tf.estimator.tpu.InputPipelineConfig is deprecated. Please use tf.compat.v1.estimator.tpu.InputPipelineConfig instead.
+
+WARNING:tensorflow:From main.py:248: The name tf.estimator.tpu.RunConfig is deprecated. Please use tf.compat.v1.estimator.tpu.RunConfig instead.
+
+W0827 12:11:09.828847 139844883078208 module_wrapper.py:136] From main.py:248: The name tf.estimator.tpu.RunConfig is deprecated. Please use tf.compat.v1.estimator.tpu.RunConfig instead.
+
+I0827 12:11:09.828958 139844883078208 main.py:261] {'name': 'efficientdet-d6', 'act_type': 'swish', 'image_size': (1280, 1280), 'target_size': None, 'input_rand_hflip': False, 'jitter_min': 0.8, 'jitter_max': 1.2, 'autoaugment_policy': None, 'use_augmix': False, 'augmix_params': (3, -1, 1), 'sample_image': None, 'num_classes': 2, 'seg_num_classes': 3, 'heads': ['object_detection'], 'skip_crowd_during_training': True, 'label_map': {1: 'table'}, 'max_instances_per_image': 100, 'regenerate_source_id': False, 'min_level': 3, 'max_level': 7, 'num_scales': 3, 'aspect_ratios': [[1.0, 1.0], [0.521, 1.921], [1.921, 0.521], [0.25, 4.0], [4.0, 0.25]], 'anchor_scale': 4.0, 'is_training_bn': True, 'momentum': 0.9, 'optimizer': 'sgd', 'learning_rate': 0.08, 'lr_warmup_init': 0.008, 'lr_warmup_epoch': 1.0, 'first_lr_drop_epoch': 200.0, 'second_lr_drop_epoch': 250.0, 'poly_lr_power': 0.9, 'clip_gradients_norm': 5.0, 'num_epochs': 300, 'data_format': 'channels_last', 'label_smoothing': 0.0, 'alpha': 0.25, 'gamma': 1.5, 'delta': 0.1, 'box_loss_weight': 50.0, 'iou_loss_type': None, 'iou_loss_weight': 1.0, 'weight_decay': 4e-05, 'strategy': None, 'mixed_precision': True, 'box_class_repeats': 5, 'fpn_cell_repeats': 8, 'fpn_num_filters': 384, 'separable_conv': True, 'apply_bn_for_resampling': True, 'conv_after_downsample': False, 'conv_bn_act_pattern': False, 'nms_configs': {'method': 'gaussian', 'iou_thresh': None, 'score_thresh': None, 'sigma': None, 'max_nms_inputs': 0, 'max_output_size': 100}, 'fpn_name': None, 'fpn_weight_method': 'sum', 'fpn_config': None, 'survival_prob': None, 'img_summary_steps': None, 'lr_decay_method': 'cosine', 'moving_average_decay': 0.9998, 'ckpt_var_scope': None, 'skip_mismatch': True, 'backbone_name': 'efficientnet-b6', 'backbone_config': None, 'var_freeze_expr': None, 'use_keras_model': True, 'resnet_depth': 50, 'model_name': 'efficientdet-d6', 'iterations_per_loop': 100, 'model_dir': '../../efficientdet/logs/ckpt/python_table_reader_d6', 'num_shards': 8, 'num_examples_per_epoch': 6100, 'backbone_ckpt': '', 'ckpt': '../../efficientdet/logs/ckpt/python_table_reader_d6_adam', 'val_json_file': None, 'testdev_dir': None, 'mode': 'train_and_eval'}
+I0827 12:11:09.829817 139844883078208 main.py:351] found ckpt at step 154025 (epoch 25)
+WARNING:tensorflow:From main.py:265: The name tf.estimator.tpu.TPUEstimator is deprecated. Please use tf.compat.v1.estimator.tpu.TPUEstimator instead.
+
+W0827 12:11:09.834547 139844883078208 module_wrapper.py:136] From main.py:265: The name tf.estimator.tpu.TPUEstimator is deprecated. Please use tf.compat.v1.estimator.tpu.TPUEstimator instead.
+
+INFO:tensorflow:Using config: {'_model_dir': '../../efficientdet/logs/ckpt/python_table_reader_d6', '_tf_random_seed': None, '_save_summary_steps': 100, '_save_checkpoints_steps': None, '_save_checkpoints_secs': 600, '_session_config': gpu_options {
+  allow_growth: true
+}
+allow_soft_placement: true
+, '_keep_checkpoint_max': 5, '_keep_checkpoint_every_n_hours': 10000, '_log_step_count_steps': None, '_train_distribute': None, '_device_fn': None, '_protocol': None, '_eval_distribute': None, '_experimental_distribute': None, '_experimental_max_worker_delay_secs': None, '_session_creation_timeout_secs': 7200, '_service': None, '_cluster_spec': ClusterSpec({}), '_task_type': 'worker', '_task_id': 0, '_global_id_in_cluster': 0, '_master': '', '_evaluation_master': '', '_is_chief': True, '_num_ps_replicas': 0, '_num_worker_replicas': 1, '_tpu_config': TPUConfig(iterations_per_loop=1, num_shards=None, num_cores_per_replica=None, per_host_input_for_training=3, tpu_job_name=None, initial_infeed_sleep_secs=None, input_partition_dims=None, eval_training_input_configuration=2, experimental_host_call_every_n_steps=1), '_cluster': None}
+I0827 12:11:09.836067 139844883078208 estimator.py:191] Using config: {'_model_dir': '../../efficientdet/logs/ckpt/python_table_reader_d6', '_tf_random_seed': None, '_save_summary_steps': 100, '_save_checkpoints_steps': None, '_save_checkpoints_secs': 600, '_session_config': gpu_options {
+  allow_growth: true
+}
+allow_soft_placement: true
+, '_keep_checkpoint_max': 5, '_keep_checkpoint_every_n_hours': 10000, '_log_step_count_steps': None, '_train_distribute': None, '_device_fn': None, '_protocol': None, '_eval_distribute': None, '_experimental_distribute': None, '_experimental_max_worker_delay_secs': None, '_session_creation_timeout_secs': 7200, '_service': None, '_cluster_spec': ClusterSpec({}), '_task_type': 'worker', '_task_id': 0, '_global_id_in_cluster': 0, '_master': '', '_evaluation_master': '', '_is_chief': True, '_num_ps_replicas': 0, '_num_worker_replicas': 1, '_tpu_config': TPUConfig(iterations_per_loop=1, num_shards=None, num_cores_per_replica=None, per_host_input_for_training=3, tpu_job_name=None, initial_infeed_sleep_secs=None, input_partition_dims=None, eval_training_input_configuration=2, experimental_host_call_every_n_steps=1), '_cluster': None}
+INFO:tensorflow:_TPUContext: eval_on_tpu True
+I0827 12:11:09.837065 139844883078208 tpu_context.py:217] _TPUContext: eval_on_tpu True
+WARNING:tensorflow:eval_on_tpu ignored because use_tpu is False.
+W0827 12:11:09.837214 139844883078208 tpu_context.py:219] eval_on_tpu ignored because use_tpu is False.
+WARNING:tensorflow:From /home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/training/training_util.py:235: Variable.initialized_value (from tensorflow.python.ops.variables) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use Variable.read_value. Variables in 2.X are initialized automatically both in eager and graph (inside tf.defun) contexts.
+W0827 12:11:09.852250 139844883078208 deprecation.py:317] From /home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/training/training_util.py:235: Variable.initialized_value (from tensorflow.python.ops.variables) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use Variable.read_value. Variables in 2.X are initialized automatically both in eager and graph (inside tf.defun) contexts.
+2020-08-27 12:11:09.856343: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcuda.so.1
+2020-08-27 12:11:09.890917: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:982] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-08-27 12:11:09.891385: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1716] Found device 0 with properties: 
+pciBusID: 0000:0a:00.0 name: GeForce RTX 2080 Ti computeCapability: 7.5
+coreClock: 1.65GHz coreCount: 68 deviceMemorySize: 10.76GiB deviceMemoryBandwidth: 573.69GiB/s
+2020-08-27 12:11:09.891405: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudart.so.10.1
+2020-08-27 12:11:09.892582: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcublas.so.10
+2020-08-27 12:11:09.893726: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcufft.so.10
+2020-08-27 12:11:09.893895: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcurand.so.10
+2020-08-27 12:11:09.894915: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcusolver.so.10
+2020-08-27 12:11:09.896044: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcusparse.so.10
+2020-08-27 12:11:09.898399: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudnn.so.7
+2020-08-27 12:11:09.898488: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:982] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-08-27 12:11:09.898951: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:982] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-08-27 12:11:09.899347: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1858] Adding visible gpu devices: 0
+I0827 12:11:10.046714 139844883078208 dataloader.py:82] target_size = (1280, 1280), output_size = (1280, 1280)
+INFO:tensorflow:Calling model_fn.
+I0827 12:11:10.244620 139844883078208 estimator.py:1162] Calling model_fn.
+INFO:tensorflow:Running train on CPU/GPU
+I0827 12:11:10.244768 139844883078208 tpu_estimator.py:3177] Running train on CPU/GPU
+I0827 12:11:10.245020 139844883078208 utils.py:415] Adding image summary ('input_image', <tf.Tensor 'IteratorGetNext:0' shape=(1, 1280, 1280, 3) dtype=float32>)
+I0827 12:11:10.245081 139844883078208 utils.py:628] use mixed precision policy name mixed_float16
+2020-08-27 12:11:10.247627: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:982] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+INFO:tensorflow:Mixed precision compatibility check (mixed_float16): OK
+Your GPU will likely run quickly with dtype policy mixed_float16 as it has compute capability of at least 7.0. Your GPU: GeForce RTX 2080 Ti, compute capability 7.5
+I0827 12:11:10.248101 139844883078208 device_compatibility_check.py:120] Mixed precision compatibility check (mixed_float16): OK
+Your GPU will likely run quickly with dtype policy mixed_float16 as it has compute capability of at least 7.0. Your GPU: GeForce RTX 2080 Ti, compute capability 7.5
+I0827 12:11:10.251329 139844883078208 efficientnet_builder.py:215] global_params= GlobalParams(batch_norm_momentum=0.99, batch_norm_epsilon=0.001, dropout_rate=0.5, data_format='channels_last', num_classes=1000, width_coefficient=1.8, depth_coefficient=2.6, depth_divisor=8, min_depth=None, survival_prob=0.8, relu_fn=functools.partial(<function activation_fn at 0x7f3000d5d430>, act_type='swish'), batch_norm=<class 'utils.BatchNormalization'>, use_se=True, local_pooling=None, condconv_num_experts=None, clip_projection_output=False, blocks_args=['r1_k3_s11_e1_i32_o16_se0.25', 'r2_k3_s22_e6_i16_o24_se0.25', 'r2_k5_s22_e6_i24_o40_se0.25', 'r3_k3_s22_e6_i40_o80_se0.25', 'r3_k5_s11_e6_i80_o112_se0.25', 'r4_k5_s22_e6_i112_o192_se0.25', 'r1_k3_s11_e6_i192_o320_se0.25'], fix_head_stem=None)
+I0827 12:11:10.643525 139844883078208 efficientdet_keras.py:686] fnode 0 : {'feat_level': 6, 'inputs_offsets': [3, 4]}
+I0827 12:11:10.643985 139844883078208 efficientdet_keras.py:686] fnode 1 : {'feat_level': 5, 'inputs_offsets': [2, 5]}
+I0827 12:11:10.644356 139844883078208 efficientdet_keras.py:686] fnode 2 : {'feat_level': 4, 'inputs_offsets': [1, 6]}
+I0827 12:11:10.644725 139844883078208 efficientdet_keras.py:686] fnode 3 : {'feat_level': 3, 'inputs_offsets': [0, 7]}
+I0827 12:11:10.645139 139844883078208 efficientdet_keras.py:686] fnode 4 : {'feat_level': 4, 'inputs_offsets': [1, 7, 8]}
+I0827 12:11:10.645511 139844883078208 efficientdet_keras.py:686] fnode 5 : {'feat_level': 5, 'inputs_offsets': [2, 6, 9]}
+I0827 12:11:10.645888 139844883078208 efficientdet_keras.py:686] fnode 6 : {'feat_level': 6, 'inputs_offsets': [3, 5, 10]}
+I0827 12:11:10.646250 139844883078208 efficientdet_keras.py:686] fnode 7 : {'feat_level': 7, 'inputs_offsets': [4, 11]}
+I0827 12:11:10.646814 139844883078208 efficientdet_keras.py:686] fnode 0 : {'feat_level': 6, 'inputs_offsets': [3, 4]}
+I0827 12:11:10.647176 139844883078208 efficientdet_keras.py:686] fnode 1 : {'feat_level': 5, 'inputs_offsets': [2, 5]}
+I0827 12:11:10.647572 139844883078208 efficientdet_keras.py:686] fnode 2 : {'feat_level': 4, 'inputs_offsets': [1, 6]}
+I0827 12:11:10.647938 139844883078208 efficientdet_keras.py:686] fnode 3 : {'feat_level': 3, 'inputs_offsets': [0, 7]}
+I0827 12:11:10.648288 139844883078208 efficientdet_keras.py:686] fnode 4 : {'feat_level': 4, 'inputs_offsets': [1, 7, 8]}
+I0827 12:11:10.648648 139844883078208 efficientdet_keras.py:686] fnode 5 : {'feat_level': 5, 'inputs_offsets': [2, 6, 9]}
+I0827 12:11:10.649017 139844883078208 efficientdet_keras.py:686] fnode 6 : {'feat_level': 6, 'inputs_offsets': [3, 5, 10]}
+I0827 12:11:10.649384 139844883078208 efficientdet_keras.py:686] fnode 7 : {'feat_level': 7, 'inputs_offsets': [4, 11]}
+I0827 12:11:10.650219 139844883078208 efficientdet_keras.py:686] fnode 0 : {'feat_level': 6, 'inputs_offsets': [3, 4]}
+I0827 12:11:10.650577 139844883078208 efficientdet_keras.py:686] fnode 1 : {'feat_level': 5, 'inputs_offsets': [2, 5]}
+I0827 12:11:10.650939 139844883078208 efficientdet_keras.py:686] fnode 2 : {'feat_level': 4, 'inputs_offsets': [1, 6]}
+I0827 12:11:10.651308 139844883078208 efficientdet_keras.py:686] fnode 3 : {'feat_level': 3, 'inputs_offsets': [0, 7]}
+I0827 12:11:10.651661 139844883078208 efficientdet_keras.py:686] fnode 4 : {'feat_level': 4, 'inputs_offsets': [1, 7, 8]}
+I0827 12:11:10.652029 139844883078208 efficientdet_keras.py:686] fnode 5 : {'feat_level': 5, 'inputs_offsets': [2, 6, 9]}
+I0827 12:11:10.652386 139844883078208 efficientdet_keras.py:686] fnode 6 : {'feat_level': 6, 'inputs_offsets': [3, 5, 10]}
+I0827 12:11:10.652770 139844883078208 efficientdet_keras.py:686] fnode 7 : {'feat_level': 7, 'inputs_offsets': [4, 11]}
+I0827 12:11:10.653331 139844883078208 efficientdet_keras.py:686] fnode 0 : {'feat_level': 6, 'inputs_offsets': [3, 4]}
+I0827 12:11:10.653693 139844883078208 efficientdet_keras.py:686] fnode 1 : {'feat_level': 5, 'inputs_offsets': [2, 5]}
+I0827 12:11:10.654047 139844883078208 efficientdet_keras.py:686] fnode 2 : {'feat_level': 4, 'inputs_offsets': [1, 6]}
+I0827 12:11:10.654393 139844883078208 efficientdet_keras.py:686] fnode 3 : {'feat_level': 3, 'inputs_offsets': [0, 7]}
+I0827 12:11:10.654775 139844883078208 efficientdet_keras.py:686] fnode 4 : {'feat_level': 4, 'inputs_offsets': [1, 7, 8]}
+I0827 12:11:10.655133 139844883078208 efficientdet_keras.py:686] fnode 5 : {'feat_level': 5, 'inputs_offsets': [2, 6, 9]}
+I0827 12:11:10.655485 139844883078208 efficientdet_keras.py:686] fnode 6 : {'feat_level': 6, 'inputs_offsets': [3, 5, 10]}
+I0827 12:11:10.655836 139844883078208 efficientdet_keras.py:686] fnode 7 : {'feat_level': 7, 'inputs_offsets': [4, 11]}
+I0827 12:11:10.656384 139844883078208 efficientdet_keras.py:686] fnode 0 : {'feat_level': 6, 'inputs_offsets': [3, 4]}
+I0827 12:11:10.656742 139844883078208 efficientdet_keras.py:686] fnode 1 : {'feat_level': 5, 'inputs_offsets': [2, 5]}
+I0827 12:11:10.657125 139844883078208 efficientdet_keras.py:686] fnode 2 : {'feat_level': 4, 'inputs_offsets': [1, 6]}
+I0827 12:11:10.657484 139844883078208 efficientdet_keras.py:686] fnode 3 : {'feat_level': 3, 'inputs_offsets': [0, 7]}
+I0827 12:11:10.657832 139844883078208 efficientdet_keras.py:686] fnode 4 : {'feat_level': 4, 'inputs_offsets': [1, 7, 8]}
+I0827 12:11:10.658175 139844883078208 efficientdet_keras.py:686] fnode 5 : {'feat_level': 5, 'inputs_offsets': [2, 6, 9]}
+I0827 12:11:10.658554 139844883078208 efficientdet_keras.py:686] fnode 6 : {'feat_level': 6, 'inputs_offsets': [3, 5, 10]}
+I0827 12:11:10.658912 139844883078208 efficientdet_keras.py:686] fnode 7 : {'feat_level': 7, 'inputs_offsets': [4, 11]}
+I0827 12:11:10.659477 139844883078208 efficientdet_keras.py:686] fnode 0 : {'feat_level': 6, 'inputs_offsets': [3, 4]}
+I0827 12:11:10.659818 139844883078208 efficientdet_keras.py:686] fnode 1 : {'feat_level': 5, 'inputs_offsets': [2, 5]}
+I0827 12:11:10.660165 139844883078208 efficientdet_keras.py:686] fnode 2 : {'feat_level': 4, 'inputs_offsets': [1, 6]}
+I0827 12:11:10.660504 139844883078208 efficientdet_keras.py:686] fnode 3 : {'feat_level': 3, 'inputs_offsets': [0, 7]}
+I0827 12:11:10.660865 139844883078208 efficientdet_keras.py:686] fnode 4 : {'feat_level': 4, 'inputs_offsets': [1, 7, 8]}
+I0827 12:11:10.661219 139844883078208 efficientdet_keras.py:686] fnode 5 : {'feat_level': 5, 'inputs_offsets': [2, 6, 9]}
+I0827 12:11:10.661562 139844883078208 efficientdet_keras.py:686] fnode 6 : {'feat_level': 6, 'inputs_offsets': [3, 5, 10]}
+I0827 12:11:10.661944 139844883078208 efficientdet_keras.py:686] fnode 7 : {'feat_level': 7, 'inputs_offsets': [4, 11]}
+I0827 12:11:10.662490 139844883078208 efficientdet_keras.py:686] fnode 0 : {'feat_level': 6, 'inputs_offsets': [3, 4]}
+I0827 12:11:10.662836 139844883078208 efficientdet_keras.py:686] fnode 1 : {'feat_level': 5, 'inputs_offsets': [2, 5]}
+I0827 12:11:10.663177 139844883078208 efficientdet_keras.py:686] fnode 2 : {'feat_level': 4, 'inputs_offsets': [1, 6]}
+I0827 12:11:10.663516 139844883078208 efficientdet_keras.py:686] fnode 3 : {'feat_level': 3, 'inputs_offsets': [0, 7]}
+I0827 12:11:10.663885 139844883078208 efficientdet_keras.py:686] fnode 4 : {'feat_level': 4, 'inputs_offsets': [1, 7, 8]}
+I0827 12:11:10.664236 139844883078208 efficientdet_keras.py:686] fnode 5 : {'feat_level': 5, 'inputs_offsets': [2, 6, 9]}
+I0827 12:11:10.664577 139844883078208 efficientdet_keras.py:686] fnode 6 : {'feat_level': 6, 'inputs_offsets': [3, 5, 10]}
+I0827 12:11:10.664920 139844883078208 efficientdet_keras.py:686] fnode 7 : {'feat_level': 7, 'inputs_offsets': [4, 11]}
+I0827 12:11:10.665469 139844883078208 efficientdet_keras.py:686] fnode 0 : {'feat_level': 6, 'inputs_offsets': [3, 4]}
+I0827 12:11:10.665814 139844883078208 efficientdet_keras.py:686] fnode 1 : {'feat_level': 5, 'inputs_offsets': [2, 5]}
+I0827 12:11:10.666181 139844883078208 efficientdet_keras.py:686] fnode 2 : {'feat_level': 4, 'inputs_offsets': [1, 6]}
+I0827 12:11:10.666532 139844883078208 efficientdet_keras.py:686] fnode 3 : {'feat_level': 3, 'inputs_offsets': [0, 7]}
+I0827 12:11:10.666865 139844883078208 efficientdet_keras.py:686] fnode 4 : {'feat_level': 4, 'inputs_offsets': [1, 7, 8]}
+I0827 12:11:10.667213 139844883078208 efficientdet_keras.py:686] fnode 5 : {'feat_level': 5, 'inputs_offsets': [2, 6, 9]}
+I0827 12:11:10.667566 139844883078208 efficientdet_keras.py:686] fnode 6 : {'feat_level': 6, 'inputs_offsets': [3, 5, 10]}
+I0827 12:11:10.667905 139844883078208 efficientdet_keras.py:686] fnode 7 : {'feat_level': 7, 'inputs_offsets': [4, 11]}
+WARNING:tensorflow:AutoGraph could not transform <bound method PythonHandler.emit of <PythonHandler <stderr> (NOTSET)>> and will run it as-is.
+Please report this to the TensorFlow team. When filing the bug, set the verbosity to 10 (on Linux, `export AUTOGRAPH_VERBOSITY=10`) and attach the full output.
+Cause: invalid syntax (tmpmkju2biu.py, line 52)
+To silence this warning, decorate the function with @tf.autograph.experimental.do_not_convert
+W0827 12:11:11.893816 139844883078208 ag_logging.py:146] AutoGraph could not transform <bound method PythonHandler.emit of <PythonHandler <stderr> (NOTSET)>> and will run it as-is.
+Please report this to the TensorFlow team. When filing the bug, set the verbosity to 10 (on Linux, `export AUTOGRAPH_VERBOSITY=10`) and attach the full output.
+Cause: invalid syntax (tmpmkju2biu.py, line 52)
+To silence this warning, decorate the function with @tf.autograph.experimental.do_not_convert
+-----------------------------------------------------
+=====> Starting training, epoch: 26.
+I0827 12:11:11.561025 139844883078208 api.py:598] Built stem stem : (1, 640, 640, 56)
+I0827 12:11:11.909387 139844883078208 api.py:598] block_0 survival_prob: 1.0
+I0827 12:11:12.042948 139844883078208 api.py:598] Block blocks_0 input shape: (1, 640, 640, 56)
+I0827 12:11:12.061906 139844883078208 api.py:598] DWConv shape: (1, 640, 640, 56)
+I0827 12:11:12.121771 139844883078208 api.py:598] Built SE se : (1, 1, 1, 56)
+I0827 12:11:12.139511 139844883078208 api.py:598] Project shape: (1, 640, 640, 32)
+I0827 12:11:12.155680 139844883078208 api.py:598] block_1 survival_prob: 0.9955555555555555
+I0827 12:11:12.158251 139844883078208 api.py:598] Block blocks_1 input shape: (1, 640, 640, 32)
+I0827 12:11:12.176535 139844883078208 api.py:598] DWConv shape: (1, 640, 640, 32)
+I0827 12:11:12.191750 139844883078208 api.py:598] Built SE se : (1, 1, 1, 32)
+I0827 12:11:12.246939 139844883078208 api.py:598] Project shape: (1, 640, 640, 32)
+I0827 12:11:12.249552 139844883078208 api.py:598] block_2 survival_prob: 0.9911111111111112
+I0827 12:11:12.252120 139844883078208 api.py:598] Block blocks_2 input shape: (1, 640, 640, 32)
+I0827 12:11:12.270759 139844883078208 api.py:598] DWConv shape: (1, 640, 640, 32)
+I0827 12:11:12.285978 139844883078208 api.py:598] Built SE se : (1, 1, 1, 32)
+I0827 12:11:12.306579 139844883078208 api.py:598] Project shape: (1, 640, 640, 32)
+I0827 12:11:12.309078 139844883078208 api.py:598] block_3 survival_prob: 0.9866666666666667
+I0827 12:11:12.311608 139844883078208 api.py:598] Block blocks_3 input shape: (1, 640, 640, 32)
+I0827 12:11:12.329101 139844883078208 api.py:598] Expand shape: (1, 640, 640, 192)
+I0827 12:11:12.346611 139844883078208 api.py:598] DWConv shape: (1, 320, 320, 192)
+I0827 12:11:12.361561 139844883078208 api.py:598] Built SE se : (1, 1, 1, 192)
+I0827 12:11:12.378023 139844883078208 api.py:598] Project shape: (1, 320, 320, 40)
+I0827 12:11:12.380420 139844883078208 api.py:598] block_4 survival_prob: 0.9822222222222222
+I0827 12:11:12.382868 139844883078208 api.py:598] Block blocks_4 input shape: (1, 320, 320, 40)
+I0827 12:11:12.400125 139844883078208 api.py:598] Expand shape: (1, 320, 320, 240)
+I0827 12:11:12.417593 139844883078208 api.py:598] DWConv shape: (1, 320, 320, 240)
+I0827 12:11:12.432782 139844883078208 api.py:598] Built SE se : (1, 1, 1, 240)
+I0827 12:11:12.452907 139844883078208 api.py:598] Project shape: (1, 320, 320, 40)
+I0827 12:11:12.455280 139844883078208 api.py:598] block_5 survival_prob: 0.9777777777777777
+I0827 12:11:12.457681 139844883078208 api.py:598] Block blocks_5 input shape: (1, 320, 320, 40)
+I0827 12:11:12.474876 139844883078208 api.py:598] Expand shape: (1, 320, 320, 240)
+I0827 12:11:12.492311 139844883078208 api.py:598] DWConv shape: (1, 320, 320, 240)
+I0827 12:11:12.507857 139844883078208 api.py:598] Built SE se : (1, 1, 1, 240)
+I0827 12:11:12.528024 139844883078208 api.py:598] Project shape: (1, 320, 320, 40)
+I0827 12:11:12.530549 139844883078208 api.py:598] block_6 survival_prob: 0.9733333333333334
+I0827 12:11:12.533089 139844883078208 api.py:598] Block blocks_6 input shape: (1, 320, 320, 40)
+I0827 12:11:12.550676 139844883078208 api.py:598] Expand shape: (1, 320, 320, 240)
+I0827 12:11:12.568347 139844883078208 api.py:598] DWConv shape: (1, 320, 320, 240)
+I0827 12:11:12.583438 139844883078208 api.py:598] Built SE se : (1, 1, 1, 240)
+I0827 12:11:12.603530 139844883078208 api.py:598] Project shape: (1, 320, 320, 40)
+I0827 12:11:12.605933 139844883078208 api.py:598] block_7 survival_prob: 0.9688888888888889
+I0827 12:11:12.608373 139844883078208 api.py:598] Block blocks_7 input shape: (1, 320, 320, 40)
+I0827 12:11:12.625876 139844883078208 api.py:598] Expand shape: (1, 320, 320, 240)
+I0827 12:11:12.643525 139844883078208 api.py:598] DWConv shape: (1, 320, 320, 240)
+I0827 12:11:12.658836 139844883078208 api.py:598] Built SE se : (1, 1, 1, 240)
+I0827 12:11:12.679754 139844883078208 api.py:598] Project shape: (1, 320, 320, 40)
+I0827 12:11:12.682172 139844883078208 api.py:598] block_8 survival_prob: 0.9644444444444444
+I0827 12:11:12.684571 139844883078208 api.py:598] Block blocks_8 input shape: (1, 320, 320, 40)
+I0827 12:11:12.702142 139844883078208 api.py:598] Expand shape: (1, 320, 320, 240)
+I0827 12:11:12.719734 139844883078208 api.py:598] DWConv shape: (1, 320, 320, 240)
+I0827 12:11:12.735222 139844883078208 api.py:598] Built SE se : (1, 1, 1, 240)
+I0827 12:11:12.755252 139844883078208 api.py:598] Project shape: (1, 320, 320, 40)
+I0827 12:11:12.757698 139844883078208 api.py:598] block_9 survival_prob: 0.96
+I0827 12:11:12.760073 139844883078208 api.py:598] Block blocks_9 input shape: (1, 320, 320, 40)
+I0827 12:11:12.777439 139844883078208 api.py:598] Expand shape: (1, 320, 320, 240)
+I0827 12:11:12.794997 139844883078208 api.py:598] DWConv shape: (1, 160, 160, 240)
+I0827 12:11:12.810193 139844883078208 api.py:598] Built SE se : (1, 1, 1, 240)
+I0827 12:11:12.826841 139844883078208 api.py:598] Project shape: (1, 160, 160, 72)
+I0827 12:11:12.829286 139844883078208 api.py:598] block_10 survival_prob: 0.9555555555555556
+I0827 12:11:12.831725 139844883078208 api.py:598] Block blocks_10 input shape: (1, 160, 160, 72)
+I0827 12:11:12.849349 139844883078208 api.py:598] Expand shape: (1, 160, 160, 432)
+I0827 12:11:12.868229 139844883078208 api.py:598] DWConv shape: (1, 160, 160, 432)
+I0827 12:11:12.883802 139844883078208 api.py:598] Built SE se : (1, 1, 1, 432)
+I0827 12:11:12.903949 139844883078208 api.py:598] Project shape: (1, 160, 160, 72)
+I0827 12:11:12.906375 139844883078208 api.py:598] block_11 survival_prob: 0.9511111111111111
+I0827 12:11:12.908813 139844883078208 api.py:598] Block blocks_11 input shape: (1, 160, 160, 72)
+I0827 12:11:12.926365 139844883078208 api.py:598] Expand shape: (1, 160, 160, 432)
+I0827 12:11:12.944093 139844883078208 api.py:598] DWConv shape: (1, 160, 160, 432)
+I0827 12:11:12.959270 139844883078208 api.py:598] Built SE se : (1, 1, 1, 432)
+I0827 12:11:12.979482 139844883078208 api.py:598] Project shape: (1, 160, 160, 72)
+I0827 12:11:12.981878 139844883078208 api.py:598] block_12 survival_prob: 0.9466666666666667
+I0827 12:11:12.984265 139844883078208 api.py:598] Block blocks_12 input shape: (1, 160, 160, 72)
+I0827 12:11:13.001823 139844883078208 api.py:598] Expand shape: (1, 160, 160, 432)
+I0827 12:11:13.019553 139844883078208 api.py:598] DWConv shape: (1, 160, 160, 432)
+I0827 12:11:13.034817 139844883078208 api.py:598] Built SE se : (1, 1, 1, 432)
+I0827 12:11:13.055410 139844883078208 api.py:598] Project shape: (1, 160, 160, 72)
+I0827 12:11:13.057805 139844883078208 api.py:598] block_13 survival_prob: 0.9422222222222222
+I0827 12:11:13.060194 139844883078208 api.py:598] Block blocks_13 input shape: (1, 160, 160, 72)
+I0827 12:11:13.077863 139844883078208 api.py:598] Expand shape: (1, 160, 160, 432)
+I0827 12:11:13.095704 139844883078208 api.py:598] DWConv shape: (1, 160, 160, 432)
+I0827 12:11:13.110938 139844883078208 api.py:598] Built SE se : (1, 1, 1, 432)
+I0827 12:11:13.131001 139844883078208 api.py:598] Project shape: (1, 160, 160, 72)
+I0827 12:11:13.133380 139844883078208 api.py:598] block_14 survival_prob: 0.9377777777777778
+I0827 12:11:13.135763 139844883078208 api.py:598] Block blocks_14 input shape: (1, 160, 160, 72)
+I0827 12:11:13.153360 139844883078208 api.py:598] Expand shape: (1, 160, 160, 432)
+I0827 12:11:13.171190 139844883078208 api.py:598] DWConv shape: (1, 160, 160, 432)
+I0827 12:11:13.186497 139844883078208 api.py:598] Built SE se : (1, 1, 1, 432)
+I0827 12:11:13.284202 139844883078208 api.py:598] Project shape: (1, 160, 160, 72)
+I0827 12:11:13.286891 139844883078208 api.py:598] block_15 survival_prob: 0.9333333333333333
+I0827 12:11:13.289401 139844883078208 api.py:598] Block blocks_15 input shape: (1, 160, 160, 72)
+I0827 12:11:13.307738 139844883078208 api.py:598] Expand shape: (1, 160, 160, 432)
+I0827 12:11:13.325768 139844883078208 api.py:598] DWConv shape: (1, 80, 80, 432)
+I0827 12:11:13.341156 139844883078208 api.py:598] Built SE se : (1, 1, 1, 432)
+I0827 12:11:13.357749 139844883078208 api.py:598] Project shape: (1, 80, 80, 144)
+I0827 12:11:13.360166 139844883078208 api.py:598] block_16 survival_prob: 0.9288888888888889
+I0827 12:11:13.362597 139844883078208 api.py:598] Block blocks_16 input shape: (1, 80, 80, 144)
+I0827 12:11:13.380354 139844883078208 api.py:598] Expand shape: (1, 80, 80, 864)
+I0827 12:11:13.398306 139844883078208 api.py:598] DWConv shape: (1, 80, 80, 864)
+I0827 12:11:13.413603 139844883078208 api.py:598] Built SE se : (1, 1, 1, 864)
+I0827 12:11:13.434178 139844883078208 api.py:598] Project shape: (1, 80, 80, 144)
+I0827 12:11:13.436581 139844883078208 api.py:598] block_17 survival_prob: 0.9244444444444444
+I0827 12:11:13.438986 139844883078208 api.py:598] Block blocks_17 input shape: (1, 80, 80, 144)
+I0827 12:11:13.456785 139844883078208 api.py:598] Expand shape: (1, 80, 80, 864)
+I0827 12:11:13.474691 139844883078208 api.py:598] DWConv shape: (1, 80, 80, 864)
+I0827 12:11:13.489958 139844883078208 api.py:598] Built SE se : (1, 1, 1, 864)
+I0827 12:11:13.510153 139844883078208 api.py:598] Project shape: (1, 80, 80, 144)
+I0827 12:11:13.512555 139844883078208 api.py:598] block_18 survival_prob: 0.92
+I0827 12:11:13.514992 139844883078208 api.py:598] Block blocks_18 input shape: (1, 80, 80, 144)
+I0827 12:11:13.532987 139844883078208 api.py:598] Expand shape: (1, 80, 80, 864)
+I0827 12:11:13.551338 139844883078208 api.py:598] DWConv shape: (1, 80, 80, 864)
+I0827 12:11:13.566834 139844883078208 api.py:598] Built SE se : (1, 1, 1, 864)
+I0827 12:11:13.587023 139844883078208 api.py:598] Project shape: (1, 80, 80, 144)
+I0827 12:11:13.589420 139844883078208 api.py:598] block_19 survival_prob: 0.9155555555555556
+I0827 12:11:13.591840 139844883078208 api.py:598] Block blocks_19 input shape: (1, 80, 80, 144)
+I0827 12:11:13.609814 139844883078208 api.py:598] Expand shape: (1, 80, 80, 864)
+I0827 12:11:13.627968 139844883078208 api.py:598] DWConv shape: (1, 80, 80, 864)
+I0827 12:11:13.643438 139844883078208 api.py:598] Built SE se : (1, 1, 1, 864)
+I0827 12:11:13.663652 139844883078208 api.py:598] Project shape: (1, 80, 80, 144)
+I0827 12:11:13.666101 139844883078208 api.py:598] block_20 survival_prob: 0.9111111111111111
+I0827 12:11:13.668534 139844883078208 api.py:598] Block blocks_20 input shape: (1, 80, 80, 144)
+I0827 12:11:13.686816 139844883078208 api.py:598] Expand shape: (1, 80, 80, 864)
+I0827 12:11:13.705032 139844883078208 api.py:598] DWConv shape: (1, 80, 80, 864)
+I0827 12:11:13.720578 139844883078208 api.py:598] Built SE se : (1, 1, 1, 864)
+I0827 12:11:13.740876 139844883078208 api.py:598] Project shape: (1, 80, 80, 144)
+I0827 12:11:13.743261 139844883078208 api.py:598] block_21 survival_prob: 0.9066666666666667
+I0827 12:11:13.745673 139844883078208 api.py:598] Block blocks_21 input shape: (1, 80, 80, 144)
+I0827 12:11:13.763633 139844883078208 api.py:598] Expand shape: (1, 80, 80, 864)
+I0827 12:11:13.781809 139844883078208 api.py:598] DWConv shape: (1, 80, 80, 864)
+I0827 12:11:13.797371 139844883078208 api.py:598] Built SE se : (1, 1, 1, 864)
+I0827 12:11:13.818318 139844883078208 api.py:598] Project shape: (1, 80, 80, 144)
+I0827 12:11:13.820744 139844883078208 api.py:598] block_22 survival_prob: 0.9022222222222223
+I0827 12:11:13.823405 139844883078208 api.py:598] Block blocks_22 input shape: (1, 80, 80, 144)
+I0827 12:11:13.841595 139844883078208 api.py:598] Expand shape: (1, 80, 80, 864)
+I0827 12:11:13.859891 139844883078208 api.py:598] DWConv shape: (1, 80, 80, 864)
+I0827 12:11:13.876205 139844883078208 api.py:598] Built SE se : (1, 1, 1, 864)
+I0827 12:11:13.897024 139844883078208 api.py:598] Project shape: (1, 80, 80, 144)
+I0827 12:11:13.899537 139844883078208 api.py:598] block_23 survival_prob: 0.8977777777777778
+I0827 12:11:13.902020 139844883078208 api.py:598] Block blocks_23 input shape: (1, 80, 80, 144)
+I0827 12:11:13.920477 139844883078208 api.py:598] Expand shape: (1, 80, 80, 864)
+I0827 12:11:13.939254 139844883078208 api.py:598] DWConv shape: (1, 80, 80, 864)
+I0827 12:11:13.956885 139844883078208 api.py:598] Built SE se : (1, 1, 1, 864)
+I0827 12:11:13.973994 139844883078208 api.py:598] Project shape: (1, 80, 80, 200)
+I0827 12:11:13.976522 139844883078208 api.py:598] block_24 survival_prob: 0.8933333333333333
+I0827 12:11:13.979055 139844883078208 api.py:598] Block blocks_24 input shape: (1, 80, 80, 200)
+I0827 12:11:13.999630 139844883078208 api.py:598] Expand shape: (1, 80, 80, 1200)
+I0827 12:11:14.020447 139844883078208 api.py:598] DWConv shape: (1, 80, 80, 1200)
+I0827 12:11:14.036848 139844883078208 api.py:598] Built SE se : (1, 1, 1, 1200)
+I0827 12:11:14.057016 139844883078208 api.py:598] Project shape: (1, 80, 80, 200)
+I0827 12:11:14.059395 139844883078208 api.py:598] block_25 survival_prob: 0.888888888888889
+I0827 12:11:14.061766 139844883078208 api.py:598] Block blocks_25 input shape: (1, 80, 80, 200)
+I0827 12:11:14.082007 139844883078208 api.py:598] Expand shape: (1, 80, 80, 1200)
+I0827 12:11:14.102396 139844883078208 api.py:598] DWConv shape: (1, 80, 80, 1200)
+I0827 12:11:14.118676 139844883078208 api.py:598] Built SE se : (1, 1, 1, 1200)
+I0827 12:11:14.138786 139844883078208 api.py:598] Project shape: (1, 80, 80, 200)
+I0827 12:11:14.141209 139844883078208 api.py:598] block_26 survival_prob: 0.8844444444444445
+I0827 12:11:14.143615 139844883078208 api.py:598] Block blocks_26 input shape: (1, 80, 80, 200)
+I0827 12:11:14.164078 139844883078208 api.py:598] Expand shape: (1, 80, 80, 1200)
+I0827 12:11:14.185287 139844883078208 api.py:598] DWConv shape: (1, 80, 80, 1200)
+I0827 12:11:14.202435 139844883078208 api.py:598] Built SE se : (1, 1, 1, 1200)
+I0827 12:11:14.223228 139844883078208 api.py:598] Project shape: (1, 80, 80, 200)
+I0827 12:11:14.225766 139844883078208 api.py:598] block_27 survival_prob: 0.88
+I0827 12:11:14.228290 139844883078208 api.py:598] Block blocks_27 input shape: (1, 80, 80, 200)
+I0827 12:11:14.248635 139844883078208 api.py:598] Expand shape: (1, 80, 80, 1200)
+I0827 12:11:14.269054 139844883078208 api.py:598] DWConv shape: (1, 80, 80, 1200)
+I0827 12:11:14.285383 139844883078208 api.py:598] Built SE se : (1, 1, 1, 1200)
+I0827 12:11:14.305537 139844883078208 api.py:598] Project shape: (1, 80, 80, 200)
+I0827 12:11:14.307952 139844883078208 api.py:598] block_28 survival_prob: 0.8755555555555556
+I0827 12:11:14.310383 139844883078208 api.py:598] Block blocks_28 input shape: (1, 80, 80, 200)
+I0827 12:11:14.331191 139844883078208 api.py:598] Expand shape: (1, 80, 80, 1200)
+I0827 12:11:14.351903 139844883078208 api.py:598] DWConv shape: (1, 80, 80, 1200)
+I0827 12:11:14.368180 139844883078208 api.py:598] Built SE se : (1, 1, 1, 1200)
+I0827 12:11:14.388454 139844883078208 api.py:598] Project shape: (1, 80, 80, 200)
+I0827 12:11:14.390913 139844883078208 api.py:598] block_29 survival_prob: 0.8711111111111112
+I0827 12:11:14.393369 139844883078208 api.py:598] Block blocks_29 input shape: (1, 80, 80, 200)
+I0827 12:11:14.413679 139844883078208 api.py:598] Expand shape: (1, 80, 80, 1200)
+I0827 12:11:14.433955 139844883078208 api.py:598] DWConv shape: (1, 80, 80, 1200)
+I0827 12:11:14.450668 139844883078208 api.py:598] Built SE se : (1, 1, 1, 1200)
+I0827 12:11:14.470943 139844883078208 api.py:598] Project shape: (1, 80, 80, 200)
+I0827 12:11:14.473369 139844883078208 api.py:598] block_30 survival_prob: 0.8666666666666667
+I0827 12:11:14.475807 139844883078208 api.py:598] Block blocks_30 input shape: (1, 80, 80, 200)
+I0827 12:11:14.496495 139844883078208 api.py:598] Expand shape: (1, 80, 80, 1200)
+I0827 12:11:14.517166 139844883078208 api.py:598] DWConv shape: (1, 80, 80, 1200)
+I0827 12:11:14.533551 139844883078208 api.py:598] Built SE se : (1, 1, 1, 1200)
+I0827 12:11:14.553918 139844883078208 api.py:598] Project shape: (1, 80, 80, 200)
+I0827 12:11:14.556371 139844883078208 api.py:598] block_31 survival_prob: 0.8622222222222222
+I0827 12:11:14.558764 139844883078208 api.py:598] Block blocks_31 input shape: (1, 80, 80, 200)
+I0827 12:11:14.579087 139844883078208 api.py:598] Expand shape: (1, 80, 80, 1200)
+I0827 12:11:14.599642 139844883078208 api.py:598] DWConv shape: (1, 40, 40, 1200)
+I0827 12:11:14.616015 139844883078208 api.py:598] Built SE se : (1, 1, 1, 1200)
+I0827 12:11:14.632616 139844883078208 api.py:598] Project shape: (1, 40, 40, 344)
+I0827 12:11:14.635061 139844883078208 api.py:598] block_32 survival_prob: 0.8577777777777778
+I0827 12:11:14.637495 139844883078208 api.py:598] Block blocks_32 input shape: (1, 40, 40, 344)
+I0827 12:11:14.658246 139844883078208 api.py:598] Expand shape: (1, 40, 40, 2064)
+I0827 12:11:14.678792 139844883078208 api.py:598] DWConv shape: (1, 40, 40, 2064)
+I0827 12:11:14.695293 139844883078208 api.py:598] Built SE se : (1, 1, 1, 2064)
+I0827 12:11:14.715513 139844883078208 api.py:598] Project shape: (1, 40, 40, 344)
+I0827 12:11:14.717934 139844883078208 api.py:598] block_33 survival_prob: 0.8533333333333334
+I0827 12:11:14.720332 139844883078208 api.py:598] Block blocks_33 input shape: (1, 40, 40, 344)
+I0827 12:11:14.740728 139844883078208 api.py:598] Expand shape: (1, 40, 40, 2064)
+I0827 12:11:14.761373 139844883078208 api.py:598] DWConv shape: (1, 40, 40, 2064)
+I0827 12:11:14.777758 139844883078208 api.py:598] Built SE se : (1, 1, 1, 2064)
+I0827 12:11:14.797978 139844883078208 api.py:598] Project shape: (1, 40, 40, 344)
+I0827 12:11:14.800383 139844883078208 api.py:598] block_34 survival_prob: 0.8488888888888889
+I0827 12:11:14.802781 139844883078208 api.py:598] Block blocks_34 input shape: (1, 40, 40, 344)
+I0827 12:11:14.823137 139844883078208 api.py:598] Expand shape: (1, 40, 40, 2064)
+I0827 12:11:14.843678 139844883078208 api.py:598] DWConv shape: (1, 40, 40, 2064)
+I0827 12:11:14.860644 139844883078208 api.py:598] Built SE se : (1, 1, 1, 2064)
+I0827 12:11:14.881272 139844883078208 api.py:598] Project shape: (1, 40, 40, 344)
+I0827 12:11:14.883723 139844883078208 api.py:598] block_35 survival_prob: 0.8444444444444446
+I0827 12:11:14.886125 139844883078208 api.py:598] Block blocks_35 input shape: (1, 40, 40, 344)
+I0827 12:11:14.906769 139844883078208 api.py:598] Expand shape: (1, 40, 40, 2064)
+I0827 12:11:14.927449 139844883078208 api.py:598] DWConv shape: (1, 40, 40, 2064)
+I0827 12:11:14.944278 139844883078208 api.py:598] Built SE se : (1, 1, 1, 2064)
+I0827 12:11:14.965152 139844883078208 api.py:598] Project shape: (1, 40, 40, 344)
+I0827 12:11:14.967558 139844883078208 api.py:598] block_36 survival_prob: 0.8400000000000001
+I0827 12:11:14.969969 139844883078208 api.py:598] Block blocks_36 input shape: (1, 40, 40, 344)
+I0827 12:11:14.990513 139844883078208 api.py:598] Expand shape: (1, 40, 40, 2064)
+I0827 12:11:15.011228 139844883078208 api.py:598] DWConv shape: (1, 40, 40, 2064)
+I0827 12:11:15.027800 139844883078208 api.py:598] Built SE se : (1, 1, 1, 2064)
+I0827 12:11:15.048556 139844883078208 api.py:598] Project shape: (1, 40, 40, 344)
+I0827 12:11:15.051106 139844883078208 api.py:598] block_37 survival_prob: 0.8355555555555556
+I0827 12:11:15.053627 139844883078208 api.py:598] Block blocks_37 input shape: (1, 40, 40, 344)
+I0827 12:11:15.075096 139844883078208 api.py:598] Expand shape: (1, 40, 40, 2064)
+I0827 12:11:15.095998 139844883078208 api.py:598] DWConv shape: (1, 40, 40, 2064)
+I0827 12:11:15.112686 139844883078208 api.py:598] Built SE se : (1, 1, 1, 2064)
+I0827 12:11:15.133003 139844883078208 api.py:598] Project shape: (1, 40, 40, 344)
+I0827 12:11:15.135421 139844883078208 api.py:598] block_38 survival_prob: 0.8311111111111111
+I0827 12:11:15.137862 139844883078208 api.py:598] Block blocks_38 input shape: (1, 40, 40, 344)
+I0827 12:11:15.158925 139844883078208 api.py:598] Expand shape: (1, 40, 40, 2064)
+I0827 12:11:15.180153 139844883078208 api.py:598] DWConv shape: (1, 40, 40, 2064)
+I0827 12:11:15.196865 139844883078208 api.py:598] Built SE se : (1, 1, 1, 2064)
+I0827 12:11:15.217295 139844883078208 api.py:598] Project shape: (1, 40, 40, 344)
+I0827 12:11:15.219768 139844883078208 api.py:598] block_39 survival_prob: 0.8266666666666667
+I0827 12:11:15.222194 139844883078208 api.py:598] Block blocks_39 input shape: (1, 40, 40, 344)
+I0827 12:11:15.243813 139844883078208 api.py:598] Expand shape: (1, 40, 40, 2064)
+I0827 12:11:15.357186 139844883078208 api.py:598] DWConv shape: (1, 40, 40, 2064)
+I0827 12:11:15.374609 139844883078208 api.py:598] Built SE se : (1, 1, 1, 2064)
+I0827 12:11:15.395030 139844883078208 api.py:598] Project shape: (1, 40, 40, 344)
+I0827 12:11:15.397474 139844883078208 api.py:598] block_40 survival_prob: 0.8222222222222223
+I0827 12:11:15.399935 139844883078208 api.py:598] Block blocks_40 input shape: (1, 40, 40, 344)
+I0827 12:11:15.421109 139844883078208 api.py:598] Expand shape: (1, 40, 40, 2064)
+I0827 12:11:15.442325 139844883078208 api.py:598] DWConv shape: (1, 40, 40, 2064)
+I0827 12:11:15.459472 139844883078208 api.py:598] Built SE se : (1, 1, 1, 2064)
+I0827 12:11:15.479833 139844883078208 api.py:598] Project shape: (1, 40, 40, 344)
+I0827 12:11:15.482268 139844883078208 api.py:598] block_41 survival_prob: 0.8177777777777778
+I0827 12:11:15.484661 139844883078208 api.py:598] Block blocks_41 input shape: (1, 40, 40, 344)
+I0827 12:11:15.505656 139844883078208 api.py:598] Expand shape: (1, 40, 40, 2064)
+I0827 12:11:15.526622 139844883078208 api.py:598] DWConv shape: (1, 40, 40, 2064)
+I0827 12:11:15.543497 139844883078208 api.py:598] Built SE se : (1, 1, 1, 2064)
+I0827 12:11:15.564069 139844883078208 api.py:598] Project shape: (1, 40, 40, 344)
+I0827 12:11:15.566524 139844883078208 api.py:598] block_42 survival_prob: 0.8133333333333334
+I0827 12:11:15.568931 139844883078208 api.py:598] Block blocks_42 input shape: (1, 40, 40, 344)
+I0827 12:11:15.589902 139844883078208 api.py:598] Expand shape: (1, 40, 40, 2064)
+I0827 12:11:15.610905 139844883078208 api.py:598] DWConv shape: (1, 40, 40, 2064)
+I0827 12:11:15.628874 139844883078208 api.py:598] Built SE se : (1, 1, 1, 2064)
+I0827 12:11:15.645692 139844883078208 api.py:598] Project shape: (1, 40, 40, 576)
+I0827 12:11:15.648185 139844883078208 api.py:598] block_43 survival_prob: 0.808888888888889
+I0827 12:11:15.650667 139844883078208 api.py:598] Block blocks_43 input shape: (1, 40, 40, 576)
+I0827 12:11:15.672066 139844883078208 api.py:598] Expand shape: (1, 40, 40, 3456)
+I0827 12:11:15.693819 139844883078208 api.py:598] DWConv shape: (1, 40, 40, 3456)
+I0827 12:11:15.711125 139844883078208 api.py:598] Built SE se : (1, 1, 1, 3456)
+I0827 12:11:15.731808 139844883078208 api.py:598] Project shape: (1, 40, 40, 576)
+I0827 12:11:15.734277 139844883078208 api.py:598] block_44 survival_prob: 0.8044444444444445
+I0827 12:11:15.736719 139844883078208 api.py:598] Block blocks_44 input shape: (1, 40, 40, 576)
+I0827 12:11:15.758154 139844883078208 api.py:598] Expand shape: (1, 40, 40, 3456)
+I0827 12:11:15.779307 139844883078208 api.py:598] DWConv shape: (1, 40, 40, 3456)
+I0827 12:11:15.796413 139844883078208 api.py:598] Built SE se : (1, 1, 1, 3456)
+I0827 12:11:15.817099 139844883078208 api.py:598] Project shape: (1, 40, 40, 576)
+I0827 12:11:19.828756 139844883078208 utils.py:628] use mixed precision policy name float32
+I0827 12:11:19.830719 139844883078208 det_model_fn.py:76] LR schedule method: cosine
+I0827 12:11:20.026927 139844883078208 utils.py:410] Adding scale summary ('lrn_rate', <tf.Tensor 'Select:0' shape=() dtype=float32>)
+I0827 12:11:20.027415 139844883078208 utils.py:410] Adding scale summary ('trainloss/cls_loss', <tf.Tensor 'AddN:0' shape=() dtype=float32>)
+I0827 12:11:20.027794 139844883078208 utils.py:410] Adding scale summary ('trainloss/box_loss', <tf.Tensor 'AddN_1:0' shape=() dtype=float32>)
+I0827 12:11:20.028174 139844883078208 utils.py:410] Adding scale summary ('trainloss/det_loss', <tf.Tensor 'add_4:0' shape=() dtype=float32>)
+I0827 12:11:20.028544 139844883078208 utils.py:410] Adding scale summary ('trainloss/reg_l2_loss', <tf.Tensor 'mul_14:0' shape=() dtype=float32>)
+I0827 12:11:20.028938 139844883078208 utils.py:410] Adding scale summary ('trainloss/loss', <tf.Tensor 'add_5:0' shape=() dtype=float32>)
+I0827 12:11:20.030024 139844883078208 utils.py:410] Adding scale summary ('train_epochs', <tf.Tensor 'truediv_7:0' shape=() dtype=float32>)
+I0827 12:11:20.043255 139844883078208 det_model_fn.py:415] clip gradients norm by 5.000000
+I0827 12:11:27.867478 139844883078208 utils.py:410] Adding scale summary ('gradient_norm', <tf.Tensor 'clip/global_norm_1/global_norm:0' shape=() dtype=float32>)
+INFO:tensorflow:training_loop marked as finished
+I0827 12:11:37.414604 139844883078208 error_handling.py:115] training_loop marked as finished
+Traceback (most recent call last):
+  File "main.py", line 381, in <module>
+    app.run(main)
+  File "/home/nikolay/.local/lib/python3.8/site-packages/absl/app.py", line 299, in run
+    _run_main(main, args)
+  File "/home/nikolay/.local/lib/python3.8/site-packages/absl/app.py", line 250, in _run_main
+    sys.exit(main(argv))
+  File "main.py", line 372, in main
+    p.join()
+  File "/usr/lib/python3.8/multiprocessing/process.py", line 149, in join
+    res = self._popen.wait(timeout)
+  File "/usr/lib/python3.8/multiprocessing/popen_fork.py", line 47, in wait
+    return self.poll(os.WNOHANG if timeout == 0.0 else 0)
+  File "/usr/lib/python3.8/multiprocessing/popen_fork.py", line 27, in poll
+    pid, sts = os.waitpid(self.pid, flag)
+KeyboardInterrupt
+Process Process-1:
+Traceback (most recent call last):
+  File "/usr/lib/python3.8/multiprocessing/process.py", line 315, in _bootstrap
+    self.run()
+  File "/usr/lib/python3.8/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "main.py", line 361, in run_train_and_eval
+    _train(e * FLAGS.num_examples_per_epoch // FLAGS.train_batch_size)
+  File "main.py", line 271, in _train
+    train_estimator.train(
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow_estimator/python/estimator/tpu/tpu_estimator.py", line 3079, in train
+    return super(TPUEstimator, self).train(
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow_estimator/python/estimator/estimator.py", line 349, in train
+    loss = self._train_model(input_fn, hooks, saving_listeners)
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow_estimator/python/estimator/estimator.py", line 1175, in _train_model
+    return self._train_model_default(input_fn, hooks, saving_listeners)
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow_estimator/python/estimator/estimator.py", line 1203, in _train_model_default
+    estimator_spec = self._call_model_fn(features, labels, ModeKeys.TRAIN,
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow_estimator/python/estimator/tpu/tpu_estimator.py", line 2920, in _call_model_fn
+    return super(TPUEstimator, self)._call_model_fn(features, labels, mode,
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow_estimator/python/estimator/estimator.py", line 1163, in _call_model_fn
+    model_fn_results = self._model_fn(features=features, **kwargs)
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow_estimator/python/estimator/tpu/tpu_estimator.py", line 3178, in _model_fn
+    estimator_spec = model_fn_wrapper.call_without_tpu(
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow_estimator/python/estimator/tpu/tpu_estimator.py", line 1700, in call_without_tpu
+    return self._call_model_fn(features, labels, is_export_mode=is_export_mode)
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow_estimator/python/estimator/tpu/tpu_estimator.py", line 2031, in _call_model_fn
+    estimator_spec = self._model_fn(features=features, **kwargs)
+  File "/home/nikolay/Projects/source/automl/efficientdet_fork/efficientdet/det_model_fn.py", line 624, in efficientdet_model_fn
+    return _model_fn(
+  File "/home/nikolay/Projects/source/automl/efficientdet_fork/efficientdet/det_model_fn.py", line 436, in _model_fn
+    train_op = ema.apply(ema_vars)
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/training/moving_averages.py", line 486, in apply
+    updates.append(assign_moving_average(avg, var, decay, zero_debias))
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/training/moving_averages.py", line 111, in assign_moving_average
+    return replica_context.merge_call(merge_fn, args=(variable, value))
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/distribute/distribute_lib.py", line 2715, in merge_call
+    return self._merge_call(merge_fn, args, kwargs)
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/distribute/distribute_lib.py", line 2722, in _merge_call
+    return merge_fn(self._strategy, *args, **kwargs)
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/autograph/impl/api.py", line 275, in wrapper
+    return func(*args, **kwargs)
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/training/moving_averages.py", line 109, in merge_fn
+    return update(strategy, v, value)
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/training/moving_averages.py", line 100, in update
+    return _update(strategy, v, update_fn, args=(value,))
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/training/moving_averages.py", line 192, in _update
+    return strategy.extended.update(var, update_fn, args)
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/distribute/distribute_lib.py", line 2300, in update
+    return self._update(var, fn, args, kwargs, group)
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/distribute/distribute_lib.py", line 2955, in _update
+    return self._update_non_slot(var, fn, (var,) + tuple(args), kwargs, group)
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/distribute/distribute_lib.py", line 2961, in _update_non_slot
+    result = fn(*args, **kwargs)
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/autograph/impl/api.py", line 275, in wrapper
+    return func(*args, **kwargs)
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/training/moving_averages.py", line 94, in update_fn
+    return state_ops.assign_sub(v, (v - value) * decay, name=scope)
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/ops/variables.py", line 1074, in _run_op
+    return tensor_oper(a.value(), *args, **kwargs)
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/ops/resource_variable_ops.py", line 555, in value
+    return self._read_variable_op()
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/ops/resource_variable_ops.py", line 657, in _read_variable_op
+    result = read_and_set_handle()
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/ops/resource_variable_ops.py", line 647, in read_and_set_handle
+    result = gen_resource_variable_ops.read_variable_op(self._handle,
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/ops/gen_resource_variable_ops.py", line 490, in read_variable_op
+    _, _, _op, _outputs = _op_def_library._apply_op_helper(
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/framework/op_def_library.py", line 742, in _apply_op_helper
+    op = g._create_op_internal(op_type_name, inputs, dtypes=None,
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/framework/ops.py", line 3477, in _create_op_internal
+    ret = Operation(
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/framework/ops.py", line 1974, in __init__
+    self._c_op = _create_c_op(self._graph, node_def, inputs,
+  File "/home/nikolay/.local/lib/python3.8/site-packages/tensorflow/python/framework/ops.py", line 1800, in _create_c_op
+    pywrap_tf_session.TF_AddControlInput(op_desc, control_input._c_op)
+KeyboardInterrupt

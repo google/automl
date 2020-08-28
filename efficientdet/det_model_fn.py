@@ -18,7 +18,6 @@ import re
 from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
-
 import coco_metric
 import efficientdet_arch
 import hparams_config
@@ -153,7 +152,7 @@ def focal_loss(y_pred, y_true, alpha, gamma, normalizer, label_smoothing=0.0):
     pred_prob = tf.sigmoid(y_pred)
     p_t = (y_true * pred_prob) + ((1 - y_true) * (1 - pred_prob))
     alpha_factor = y_true * alpha + (1 - y_true) * (1 - alpha)
-    modulating_factor = (1.0 - p_t) ** gamma
+    modulating_factor = (1.0 - p_t)**gamma
 
     # apply label smoothing for cross_entropy for each entry.
     y_true = y_true * (1.0 - label_smoothing) + 0.5 * label_smoothing
@@ -286,8 +285,7 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
   box_loss = tf.add_n(box_losses) if box_losses else 0
 
   total_loss = (
-      cls_loss +
-      params['box_loss_weight'] * box_loss +
+      cls_loss + params['box_loss_weight'] * box_loss +
       params['iou_loss_weight'] * box_iou_loss)
 
   return total_loss, cls_loss, box_loss, box_iou_loss
@@ -329,6 +327,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   training_hooks = []
 
   if params['use_keras_model']:
+
     def model_fn(inputs):
       model = efficientdet_keras.EfficientDetNet(
           config=hparams_config.Config(params))
@@ -405,6 +404,23 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     elif params['strategy'] == 'horovod':
       optimizer = hvd.DistributedOptimizer(optimizer)
       training_hooks = [hvd.BroadcastGlobalVariablesHook(0)]
+    if params['gradient_checkpointing']:
+      from gradient_checkpointing \
+          import memory_saving_gradients  # pylint: disable=g-import-not-at-top
+      from tensorflow.python.ops \
+          import gradients  # pylint: disable=g-import-not-at-top
+
+      # monkey patch tf.gradients to point to our custom version,
+      # with automatic checkpoint selection
+      def gradients_(ys, xs, grad_ys=None, **kwargs):
+        return memory_saving_gradients.gradients(
+            ys,
+            xs,
+            grad_ys,
+            checkpoints=params['gradient_checkpointing'],
+            **kwargs)
+
+      gradients.__dict__["gradients"] = gradients_
 
     # Batch norm requires update_ops to be added as a train_op dependency.
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -597,6 +613,56 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
         every_n_iter=params.get('iterations_per_loop', 100),
     )
     training_hooks.append(logging_hook)
+
+    epoch = 1 + tf.math.floordiv(global_step * params["batch_size"],
+                                 params['num_examples_per_epoch'])
+    step_in_epoch = tf.math.floormod((global_step * params["batch_size"]),
+                                     params['num_examples_per_epoch'])
+
+    def formatter_log(tensors):
+      """
+      Format the log output
+      """
+
+      logstring = "Epoch {}. Step {} of {}: ".format(
+          tensors["epoch"], tensors["step_in_epoch"],
+          params['num_examples_per_epoch'])
+
+      return logstring
+
+    logging_hook2 = tf.train.LoggingTensorHook(
+        tensors={
+            "epoch": epoch,
+            "step_in_epoch": step_in_epoch
+        },
+        every_n_iter=params.get('iterations_per_loop', 100),
+        formatter=formatter_log,
+    )
+    training_hooks.append(logging_hook2)
+
+    if params["nvgpu_logging"]:
+      try:
+        import nvgpu  # pylint: disable=g-import-not-at-top
+
+        def nvgpu_gpu_info(x):
+          return np.float32(nvgpu.gpu_info()[0][x.decode("utf-8")])
+
+        mem_used = tf.py_func(nvgpu_gpu_info, ['mem_used'], [tf.float32])[0]
+        mem_total = tf.py_func(nvgpu_gpu_info, ['mem_total'], [tf.float32])[0]
+        mem_used_percent = tf.py_func(nvgpu_gpu_info, ['mem_used_percent'],
+                                      [tf.float32])[0]
+        logging_hook3 = tf.train.LoggingTensorHook(
+            {
+                "memory used": mem_used,
+                "memory total": mem_total,
+                "memory used %": mem_used_percent,
+            },
+            every_n_iter=params.get('iterations_per_loop', 100),
+        )
+        training_hooks.append(logging_hook3)
+      except ImportError:
+        logging.error("nvgpu module not installed")
+        pass
 
   return tf.estimator.tpu.TPUEstimatorSpec(
       mode=mode,

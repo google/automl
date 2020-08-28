@@ -1,0 +1,14 @@
+#!/bin/bash
+COMPOUND_COEF=4
+BATCH_SIZE=1
+LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc.so python main.py \
+	--mode=train_and_eval \
+	--training_file_pattern=/home/nikolay/Projects/data/python_table_reader/datasets/python_table_reader/train_General_CascadeTabNet_add_dilate_smudge.tfrecord/*.tfrecord \
+	--validation_file_pattern=/home/nikolay/Projects/data/python_table_reader/datasets/python_table_reader/val_ICDAR19_modern.tfrecord \
+	--model_name=efficientdet-$(COMPOUND_COEF) \
+	--model_dir=../../efficientdet/logs/ckpt/python_table_reader_$(COMPOUND_COEF) \
+  --ckpt=../../efficientdet/efficientdet-$(COMPOUND_COEF)\
+	--train_batch_size=1 \
+	--eval_batch_size=4 --eval_samples=1024 \
+	--num_examples_per_epoch=6100 --num_epochs=300 \
+	--hparams=../../efficientdet/projects/python_table_reader/python_table_reader_$(COMPOUND_COEF).yaml > ../../efficientdet/logs/run/train_logs/log_train_$(COMPOUND_COEF)_$(BATCH_SIZE)_$(date +'%Y%m%d%H%M') 2>&1

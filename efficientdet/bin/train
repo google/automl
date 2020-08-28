@@ -1,0 +1,12 @@
+#!/bin/bash
+LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc.so python main.py \
+	--mode=train_and_eval \
+	--training_file_pattern=/home/nikolay/Projects/data/python_table_reader/datasets/python_table_reader/train_General_CascadeTabNet_add_dilate_smudge.tfrecord/*.tfrecord \
+	--validation_file_pattern=/home/nikolay/Projects/data/python_table_reader/datasets/python_table_reader/val_ICDAR19_modern.tfrecord \
+	--model_name=efficientdet-d6 \
+	--model_dir=../../efficientdet/logs/ckpt/python_table_reader_d6 \
+	--ckpt=../../efficientdet/logs/ckpt/python_table_reader_d6_adam \
+	--train_batch_size=1 \
+	--eval_batch_size=4 --eval_samples=1024 \
+	--num_examples_per_epoch=6100 --num_epochs=300 \
+	--hparams=../../efficientdet/projects/python_table_reader/python_table_reader_d6.yaml > ../../efficientdet/logs/run/train_logs/log_train_d6_b4_$(date +'%Y%m%d%H%M') 2>&1

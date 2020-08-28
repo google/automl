@@ -1,0 +1,2 @@
+#!/bin/sh
+python model_inspect.py --runmode=saved_model --model_name=efficientdet-d6 --ckpt_path=../../efficientdet/logs/ckpt/python_table_reader_d6 --saved_model_dir=../../efficientdet/trained_models/efficientdet-d6_$(date +'%Y%m%d%H%M') --hparams=../../efficientdet/projects/python_table_reader/python_table_reader_d6.yaml
