@@ -119,20 +119,20 @@ flags.DEFINE_bool(
 
 flags.DEFINE_multi_string(
     'gradient_checkpointing', None,
-    'This is an experimental option. It may help you to save GPU memory while '
-    'training. Here you may add a list of strings that would indicate '
-    'which layers of the network to use to save checkpoints as in '
-    'https://github.com/cybertronai/gradient-checkpointing implementation and '
-    '"Training Deep Nets with Sublinear Memory Cost, by Chen et al. (2016)'
-    'paper."\n'
+    'This is an experimental option. It may help to save GPU memory while '
+    'training. You need to provide a list of strings that would indicate '
+    'which layers of the network to use to save checkpoints. \n'
+    'These strings will be searched in the tensors name and only those '
+    'tensors that match will be kept as checkpoints.\n'
     'When this option is used the standard tensorflow.python.ops.gradients '
     'method is being replaced with a custom method. The parameters that you use '
-    'are important and require optimization'
-    'Gradient_checkpointing: ["Add"] is an option that has been tested '
-    ' on d4 network with batch-size of 4 and works reasonably well: '
-    'It allows 3.2x larger network for roughly 32% slower computation.'
-    'It also allows to compute a d6 network with batch size of 4 on a 11Gb GPU.'
-)
+    'are important and require optimization.\n'
+    'gradient_checkpointing: ["Add"] is an option that has been tested '
+    'and works reasonably well: \n'
+    '- On d4 network with batch-size of 1 with batch-size of 1 (FP16 enabled) '
+    'it takes only 1/3.2 of memory with roughly 32% slower computation\n'
+    '- It also allows to compute a d6 network with batch size of 1 '
+    '(FP16 enabled) on a 11Gb GPU.')
 flags.DEFINE_bool('nvgpu_logging', False,
                   'enable memory logging for NVIDIA cards')
 

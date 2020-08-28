@@ -242,6 +242,7 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
   # at this point selection happened and checkpoints is list of nodes
   assert isinstance(checkpoints, list)
 
+  # TODO: implement multithreading in graph recomputation
   logging.debug("Checkpoint nodes used: %s", len(checkpoints))
   # better error handling of special cases
   # xs are already handled as checkpoint nodes, so no need to include them
