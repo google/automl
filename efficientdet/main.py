@@ -126,7 +126,13 @@ flags.DEFINE_multi_string(
     '"Training Deep Nets with Sublinear Memory Cost, by Chen et al. (2016)'
     'paper."\n'
     'When this option is used the standard tensorflow.python.ops.gradients '
-    'method is being replaced with a custom method')
+    'method is being replaced with a custom method. The parameters that you use '
+    'are important and require optimization'
+    'Gradient_checkpointing: ["Add"] is an option that has been tested '
+    ' on d4 network with batch-size of 4 and works reasonably well: '
+    'It allows 3.2x larger network for roughly 32% slower computation.'
+    'It also allows to compute a d6 network with batch size of 4 on a 11Gb GPU.'
+)
 flags.DEFINE_bool('nvgpu_logging', False,
                   'enable memory logging for NVIDIA cards')
 
