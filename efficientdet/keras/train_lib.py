@@ -491,20 +491,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     loss_vals['box_loss'] = box_loss
     return total_loss
 
-  def train_step(self, data):
-    """Train step.
-
-    Args:
-      data: Tuple of (images, labels). Image tensor with shape [batch_size,
-        height, width, 3]. The height and width are fixed and equal.Input labels
-        in a dictionary. The labels include class targets and box targets which
-        are dense label maps. The labels are generated from get_input_fn
-        function in data/dataloader.py.
-
-    Returns:
-      A dict record loss info.
-    """
-    images, labels = data
+  def _eager_gradients(self, images, labels):
     with tf.GradientTape() as tape:
       if len(self.config.heads) == 2:
         cls_outputs, box_outputs, seg_outputs = self(images, training=True)
@@ -543,6 +530,64 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       loss_vals['gnorm'] = gnorm
     self.optimizer.apply_gradients(zip(gradients, trainable_vars))
     return loss_vals
+
+  def _graph_gradients(self, images, labels):
+    cls_outputs, box_outputs, seg_outputs = None, None, None
+    if len(self.config.heads) == 2:
+      cls_outputs, box_outputs, seg_outputs = self(images, training=True)
+    elif 'object_detection' in self.config.heads:
+      cls_outputs, box_outputs = self(images, training=True)
+    elif 'segmentation' in self.config.heads:
+      seg_outputs, = self(images, training=True)
+    reg_l2loss = self._reg_l2_loss(self.config.weight_decay)
+    total_loss = reg_l2loss
+    loss_vals = {}
+    if 'object_detection' in self.config.heads:
+      det_loss = self._detection_loss(cls_outputs, box_outputs, labels,
+                                      loss_vals)
+      total_loss += det_loss
+    if 'segmentation' in self.config.heads:
+      seg_loss_layer = self.loss['seg_loss']
+      seg_loss = seg_loss_layer(labels['image_masks'], seg_outputs)
+      total_loss += seg_loss
+      loss_vals['seg_loss'] = seg_loss
+    if isinstance(self.optimizer,
+                  tf.keras.mixed_precision.experimental.LossScaleOptimizer):
+      scaled_loss = self.optimizer.get_scaled_loss(total_loss)
+    else:
+      scaled_loss = total_loss
+    loss_vals['loss'] = total_loss
+    trainable_vars = self._freeze_vars()
+    scaled_gradients = tf.gradients(scaled_loss, trainable_vars)
+    if isinstance(self.optimizer,
+                  tf.keras.mixed_precision.experimental.LossScaleOptimizer):
+      gradients = self.optimizer.get_unscaled_gradients(scaled_gradients)
+    else:
+      gradients = scaled_gradients
+    if self.config.clip_gradients_norm > 0:
+      gradients, gnorm = tf.clip_by_global_norm(gradients,
+                                                self.config.clip_gradients_norm)
+      loss_vals['gnorm'] = gnorm
+    self.optimizer.apply_gradients(zip(gradients, trainable_vars))
+    return loss_vals
+
+  def train_step(self, data):
+    """Train step.
+
+    Args:
+      data: Tuple of (images, labels). Image tensor with shape [batch_size,
+        height, width, 3]. The height and width are fixed and equal.Input labels
+        in a dictionary. The labels include class targets and box targets which
+        are dense label maps. The labels are generated from get_input_fn
+        function in data/dataloader.py.
+
+    Returns:
+      A dict record loss info.
+    """
+    images, labels = data
+    if tf.executing_eagerly():
+      return self._eager_gradients(images, labels)
+    return self._graph_gradients(images, labels)
 
   def test_step(self, data):
     """Test step.
