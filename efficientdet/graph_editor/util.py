@@ -1,12 +1,4 @@
-<<<<<<< HEAD
 # Copyright 2020 Google Research. All Rights Reserved.
-=======
-<<<<<<< HEAD
-# Copyright 2015 The TensorFlow Authors. All Rights Reserved.
-=======
-# Copyright 2020 Google Research. All Rights Reserved.
->>>>>>> bea39c1ee4c70d71018e6679da1d71c60ec8fafb
->>>>>>> 453bd4fb8b1910b7db9f139f9e5d3ddc0f3e0273
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,13 +37,6 @@ __all__ = [
     "make_placeholder_from_dtype_and_shape",
 ]
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-
-=======
->>>>>>> bea39c1ee4c70d71018e6679da1d71c60ec8fafb
->>>>>>> 453bd4fb8b1910b7db9f139f9e5d3ddc0f3e0273
 # The graph editor sometimes need to create placeholders, they are named
 # "geph_*". "geph" stands for Graph-Editor PlaceHolder.
 _DEFAULT_PLACEHOLDER_PREFIX = "geph"
