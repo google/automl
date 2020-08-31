@@ -117,6 +117,37 @@ flags.DEFINE_bool(
     'Drawback: you need to kill 2 processes instead of one if '
     'you want to interrupt training')
 
+<<<<<<< HEAD
+=======
+flags.DEFINE_multi_string(
+    'gradient_checkpointing', None,
+    'This is an experimental option. It may help to save GPU memory while '
+    'training. '
+    'To get a high-level idea see: \n'
+    '1) https://github.com/cybertronai/gradient-checkpointing and\n'
+    '2) https://medium.com/tensorflow/'
+    'fitting-larger-networks-into-memory-583e3c758ff9\n'
+    'You need to provide a list of strings that would indicate '
+    'which layers of the network to use as checkpoints. '
+    'These strings will be searched in the tensors name and only those '
+    'tensors that match will be kept as checkpoints.\n'
+    'When this option is used the standard tensorflow.python.ops.gradients '
+    'method is being replaced with a custom method. Finding layers to save as '
+    'checkpoints for the best performance is an open problem that requires '
+    'further investigation, however: \n\n'
+    'gradient_checkpointing: ["Add"]\n\n'
+    '(use layers with "Add" in the name as checkpoints) '
+    'is a reasonably well working option that has been tested '
+    'and gives following results: \n'
+    '- On d4 network with batch-size of 1 '
+    '(mixed precision enabled) '
+    'it takes only 1/3.2 of memory with roughly 32% slower computation\n'
+    '- It also allows to compute a d6 network with batch size of 2 '
+    '(mixed precision enabled) on a 11Gb (2080Ti) GPU')
+flags.DEFINE_bool('nvgpu_logging', False,
+                  'enable memory logging for NVIDIA cards')
+
+>>>>>>> gradient_checkpoint
 FLAGS = flags.FLAGS
 
 
@@ -342,7 +373,11 @@ def main(_):
 
   elif FLAGS.mode == 'train_and_eval':
     ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
+<<<<<<< HEAD
     if not ckpt:
+=======
+    if not ckpt and FLAGS.ckpt:
+>>>>>>> gradient_checkpoint
       ckpt = tf.train.latest_checkpoint(FLAGS.ckpt)
     try:
       step = int(os.path.basename(ckpt).split("-")[1])

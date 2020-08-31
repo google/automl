@@ -133,7 +133,7 @@ class Config(object):
           if '.' not in k:
             return {k: eval_str_fn(v)}
           pos = k.index('.')
-          return {k[:pos]: add_kv_recursive(k[pos+1:], v)}
+          return {k[:pos]: add_kv_recursive(k[pos + 1:], v)}
 
         def merge_dict_recursive(target, src):
           """Recursively merge two nested dictionary."""
@@ -158,6 +158,8 @@ class Config(object):
       else:
         config_dict[k] = copy.deepcopy(v)
     return config_dict
+
+
 # pylint: enable=protected-access
 
 
@@ -276,8 +278,22 @@ def default_detection_configs():
   # A temporary flag to switch between legacy and keras models.
   h.use_keras_model = True
 
+  # This is an experimental option. It may help you to save GPU memory while
+  # training. Here you may add a list of strings that would indicate
+  # which layers of the network to use to save checkpoints as in
+  # https://github.com/cybertronai/gradient-checkpointing implementation and
+  # "Training Deep Nets with Sublinear Memory Cost, by Chen et al. (2016)
+  # paper"
+  # When this option is used the standard tensorflow.python.ops.gradients
+  # method is being replaced with a custom method
+  h.gradient_checkpointing = None
+
+  # enable memory logging for NVIDIA cards
+  h.nvgpu_logging = False
+
   # unused.
   h.resnet_depth = 50
+
   return h
 
 
