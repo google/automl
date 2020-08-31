@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Copyright 2015 The TensorFlow Authors. All Rights Reserved.
+=======
+# Copyright 2020 Google Research. All Rights Reserved.
+>>>>>>> bea39c1ee4c70d71018e6679da1d71c60ec8fafb
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
