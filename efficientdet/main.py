@@ -117,8 +117,6 @@ flags.DEFINE_bool(
     'Drawback: you need to kill 2 processes instead of one if '
     'you want to interrupt training')
 
-<<<<<<< HEAD
-=======
 flags.DEFINE_multi_string(
     'gradient_checkpointing', None,
     'This is an experimental option. It may help to save GPU memory while '
@@ -147,7 +145,6 @@ flags.DEFINE_multi_string(
 flags.DEFINE_bool('nvgpu_logging', False,
                   'enable memory logging for NVIDIA cards')
 
->>>>>>> gradient_checkpoint
 FLAGS = flags.FLAGS
 
 
@@ -373,11 +370,7 @@ def main(_):
 
   elif FLAGS.mode == 'train_and_eval':
     ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
-<<<<<<< HEAD
-    if not ckpt:
-=======
     if not ckpt and FLAGS.ckpt:
->>>>>>> gradient_checkpoint
       ckpt = tf.train.latest_checkpoint(FLAGS.ckpt)
     try:
       step = int(os.path.basename(ckpt).split("-")[1])
