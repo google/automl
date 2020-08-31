@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Copyright 2015 The TensorFlow Authors. All Rights Reserved.
+=======
+# Copyright 2020 Google Research. All Rights Reserved.
+>>>>>>> bea39c1ee4c70d71018e6679da1d71c60ec8fafb
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,7 +41,10 @@ __all__ = [
     "make_placeholder_from_dtype_and_shape",
 ]
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> bea39c1ee4c70d71018e6679da1d71c60ec8fafb
 # The graph editor sometimes need to create placeholders, they are named
 # "geph_*". "geph" stands for Graph-Editor PlaceHolder.
 _DEFAULT_PLACEHOLDER_PREFIX = "geph"
@@ -154,8 +161,13 @@ def transform_tree(tree, fn, iterable_type=tuple):
       if hasattr(tree, "_asdict"):
         res = tree.__new__(type(tree), **transform_tree(tree._asdict(), fn))
       else:
+<<<<<<< HEAD
         res = tree.__new__(type(tree),
                            (transform_tree(child, fn) for child in tree))
+=======
+        res = tree.__new__(
+            type(tree), (transform_tree(child, fn) for child in tree))
+>>>>>>> bea39c1ee4c70d71018e6679da1d71c60ec8fafb
       return res
     elif isinstance(tree, collections_abc.Sequence):
       res = tree.__new__(type(tree))
@@ -210,8 +222,13 @@ def get_unique_graph(tops, check_types=None, none_if_empty=False):
   g = None
   for op in tops:
     if not isinstance(op, check_types):
+<<<<<<< HEAD
       raise TypeError("Expected a type in ({}), got: {}".format(", ".join([str(
           t) for t in check_types]), type(op)))
+=======
+      raise TypeError("Expected a type in ({}), got: {}".format(
+          ", ".join([str(t) for t in check_types]), type(op)))
+>>>>>>> bea39c1ee4c70d71018e6679da1d71c60ec8fafb
     if g is None:
       g = op.graph
     elif g is not op.graph:
@@ -448,7 +465,12 @@ def placeholder_name(t=None, scope=None, prefix=_DEFAULT_PLACEHOLDER_PREFIX):
     return "{}{}".format(scope, prefix)
 
 
+<<<<<<< HEAD
 def make_placeholder_from_tensor(t, scope=None,
+=======
+def make_placeholder_from_tensor(t,
+                                 scope=None,
+>>>>>>> bea39c1ee4c70d71018e6679da1d71c60ec8fafb
                                  prefix=_DEFAULT_PLACEHOLDER_PREFIX):
   """Create a `tf.compat.v1.placeholder` for the Graph Editor.
 
@@ -467,11 +489,22 @@ def make_placeholder_from_tensor(t, scope=None,
     TypeError: if `t` is not `None` or a `tf.Tensor`.
   """
   return tf_array_ops.placeholder(
+<<<<<<< HEAD
       dtype=t.dtype, shape=t.get_shape(),
       name=placeholder_name(t, scope=scope, prefix=prefix))
 
 
 def make_placeholder_from_dtype_and_shape(dtype, shape=None, scope=None,
+=======
+      dtype=t.dtype,
+      shape=t.get_shape(),
+      name=placeholder_name(t, scope=scope, prefix=prefix))
+
+
+def make_placeholder_from_dtype_and_shape(dtype,
+                                          shape=None,
+                                          scope=None,
+>>>>>>> bea39c1ee4c70d71018e6679da1d71c60ec8fafb
                                           prefix=_DEFAULT_PLACEHOLDER_PREFIX):
   """Create a tf.compat.v1.placeholder for the Graph Editor.
 
@@ -490,7 +523,12 @@ def make_placeholder_from_dtype_and_shape(dtype, shape=None, scope=None,
     A newly created tf.placeholder.
   """
   return tf_array_ops.placeholder(
+<<<<<<< HEAD
       dtype=dtype, shape=shape,
+=======
+      dtype=dtype,
+      shape=shape,
+>>>>>>> bea39c1ee4c70d71018e6679da1d71c60ec8fafb
       name=placeholder_name(scope=scope, prefix=prefix))
 
 
@@ -499,8 +537,16 @@ _INTERNAL_VARIABLE_RE = re.compile(r"^__\w+__$")
 
 def get_predefined_collection_names():
   """Return all the predefined collection names."""
+<<<<<<< HEAD
   return [getattr(tf_ops.GraphKeys, key) for key in dir(tf_ops.GraphKeys)
           if not _INTERNAL_VARIABLE_RE.match(key)]
+=======
+  return [
+      getattr(tf_ops.GraphKeys, key)
+      for key in dir(tf_ops.GraphKeys)
+      if not _INTERNAL_VARIABLE_RE.match(key)
+  ]
+>>>>>>> bea39c1ee4c70d71018e6679da1d71c60ec8fafb
 
 
 def find_corresponding_elem(target, dst_graph, dst_scope="", src_scope=""):
@@ -561,6 +607,13 @@ def find_corresponding(targets, dst_graph, dst_scope="", src_scope=""):
     TypeError: if `top` is not a `tf.Tensor` or a `tf.Operation`
     KeyError: If the corresponding graph element cannot be found.
   """
+<<<<<<< HEAD
   def func(top):
     return find_corresponding_elem(top, dst_graph, dst_scope, src_scope)
+=======
+
+  def func(top):
+    return find_corresponding_elem(top, dst_graph, dst_scope, src_scope)
+
+>>>>>>> bea39c1ee4c70d71018e6679da1d71c60ec8fafb
   return transform_tree(targets, func)
