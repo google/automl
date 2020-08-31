@@ -624,7 +624,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
       Format the log output
       """
 
-      logstring = "Epoch {}. Step {} of {}: ".format(
+      logstring = "Epoch {}. Example {} of {}: ".format(
           tensors["epoch"], tensors["step_in_epoch"],
           params['num_examples_per_epoch'])
 
