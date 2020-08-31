@@ -371,7 +371,7 @@ For more instructions about training on TPUs, please refer to the following tuto
 
   * EfficientNet tutorial: https://cloud.google.com/tpu/docs/tutorials/efficientnet
 
-## 11. Saving Memory when Training EfficientDets on GPU.
+## 11. Reducing Memory Usage when Training EfficientDets on GPU.
 
 EfficientDets use a lot of GPU memory for a few reasons:
 
