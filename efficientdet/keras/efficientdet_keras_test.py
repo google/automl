@@ -113,7 +113,8 @@ class EfficientDetKerasTest(tf.test.TestCase):
 
     for i in range(config.min_level, config.max_level + 1):
       self.assertAllClose(keras_feats[i - config.min_level], legacy_feats[i])
-      self.assertAllClose(keras_grads[i - config.min_level], legacy_grads[i - config.min_level])
+      self.assertAllClose(keras_grads[i - config.min_level],
+                          legacy_grads[i - config.min_level])
 
   def test_model_variables(self):
     input_shape = (1, 512, 512, 3)
