@@ -13,9 +13,8 @@
 # limitations under the License.
 # ==============================================================================
 """A few predefined label id mapping."""
-import yaml
 import tensorflow as tf
-
+import yaml
 
 coco = {
     # 0: 'background',

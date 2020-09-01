@@ -213,8 +213,23 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
   # Sum all positives in a batch for normalization and avoid zero
   # num_positives_sum, which would lead to inf loss during training
   num_positives_sum = tf.reduce_sum(labels['mean_num_positives']) + 1.0
-  levels = cls_outputs.keys()
+  if params.get('positives_momentum', 0) > 0:
+    # normalize the num_positive_examples for training stability.
+    moving_normalizer_var = tf.Variable(
+        0.0,
+        name='moving_normalizer',
+        dtype=tf.float32,
+        synchronization=tf.VariableSynchronization.ON_READ,
+        trainable=False,
+        aggregation=tf.VariableAggregation.MEAN)
+    num_positives_sum = tf.keras.backend.moving_average_update(
+        moving_normalizer_var,
+        num_positives_sum,
+        momentum=params['positives_momentum'])
+  elif params['positives_momentum'] < 0:
+    num_positives_sum = utils.cross_replica_mean(num_positives_sum)
 
+  levels = cls_outputs.keys()
   cls_losses = []
   box_losses = []
   for level in levels:
@@ -249,7 +264,7 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
     cls_loss *= tf.cast(
         tf.expand_dims(tf.not_equal(labels['cls_targets_%d' % level], -2), -1),
         tf.float32)
-    cls_losses.append(tf.reduce_sum(cls_loss))
+    cls_losses.append(tf.clip_by_value(tf.reduce_sum(cls_loss), 0.0, 2.0))
 
     if params['box_loss_weight']:
       box_losses.append(
@@ -460,6 +475,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
                   nms_configs['max_output_size'],
               ], tf.float32)
           detections_bs.append(detections)
+        detections_bs = postprocess.transform_detections(
+            tf.stack(detections_bs))
       else:
         # These two branches should be equivalent, but currently they are not.
         # TODO(tanmingxing): enable the non_pyfun path after bug fix.
@@ -589,10 +606,10 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
     logging_hook = tf.train.LoggingTensorHook(
         {
-            "step": global_step,
-            "det_loss": det_loss,
-            "cls_loss": cls_loss,
-            "box_loss": box_loss,
+            'step': global_step,
+            'det_loss': det_loss,
+            'cls_loss': cls_loss,
+            'box_loss': box_loss,
         },
         every_n_iter=params.get('iterations_per_loop', 100),
     )

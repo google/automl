@@ -27,6 +27,7 @@ import tensorflow as tf
 
 from keras import label_util
 
+
 class EvaluationMetric():
   """COCO evaluation metric class.
 
@@ -231,5 +232,6 @@ class EvaluationMetric():
           label_map = label_util.get_label_map(label_map)
           for i, cid in enumerate(sorted(label_map.keys())):
             name = 'AP_/%s' % label_map[cid]
-            metrics_dict[name] = (metrics[i - len(self.metric_names)], update_op)
+            metrics_dict[name] = (metrics[i - len(self.metric_names)],
+                                  update_op)
         return metrics_dict

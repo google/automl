@@ -394,7 +394,10 @@ class InputReader(object):
 
     # Prefetch data from files.
     def _prefetch_dataset(filename):
-      dataset = tf.data.TFRecordDataset(filename).prefetch(1)
+      if params.get('dataset_type', None) == 'sstable':
+        pass
+      else:
+        dataset = tf.data.TFRecordDataset(filename).prefetch(1)
       return dataset
 
     dataset = dataset.interleave(
@@ -406,10 +409,16 @@ class InputReader(object):
       dataset = dataset.shuffle(64)
 
     # Parse the fetched records to input tensors for model function.
+    # pylint: disable=g-long-lambda
+    if params.get('dataset_type', None) == 'sstable':
+      map_fn = lambda key, value: self.dataset_parser(value, example_decoder,
+                                                      anchor_labeler, params)
+    else:
+      map_fn = lambda value: self.dataset_parser(value, example_decoder,
+                                                 anchor_labeler, params)
+    # pylint: enable=g-long-lambda
     dataset = dataset.map(
-        lambda value: self.dataset_parser(  # pylint: disable=g-long-lambda
-            value, example_decoder, anchor_labeler, params),
-        num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     dataset = dataset.prefetch(batch_size)
     dataset = dataset.batch(batch_size, drop_remainder=True)
     dataset = dataset.map(
