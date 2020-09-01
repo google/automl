@@ -16,8 +16,9 @@
 import os
 import tempfile
 from absl import logging
-import tensorflow.compat.v1 as tf
-
+import tensorflow
+tf = tensorflow.compat.v1
+tf2 = tensorflow.compat.v2
 import efficientdet_arch as legacy_arch
 import hparams_config
 from keras import efficientdet_keras
@@ -46,18 +47,26 @@ class EfficientDetKerasTest(tf.test.TestCase):
       outputs = model(feats, True)
       sess.run(tf.global_variables_initializer())
       keras_class_out, keras_box_out, keras_seg_out = sess.run(outputs)
+      grads = tf.nest.map_structure(lambda output: tf.gradients(output, feats), outputs)
+      keras_class_grads, keras_box_grads, keras_seg_grads = sess.run(grads)
       model.save_weights(tmp_ckpt)
     with tf.Session(graph=tf.Graph()) as sess:
       feats = tf.ones(inputs_shape)
       tf.random.set_random_seed(SEED)
-      feats = legacy_arch.efficientdet(feats, config=config)
+      outputs = legacy_arch.efficientdet(feats, config=config)
       sess.run(tf.global_variables_initializer())
-      legacy_class_out, legacy_box_out = sess.run(feats)
+      legacy_class_out, legacy_box_out = sess.run(outputs)
+      grads = tf.nest.map_structure(lambda output: tf.gradients(output, feats), outputs)
+      legacy_class_grads, legacy_box_grads = sess.run(grads)
     for i in range(3, 8):
       self.assertAllClose(
           keras_class_out[i - 3], legacy_class_out[i], rtol=1e-4, atol=1e-4)
       self.assertAllClose(
           keras_box_out[i - 3], legacy_box_out[i], rtol=1e-4, atol=1e-4)
+      self.assertAllClose(
+          keras_class_grads[i - 3], legacy_class_grads[i], rtol=1e-4, atol=1e-4)
+      self.assertAllClose(
+          keras_box_grads[i - 3], legacy_box_grads[i], rtol=1e-4, atol=1e-4)
 
     feats = tf.ones(inputs_shape)
     model = efficientdet_keras.EfficientDetNet(config=config)
@@ -81,9 +90,13 @@ class EfficientDetKerasTest(tf.test.TestCase):
           tf.ones([1, 16, 16, 320]),  # level 5
       ]
       tf.random.set_random_seed(SEED)
-      new_feats1 = efficientdet_keras.FPNCells(config)(inputs, True)
+      fpn_cell = efficientdet_keras.FPNCells(config)
+      new_feats1 = fpn_cell(inputs, True)
       sess.run(tf.global_variables_initializer())
       keras_feats = sess.run(new_feats1)
+      grads = tf.gradients(new_feats1, inputs)
+      keras_grads = sess.run(grads)
+
     with tf.Session(graph=tf.Graph()) as sess:
       inputs = {
           0: tf.ones([1, 512, 512, 3]),
@@ -97,9 +110,12 @@ class EfficientDetKerasTest(tf.test.TestCase):
       new_feats2 = legacy_arch.build_feature_network(inputs, config)
       sess.run(tf.global_variables_initializer())
       legacy_feats = sess.run(new_feats2)
+      grads = tf.gradients(tf.nest.flatten(new_feats2), tf.nest.flatten(inputs))
+      legacy_grads = sess.run(grads[3:6])
 
     for i in range(config.min_level, config.max_level + 1):
       self.assertAllClose(keras_feats[i - config.min_level], legacy_feats[i])
+      self.assertAllClose(keras_grads[i - config.min_level], legacy_grads[i - config.min_level])
 
   def test_model_variables(self):
     input_shape = (1, 512, 512, 3)
