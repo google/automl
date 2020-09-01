@@ -16,9 +16,7 @@
 import os
 import tempfile
 from absl import logging
-import tensorflow
-tf = tensorflow.compat.v1
-tf2 = tensorflow.compat.v2
+import tensorflow.compat.v1 as tf
 import efficientdet_arch as legacy_arch
 import hparams_config
 from keras import efficientdet_keras
