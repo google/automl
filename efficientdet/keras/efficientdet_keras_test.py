@@ -56,6 +56,7 @@ class EfficientDetKerasTest(tf.test.TestCase):
       legacy_class_out, legacy_box_out = sess.run(outputs)
       grads = tf.nest.map_structure(lambda output: tf.gradients(output, feats), outputs)
       legacy_class_grads, legacy_box_grads = sess.run(grads)
+
     for i in range(3, 8):
       self.assertAllClose(
           keras_class_out[i - 3], legacy_class_out[i], rtol=1e-4, atol=1e-4)
@@ -125,19 +126,21 @@ class EfficientDetKerasTest(tf.test.TestCase):
     with tf.Graph().as_default():
       feats = tf.ones([1, 512, 512, 3])
       model = efficientdet_keras.EfficientDetNet('efficientdet-d0')
-      model.build(input_shape)
-      keras_train_vars = sorted([var.name for var in model.trainable_variables])
-      keras_model_vars = sorted([var.name for var in model.variables])
+      model(feats, True)
+      keras_train_vars = sorted([var.name for var in tf.trainable_variables()])
+      keras_model_vars = sorted([var.name for var in tf.global_variables()])
+      keras_update_ops = [op.name for op in tf.get_collection(tf.GraphKeys.UPDATE_OPS)]
     with tf.Graph().as_default():
       feats = tf.ones([1, 512, 512, 3])
       legacy_arch.efficientdet(feats, 'efficientdet-d0')
       legacy_train_vars = sorted([var.name for var in tf.trainable_variables()])
       legacy_model_vars = sorted([var.name for var in tf.global_variables()])
-
+      legacy_update_ops = [op.name for op in tf.get_collection(tf.GraphKeys.UPDATE_OPS)]
     self.assertEqual(keras_train_vars, legacy_train_vars)
     self.assertEqual(keras_model_vars, legacy_model_vars)
     self.assertEqual(eager_train_vars, legacy_train_vars)
     self.assertEqual(eager_model_vars, legacy_model_vars)
+    self.assertAllEqual(keras_update_ops, legacy_update_ops)
 
   def test_resample_feature_map(self):
     feat = tf.random.uniform([1, 16, 16, 320])
