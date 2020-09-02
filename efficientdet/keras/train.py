@@ -215,7 +215,7 @@ def main(_):
     if FLAGS.pretrained_ckpt:
       ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)
       model.load_weights(ckpt_path)
-    os.makedirs(FLAGS.model_dir, exist_ok=True)
+    tf.io.gfile.makedirs(FLAGS.model_dir, exist_ok=True)
     model.fit(
         get_dataset(True, params=params),
         epochs=params['num_epochs'],

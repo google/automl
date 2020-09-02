@@ -265,7 +265,7 @@ def visualize_image(image,
     boxes: a box prediction with shape [N, 4] ordered [ymin, xmin, ymax, xmax].
     classes: a class prediction with shape [N].
     scores: A list of float value with shape [N].
-    id_mapping: a dictionary from class id to name.
+    label_map: a dictionary from class id to name.
     min_score_thresh: minimal score for showing. If claass probability is below
       this threshold, then the object will not show up.
     max_boxes_to_draw: maximum bounding box to draw.

@@ -13,10 +13,13 @@
 # limitations under the License.
 # =============================================================================
 """Postprocessing for anchor-based detection."""
+import functools
 from typing import List, Tuple
+
 from absl import logging
 import tensorflow as tf
 
+import nms_np
 import utils
 from keras import anchors
 T = tf.Tensor  # a shortcut for typing check.
@@ -367,14 +370,50 @@ def generate_detections(params,
                         image_ids,
                         flip=False):
   """A legacy interface for generating [id, x, y, w, h, score, class]."""
+  _, width = utils.parse_image_size(params['image_size'])
+
+  original_image_widths = tf.expand_dims(image_scales, -1) * width
+
+  if params['nms_configs'].get('pyfunc', True):
+    # numpy based soft-nms gives better accuracy than the tensorflow builtin
+    # the reason why is unknown
+    detections_bs = []
+    boxes, scores, classes = pre_nms(params, cls_outputs, box_outputs)
+    for index in range(boxes.shape[0]):
+      nms_configs = params['nms_configs']
+      detections = tf.numpy_function(
+          functools.partial(nms_np.per_class_nms, nms_configs=nms_configs), [
+              boxes[index],
+              scores[index],
+              classes[index],
+              tf.slice(image_ids, [index], [1]),
+              tf.slice(image_scales, [index], [1]),
+              params['num_classes'],
+              nms_configs['max_output_size'],
+          ], tf.float32)
+
+      if flip:
+        detections = tf.stack([
+            detections[:, 0],
+            # the mirrored location of the left edge is the image width
+            # minus the position of the right edge
+            original_image_widths[index] - detections[:, 3],
+            detections[:, 2],
+            # the mirrored location of the right edge is the image width
+            # minus the position of the left edge
+            original_image_widths[index] - detections[:, 1],
+            detections[:, 4],
+            detections[:, 5],
+            detections[:, 6],
+        ], axis=-1)
+      detections_bs.append(detections)
+    return tf.stack(detections_bs, axis=0, name='detnections')
+
   nms_boxes_bs, nms_scores_bs, nms_classes_bs, _ = postprocess_per_class(
       params, cls_outputs, box_outputs, image_scales)
 
   image_ids_bs = tf.cast(tf.expand_dims(image_ids, -1), nms_scores_bs.dtype)
   if flip:
-    _, width = utils.parse_image_size(params['image_size'])
-
-    original_image_widths = tf.expand_dims(image_scales, -1) * width
     detections_bs = [
         image_ids_bs * tf.ones_like(nms_scores_bs),
         # the mirrored location of the left edge is the image width

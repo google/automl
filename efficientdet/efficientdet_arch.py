@@ -44,12 +44,13 @@ def freeze_vars(variables, pattern):
     var_list: a list containing variables for training
   """
   if pattern:
-    _variables = [v for v in variables if not re.match(pattern, v.name)]
-    if len(_variables) == len(variables):
-        logging.warning(f'{pattern} pattern didnt match with any variable in the model.Please use compatible pattern. i.e "(efficientnet)"')
-    return _variables
-  else:
-    return variables
+    filtered_vars = [v for v in variables if not re.match(pattern, v.name)]
+    if len(filtered_vars) == len(variables):
+      logging.warning('%s didnt match with any variable. Please use compatible '
+                      'pattern. i.e "(efficientnet)"', pattern)
+    return filtered_vars
+  return variables
+
 
 def resize_bilinear(images, size, output_type):
   """Returns resized images as output_type."""
