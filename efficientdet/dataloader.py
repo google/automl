@@ -333,12 +333,8 @@ class InputReader(object):
       image_scale = input_processor.image_scale_to_original
       boxes *= image_scale
       is_crowds = tf.cast(is_crowds, dtype=tf.float32)
-      boxes = pad_to_fixed_size(boxes, -1, [self._max_instances_per_image, 4])
-      is_crowds = pad_to_fixed_size(is_crowds, 0,
-                                    [self._max_instances_per_image, 1])
-      areas = pad_to_fixed_size(areas, -1, [self._max_instances_per_image, 1])
-      classes = pad_to_fixed_size(classes, -1,
-                                  [self._max_instances_per_image, 1])
+      is_crowds = tf.expand_dims(is_crowds, axis=1)
+      areas = tf.expand_dims(areas, axis=1)
       return (image, cls_targets, box_targets, num_positives, source_id,
               image_scale, boxes, is_crowds, areas, classes, image_masks)
 
@@ -374,7 +370,7 @@ class InputReader(object):
     labels['image_masks'] = image_masks
     return images, labels
 
-  def __call__(self, params):
+  def __call__(self, params, input_context=None):
     input_anchors = anchors.Anchors(params['min_level'], params['max_level'],
                                     params['num_scales'],
                                     params['aspect_ratios'],
@@ -391,7 +387,9 @@ class InputReader(object):
         self._file_pattern, shuffle=self._is_training)
     if self._is_training:
       dataset = dataset.repeat()
-
+    if input_context:
+      dataset = dataset.shard(input_context.num_input_pipelines,
+                              input_context.input_pipeline_id)
     # Prefetch data from files.
     def _prefetch_dataset(filename):
       if params.get('dataset_type', None) == 'sstable':
@@ -404,6 +402,9 @@ class InputReader(object):
         _prefetch_dataset, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     options = tf.data.Options()
     options.experimental_deterministic = not self._is_training
+    options.experimental_optimization.map_vectorization.enabled = True
+    options.experimental_optimization.map_parallelization = True
+    options.experimental_optimization.parallel_batch = True
     dataset = dataset.with_options(options)
     if self._is_training:
       dataset = dataset.shuffle(64)
@@ -420,7 +421,40 @@ class InputReader(object):
     dataset = dataset.map(
         map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     dataset = dataset.prefetch(batch_size)
-    dataset = dataset.batch(batch_size, drop_remainder=True)
+    shapes = list(tf.nest.map_structure(lambda item: item.shape,
+                                        dataset.element_spec))
+    shapes[6] = (self._max_instances_per_image,4)
+    shapes[7] = (self._max_instances_per_image,1)
+    shapes[8] = (self._max_instances_per_image,1)
+    shapes[9] = (self._max_instances_per_image,1)
+    shapes = tuple(shapes)
+
+    def make_zero(t):
+      if t.base_dtype == tf.string:
+        return ""
+      elif t.base_dtype == tf.variant:
+        error_msg = ("Unable to create padding for field of type 'variant' "
+                     "because t.base_type == dtypes.variant == "
+                     "{}.".format(t.base_dtype))
+        raise TypeError(error_msg)
+      elif t.base_dtype == tf.bfloat16:
+        # Special case `bfloat16` because it is not supported by NumPy.
+        return tf.constant(0, dtype=tf.bfloat16)
+      else:
+        return tf.zeros_like(t.as_numpy_dtype())
+
+    paddings = tf.nest.map_structure(
+      make_zero,
+      tf.nest.map_structure(lambda item: item.dtype, dataset.element_spec))
+
+    paddings = list(paddings)
+    paddings[6] = tf.constant(-1, tf.float32)
+    paddings[7] = tf.constant(0, tf.float32)
+    paddings[8] = tf.constant(-1, tf.float32)
+    paddings[9] = tf.constant(-1, tf.float32)
+    paddings = tuple(paddings)
+
+    dataset = dataset.padded_batch(batch_size, shapes, paddings, drop_remainder=True)
     dataset = dataset.map(
         lambda *args: self.process_example(params, batch_size, *args))
     dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
@@ -429,4 +463,5 @@ class InputReader(object):
       # first batch. This reduces variance in performance and is useful in
       # testing.
       dataset = dataset.take(1).cache().repeat()
+    dataset = dataset.apply(tf.data.experimental.ignore_errors())
     return dataset

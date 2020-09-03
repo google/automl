@@ -319,6 +319,7 @@ def reg_l2_loss(weight_decay, regex=r'.*(kernel|weight):0$'):
   ])
 
 
+@tf.autograph.experimental.do_not_convert
 def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   """Model definition entry.
 
@@ -405,9 +406,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     ema = tf.train.ExponentialMovingAverage(
         decay=moving_average_decay, num_updates=global_step)
     ema_vars = utils.get_ema_vars()
-  if params['strategy'] == 'horovod':
-    import horovod.tensorflow as hvd  # pylint: disable=g-import-not-at-top
-    learning_rate = learning_rate * hvd.size()
+
   if mode == tf.estimator.ModeKeys.TRAIN:
     if params['optimizer'].lower() == 'sgd':
       optimizer = tf.train.MomentumOptimizer(
@@ -419,9 +418,6 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
     if params['strategy'] == 'tpu':
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)
-    elif params['strategy'] == 'horovod':
-      optimizer = hvd.DistributedOptimizer(optimizer)
-      training_hooks = [hvd.BroadcastGlobalVariablesHook(0)]
 
     # Batch norm requires update_ops to be added as a train_op dependency.
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -577,7 +573,6 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
           skip_mismatch=params['skip_mismatch'])
 
       tf.train.init_from_checkpoint(checkpoint, var_map)
-
       return tf.train.Scaffold()
   elif mode == tf.estimator.ModeKeys.EVAL and moving_average_decay:
 
@@ -592,21 +587,22 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
   if params['strategy'] != 'tpu':
     # Profile every 1K steps.
-    profile_hook = tf.train.ProfilerHook(
-        save_steps=1000, output_dir=params['model_dir'])
-    training_hooks.append(profile_hook)
+    if params.get('profile', False):
+      profile_hook = tf.estimator.ProfilerHook(
+          save_steps=1000, output_dir=params['model_dir'], show_memory=True)
+      training_hooks.append(profile_hook)
 
-    # Report memory allocation if OOM
-    class OomReportingHook(tf.estimator.SessionRunHook):
+      # Report memory allocation if OOM
+      class OomReportingHook(tf.estimator.SessionRunHook):
 
-      def before_run(self, run_context):
-        return tf.estimator.SessionRunArgs(
-            fetches=[],
-            options=tf.RunOptions(report_tensor_allocations_upon_oom=True))
+        def before_run(self, run_context):
+          return tf.estimator.SessionRunArgs(
+              fetches=[],
+              options=tf.RunOptions(report_tensor_allocations_upon_oom=True))
 
-    training_hooks.append(OomReportingHook())
+      training_hooks.append(OomReportingHook())
 
-    logging_hook = tf.train.LoggingTensorHook(
+    logging_hook = tf.estimator.LoggingTensorHook(
         {
             'step': global_step,
             'det_loss': det_loss,
@@ -616,15 +612,24 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
         every_n_iter=params.get('iterations_per_loop', 100),
     )
     training_hooks.append(logging_hook)
-
-  return tf.estimator.tpu.TPUEstimatorSpec(
-      mode=mode,
-      loss=total_loss,
-      train_op=train_op,
-      eval_metrics=eval_metrics,
-      host_call=utils.get_tpu_host_call(global_step, params),
-      scaffold_fn=scaffold_fn,
-      training_hooks=training_hooks)
+  if params['strategy'] == 'tpu':
+    return tf.estimator.tpu.TPUEstimatorSpec(
+        mode=mode,
+        loss=total_loss,
+        train_op=train_op,
+        eval_metrics=eval_metrics,
+        host_call=utils.get_tpu_host_call(global_step, params),
+        scaffold_fn=scaffold_fn,
+        training_hooks=training_hooks)
+  else:
+    eval_metric_ops = eval_metrics[0](eval_metrics[1]) if eval_metrics else None
+    return tf.estimator.EstimatorSpec(
+        mode=mode,
+        loss=total_loss,
+        train_op=train_op,
+        eval_metric_ops=eval_metric_ops,
+        scaffold=scaffold_fn(),
+        training_hooks=training_hooks)
 
 
 def efficientdet_model_fn(features, labels, mode, params):

@@ -41,8 +41,8 @@ flags.DEFINE_string(
     help='GCE zone where the Cloud TPU is located in. If not specified, we '
     'will attempt to automatically detect the GCE project from metadata.')
 flags.DEFINE_string('eval_name', default=None, help='Eval job name')
-flags.DEFINE_enum('strategy', None, ['tpu', 'horovod', ''],
-                  'Training: horovod for multi-gpu, if None, use TF default.')
+flags.DEFINE_enum('strategy', None, ['tpu', 'gpus', ''],
+                  'Training: gpus for multi-gpu, if None, use TF default.')
 
 flags.DEFINE_bool('use_fake_data', False, 'Use fake input.')
 flags.DEFINE_bool(
@@ -95,6 +95,7 @@ flags.DEFINE_string('mode', 'train',
 flags.DEFINE_string('model_name', 'efficientdet-d1', 'Model name.')
 flags.DEFINE_bool('eval_after_training', False, 'Run one eval after the '
                   'training finishes.')
+flags.DEFINE_bool('profile', False, 'Profile training performance.')
 flags.DEFINE_integer(
     'tf_random_seed', None, 'Sets the TF graph seed for deterministic execution'
     ' across runs (for debugging).')
@@ -118,11 +119,6 @@ FLAGS = flags.FLAGS
 
 def main(_):
 
-  if FLAGS.strategy == 'horovod':
-    import horovod.tensorflow as hvd  # pylint: disable=g-import-not-at-top
-    logging.info('Use horovod with multi gpus')
-    hvd.init()
-    os.environ['CUDA_VISIBLE_DEVICES'] = str(hvd.local_rank())
   import tensorflow.compat.v1 as tf  # pylint: disable=g-import-not-at-top
   tf.enable_v2_tensorshape()
   tf.disable_eager_execution()
@@ -226,19 +222,28 @@ def main(_):
       per_host_input_for_training=tf.estimator.tpu.InputPipelineConfig
       .PER_HOST_V2)
 
-  if FLAGS.strategy == 'horovod':
-    model_dir = FLAGS.model_dir if hvd.rank() == 0 else None
+  model_dir = FLAGS.model_dir
+  if FLAGS.strategy == 'tpu':
+    run_config = tf.estimator.tpu.RunConfig(
+        cluster=tpu_cluster_resolver,
+        model_dir=model_dir,
+        log_step_count_steps=FLAGS.iterations_per_loop,
+        session_config=config_proto,
+        tpu_config=tpu_config,
+        tf_random_seed=FLAGS.tf_random_seed,
+    )
   else:
-    model_dir = FLAGS.model_dir
-
-  run_config = tf.estimator.tpu.RunConfig(
-      cluster=tpu_cluster_resolver,
-      model_dir=model_dir,
-      log_step_count_steps=FLAGS.iterations_per_loop,
-      session_config=config_proto,
-      tpu_config=tpu_config,
-      tf_random_seed=FLAGS.tf_random_seed,
-  )
+    strategy = None
+    if FLAGS.strategy == 'gpus':
+      strategy = tf.distribute.MirroredStrategy()
+    run_config = tf.estimator.RunConfig(
+        model_dir=model_dir,
+        train_distribute=strategy,
+        log_step_count_steps=FLAGS.iterations_per_loop,
+        session_config=config_proto,
+        save_checkpoints_steps=5000,
+        tf_random_seed=FLAGS.tf_random_seed,
+    )
 
   model_fn_instance = det_model_fn.get_model_fn(FLAGS.model_name)
   max_instances_per_image = config.max_instances_per_image
@@ -248,14 +253,6 @@ def main(_):
   use_tpu = (FLAGS.strategy == 'tpu')
   logging.info(params)
 
-  # Use the unified estimator, train, and eval interfaces.
-  estimator = tf.estimator.tpu.TPUEstimator(
-      model_fn=model_fn_instance,
-      use_tpu=use_tpu,
-      train_batch_size=FLAGS.train_batch_size,
-      eval_batch_size=FLAGS.eval_batch_size,
-      config=run_config,
-      params=params)
   train_input_fn = dataloader.InputReader(
       FLAGS.training_file_pattern,
       is_training=True,
@@ -267,9 +264,25 @@ def main(_):
       use_fake_data=FLAGS.use_fake_data,
       max_instances_per_image=max_instances_per_image)
 
+  """Build train estimator and run training if steps > 0."""
+  if FLAGS.strategy == 'tpu':
+    estimator = tf.estimator.tpu.TPUEstimator(
+      model_fn=model_fn_instance,
+      use_tpu=use_tpu,
+      train_batch_size=FLAGS.train_batch_size,
+      eval_batch_size=FLAGS.eval_batch_size,
+      config=run_config,
+      params=params)
+  else:
+    params['batch_size'] = (
+      FLAGS.train_batch_size // getattr(strategy, 'num_replicas_in_sync', 1))
+    estimator = tf.estimator.Estimator(
+        model_fn=model_fn_instance,
+        config=run_config,
+        params=params)
+
   # start train/eval flow.
   if FLAGS.mode == 'train':
-    total_examples = int(config.num_epochs * FLAGS.num_examples_per_epoch),
     estimator.train(input_fn=train_input_fn, max_steps=train_steps)
     if FLAGS.eval_after_training:
       estimator.evaluate(input_fn=eval_input_fn, steps=eval_steps)
