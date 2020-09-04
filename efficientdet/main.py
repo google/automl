@@ -350,7 +350,7 @@ def main(_):
           step * FLAGS.train_batch_size // FLAGS.num_examples_per_epoch)
       logging.info('found ckpt at step %d (epoch %d)', step, current_epoch)
     except (IndexError, TypeError):
-      logging.info("Folder has no ckpt with valid step.", FLAGS.model_dir)
+      logging.info("Folder has no ckpt with valid step. Folder: %s", FLAGS.model_dir)
       current_epoch = 0
 
     epochs_per_cycle = 1  # higher number has less graph construction overhead.
