@@ -278,8 +278,6 @@ def default_detection_configs():
   h.dataset_type = None
   h.positives_momentum = None
 
-  # unused.
-  h.resnet_depth = 50
   return h
 
 
