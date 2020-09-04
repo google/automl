@@ -76,7 +76,8 @@ def cross_replica_mean(t, num_shards_per_group=None):
 
 def get_ema_vars():
   """Get all exponential moving average (ema) variables."""
-  ema_vars = tf.trainable_variables() + tf.get_collection('moving_vars')
+  ema_vars = tf.trainable_variables() + \
+             tf.get_collection(tf.GraphKeys.MOVING_AVERAGE_VARIABLES)
   for v in tf.global_variables():
     # We maintain mva for batch norm moving mean and variance as well.
     if 'moving_mean' in v.name or 'moving_variance' in v.name:
