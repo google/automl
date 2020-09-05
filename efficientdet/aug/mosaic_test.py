@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""
-Mosaic Augmentation simple test.
-"""
+"""Mosaic Augmentation simple test."""
 from absl import logging
 import tensorflow.compat.v1 as tf
-from aug.mosaic import Mosaic
+
+from aug import mosaic
 
 
 class MosaicTest(tf.test.TestCase):
@@ -25,26 +24,23 @@ class MosaicTest(tf.test.TestCase):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self.output_size = (512, 512)
-    self.mosaic = Mosaic(out_size=self.output_size)
+    self.mosaic = mosaic.Mosaic(out_size=self.output_size)
     tf.random.set_random_seed(111111)
 
   def test_mosaic_boxes(self):
-    # A very simple test to verify moisac num of boxes are valid and syntax check.
-    # random four images
+    """Verify num of boxes are valid and syntax check random four images."""
     images = tf.random.uniform(
         shape=(4, 512, 512, 3), minval=0, maxval=255, dtype=tf.float32)
     bboxes = tf.random.uniform(
         shape=(4, 2, 4), minval=1, maxval=511, dtype=tf.int32)
-    mosaic_image, mosaic_boxes = self.mosaic(images, bboxes)
+    _, mosaic_boxes = self.mosaic(images, bboxes)
     self.assertEqual(bboxes.shape[0], len(mosaic_boxes))
 
   def test_mosaic_tiny_images(self):
-    # A very simple test to verify moisac num of boxes are valid and syntax check.
-    # tiny  4x4 four images
     images = tf.zeros(shape=(4, 4, 4, 3))
     bboxes = tf.random.uniform(
         shape=(4, 2, 4), minval=1, maxval=511, dtype=tf.int32)
-    mosaic_image, mosaic_boxes = self.mosaic(images, bboxes)
+    _, mosaic_boxes = self.mosaic(images, bboxes)
     self.assertEqual(bboxes.shape[0], len(mosaic_boxes))
 
 

@@ -276,7 +276,7 @@ def default_detection_configs():
   # A temporary flag to switch between legacy and keras models.
   h.use_keras_model = True
   h.dataset_type = None
-  h.positives_momentum = 0
+  h.positives_momentum = None
 
   # unused.
   h.resnet_depth = 50

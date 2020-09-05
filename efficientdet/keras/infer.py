@@ -64,6 +64,7 @@ def main(_):
   model.summary()
 
   class ExportModel(tf.Module):
+
     def __init__(self, model):
       super().__init__()
       self.model = model
@@ -76,9 +77,10 @@ def main(_):
   export_model = ExportModel(model)
   if FLAGS.saved_model_dir:
     tf.saved_model.save(
-      export_model, FLAGS.saved_model_dir,
-      signatures=export_model.f.get_concrete_function(
-        tf.TensorSpec(shape=(None, None, None, 3), dtype=tf.uint8)))
+        export_model,
+        FLAGS.saved_model_dir,
+        signatures=export_model.f.get_concrete_function(
+            tf.TensorSpec(shape=(None, None, None, 3), dtype=tf.uint8)))
     export_model = tf.saved_model.load(FLAGS.saved_model_dir)
 
   boxes, scores, classes, valid_len = export_model.f(imgs)
@@ -96,7 +98,7 @@ def main(_):
         max_boxes_to_draw=config.nms_configs.max_output_size)
     output_image_path = os.path.join(FLAGS.output_dir, str(i) + '.jpg')
     Image.fromarray(img).save(output_image_path)
-    logging.info('writing annotated image to ', output_image_path)
+    logging.info('writing annotated image to %s', output_image_path)
 
 
 if __name__ == '__main__':
