@@ -52,6 +52,8 @@ flags.DEFINE_enum('strategy', None, ['tpu', 'gpus', ''],
 
 flags.DEFINE_string('val_file_pattern', None,
                     'Glob for eval tfrecords, e.g. coco/val-*.tfrecord.')
+flags.DEFINE_integer('eval_samples', None, 'The number of samples for '
+                     'evaluation.')
 flags.DEFINE_string(
     'val_json_file', None,
     'Groudtruth file, e.g. annotations/instances_val2017.json.')
@@ -116,6 +118,8 @@ def main(_):
           use_fake_data=False,
           max_instances_per_image=config.max_instances_per_image)(
               config)
+      if FLAGS.eval_samples:
+        ds = ds.take(FLAGS.eval_samples // config.batch_size)
 
       # create the function once per augmentation, since it closes over the
       # value of config, which gets updated with the new image size

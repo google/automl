@@ -213,7 +213,8 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
   # Sum all positives in a batch for normalization and avoid zero
   # num_positives_sum, which would lead to inf loss during training
   num_positives_sum = tf.reduce_sum(labels['mean_num_positives']) + 1.0
-  if params.get('positives_momentum', 0) > 0:
+  positives_momentum = params.get('positives_momentum', None) or 0
+  if positives_momentum > 0:
     # normalize the num_positive_examples for training stability.
     moving_normalizer_var = tf.Variable(
         0.0,
@@ -226,7 +227,7 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
         moving_normalizer_var,
         num_positives_sum,
         momentum=params['positives_momentum'])
-  elif params['positives_momentum'] < 0:
+  elif positives_momentum < 0:
     num_positives_sum = utils.cross_replica_mean(num_positives_sum)
 
   levels = cls_outputs.keys()

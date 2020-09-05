@@ -45,8 +45,9 @@ class EfficientDetKerasTest(tf.test.TestCase):
       outputs = model(feats, True)
       sess.run(tf.global_variables_initializer())
       keras_class_out, keras_box_out, keras_seg_out = sess.run(outputs)
-      grads = tf.nest.map_structure(lambda output: tf.gradients(output, feats), outputs)
-      keras_class_grads, keras_box_grads, keras_seg_grads = sess.run(grads)
+      grads = tf.nest.map_structure(lambda output: tf.gradients(output, feats),
+                                    outputs)
+      keras_class_grads, keras_box_grads, _ = sess.run(grads)
       model.save_weights(tmp_ckpt)
     with tf.Session(graph=tf.Graph()) as sess:
       feats = tf.ones(inputs_shape)
@@ -54,7 +55,8 @@ class EfficientDetKerasTest(tf.test.TestCase):
       outputs = legacy_arch.efficientdet(feats, config=config)
       sess.run(tf.global_variables_initializer())
       legacy_class_out, legacy_box_out = sess.run(outputs)
-      grads = tf.nest.map_structure(lambda output: tf.gradients(output, feats), outputs)
+      grads = tf.nest.map_structure(lambda output: tf.gradients(output, feats),
+                                    outputs)
       legacy_class_grads, legacy_box_grads = sess.run(grads)
 
     for i in range(3, 8):
@@ -129,13 +131,17 @@ class EfficientDetKerasTest(tf.test.TestCase):
       model(feats, True)
       keras_train_vars = sorted([var.name for var in tf.trainable_variables()])
       keras_model_vars = sorted([var.name for var in tf.global_variables()])
-      keras_update_ops = [op.name for op in tf.get_collection(tf.GraphKeys.UPDATE_OPS)]
+      keras_update_ops = [
+          op.name for op in tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+      ]
     with tf.Graph().as_default():
       feats = tf.ones([1, 512, 512, 3])
       legacy_arch.efficientdet(feats, 'efficientdet-d0')
       legacy_train_vars = sorted([var.name for var in tf.trainable_variables()])
       legacy_model_vars = sorted([var.name for var in tf.global_variables()])
-      legacy_update_ops = [op.name for op in tf.get_collection(tf.GraphKeys.UPDATE_OPS)]
+      legacy_update_ops = [
+          op.name for op in tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+      ]
     self.assertEqual(keras_train_vars, legacy_train_vars)
     self.assertEqual(keras_model_vars, legacy_model_vars)
     self.assertEqual(eager_train_vars, legacy_train_vars)

@@ -124,6 +124,13 @@ voc = {
     20: 'tvmonitor',
 }
 
+waymo = {
+    # 0: 'background',
+    1: 'vehicle',
+    2: 'pedestrian',
+    3: 'cyclist',
+}
+
 
 def get_label_map(mapping):
   """Get label id map based on the name, filename, or dict."""
@@ -138,4 +145,4 @@ def get_label_map(mapping):
       return yaml.load(f, Loader=yaml.FullLoader)
 
   # case 3: it is a name of a predefined dataset.
-  return {'coco': coco, 'voc': voc}[mapping]
+  return {'coco': coco, 'voc': voc, 'waymo': waymo}[mapping]

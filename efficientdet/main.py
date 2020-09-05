@@ -13,9 +13,8 @@
 # limitations under the License.
 # ==============================================================================
 """The main training script."""
-import os
 import multiprocessing
-from functools import partial
+import os
 from absl import app
 from absl import flags
 from absl import logging
@@ -111,11 +110,9 @@ flags.DEFINE_integer(
 # for train_and_eval mode
 flags.DEFINE_bool(
     'run_epoch_in_child_process', True,
-    'This option helps to rectify CPU memory leak. If set to True then every '
-    'epoch iteration is run in a separate process '
-    'for train_and_eval mode and the memory is cleared after each epoch.\n'
-    'Drawback: you need to kill 2 processes instead of one if '
-    'you want to interrupt training')
+    'This option helps to rectify CPU memory leak. If True, every epoch is '
+    'run in a separate process for train and eval and memory will be cleared.'
+    'Drawback: need to kill 2 processes if trainining needs to be interrupted.')
 
 FLAGS = flags.FLAGS
 
@@ -342,18 +339,17 @@ def main(_):
 
   elif FLAGS.mode == 'train_and_eval':
     ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
-    if not ckpt:
+    if not ckpt and FLAGS.ckpt:
+      # Load the pretrained ckpt from FLAGS.ckpt at the begining of training.
       ckpt = tf.train.latest_checkpoint(FLAGS.ckpt)
     try:
-      step = int(os.path.basename(ckpt).split("-")[1])
+      step = int(os.path.basename(ckpt).split('-')[1])
       current_epoch = (
           step * FLAGS.train_batch_size // FLAGS.num_examples_per_epoch)
       logging.info('found ckpt at step %d (epoch %d)', step, current_epoch)
     except (IndexError, TypeError):
-      logging.info("Folder has no ckpt with valid step. Folder: %s", FLAGS.model_dir)
+      logging.info('Folder %s has no ckpt with valid step.', FLAGS.model_dir)
       current_epoch = 0
-
-    epochs_per_cycle = 1  # higher number has less graph construction overhead.
 
     def run_train_and_eval(e):
       print('-----------------------------------------------------\n'
@@ -365,9 +361,10 @@ def main(_):
       ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
       utils.archive_ckpt(eval_results, eval_results['AP'], ckpt)
 
+    epochs_per_cycle = 1  # higher number has less graph construction overhead.
     for e in range(current_epoch + 1, config.num_epochs + 1, epochs_per_cycle):
       if FLAGS.run_epoch_in_child_process:
-        p = multiprocessing.Process(target=partial(run_train_and_eval, e=e))
+        p = multiprocessing.Process(target=run_train_and_eval, args=(e,))
         p.start()
         p.join()
       else:
