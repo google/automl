@@ -285,9 +285,13 @@ def main(_):
   if FLAGS.mode == 'train':
     estimator.train(input_fn=train_input_fn, max_steps=train_steps)
     if FLAGS.eval_after_training:
+      estimator._params['batch_size'] = (
+                FLAGS.eval_batch_size // getattr(strategy, 'num_replicas_in_sync', 1))
       estimator.evaluate(input_fn=eval_input_fn, steps=eval_steps)
 
   elif FLAGS.mode == 'eval':
+    estimator._params['batch_size'] = (
+      FLAGS.eval_batch_size // getattr(strategy, 'num_replicas_in_sync', 1))
     # Run evaluation when there's a new checkpoint
     for ckpt in tf.train.checkpoints_iterator(
         FLAGS.model_dir,
