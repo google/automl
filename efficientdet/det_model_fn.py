@@ -343,6 +343,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   """
   utils.image('input_image', features)
   training_hooks = []
+  params['is_training_bn'] = (mode == tf.estimator.ModeKeys.TRAIN)
 
   if params['use_keras_model']:
     def model_fn(inputs):
