@@ -276,7 +276,8 @@ def batch_norm_class(is_training, strategy=None):
   if is_training and strategy == 'tpu':
     return TpuBatchNormalization
   elif is_training and strategy == 'gpus':
-    # TODO(fsx950223): Wait for #41980 to be fixed
+    # TODO(fsx950223): use SyncBatchNorm after the TF bug (incorrect nccl all_reduce) is fixed:
+    # see https://github.com/tensorflow/tensorflow/issues/41980
     return BatchNormalization
   else:
     return BatchNormalization
