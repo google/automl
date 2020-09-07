@@ -22,7 +22,7 @@ from object_detection import preprocessor
 from object_detection import tf_example_decoder
 
 
-class InputProcessor(object):
+class InputProcessor:
   """Base class of Input processor."""
 
   def __init__(self, image, output_size):
@@ -207,12 +207,10 @@ class DetectionInputProcessor(InputProcessor):
 
 def pad_to_fixed_size(data, pad_value, output_shape):
   """Pad data to a fixed length at the first dimension.
-
   Args:
     data: Tensor to be padded to output_shape.
     pad_value: A constant value assigned to the paddings.
     output_shape: The output shape of a 2D tensor.
-
   Returns:
     The Padded tensor with output_shape [max_instances_per_image, dimension].
   """
@@ -230,7 +228,7 @@ def pad_to_fixed_size(data, pad_value, output_shape):
   return padded_data
 
 
-class InputReader(object):
+class InputReader:
   """Input reader for dataset."""
 
   def __init__(self,
@@ -374,7 +372,8 @@ class InputReader(object):
     labels['image_masks'] = image_masks
     return images, labels
 
-  def __call__(self, params):
+
+  def __call__(self, params, input_context=None):
     input_anchors = anchors.Anchors(params['min_level'], params['max_level'],
                                     params['num_scales'],
                                     params['aspect_ratios'],
@@ -391,7 +390,9 @@ class InputReader(object):
         self._file_pattern, shuffle=self._is_training)
     if self._is_training:
       dataset = dataset.repeat()
-
+    if input_context:
+      dataset = dataset.shard(input_context.num_input_pipelines,
+                              input_context.input_pipeline_id)
     # Prefetch data from files.
     def _prefetch_dataset(filename):
       if params.get('dataset_type', None) == 'sstable':
@@ -404,6 +405,9 @@ class InputReader(object):
         _prefetch_dataset, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     options = tf.data.Options()
     options.experimental_deterministic = not self._is_training
+    options.experimental_optimization.map_vectorization.enabled = True
+    options.experimental_optimization.map_parallelization = True
+    options.experimental_optimization.parallel_batch = True
     dataset = dataset.with_options(options)
     if self._is_training:
       dataset = dataset.shuffle(64)
@@ -429,4 +433,5 @@ class InputReader(object):
       # first batch. This reduces variance in performance and is useful in
       # testing.
       dataset = dataset.take(1).cache().repeat()
+    dataset = dataset.apply(tf.data.experimental.ignore_errors())
     return dataset

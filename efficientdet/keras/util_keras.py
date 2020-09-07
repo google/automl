@@ -44,14 +44,7 @@ def build_batch_norm(is_training_bn: bool,
     A normalized `Tensor` with the same `data_format`.
   """
   axis = 1 if data_format == 'channels_first' else -1
-  if is_training_bn and strategy in ('gpus',):
-    batch_norm_class = tf.keras.layers.experimental.SyncBatchNormalization
-  elif (not tf.compat.v1.executing_eagerly_outside_functions() or
-        (is_training_bn and strategy in ('tpu',))):
-    # TODO(tanmingxing): compare them on TPU.
-    batch_norm_class = utils.batch_norm_class(is_training_bn, strategy)
-  else:
-    batch_norm_class = tf.keras.layers.BatchNormalization
+  batch_norm_class = utils.batch_norm_class(is_training_bn, strategy)
 
   bn_layer = batch_norm_class(
       axis=axis,
