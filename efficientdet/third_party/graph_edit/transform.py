@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Class to transform an subgraph into another.
-"""
+"""Class to transform an subgraph into another."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -77,8 +76,7 @@ def keep_t_if_possible_handler(info, t):
   """
   if info.graph is info.graph_:
     return t
-  else:
-    return replace_t_with_placeholder_handler(info, t)
+  return replace_t_with_placeholder_handler(info, t)
 
 
 def assign_renamed_collections_handler(info, elem, elem_):
@@ -120,11 +118,9 @@ def transform_op_if_inside_handler(info, op, keep_if_possible=True):
   """
   if op in info.sgv.ops:
     return info.transformed_ops[op]
-  else:
-    if keep_if_possible and info.graph is info.graph_:
-      return op
-    else:
-      return None
+  if keep_if_possible and info.graph is info.graph_:
+    return op
+  return None
 
 
 def copy_op_handler(info, op, new_inputs, copy_shape=False, nodedef_fn=None):
@@ -190,11 +186,11 @@ def copy_op_handler(info, op, new_inputs, copy_shape=False, nodedef_fn=None):
   return op_, op_.outputs
 
 
-class TransformerInfo(object):
-  """"Contains information about the result of a transform operation."""
+class TransformerInfo():
+  """Contains information about the result of a transform operation."""
 
   def __init__(self, info):
-    """Constructor.
+    """Init.
 
     Args:
       info: an instance of Transformer._TmpInfo containing various internal
@@ -211,11 +207,10 @@ class TransformerInfo(object):
     """Return the correct container depending on the type of `top`."""
     if isinstance(top, tf_ops.Operation):
       return self._transformed_ops
-    elif isinstance(top, tf_ops.Tensor):
+    if isinstance(top, tf_ops.Tensor):
       return self._transformed_ts
-    else:
-      raise TypeError("Expected a tf.Tensor or a tf.Operation, got a {}".format(
-          type(top)))
+    raise TypeError("Expected a tf.Tensor or a tf.Operation, got a %s" %
+                    type(top))
 
   def _transformed_elem(self, original_top, missing_fn=None):
     """Return the transformed op/tensor corresponding to the original one.
@@ -233,10 +228,9 @@ class TransformerInfo(object):
         if original.name == original_top:
           return transformed
       return None if missing_fn is None else missing_fn(original_top)
-    else:
-      if original_top not in transformed_map:
-        return None if missing_fn is None else missing_fn(original_top)
-      return transformed_map[original_top]
+    if original_top not in transformed_map:
+      return None if missing_fn is None else missing_fn(original_top)
+    return transformed_map[original_top]
 
   def _original_elem(self, transformed_top, missing_fn=None):
     """Return the original op/tensor corresponding to the transformed one.
@@ -295,6 +289,7 @@ class TransformerInfo(object):
     return util.transform_tree(transformed, original_elem)
 
   def __str__(self):
+    """Print result."""
     res = StringIO()
     print("Transform result info:", file=res)
     if self._graph == self._graph_:
@@ -316,7 +311,7 @@ class TransformerInfo(object):
     return res.getvalue()
 
 
-class _TmpInfo(object):
+class _TmpInfo():
   """Transformer temporary data.
 
   An instance of this class holds all the information relevant to a call
@@ -369,7 +364,7 @@ class _TmpInfo(object):
     return name_
 
 
-class Transformer(object):
+class Transformer():
   """Transform a subgraph into another one.
 
   By default, the constructor create a transform which copy a subgraph and
@@ -378,7 +373,7 @@ class Transformer(object):
   """
 
   def __init__(self):
-    """Transformer constructor.
+    """Init.
 
     The following members can be modified:
     transform_op_handler: handle the transformation of a `tf.Operation`.
@@ -398,7 +393,6 @@ class Transformer(object):
       handler defaults to transforming original_op only if they are in the
       subgraph, otherwise they are ignored.
     """
-
     # handlers
     self.transform_op_handler = copy_op_handler
     self.transform_control_input_handler = transform_op_if_inside_handler
@@ -565,7 +559,7 @@ class Transformer(object):
     if t in info.sgv_inputs_set:
       # `t` is an input of the subgraph.
       return self.transform_external_input_handler(info, t)
-    elif t.op in info.ops:
+    if t.op in info.ops:
       # `t` is an internal tensor but is not transformed yet because it
       # belongs to a graph cycle.
       logging.debug("Cyclic tensor: t.name = %s", t.name)
@@ -585,9 +579,8 @@ class Transformer(object):
       # Register as temporary and return.
       info.tmp_cyclic_ts.append((t, tmp_t_, consumer_op))
       return tmp_t_
-    else:
-      # `t` is a hidden input of the subgraph.
-      return self.transform_external_hidden_input_handler(info, t)
+    # `t` is a hidden input of the subgraph.
+    return self.transform_external_hidden_input_handler(info, t)
 
 
 def copy(sgv,
@@ -674,8 +667,7 @@ def copy_with_input_replacements(sgv,
   def replace_t_with_replacement_handler(info, t):
     if t in replacement_ts:
       return replacement_ts[t]
-    else:
-      return keep_t_if_possible_handler(info, t)
+    return keep_t_if_possible_handler(info, t)
 
   copier.transform_external_input_handler = replace_t_with_replacement_handler
   return copier(

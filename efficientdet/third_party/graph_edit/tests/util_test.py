@@ -26,6 +26,7 @@ from tensorflow.python.platform import test
 
 
 class UtilTest(test.TestCase):
+  """Test util."""
 
   def test_list_view(self):
     """Test for ge.util.ListView."""

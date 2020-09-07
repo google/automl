@@ -39,18 +39,21 @@ ERROR_TOLERANCE = 1e-3
 
 
 class TransformTest(test.TestCase):
+  """Test transform."""
 
   def setUp(self):
+    """Set up."""
     self.graph = ops.Graph()
     with self.graph.as_default():
-      c0 = constant_op.constant(1.0, shape=[10], name="Const")
-      c0.op._set_attr("_foo", attr_value_pb2.AttrValue(s=b"foo"))
+      c0 = constant_op.constant(1.0, shape=[10], name="Const")  # pylint: disable=W0212
+      c0.op._set_attr("_foo", attr_value_pb2.AttrValue(s=b"foo"))  # pylint: disable=W0212
       c1 = constant_op.constant(1.0, shape=[10], name="Const")
       c2 = constant_op.constant(1.0, shape=[10], name="Const")
       i = constant_op.constant(1.0, shape=[10], name="Input")
       self.o = math_ops.add(c2, math_ops.add(c1, math_ops.add(c0, i)))
 
   def test_copy(self):
+    """Test copy graph."""
     graph = ops.Graph()
     _, info = ge.copy(self.graph, graph)
     self.assertEqual(
@@ -72,6 +75,7 @@ class TransformTest(test.TestCase):
       self.assertEqual(info.original(t_), t)
 
   def test_copy_assert(self):
+    """Test copy graph."""
     ops.reset_default_graph()
     a = constant_op.constant(1)
     b = constant_op.constant(1)
@@ -86,6 +90,7 @@ class TransformTest(test.TestCase):
     self.assertIsNotNone(new_assert_op)
 
   def test_transform(self):
+    """Test transform graph."""
     transformer = ge.Transformer()
 
     def my_transform_op_handler(info, op, new_inputs):
@@ -119,6 +124,7 @@ class TransformTest(test.TestCase):
     self.assertTrue(matcher2(top))
 
   def test_transform_nodedef_fn(self):
+    """Test transform nodedef_fn."""
     transformer = ge.Transformer()
 
     def nodedef_fn(node_def):
@@ -145,6 +151,7 @@ class TransformTest(test.TestCase):
       self.assertEquals(op.get_attr("_bar"), b"bar")
 
   def test_copy_with_input_replacements(self):
+    """Test copy with input replacements."""
     with self.graph.as_default():
       ten = constant_op.constant(10.0, shape=[10], name="Input")
       sgv, _ = ge.copy_with_input_replacements(self.o.op,
@@ -155,6 +162,7 @@ class TransformTest(test.TestCase):
           np.linalg.norm(val - np.array([11])), 0.0, ERROR_TOLERANCE)
 
   def test_graph_replace(self):
+    """Test replace graph."""
     ops.reset_default_graph()
     a = constant_op.constant(1.0, name="a")
     b = variables.Variable(1.0, name="b")
@@ -169,6 +177,7 @@ class TransformTest(test.TestCase):
     self.assertNear(c_new_val, 3.001, ERROR_TOLERANCE)
 
   def test_graph_replace_dict(self):
+    """Test replace graph with dict."""
     ops.reset_default_graph()
     a = constant_op.constant(1.0, name="a")
     b = variables.Variable(1.0, name="b")
@@ -185,6 +194,7 @@ class TransformTest(test.TestCase):
     self.assertNear(c_new_val["c"], 3.001, ERROR_TOLERANCE)
 
   def test_graph_replace_ordered_dict(self):
+    """Test replace graph with ord dict."""
     ops.reset_default_graph()
     a = constant_op.constant(1.0, name="a")
     b = variables.Variable(1.0, name="b")
@@ -195,6 +205,7 @@ class TransformTest(test.TestCase):
     self.assertTrue(isinstance(c_new, collections.OrderedDict))
 
   def test_graph_replace_named_tuple(self):
+    """Test replace graph with named tuple."""
     ops.reset_default_graph()
     a = constant_op.constant(1.0, name="a")
     b = variables.Variable(1.0, name="b")
@@ -206,6 +217,7 @@ class TransformTest(test.TestCase):
     self.assertTrue(isinstance(c_new, one_tensor))
 
   def test_graph_replace_missing(self):
+    """Test replace missing."""
     ops.reset_default_graph()
     a = constant_op.constant(1.0, name="a")
     b = constant_op.constant(2.0, name="b")
@@ -216,6 +228,7 @@ class TransformTest(test.TestCase):
     self.assertEqual(res[1].name, "add_1:0")
 
   def test_graph_replace_gradients(self):
+    """Test replace gradients."""
     ops.reset_default_graph()
     w = variables.VariableV1(0.0, name="w")
     y = math_ops.multiply(math_ops.multiply(w, w, name="mul1"), w, name="mul2")
@@ -235,8 +248,8 @@ class TransformTest(test.TestCase):
             "res/grad/mul1_grad/Mul_1"))
 
     # Make sure _original_ops are as expected.
-    self.assertEqual(original_mul1_grad._original_op.name, u"mul1")
-    self.assertEqual(result_mul1_grad._original_op.name, u"res/mul1")
+    self.assertEqual(original_mul1_grad._original_op.name, u"mul1")  # pylint: disable=W0212
+    self.assertEqual(result_mul1_grad._original_op.name, u"res/mul1")  # pylint: disable=W0212
     self.assertNotEqual(res.name, g.name)
     with session.Session() as sess:
       sess.run(variables.global_variables_initializer())
@@ -245,6 +258,7 @@ class TransformTest(test.TestCase):
     self.assertNear(res_val, 0.0, ERROR_TOLERANCE)
 
   def test_graph_while_loop(self):
+    """Test graph while loop."""
     graph = ops.Graph()
     with graph.as_default():
       max_index = array_ops.placeholder(dtype=dtypes.int32, shape=tuple())
@@ -265,6 +279,7 @@ class TransformTest(test.TestCase):
         self.assertEqual(sum_val, 55)
 
   def test_graph_cond(self):
+    """Test graph cond."""
     graph = ops.Graph()
     with graph.as_default():
       choice = array_ops.placeholder(shape=(), dtype=dtypes.bool)

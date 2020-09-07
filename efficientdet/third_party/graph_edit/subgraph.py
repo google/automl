@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""SubGraphView: a subgraph view on an existing tf.Graph.
-"""
+"""SubGraphView: a subgraph view on an existing tf.Graph."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -37,15 +36,14 @@ __all__ = [
 
 
 def _finalize_index(index_or_t, ts):
-  """Returns index as is or return index of tensor in `ts`."""
+  """Return index as is or return index of tensor in `ts`."""
   if isinstance(index_or_t, six.integer_types):
     return index_or_t
-  else:
-    return ts.index(index_or_t)
+  return ts.index(index_or_t)
 
 
 def _finalize_indices(list_of_index_or_t, ts):
-  """Returns index in `indices` as is or replace with tensor's index."""
+  """Return index in `indices` as is or replace with tensor's index."""
   return [_finalize_index(index_or_t, ts) for index_or_t in list_of_index_or_t]
 
 
@@ -70,7 +68,7 @@ def _check_within_range(mapping, n, repetition):
     raise ValueError("Found repetition in mapping: {}".format(mapping))
 
 
-class SubGraphView(object):
+class SubGraphView():
   """A subgraph view on an existing `tf.Graph`.
 
   An instance of this class is a subgraph view on an existing `tf.Graph`.
@@ -188,7 +186,6 @@ class SubGraphView(object):
       TypeError: if inside_ops cannot be converted to a list of `tf.Operation`
         or if `passthrough_ts` cannot be converted to a list of `tf.Tensor`.
     """
-
     inside_ops = util.make_list_of_op(inside_ops)
     passthrough_ts = util.make_list_of_t(passthrough_ts)
     ops_and_ts = inside_ops + passthrough_ts
@@ -453,6 +450,7 @@ class SubGraphView(object):
     return res[0]
 
   def __str__(self):
+    """Print graph."""
     if not self:
       return "SubGraphView: empty"
 
@@ -462,8 +460,7 @@ class SubGraphView(object):
     def tensor_name(t):
       if t in self._passthrough_ts:
         return "{} *".format(t.name)
-      else:
-        return t.name
+      return t.name
 
     def print_list(name, iterable, get_name):
       if iterable:
@@ -483,41 +480,41 @@ class SubGraphView(object):
 
   @property
   def graph(self):
-    """The underlying `tf.Graph`."""
+    """Return the underlying `tf.Graph`."""
     return self._graph
 
   @property
   def ops(self):
-    """The operations in this subgraph view."""
+    """Return the operations in this subgraph view."""
     return self._ops
 
   @property
   def inputs(self):
-    """The input tensors of this subgraph view."""
+    """Return the input tensors of this subgraph view."""
     return util.ListView(self._input_ts)
 
   @property
   def connected_inputs(self):
-    """The connected input tensors of this subgraph view."""
+    """Return the connected input tensors of this subgraph view."""
     return [t for t in self._input_ts if t not in self._passthrough_ts]
 
   @property
   def outputs(self):
-    """The output tensors of this subgraph view."""
+    """Return the output tensors of this subgraph view."""
     return util.ListView(self._output_ts)
 
   @property
   def connected_outputs(self):
-    """The connected output tensors of this subgraph view."""
+    """Return the connected output tensors of this subgraph view."""
     return [t for t in self._output_ts if t not in self._passthrough_ts]
 
   @property
   def passthroughs(self):
-    """The passthrough tensors, going straight from input to output."""
+    """Return the passthrough tensors, going straight from input to output."""
     return util.ListView(self._passthrough_ts)
 
   def __bool__(self):
-    """Allows for implicit boolean conversion."""
+    """Check if allowed for implicit boolean conversion."""
     return self._graph is not None
 
   # Python 3 wants __bool__, Python 2.7 wants __nonzero__
@@ -548,8 +545,9 @@ class SubGraphView(object):
     """
     return self
 
-  def __exit__(self, exc_type, exc_value, traceback):
-    pass
+  # def __exit__(self, exc_type, exc_value, traceback):
+  #   """Exit."""
+  #   pass
 
   def input_index(self, t):
     """Find the input index corresponding to the given input tensor t.
@@ -563,9 +561,9 @@ class SubGraphView(object):
     """
     try:
       subgraph_id = self._input_ts.index(t)
-    except:
+    except Exception as e:
       raise ValueError("Can't find {} in inputs of subgraph {}.".format(
-          t.name, self.name))
+          t.name, self.name)) from e
     return subgraph_id
 
   def output_index(self, t):
@@ -580,9 +578,9 @@ class SubGraphView(object):
     """
     try:
       subgraph_id = self._output_ts.index(t)
-    except:
+    except Exception as e:
       raise ValueError("Can't find {} in outputs of subgraph {}.".format(
-          t.name, self.name))
+          t.name, self.name)) from e
     return subgraph_id
 
   def consumers(self):
