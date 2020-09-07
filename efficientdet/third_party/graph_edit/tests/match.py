@@ -50,14 +50,13 @@ def op_type(op_types, op=None):
     if op is None, return a lambda function which does the type checking.
   """
   if isinstance(op_types, string_types):
-    op_types = (op_types)
+    op_types = (op_types,)
   if op is None:
     return lambda op: op.node_def.op in op_types
-  else:
-    return op.node_def.op in op_types
+  return op.node_def.op in op_types
 
 
-class OpMatcher(object):
+class OpMatcher():
   """Graph match class."""
 
   def __init__(self, positive_filter):
@@ -74,14 +73,13 @@ class OpMatcher(object):
     if select.can_be_regex(elem):
       regex_ = select.make_regex(elem)
       return lambda op, regex=regex_: regex.search(op.name) is not None
-    elif isinstance(elem, tf_ops.Operation):
+    if isinstance(elem, tf_ops.Operation):
       return lambda op, match_op=elem: op is match_op
-    elif callable(elem):
+    if callable(elem):
       return elem
-    elif elem is True:
+    if elem is True:
       return lambda op: True
-    else:
-      raise ValueError("Cannot finalize the positive filter: {}".format(elem))
+    raise ValueError("Cannot finalize the positive filter: {}".format(elem))
 
   def __call__(self, op):
     """Evaluate if the op matches or not."""

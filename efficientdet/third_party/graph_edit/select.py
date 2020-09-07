@@ -72,8 +72,7 @@ def make_regex(obj):
 
   if isinstance(obj, string_types):
     return re.compile(obj)
-  else:
-    return obj
+  return obj
 
 
 def _get_input_ts(ops):
@@ -614,7 +613,9 @@ def get_walks_union_ops(forward_seed_ops,
 
 
 def select_ops(*args, **kwargs):
-  """Helper to select operations.
+  """Select ops.
+
+  Helper to select operations.
 
   Args:
     *args: list of 1) regular expressions (compiled or not) or 2) (array of)
@@ -680,7 +681,9 @@ def select_ops(*args, **kwargs):
 
 
 def select_ts(*args, **kwargs):
-  """Helper to select tensors.
+  """Select tensors.
+
+  Helper to select tensors.
 
   Args:
     *args: list of 1) regular expressions (compiled or not) or 2) (array of)
@@ -746,7 +749,9 @@ def select_ts(*args, **kwargs):
 
 
 def select_ops_and_ts(*args, **kwargs):
-  """Helper to select operations and tensors.
+  """Select ops and tensors.
+
+  Helper to select operations and tensors.
 
   Args:
     *args: list of 1) regular expressions (compiled or not) or 2) (array of)

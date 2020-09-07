@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Simple GraphEditor example.
-"""
+"""Simple GraphEditor example."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -27,6 +26,7 @@ FLAGS = tf.flags.FLAGS
 
 
 def main(_):
+  """Create and modify graph."""
   # create a graph
   g = tf.Graph()
   with g.as_default():

@@ -18,15 +18,23 @@ from __future__ import division
 from __future__ import print_function
 
 import graph_editor as ge
+from graph_editor.tests import match
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.platform import test
 
 
-class SubgraphTest(test.TestCase):
+class EditTest(test.TestCase):
+  """edit module test.
+
+  Generally the tests are in two steps:
+  - modify an existing graph.
+  - then make sure it has the expected topology using the graph matcher.
+  """
 
   def setUp(self):
+    """Set up."""
     self.graph = ops.Graph()
     with self.graph.as_default():
       self.a = constant_op.constant([1., 1.], shape=[2], name="a")
@@ -41,49 +49,33 @@ class SubgraphTest(test.TestCase):
           with ops.control_dependencies([self.c.op]):
             self.h = math_ops.add(self.f, self.g, name="h")
 
-  def test_subgraph(self):
-    sgv = ge.sgv(self.graph)
-    self.assertEqual(list(sgv.outputs), [self.e, self.h])
-    self.assertEqual(list(sgv.inputs), [])
-    self.assertEqual(len(sgv.ops), 8)
+  def test_detach(self):
+    """Test for ge.detach."""
+    sgv = ge.sgv(self.c.op, self.a.op)
+    control_outputs = ge.ControlOutputs(self.graph)
+    ge.detach(sgv, control_ios=control_outputs)
+    # make sure the detached graph is as expected.
+    self.assertTrue(
+        match.OpMatcher("^foo/c$").input_ops("a", "geph__b_0")(self.c.op))
 
-    sgv = ge.sgv(self.f.op, self.g.op)
-    self.assertEqual(list(sgv.outputs), [self.f, self.g])
-    self.assertEqual(list(sgv.inputs), [self.c, self.d, self.a])
+  def test_connect(self):
+    """Test for ge.connect."""
+    with self.graph.as_default():
+      x = constant_op.constant([1., 1.], shape=[2], name="x")
+      y = constant_op.constant([2., 2.], shape=[2], name="y")
+      z = math_ops.add(x, y, name="z")
 
-    sgv = ge.sgv_scope("foo/bar", graph=self.graph)
-    self.assertEqual(
-        list(sgv.ops), [self.e.op, self.f.op, self.g.op, self.h.op])
+    sgv = ge.sgv(x.op, y.op, z.op)
+    ge.connect(sgv, ge.sgv(self.e.op).remap_inputs([0]))
+    self.assertTrue(
+        match.OpMatcher("^foo/bar/e$").input_ops("^z$", "foo/d$")(self.e.op))
 
-  def test_subgraph_remap(self):
-    sgv = ge.sgv(self.c.op)
-    self.assertEqual(list(sgv.outputs), [self.c])
-    self.assertEqual(list(sgv.inputs), [self.a, self.b])
-
-    sgv = ge.sgv(self.c.op).remap([self.a], [0, self.c])
-    self.assertEqual(list(sgv.outputs), [self.c, self.c])
-    self.assertEqual(list(sgv.inputs), [self.a])
-
-    sgv = sgv.remap_outputs_to_consumers()
-    self.assertEqual(list(sgv.outputs), [self.c, self.c, self.c])
-    sgv = sgv.remap_outputs_make_unique()
-    self.assertEqual(list(sgv.outputs), [self.c])
-
-    sgv = sgv.remap(new_input_indices=[], new_output_indices=[])
-    self.assertEqual(len(sgv.inputs), 0)
-    self.assertEqual(len(sgv.outputs), 0)
-    sgv = sgv.remap_default()
-    self.assertEqual(list(sgv.outputs), [self.c])
-    self.assertEqual(list(sgv.inputs), [self.a, self.b])
-
-  def test_remove_unused_ops(self):
-    sgv = ge.sgv(self.graph)
-    self.assertEqual(list(sgv.outputs), [self.e, self.h])
-    self.assertEqual(len(sgv.ops), 8)
-
-    sgv = sgv.remap_outputs(new_output_indices=[1]).remove_unused_ops()
-    self.assertEqual(list(sgv.outputs), [self.h])
-    self.assertEqual(len(sgv.ops), 7)
+  def test_bypass(self):
+    """Test for ge.bypass."""
+    ge.bypass(ge.sgv(self.f.op).remap_inputs([0]))
+    self.assertTrue(
+        match.OpMatcher("^foo/bar/h$").input_ops("^foo/c$",
+                                                 "foo/bar/g$")(self.h.op))
 
 
 if __name__ == "__main__":

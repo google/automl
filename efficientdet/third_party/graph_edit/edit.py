@@ -57,7 +57,7 @@ def detach_control_outputs(sgv, control_outputs):
     control_outputs: a util.ControlOutputs instance.
   """
   if not isinstance(control_outputs, util.ControlOutputs):
-    raise TypeError("Expected a util.ControlOutputs, got: {}",
+    raise TypeError("Expected a util.ControlOutputs, got: %s" %
                     type(control_outputs))
   control_outputs.update()
   sgv = subgraph.make_view(sgv)
