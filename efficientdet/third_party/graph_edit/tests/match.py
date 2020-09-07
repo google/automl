@@ -20,7 +20,7 @@ from __future__ import print_function
 
 from six import string_types
 
-from graph_editor import select
+from third_party.graph_edit import select
 from tensorflow.python.framework import ops as tf_ops
 
 __all__ = [

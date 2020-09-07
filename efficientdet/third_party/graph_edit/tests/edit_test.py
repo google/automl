@@ -17,8 +17,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import graph_editor as ge
-from graph_editor.tests import match
+import third_party.graph_edit as ge
+from third_party.graph_edit.tests import match
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import math_ops

@@ -23,7 +23,7 @@ import re
 from six import iteritems
 from six import string_types
 
-from graph_editor import util
+from third_party.graph_edit import util
 from tensorflow.python.ops import op_selector
 from tensorflow.python.framework import ops as tf_ops
 from tensorflow.python.util import deprecation
