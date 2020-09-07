@@ -379,7 +379,7 @@ EfficientDets use a lot of GPU memory for a few reasons:
 
 To train this model on GPU with low memory there is an experimental option gradient_checkpointing.
 
-A high-level idea of what gradient checkpointing is doing you may find here:
+Check these links for a high-level idea of what gradient checkpointing is doing:
 1. https://github.com/cybertronai/gradient-checkpointing
 2. https://medium.com/tensorflow/fitting-larger-networks-into-memory-583e3c758ff9
 
