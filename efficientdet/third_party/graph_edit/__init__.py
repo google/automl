@@ -19,18 +19,18 @@ from __future__ import division
 from __future__ import print_function
 
 # pylint: disable=wildcard-import
-from graph_editor.edit import *
-from graph_editor.reroute import *
-from graph_editor.select import *
-from graph_editor.subgraph import *
-from graph_editor.transform import *
-from graph_editor.util import *
+from third_party.graph_edit.edit import *
+from third_party.graph_edit.reroute import *
+from third_party.graph_edit.select import *
+from third_party.graph_edit.subgraph import *
+from third_party.graph_edit.transform import *
+from third_party.graph_edit.util import *
 # pylint: enable=wildcard-import
 
 # some useful aliases
 # pylint: disable=g-bad-import-order
-from graph_editor import subgraph as _subgraph
-from graph_editor import util as _util
+from third_party.graph_edit import subgraph as _subgraph
+from third_party.graph_edit import util as _util
 # pylint: enable=g-bad-import-order
 ph = _util.make_placeholder_from_dtype_and_shape
 sgv = _subgraph.make_view

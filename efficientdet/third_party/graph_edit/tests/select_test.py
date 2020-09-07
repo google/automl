@@ -19,7 +19,7 @@ from __future__ import print_function
 
 import re
 
-import graph_editor as ge
+import third_party.graph_edit as ge
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import ops as ops_lib
 from tensorflow.python.ops import math_ops

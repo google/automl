@@ -6,11 +6,11 @@ import sys
 from toposort import toposort
 import numpy as np
 import tensorflow.compat.v1 as tf
-import graph_editor as ge
 
 # save original gradients since tf.gradient could be monkey-patched to point
 # to our version
 from tensorflow.python.ops import gradients as tf_gradients_lib
+import third_party.graph_edit as ge
 tf_gradient_function = tf_gradients_lib.gradients
 logging.getLogger().setLevel(logging.DEBUG)
 
@@ -230,7 +230,7 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
         'L2Loss', 'entropy', 'FusedBatchNorm', 'Switch', 'dropout', 'Cast'
     ]:
       ts_all = [t for t in ts_all if excl_layer not in t.name]
-      logging.debug("exlcluding %s from ts_all: %d", excl_layer, len(ts_all))
+      logging.debug("excluding %s from ts_all: %d", excl_layer, len(ts_all))
 
     # leave only layers that match strings in checkpoints list
     ts_all = [

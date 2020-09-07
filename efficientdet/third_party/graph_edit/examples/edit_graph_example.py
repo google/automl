@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
-import graph_editor as ge
+import third_party.graph_edit as ge
 
 FLAGS = tf.flags.FLAGS
 
