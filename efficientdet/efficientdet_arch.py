@@ -44,39 +44,12 @@ def freeze_vars(variables, pattern):
     var_list: a list containing variables for training
   """
   if pattern:
-    _variables = [v for v in variables if not re.match(pattern, v.name)]
-    if len(_variables) == len(variables):
-        logging.warning(f'{pattern} pattern didnt match with any variable in the model.Please use compatible pattern. i.e "(efficientnet)"')
-    return _variables
-  else:
-    return variables
-
-def resize_bilinear(images, size, output_type):
-  """Returns resized images as output_type."""
-  images = tf.image.resize_bilinear(images, size, align_corners=True)
-  return tf.cast(images, output_type)
-
-
-def remove_variables(variables, resnet_depth=50):
-  """Removes low-level variables from the input.
-
-  Removing low-level parameters (e.g., initial convolution layer) from training
-  usually leads to higher training speed and slightly better testing accuracy.
-  The intuition is that the low-level architecture (e.g., ResNet-50) is able to
-  capture low-level features such as edges; therefore, it does not need to be
-  fine-tuned for the detection task.
-
-  Args:
-    variables: all the variables in training
-    resnet_depth: the depth of ResNet model
-
-  Returns:
-    var_list: a list containing variables for training
-
-  """
-  var_list = [v for v in variables
-              if v.name.find('resnet%s/conv2d/' % resnet_depth) == -1]
-  return var_list
+    filtered_vars = [v for v in variables if not re.match(pattern, v.name)]
+    if len(filtered_vars) == len(variables):
+      logging.warning('%s didnt match with any variable. Please use compatible '
+                      'pattern. i.e "(efficientnet)"', pattern)
+    return filtered_vars
+  return variables
 
 
 def resample_feature_map(feat,

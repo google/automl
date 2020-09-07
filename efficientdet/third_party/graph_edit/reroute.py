@@ -66,7 +66,7 @@ def _check_ts_compatibility(ts0, ts1):
           shape0, shape1))
 
 
-class _RerouteMode(object):
+class _RerouteMode():
   """Enums for reroute's mode.
 
   swap: the end of tensors a and b are swapped.
@@ -75,6 +75,7 @@ class _RerouteMode(object):
   b2a:  the end of the tensor b are also rerouted to the end of the tensor a
     (the end of a is left dangling).
   """
+
   swap, a2b, b2a = range(3)
 
   @classmethod
@@ -90,12 +91,11 @@ class _RerouteMode(object):
     """
     if mode == cls.swap:
       return True, True
-    elif mode == cls.b2a:
+    if mode == cls.b2a:
       return False, True
-    elif mode == cls.a2b:
+    if mode == cls.a2b:
       return True, False
-    else:
-      raise ValueError("Unknown _RerouteMode: {}".format(mode))
+    raise ValueError("Unknown _RerouteMode: {}".format(mode))
 
 
 def _reroute_t(t0, t1, consumers1, can_modify=None, cannot_modify=None):
@@ -466,7 +466,7 @@ def remove_control_inputs(op, cops):
     ValueError: if any cop in cops is not a control input of op.
   """
   if not isinstance(op, _tf_ops.Operation):
-    raise TypeError("Expected a tf.Operation, got: {}", type(op))
+    raise TypeError("Expected a tf.Operation, got: %s" % type(op))
   cops = _util.make_list_of_op(cops, allow_graph=False)
   for cop in cops:
     if cop not in op.control_inputs:
@@ -492,7 +492,7 @@ def add_control_inputs(op, cops):
     ValueError: if any cop in cops is already a control input of op.
   """
   if not isinstance(op, _tf_ops.Operation):
-    raise TypeError("Expected a tf.Operation, got: {}", type(op))
+    raise TypeError("Expected a tf.Operation, got: %s" % type(op))
   cops = _util.make_list_of_op(cops, allow_graph=False)
   for cop in cops:
     if cop in op.control_inputs:

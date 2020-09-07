@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Utility functions for the graph_editor.
-"""
+"""Utility functions for the graph_editor."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -62,7 +61,7 @@ def concatenate_unique(la, lb):
 
 
 # TODO(fkp): very generic code, it should be moved in a more generic place.
-class ListView(object):
+class ListView():
   """Immutable list wrapper.
 
   This class is strongly inspired by the one in tf.Operation.
@@ -148,7 +147,7 @@ def transform_tree(tree, fn, iterable_type=tuple):
       res.__init__(
           (k, transform_tree(child, fn)) for k, child in iteritems(tree))
       return res
-    elif isinstance(tree, tuple):
+    if isinstance(tree, tuple):
       # NamedTuple?
       if hasattr(tree, "_asdict"):
         res = tree.__new__(type(tree), **transform_tree(tree._asdict(), fn))
@@ -156,14 +155,12 @@ def transform_tree(tree, fn, iterable_type=tuple):
         res = tree.__new__(
             type(tree), (transform_tree(child, fn) for child in tree))
       return res
-    elif isinstance(tree, collections_abc.Sequence):
+    if isinstance(tree, collections_abc.Sequence):
       res = tree.__new__(type(tree))
       res.__init__(transform_tree(child, fn) for child in tree)
       return res
-    else:
-      return iterable_type(transform_tree(child, fn) for child in tree)
-  else:
-    return fn(tree)
+    return iterable_type(transform_tree(child, fn) for child in tree)
+  return fn(tree)
 
 
 def check_graphs(*args):
@@ -239,22 +236,20 @@ def make_list_of_op(ops, check_graph=True, allow_graph=True, ignore_ts=False):
   if isinstance(ops, tf_ops.Graph):
     if allow_graph:
       return ops.get_operations()
-    else:
-      raise TypeError("allow_graph is False: cannot convert a tf.Graph.")
-  else:
-    if not is_iterable(ops):
-      ops = [ops]
-    if not ops:
-      return []
-    if check_graph:
-      check_types = None if ignore_ts else tf_ops.Operation
-      get_unique_graph(ops, check_types=check_types)
-    return [op for op in ops if isinstance(op, tf_ops.Operation)]
+    raise TypeError("allow_graph is False: cannot convert a tf.Graph.")
+  if not is_iterable(ops):
+    ops = [ops]
+  if not ops:
+    return []
+  if check_graph:
+    check_types = None if ignore_ts else tf_ops.Operation
+    get_unique_graph(ops, check_types=check_types)
+  return [op for op in ops if isinstance(op, tf_ops.Operation)]
 
 
 # TODO(fkp): move this function in tf.Graph?
 def get_tensors(graph):
-  """get all the tensors which are input or output of an op in the graph.
+  """Get all the tensors which are input or output of an op in the graph.
 
   Args:
     graph: a `tf.Graph`.
@@ -288,17 +283,15 @@ def make_list_of_t(ts, check_graph=True, allow_graph=True, ignore_ops=False):
   if isinstance(ts, tf_ops.Graph):
     if allow_graph:
       return get_tensors(ts)
-    else:
-      raise TypeError("allow_graph is False: cannot convert a tf.Graph.")
-  else:
-    if not is_iterable(ts):
-      ts = [ts]
-    if not ts:
-      return []
-    if check_graph:
-      check_types = None if ignore_ops else tf_ops.Tensor
-      get_unique_graph(ts, check_types=check_types)
-    return [t for t in ts if isinstance(t, tf_ops.Tensor)]
+    raise TypeError("allow_graph is False: cannot convert a tf.Graph.")
+  if not is_iterable(ts):
+    ts = [ts]
+  if not ts:
+    return []
+  if check_graph:
+    check_types = None if ignore_ops else tf_ops.Tensor
+    get_unique_graph(ts, check_types=check_types)
+  return [t for t in ts if isinstance(t, tf_ops.Tensor)]
 
 
 def get_generating_ops(ts):
@@ -334,7 +327,7 @@ def get_consuming_ops(ts):
   return ops
 
 
-class ControlOutputs(object):
+class ControlOutputs():
   """The control outputs topology."""
 
   def __init__(self, graph):
@@ -375,17 +368,18 @@ class ControlOutputs(object):
     self._version = self._graph.version
 
   def get_all(self):
+    """Get control outputs."""
     return self._control_outputs
 
   def get(self, op):
-    """return the control outputs of op."""
+    """Return the control outputs of op."""
     if op in self._control_outputs:
       return self._control_outputs[op]
-    else:
-      return ()
+    return ()
 
   @property
   def graph(self):
+    """Return graph."""
     return self._graph
 
 
@@ -441,10 +435,9 @@ def placeholder_name(t=None, scope=None, prefix=_DEFAULT_PLACEHOLDER_PREFIX):
       ph_name = "{}__{}_{}".format(prefix, op_basename, t.value_index)
 
     return scope + ph_name
-  else:
-    if scope is None:
-      scope = ""
-    return "{}{}".format(scope, prefix)
+  if scope is None:
+    scope = ""
+  return "{}{}".format(scope, prefix)
 
 
 def make_placeholder_from_tensor(t,
@@ -543,7 +536,7 @@ def find_corresponding_elem(target, dst_graph, dst_scope="", src_scope=""):
     return dst_graph.get_tensor_by_name(dst_name)
   if isinstance(target, tf_ops.Operation):
     return dst_graph.get_operation_by_name(dst_name)
-  raise TypeError("Expected tf.Tensor or tf.Operation, got: {}", type(target))
+  raise TypeError("Expected tf.Tensor or tf.Operation, got: %s" % type(target))
 
 
 def find_corresponding(targets, dst_graph, dst_scope="", src_scope=""):

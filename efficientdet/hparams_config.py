@@ -190,7 +190,7 @@ def default_detection_configs():
   h.heads = ['object_detection']  # 'object_detection', 'segmentation'
 
   h.skip_crowd_during_training = True
-  h.label_map = 'coco'  # a dict or a string of 'coco'/'voc'.
+  h.label_map = None  # a dict or a string of 'coco', 'voc', 'waymo'.
   h.max_instances_per_image = 100  # Default to 100 for COCO.
   h.regenerate_source_id = False
 
@@ -275,9 +275,9 @@ def default_detection_configs():
 
   # A temporary flag to switch between legacy and keras models.
   h.use_keras_model = True
+  h.dataset_type = None
+  h.positives_momentum = None
 
-  # unused.
-  h.resnet_depth = 50
   return h
 
 

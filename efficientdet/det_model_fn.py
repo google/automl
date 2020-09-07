@@ -213,8 +213,24 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
   # Sum all positives in a batch for normalization and avoid zero
   # num_positives_sum, which would lead to inf loss during training
   num_positives_sum = tf.reduce_sum(labels['mean_num_positives']) + 1.0
-  levels = cls_outputs.keys()
+  positives_momentum = params.get('positives_momentum', None) or 0
+  if positives_momentum > 0:
+    # normalize the num_positive_examples for training stability.
+    moving_normalizer_var = tf.Variable(
+        0.0,
+        name='moving_normalizer',
+        dtype=tf.float32,
+        synchronization=tf.VariableSynchronization.ON_READ,
+        trainable=False,
+        aggregation=tf.VariableAggregation.MEAN)
+    num_positives_sum = tf.keras.backend.moving_average_update(
+        moving_normalizer_var,
+        num_positives_sum,
+        momentum=params['positives_momentum'])
+  elif positives_momentum < 0:
+    num_positives_sum = utils.cross_replica_mean(num_positives_sum)
 
+  levels = cls_outputs.keys()
   cls_losses = []
   box_losses = []
   for level in levels:
@@ -249,7 +265,7 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
     cls_loss *= tf.cast(
         tf.expand_dims(tf.not_equal(labels['cls_targets_%d' % level], -2), -1),
         tf.float32)
-    cls_losses.append(tf.reduce_sum(cls_loss))
+    cls_losses.append(tf.clip_by_value(tf.reduce_sum(cls_loss), 0.0, 2.0))
 
     if params['box_loss_weight']:
       box_losses.append(
@@ -327,6 +343,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   """
   utils.image('input_image', features)
   training_hooks = []
+  params['is_training_bn'] = (mode == tf.estimator.ModeKeys.TRAIN)
 
   if params['use_keras_model']:
     def model_fn(inputs):
@@ -388,9 +405,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     ema = tf.train.ExponentialMovingAverage(
         decay=moving_average_decay, num_updates=global_step)
     ema_vars = utils.get_ema_vars()
-  if params['strategy'] == 'horovod':
-    import horovod.tensorflow as hvd  # pylint: disable=g-import-not-at-top
-    learning_rate = learning_rate * hvd.size()
+
   if mode == tf.estimator.ModeKeys.TRAIN:
     if params['optimizer'].lower() == 'sgd':
       optimizer = tf.train.MomentumOptimizer(
@@ -402,9 +417,6 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
     if params['strategy'] == 'tpu':
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)
-    elif params['strategy'] == 'horovod':
-      optimizer = hvd.DistributedOptimizer(optimizer)
-      training_hooks = [hvd.BroadcastGlobalVariablesHook(0)]
 
     # Batch norm requires update_ops to be added as a train_op dependency.
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -460,6 +472,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
                   nms_configs['max_output_size'],
               ], tf.float32)
           detections_bs.append(detections)
+        detections_bs = postprocess.transform_detections(
+            tf.stack(detections_bs))
       else:
         # These two branches should be equivalent, but currently they are not.
         # TODO(tanmingxing): enable the non_pyfun path after bug fix.
@@ -558,7 +572,6 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
           skip_mismatch=params['skip_mismatch'])
 
       tf.train.init_from_checkpoint(checkpoint, var_map)
-
       return tf.train.Scaffold()
   elif mode == tf.estimator.ModeKeys.EVAL and moving_average_decay:
 
@@ -573,39 +586,49 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
   if params['strategy'] != 'tpu':
     # Profile every 1K steps.
-    profile_hook = tf.train.ProfilerHook(
-        save_steps=1000, output_dir=params['model_dir'])
-    training_hooks.append(profile_hook)
+    if params.get('profile', False):
+      profile_hook = tf.estimator.ProfilerHook(
+          save_steps=1000, output_dir=params['model_dir'], show_memory=True)
+      training_hooks.append(profile_hook)
 
-    # Report memory allocation if OOM
-    class OomReportingHook(tf.estimator.SessionRunHook):
+      # Report memory allocation if OOM
+      class OomReportingHook(tf.estimator.SessionRunHook):
 
-      def before_run(self, run_context):
-        return tf.estimator.SessionRunArgs(
-            fetches=[],
-            options=tf.RunOptions(report_tensor_allocations_upon_oom=True))
+        def before_run(self, run_context):
+          return tf.estimator.SessionRunArgs(
+              fetches=[],
+              options=tf.RunOptions(report_tensor_allocations_upon_oom=True))
 
-    training_hooks.append(OomReportingHook())
+      training_hooks.append(OomReportingHook())
 
-    logging_hook = tf.train.LoggingTensorHook(
+    logging_hook = tf.estimator.LoggingTensorHook(
         {
-            "step": global_step,
-            "det_loss": det_loss,
-            "cls_loss": cls_loss,
-            "box_loss": box_loss,
+            'step': global_step,
+            'det_loss': det_loss,
+            'cls_loss': cls_loss,
+            'box_loss': box_loss,
         },
         every_n_iter=params.get('iterations_per_loop', 100),
     )
     training_hooks.append(logging_hook)
-
-  return tf.estimator.tpu.TPUEstimatorSpec(
-      mode=mode,
-      loss=total_loss,
-      train_op=train_op,
-      eval_metrics=eval_metrics,
-      host_call=utils.get_tpu_host_call(global_step, params),
-      scaffold_fn=scaffold_fn,
-      training_hooks=training_hooks)
+  if params['strategy'] == 'tpu':
+    return tf.estimator.tpu.TPUEstimatorSpec(
+        mode=mode,
+        loss=total_loss,
+        train_op=train_op,
+        eval_metrics=eval_metrics,
+        host_call=utils.get_tpu_host_call(global_step, params),
+        scaffold_fn=scaffold_fn,
+        training_hooks=training_hooks)
+  else:
+    eval_metric_ops = eval_metrics[0](eval_metrics[1]) if eval_metrics else None
+    return tf.estimator.EstimatorSpec(
+        mode=mode,
+        loss=total_loss,
+        train_op=train_op,
+        eval_metric_ops=eval_metric_ops,
+        scaffold=scaffold_fn(),
+        training_hooks=training_hooks)
 
 
 def efficientdet_model_fn(features, labels, mode, params):

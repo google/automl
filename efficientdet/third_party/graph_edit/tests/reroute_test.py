@@ -26,8 +26,10 @@ from tensorflow.python.platform import test
 
 
 class RerouteTest(test.TestCase):
+  """Reroute test."""
 
   def setUp(self):
+    """Set up."""
     self.graph = ops.Graph()
     with self.graph.as_default():
       self.a0 = constant_op.constant(1.0, shape=[2], name="a0")
@@ -41,11 +43,13 @@ class RerouteTest(test.TestCase):
       self.c2 = math_ops.add(self.a2, self.b2, name="c2")
 
   def test_swap(self):
+    """Test swap."""
     ge.swap_ts([self.a0, self.b0], [self.a1, self.b1])
     self.assertTrue(match.OpMatcher("c0").input_ops("a1", "b1")(self.c0.op))
     self.assertTrue(match.OpMatcher("c1").input_ops("a0", "b0")(self.c1.op))
 
   def test_multiswap(self):
+    """Test multi swap."""
     with self.graph.as_default():
       a3 = constant_op.constant(3.0, shape=[2], name="a3")
     ge.swap_ios(
@@ -54,6 +58,7 @@ class RerouteTest(test.TestCase):
     self.assertTrue(match.OpMatcher("c1").input_ops("a3", "b1")(self.c1.op))
 
   def test_reroute(self):
+    """Test reroute."""
     ge.reroute_ts([self.a0, self.b0], [self.a1, self.b1])
     self.assertTrue(match.OpMatcher("c0").input_ops("a0", "b0")(self.c0.op))
     self.assertTrue(match.OpMatcher("c1").input_ops("a0", "b0")(self.c1.op))
@@ -63,10 +68,12 @@ class RerouteTest(test.TestCase):
     self.assertTrue(match.OpMatcher("c1").input_ops("a1", "b1")(self.c1.op))
 
   def test_compatibility(self):
+    """Test compatibility."""
     with self.assertRaises(ValueError):
       ge.reroute_ts([self.a0, self.b0], [self.a2, self.b2])
 
   def test_reroute_can_modify(self):
+    """Test rerout can modify."""
     graph = ops.Graph()
     # create a special graph where "a" is an ambiguous tensor. That is
     # it is both an input and an output of the ops in sgv0.

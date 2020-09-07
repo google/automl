@@ -25,8 +25,10 @@ from tensorflow.python.platform import test
 
 
 class MatchTest(test.TestCase):
+  """Match test."""
 
   def setUp(self):
+    """Set up."""
     self.graph = ops.Graph()
     with self.graph.as_default():
       self.a = constant_op.constant([1., 1.], shape=[2], name="a")
@@ -42,6 +44,7 @@ class MatchTest(test.TestCase):
             self.h = math_ops.add(self.f, self.g, name="h")
 
   def test_simple_match(self):
+    """Test simple match."""
     self.assertTrue(match.OpMatcher("^.*/f$")(self.f.op))
     self.assertTrue(
         match.OpMatcher("^.*/f$").input_ops("^.*/c$", "^.*/d$")(self.f.op))

@@ -92,7 +92,7 @@ class TrainLibTest(tf.test.TestCase):
     self.assertLen(cls_outputs, 5)
     self.assertLen(box_outputs, 5)
 
-  def test_train(self):
+  def _build_model(self):
     tf.random.set_seed(1111)
     config = hparams_config.get_detection_config('efficientdet-d0')
     config.heads = ['object_detection', 'segmentation']
@@ -143,11 +143,13 @@ class TrainLibTest(tf.test.TestCase):
             'seg_loss':
                 tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
         })
+    return params, x, labels, model
 
-    # Test single-batch
+  def test_train_on_batch(self):
+    _, x, labels, model = self._build_model()
     outputs = model.train_on_batch(x, labels, return_dict=True)
     expect_results = {
-        'loss': [26278.3, 5061.9, 425.5, 1.217],
+        'loss': 26279.4765625,
         'det_loss': 26277.033203125,
         'cls_loss': 5060.716796875,
         'box_loss': 424.3263244628906,
@@ -155,9 +157,12 @@ class TrainLibTest(tf.test.TestCase):
         'seg_loss': 1.2215478420257568,
     }
     self.assertAllClose(outputs, expect_results, rtol=.1, atol=100.)
+
+  def test_infer_on_batch(self):
+    _, x, labels, model = self._build_model()
     outputs = model.test_on_batch(x, labels, return_dict=True)
     expect_results = {
-        'loss': [26278.3, 5061.9, 425.5, 1.217],
+        'loss': 26064.126953125,
         'det_loss': 26078.49609375,
         'cls_loss': 5063.3759765625,
         'box_loss': 420.30242919921875,
@@ -165,7 +170,8 @@ class TrainLibTest(tf.test.TestCase):
     }
     self.assertAllClose(outputs, expect_results, rtol=.1, atol=100.)
 
-    # Test fit.
+  def test_fit(self):
+    params, x, labels, model = self._build_model()
     hist = model.fit(
         x,
         labels,
@@ -173,8 +179,7 @@ class TrainLibTest(tf.test.TestCase):
         epochs=1,
         callbacks=train_lib.get_callbacks(params))
 
-    self.assertAllClose(
-        hist.history['loss'], [[26067, 5057.5, 421.4, 1.2]], rtol=.1, atol=10.)
+    self.assertAllClose(hist.history['loss'], [26061.], rtol=.1, atol=10.)
     self.assertAllClose(hist.history['det_loss'], [26061.], rtol=.1, atol=10.)
     self.assertAllClose(hist.history['cls_loss'], [5058.], rtol=.1, atol=10.)
     self.assertAllClose(hist.history['box_loss'], [420.], rtol=.1, atol=100.)

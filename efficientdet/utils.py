@@ -21,7 +21,6 @@ from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
 import tensorflow.compat.v2 as tf2
-
 from tensorflow.python.tpu import tpu_function  # pylint:disable=g-direct-tensorflow-import
 # pylint: disable=logging-format-interpolation
 
@@ -55,9 +54,30 @@ def activation_fn(features: tf.Tensor, act_type: Text):
     raise ValueError('Unsupported act_type {}'.format(act_type))
 
 
+def cross_replica_mean(t, num_shards_per_group=None):
+  """Calculates the average value of input tensor across TPU replicas."""
+  num_shards = tpu_function.get_tpu_context().number_of_shards
+  if not num_shards_per_group:
+    return tf.tpu.cross_replica_sum(t) / tf.cast(num_shards, t.dtype)
+
+  group_assignment = None
+  if num_shards_per_group > 1:
+    if num_shards % num_shards_per_group != 0:
+      raise ValueError(
+          'num_shards: %d mod shards_per_group: %d, should be 0' %
+          (num_shards, num_shards_per_group))
+    num_groups = num_shards // num_shards_per_group
+    group_assignment = [[
+        x for x in range(num_shards) if x // num_shards_per_group == y
+    ] for y in range(num_groups)]
+  return tf.tpu.cross_replica_sum(t, group_assignment) / tf.cast(
+      num_shards_per_group, t.dtype)
+
+
 def get_ema_vars():
   """Get all exponential moving average (ema) variables."""
-  ema_vars = tf.trainable_variables() + tf.get_collection('moving_vars')
+  ema_vars = tf.trainable_variables() + \
+             tf.get_collection(tf.GraphKeys.MOVING_AVERAGE_VARIABLES)
   for v in tf.global_variables():
     # We maintain mva for batch norm moving mean and variance as well.
     if 'moving_mean' in v.name or 'moving_variance' in v.name:
@@ -191,22 +211,6 @@ class TpuBatchNormalization(tf.keras.layers.BatchNormalization):
       raise ValueError('TpuBatchNormalization does not support fused=True.')
     super(TpuBatchNormalization, self).__init__(fused=fused, **kwargs)
 
-  def _cross_replica_average(self, t, num_shards_per_group):
-    """Calculates the average value of input tensor across TPU replicas."""
-    num_shards = tpu_function.get_tpu_context().number_of_shards
-    group_assignment = None
-    if num_shards_per_group > 1:
-      if num_shards % num_shards_per_group != 0:
-        raise ValueError(
-            'num_shards: %d mod shards_per_group: %d, should be 0' %
-            (num_shards, num_shards_per_group))
-      num_groups = num_shards // num_shards_per_group
-      group_assignment = [[
-          x for x in range(num_shards) if x // num_shards_per_group == y
-      ] for y in range(num_groups)]
-    return tf.tpu.cross_replica_sum(t, group_assignment) / tf.cast(
-        num_shards_per_group, t.dtype)
-
   def _moments(self, inputs, reduction_axes, keep_dims):
     """Compute the mean and variance: it overrides the original _moments."""
     shard_mean, shard_variance = super(TpuBatchNormalization, self)._moments(
@@ -220,8 +224,8 @@ class TpuBatchNormalization(tf.keras.layers.BatchNormalization):
       # Compute variance using: Var[X]= E[X^2] - E[X]^2.
       shard_square_of_mean = tf.math.square(shard_mean)
       shard_mean_of_square = shard_variance + shard_square_of_mean
-      group_mean = self._cross_replica_average(shard_mean, num_shards_per_group)
-      group_mean_of_square = self._cross_replica_average(
+      group_mean = cross_replica_mean(shard_mean, num_shards_per_group)
+      group_mean_of_square = cross_replica_mean(
           shard_mean_of_square, num_shards_per_group)
       group_variance = group_mean_of_square - tf.math.square(group_mean)
       return (group_mean, group_variance)
@@ -236,34 +240,13 @@ class TpuBatchNormalization(tf.keras.layers.BatchNormalization):
     return outputs
 
 
-class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
+class SyncBatchNormalization(tf2.keras.layers.experimental.SyncBatchNormalization):
   """Cross replica batch normalization."""
 
-  def __init__(self, fused=False, sync=False, **kwargs):
-    if fused in (True, None):
-      raise ValueError('SyncBatchNormalization does not support fused=True.')
+  def __init__(self, **kwargs):
     if not kwargs.get('name', None):
       kwargs['name'] = 'tpu_batch_normalization'
-    self._sync = sync
-    super(SyncBatchNormalization, self).__init__(fused=fused, **kwargs)
-
-  def _moments(self, inputs, reduction_axes, keep_dims):
-    """Compute the mean and variance: it overrides the original _moments."""
-    import horovod.tensorflow as hvd  # pylint: disable=g-import-not-at-top
-    shard_mean, shard_variance = super(SyncBatchNormalization, self)._moments(
-        inputs, reduction_axes, keep_dims=keep_dims)
-
-    num_shards = hvd.size()
-    if num_shards > 1 and self._sync:  # sync bn is 4x slower than non-sync.
-      # Compute variance using: Var[X]= E[X^2] - E[X]^2.
-      shard_square_of_mean = tf.math.square(shard_mean)
-      shard_mean_of_square = shard_variance + shard_square_of_mean
-      shard_stack = tf.stack([shard_mean, shard_mean_of_square])
-      group_mean, group_mean_of_square = tf.unstack(hvd.allreduce(shard_stack))
-      group_variance = group_mean_of_square - tf.math.square(group_mean)
-      return (group_mean, group_variance)
-    else:
-      return (shard_mean, shard_variance)
+    super(SyncBatchNormalization, self).__init__(**kwargs)
 
   def call(self, inputs, training=None):
     outputs = super(SyncBatchNormalization, self).call(inputs, training)
@@ -292,8 +275,10 @@ class BatchNormalization(tf.keras.layers.BatchNormalization):
 def batch_norm_class(is_training, strategy=None):
   if is_training and strategy == 'tpu':
     return TpuBatchNormalization
-  elif is_training and strategy == 'horovod':
-    return SyncBatchNormalization
+  elif is_training and strategy == 'gpus':
+    # TODO(fsx950223): use SyncBatchNorm after the TF bug (incorrect nccl all_reduce) is fixed:
+    # see https://github.com/tensorflow/tensorflow/issues/41980
+    return BatchNormalization
   else:
     return BatchNormalization
 

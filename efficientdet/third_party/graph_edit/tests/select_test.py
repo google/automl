@@ -27,8 +27,10 @@ from tensorflow.python.platform import test
 
 
 class SelectTest(test.TestCase):
+  """Test Select."""
 
   def setUp(self):
+    """Set up."""
     self.graph = ops_lib.Graph()
     with self.graph.as_default():
       self.a = constant_op.constant([1., 1.], shape=[2], name="a")
@@ -52,8 +54,8 @@ class SelectTest(test.TestCase):
 
   def test_get_input_output_ts(self):
     """Test for ge._get_input_ts abd ge._get_output_ts."""
-    self.assertEqual(len(ge.select._get_input_ts(self.graph)), 6)
-    self.assertEqual(len(ge.select._get_output_ts(self.graph)), 8)
+    self.assertEqual(len(ge.select._get_input_ts(self.graph)), 6)  # pylint: disable=W0212
+    self.assertEqual(len(ge.select._get_output_ts(self.graph)), 8)  # pylint: disable=W0212
 
   def test_get_filter(self):
     """Test for various filtering operations on ts ops."""
@@ -171,6 +173,7 @@ class SelectTest(test.TestCase):
     self.assertTrue(self.d.op not in ops)
 
   def test_select_ops(self):
+    """Test select ops."""
     parameters = (
         (("^foo/",), 7),
         (("^foo/bar/",), 4),
@@ -181,6 +184,7 @@ class SelectTest(test.TestCase):
       self.assertEqual(len(ops), length)
 
   def test_select_ts(self):
+    """Test select tensors."""
     parameters = (
         (".*:0", 8),
         (r".*/bar/\w+:0", 4),
@@ -190,6 +194,7 @@ class SelectTest(test.TestCase):
       self.assertEqual(len(ts), length)
 
   def test_select_ops_and_ts(self):
+    """Test select ops and tensors."""
     parameters = (
         (("^foo/.*",), 7, 0),
         (("^foo/.*", "(?#ts)^foo/bar/.*"), 7, 4),
@@ -200,6 +205,7 @@ class SelectTest(test.TestCase):
       self.assertEqual(len(ts), l1)
 
   def test_forward_walk_ops(self):
+    """Test select forward walk ops."""
     seed_ops = [self.a.op, self.d.op]
     # Include all ops except for self.g.op
     within_ops = [
@@ -253,6 +259,7 @@ class SelectTest(test.TestCase):
                          self.h.op]))
 
   def test_backward_walk_ops(self):
+    """Test select backward walk ops."""
     seed_ops = [self.h.op]
     # Include all ops except for self.g.op
     within_ops = [
