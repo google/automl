@@ -205,6 +205,29 @@ class DetectionInputProcessor(InputProcessor):
     return self._crop_offset_y
 
 
+def pad_to_fixed_size(data, pad_value, output_shape):
+  """Pad data to a fixed length at the first dimension.
+  Args:
+    data: Tensor to be padded to output_shape.
+    pad_value: A constant value assigned to the paddings.
+    output_shape: The output shape of a 2D tensor.
+  Returns:
+    The Padded tensor with output_shape [max_instances_per_image, dimension].
+  """
+  max_instances_per_image = output_shape[0]
+  dimension = output_shape[1]
+  data = tf.reshape(data, [-1, dimension])
+  num_instances = tf.shape(data)[0]
+  msg = 'ERROR: please increase config.max_instances_per_image'
+  with tf.control_dependencies(
+      [tf.assert_less(num_instances, max_instances_per_image, message=msg)]):
+    pad_length = max_instances_per_image - num_instances
+  paddings = pad_value * tf.ones([pad_length, dimension])
+  padded_data = tf.concat([data, paddings], axis=0)
+  padded_data = tf.reshape(padded_data, output_shape)
+  return padded_data
+
+
 class InputReader:
   """Input reader for dataset."""
 
@@ -308,8 +331,12 @@ class InputReader:
       image_scale = input_processor.image_scale_to_original
       boxes *= image_scale
       is_crowds = tf.cast(is_crowds, dtype=tf.float32)
-      is_crowds = tf.expand_dims(is_crowds, axis=1)
-      areas = tf.expand_dims(areas, axis=1)
+      boxes = pad_to_fixed_size(boxes, -1, [self._max_instances_per_image, 4])
+      is_crowds = pad_to_fixed_size(is_crowds, 0,
+                                    [self._max_instances_per_image, 1])
+      areas = pad_to_fixed_size(areas, -1, [self._max_instances_per_image, 1])
+      classes = pad_to_fixed_size(classes, -1,
+                                  [self._max_instances_per_image, 1])
       return (image, cls_targets, box_targets, num_positives, source_id,
               image_scale, boxes, is_crowds, areas, classes, image_masks)
 
@@ -345,39 +372,6 @@ class InputReader:
     labels['image_masks'] = image_masks
     return images, labels
 
-  def _get_padded_shapes_and_paddings(self, element_spec):
-    """Shape and paddings are used for padded_batch."""
-    shapes = list(tf.nest.map_structure(lambda item: item.shape, element_spec))
-    shapes[6] = (self._max_instances_per_image, 4)
-    shapes[7] = (self._max_instances_per_image, 1)
-    shapes[8] = (self._max_instances_per_image, 1)
-    shapes[9] = (self._max_instances_per_image, 1)
-    shapes = tuple(shapes)
-
-    def make_zero(t):
-      if t.base_dtype == tf.string:
-        return ''
-      if t.base_dtype == tf.variant:
-        error_msg = ('Unable to create padding for field of type "variant" '
-                     'because t.base_type == dtypes.variant == '
-                     '{}.'.format(t.base_dtype))
-        raise TypeError(error_msg)
-      if t.base_dtype == tf.bfloat16:
-        # Special case `bfloat16` because it is not supported by NumPy.
-        return tf.constant(0, dtype=tf.bfloat16)
-      return tf.zeros_like(t.as_numpy_dtype())
-
-    paddings = tf.nest.map_structure(
-        make_zero,
-        tf.nest.map_structure(lambda item: item.dtype, element_spec))
-
-    paddings = list(paddings)
-    paddings[6] = tf.constant(-1, tf.float32)
-    paddings[7] = tf.constant(0, tf.float32)
-    paddings[8] = tf.constant(-1, tf.float32)
-    paddings[9] = tf.constant(-1, tf.float32)
-    paddings = tuple(paddings)
-    return shapes, paddings
 
   def __call__(self, params, input_context=None):
     input_anchors = anchors.Anchors(params['min_level'], params['max_level'],
@@ -430,10 +424,7 @@ class InputReader:
     dataset = dataset.map(
         map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     dataset = dataset.prefetch(batch_size)
-    shapes, paddings = self._get_padded_shapes_and_paddings(
-        dataset.element_spec)
-    dataset = dataset.padded_batch(batch_size, shapes, paddings,
-                                   drop_remainder=True)
+    dataset = dataset.batch(batch_size, drop_remainder=True)
     dataset = dataset.map(
         lambda *args: self.process_example(params, batch_size, *args))
     dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
