@@ -192,7 +192,7 @@ def default_detection_configs():
   h.heads = ['object_detection']  # 'object_detection', 'segmentation'
 
   h.skip_crowd_during_training = True
-  h.label_map = 'coco'  # a dict or a string of 'coco'/'voc'.
+  h.label_map = None  # a dict or a string of 'coco', 'voc', 'waymo'.
   h.max_instances_per_image = 100  # Default to 100 for COCO.
   h.regenerate_source_id = False
 
@@ -277,22 +277,14 @@ def default_detection_configs():
 
   # A temporary flag to switch between legacy and keras models.
   h.use_keras_model = True
+  h.dataset_type = None
+  h.positives_momentum = None
 
-  # This is an experimental option. It may help you to save GPU memory while
-  # training. Here you may add a list of strings that would indicate
-  # which layers of the network to use to save checkpoints as in
-  # https://github.com/cybertronai/gradient-checkpointing implementation and
-  # "Training Deep Nets with Sublinear Memory Cost, by Chen et al. (2016)
-  # paper"
-  # When this option is used the standard tensorflow.python.ops.gradients
-  # method is being replaced with a custom method
+  # Reduces memory during training
   h.gradient_checkpointing = None
 
   # enable memory logging for NVIDIA cards
   h.nvgpu_logging = False
-
-  # unused.
-  h.resnet_depth = 50
 
   return h
 

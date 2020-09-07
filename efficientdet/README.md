@@ -312,8 +312,6 @@ You should check more details of runmode which is written in caption-4.
 
 ## 9. Train on multi GPUs.
 
-Install [horovod](https://github.com/horovod/horovod#id6).
-
 Create a config file for the PASCAL VOC dataset called voc_config.yaml and put this in it.
 
       num_classes: 21
@@ -327,7 +325,7 @@ Download efficientdet coco checkpoint.
 
 Finetune needs to use --ckpt rather than --backbone_ckpt.
 
-    !horovodrun -np <num_gpus> -H localhost:<num_gpus> python main.py --mode=train \
+    python main.py --mode=train \
         --training_file_pattern=tfrecord/pascal*.tfrecord \
         --validation_file_pattern=tfrecord/pascal*.tfrecord \
         --model_name=efficientdet-d0 \
@@ -337,7 +335,7 @@ Finetune needs to use --ckpt rather than --backbone_ckpt.
         --eval_batch_size=64 --eval_samples=1024 \
         --num_examples_per_epoch=5717 --num_epochs=50  \
         --hparams=voc_config.yaml
-        --strategy=horovod
+        --strategy=gpus
 
 If you want to do inference for custom data, you can run
 

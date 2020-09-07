@@ -236,7 +236,8 @@ def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
         params, cls_outputs, box_outputs, scales)
 
   batch_size = tf.shape(cls_outputs[params['min_level']])[0]
-  img_ids = tf.expand_dims(tf.range(0, batch_size, dtype=nms_scores.dtype), -1)
+  img_ids = tf.expand_dims(
+      tf.cast(tf.range(0, batch_size), nms_scores.dtype), -1)
   detections = [
       img_ids * tf.ones_like(nms_scores),
       nms_boxes[:, :, 0],
@@ -265,7 +266,7 @@ def visualize_image(image,
     boxes: a box prediction with shape [N, 4] ordered [ymin, xmin, ymax, xmax].
     classes: a class prediction with shape [N].
     scores: A list of float value with shape [N].
-    id_mapping: a dictionary from class id to name.
+    label_map: a dictionary from class id to name.
     min_score_thresh: minimal score for showing. If claass probability is below
       this threshold, then the object will not show up.
     max_boxes_to_draw: maximum bounding box to draw.

@@ -246,14 +246,12 @@ def get_callbacks(params, profile=False):
   tb_callback = tf.keras.callbacks.TensorBoard(
       log_dir=params['model_dir'], profile_batch=2 if profile else 0)
   ckpt_callback = tf.keras.callbacks.ModelCheckpoint(
-      f"{params['model_dir']}/ckpt", verbose=1, save_weights_only=True)
+      os.path.join(params['model_dir'], 'ckpt'),
+      verbose=1,
+      save_weights_only=True)
   early_stopping = tf.keras.callbacks.EarlyStopping(
       monitor='val_loss', min_delta=0, patience=10, verbose=1)
-  callbacks = [
-    tb_callback,
-    ckpt_callback,
-    early_stopping,
-  ]
+  callbacks = [tb_callback, ckpt_callback, early_stopping]
   if params.get('sample_image', None):
     display_callback = DisplayCallback(
         params.get('sample_image', None),
@@ -430,11 +428,17 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
                                         self.config.num_classes)
 
       if self.config.data_format == 'channels_first':
-        bs, _, width, height, _ = cls_targets_at_level.get_shape().as_list()
+        targets_shape = tf.shape(cls_targets_at_level)
+        bs = targets_shape[0]
+        width = targets_shape[2]
+        height = targets_shape[3]
         cls_targets_at_level = tf.reshape(cls_targets_at_level,
                                           [bs, -1, width, height])
       else:
-        bs, width, height, _, _ = cls_targets_at_level.get_shape().as_list()
+        targets_shape = tf.shape(cls_targets_at_level)
+        bs = targets_shape[0]
+        width = targets_shape[1]
+        height = targets_shape[2]
         cls_targets_at_level = tf.reshape(cls_targets_at_level,
                                           [bs, width, height, -1])
       box_targets_at_level = labels['box_targets_%d' % (level + 3)]

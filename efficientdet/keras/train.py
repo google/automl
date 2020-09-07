@@ -69,6 +69,8 @@ flags.DEFINE_string(
     'hparams', '', 'Comma separated k=v pairs of hyperparameters or a module'
     ' containing attributes to use as hyperparameters.')
 flags.DEFINE_integer('batch_size', 64, 'training batch size')
+flags.DEFINE_integer('eval_samples', 5000, 'The number of samples for '
+                     'evaluation.')
 flags.DEFINE_integer('iterations_per_loop', 100,
                      'Number of iterations per TPU training loop')
 flags.DEFINE_string(
@@ -184,8 +186,6 @@ def main(_):
 
   with ds_strategy.scope():
     model = train_lib.EfficientDetNetTrain(params['model_name'], config)
-    height, width = utils.parse_image_size(params['image_size'])
-    model.build((params['batch_size'], height, width, 3))
     model.compile(
         optimizer=train_lib.get_optimizer(params),
         loss={
@@ -215,16 +215,17 @@ def main(_):
     if FLAGS.pretrained_ckpt:
       ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)
       model.load_weights(ckpt_path)
-    os.makedirs(FLAGS.model_dir, exist_ok=True)
+    tf.io.gfile.makedirs(FLAGS.model_dir)
     model.fit(
         get_dataset(True, params=params),
         epochs=params['num_epochs'],
         steps_per_epoch=steps_per_epoch,
         callbacks=train_lib.get_callbacks(params, FLAGS.profile),
-        validation_data=get_dataset(False, params=params))
+        validation_data=get_dataset(False, params=params),
+        validation_steps=(FLAGS.eval_samples // FLAGS.batch_size))
   model.save_weights(os.path.join(FLAGS.model_dir, 'ckpt-final'))
 
 
 if __name__ == '__main__':
-  logging.set_verbosity(logging.WARNING)
+  logging.set_verbosity(logging.INFO)
   app.run(main)

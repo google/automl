@@ -1633,6 +1633,7 @@ def build_and_apply_nas_policy(policies, image, bboxes,
   return (augmented_images, augmented_bboxes)
 
 
+@tf.autograph.experimental.do_not_convert
 def distort_image_with_autoaugment(image,
                                    bboxes,
                                    augmentation_name,

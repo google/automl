@@ -164,15 +164,13 @@ class FNode(tf.keras.layers.Layer):
 
   def call(self, feats, training):
     nodes = []
-    append_feats = []
     for i, input_offset in enumerate(self.inputs_offsets):
       input_node = feats[input_offset]
       input_node = self.resample_layers[i](input_node, training, feats)
       nodes.append(input_node)
     new_node = self.fuse_features(nodes)
     new_node = self.op_after_combine(new_node)
-    append_feats.append(new_node)
-    return feats + append_feats
+    return feats + [new_node]
 
 
 class OpAfterCombine(tf.keras.layers.Layer):
