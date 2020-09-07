@@ -24,6 +24,9 @@ import det_model_fn
 import hparams_config
 import utils
 
+import tensorflow.compat.v1 as tf
+
+
 flags.DEFINE_string(
     'tpu',
     default=None,
@@ -118,12 +121,8 @@ FLAGS = flags.FLAGS
 
 
 def main(_):
-
-  import tensorflow.compat.v1 as tf  # pylint: disable=g-import-not-at-top
-  tf.enable_v2_tensorshape()
-  tf.disable_eager_execution()
-
   if FLAGS.strategy == 'tpu':
+    tf.disable_eager_execution()
     tpu_cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
         FLAGS.tpu, zone=FLAGS.tpu_zone, project=FLAGS.gcp_project)
     tpu_grpc_url = tpu_cluster_resolver.get_master()
@@ -250,7 +249,6 @@ def main(_):
   eval_steps = int(FLAGS.eval_samples // FLAGS.eval_batch_size)
   total_examples = int(config.num_epochs * FLAGS.num_examples_per_epoch)
   train_steps = total_examples // FLAGS.train_batch_size
-  use_tpu = (FLAGS.strategy == 'tpu')
   logging.info(params)
 
   train_input_fn = dataloader.InputReader(
@@ -268,7 +266,6 @@ def main(_):
   if FLAGS.strategy == 'tpu':
     estimator = tf.estimator.tpu.TPUEstimator(
       model_fn=model_fn_instance,
-      use_tpu=use_tpu,
       train_batch_size=FLAGS.train_batch_size,
       eval_batch_size=FLAGS.eval_batch_size,
       config=run_config,
