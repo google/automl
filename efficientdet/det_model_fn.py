@@ -676,16 +676,6 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
         training_hooks.append(logging_hook3)
       except ImportError:
         logging.error("nvgpu module not installed")
-        pass
-
-  return tf.estimator.tpu.TPUEstimatorSpec(
-      mode=mode,
-      loss=total_loss,
-      train_op=train_op,
-      eval_metrics=eval_metrics,
-      host_call=utils.get_tpu_host_call(global_step, params),
-      scaffold_fn=scaffold_fn,
-      training_hooks=training_hooks)
 
   if params['strategy'] == 'tpu':
     return tf.estimator.tpu.TPUEstimatorSpec(
