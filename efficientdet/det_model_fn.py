@@ -591,6 +591,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
       tf.train.init_from_checkpoint(checkpoint, var_map)
       return tf.train.Scaffold()
   elif mode == tf.estimator.ModeKeys.EVAL and moving_average_decay:
+
     def scaffold_fn():
       """Load moving average variables for eval."""
       logging.info('Load EMA vars with ema_decay=%f', moving_average_decay)
@@ -628,32 +629,6 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     )
     training_hooks.append(logging_hook)
 
-    epoch = 1 + tf.math.floordiv(global_step * params["batch_size"],
-                                 params['num_examples_per_epoch'])
-    step_in_epoch = tf.math.floormod((global_step * params["batch_size"]),
-                                     params['num_examples_per_epoch'])
-
-    def formatter_log(tensors):
-      """
-      Format the log output
-      """
-
-      logstring = "Epoch {}. Image {} of {}: ".format(
-          tensors["epoch"], tensors["step_in_epoch"],
-          params['num_examples_per_epoch'])
-
-      return logstring
-
-    logging_hook2 = tf.estimator.LoggingTensorHook(
-        tensors={
-            "epoch": epoch,
-            "step_in_epoch": step_in_epoch
-        },
-        every_n_iter=params.get('iterations_per_loop', 100),
-        formatter=formatter_log,
-    )
-    training_hooks.append(logging_hook2)
-
     if params["nvgpu_logging"]:
       try:
         import nvgpu  # pylint: disable=g-import-not-at-top
@@ -687,7 +662,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
         scaffold_fn=scaffold_fn,
         training_hooks=training_hooks)
   else:
-    eval_metric_ops = eval_metrics[0](**eval_metrics[1]) if eval_metrics else None
+    eval_metric_ops = eval_metrics[0](
+        **eval_metrics[1]) if eval_metrics else None
     utils.get_tpu_host_call(global_step, params)
     return tf.estimator.EstimatorSpec(
         mode=mode,
