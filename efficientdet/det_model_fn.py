@@ -319,7 +319,6 @@ def reg_l2_loss(weight_decay, regex=r'.*(kernel|weight):0$'):
   ])
 
 
-@tf.function(autograph=False)
 def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   """Model definition entry.
 
