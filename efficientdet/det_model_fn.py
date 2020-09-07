@@ -319,6 +319,7 @@ def reg_l2_loss(weight_decay, regex=r'.*(kernel|weight):0$'):
   ])
 
 
+@tf.autograph.experimental.do_not_convert
 def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   """Model definition entry.
 
@@ -574,7 +575,6 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
       tf.train.init_from_checkpoint(checkpoint, var_map)
       return tf.train.Scaffold()
   elif mode == tf.estimator.ModeKeys.EVAL and moving_average_decay:
-
     def scaffold_fn():
       """Load moving average variables for eval."""
       logging.info('Load EMA vars with ema_decay=%f', moving_average_decay)
@@ -622,6 +622,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
         training_hooks=training_hooks)
   else:
     eval_metric_ops = eval_metrics[0](eval_metrics[1]) if eval_metrics else None
+    utils.get_tpu_host_call(global_step, params)
     return tf.estimator.EstimatorSpec(
         mode=mode,
         loss=total_loss,
