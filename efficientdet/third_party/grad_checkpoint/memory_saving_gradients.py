@@ -12,7 +12,7 @@ import tensorflow.compat.v1 as tf
 from tensorflow.python.ops import gradients as tf_gradients_lib
 import third_party.graph_edit as ge
 tf_gradient_function = tf_gradients_lib.gradients
-logging.getLogger().setLevel(logging.DEBUG)
+# logging.getLogger().setLevel(logging.DEBUG)
 
 sys.setrecursionlimit(10000)
 # refers back to current module if we decide to split helpers out
