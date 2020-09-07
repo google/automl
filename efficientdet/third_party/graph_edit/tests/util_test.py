@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for tensorflow.contrib.graph_editor."""
+"""Tests for tensorflow.contrib.third_party.graph_edit."""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import graph_editor as ge
+import third_party.graph_edit as ge
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import ops

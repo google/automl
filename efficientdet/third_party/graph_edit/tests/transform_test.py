@@ -20,8 +20,8 @@ from __future__ import print_function
 import collections
 import functools
 import numpy as np
-import graph_editor as ge
-from graph_editor.tests import match
+import third_party.graph_edit as ge
+from third_party.graph_edit.tests import match
 from tensorflow.core.framework import attr_value_pb2
 from tensorflow.python.client import session
 from tensorflow.python.framework import constant_op

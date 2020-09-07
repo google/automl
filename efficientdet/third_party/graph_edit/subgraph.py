@@ -24,9 +24,9 @@ import six
 from six import iteritems
 from six import StringIO
 
-from graph_editor import select
-from graph_editor import util
 from tensorflow.python.framework import ops as tf_ops
+from third_party.graph_edit import select
+from third_party.graph_edit import util
 
 __all__ = [
     "SubGraphView",
