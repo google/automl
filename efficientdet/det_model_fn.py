@@ -621,7 +621,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
         scaffold_fn=scaffold_fn,
         training_hooks=training_hooks)
   else:
-    eval_metric_ops = eval_metrics[0](eval_metrics[1]) if eval_metrics else None
+    eval_metric_ops = eval_metrics[0](**eval_metrics[1]) if eval_metrics else None
     utils.get_tpu_host_call(global_step, params)
     return tf.estimator.EstimatorSpec(
         mode=mode,
