@@ -37,7 +37,7 @@ def update_learning_rate_schedule_parameters(params):
   # params['batch_size'] is per-shard within model_fn if strategy=tpu.
   batch_size = (
       params['batch_size'] * params['num_shards']
-      if params['strategy'] == 'tpu' else params['batch_size'])
+      if params['strategy'] in ['tpu', 'gpus'] else params['batch_size'])
   # Learning rate is proportional to the batch size
   params['adjusted_learning_rate'] = (
       params['learning_rate'] * batch_size / _DEFAULT_BATCH_SIZE)
