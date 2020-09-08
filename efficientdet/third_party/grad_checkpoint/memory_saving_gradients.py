@@ -230,14 +230,14 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
         'L2Loss', 'entropy', 'FusedBatchNorm', 'Switch', 'dropout', 'Cast'
     ]:
       ts_all = [t for t in ts_all if excl_layer not in t.name]
-      logging.debug("excluding %s from ts_all: %d", excl_layer, len(ts_all))
+      logging.info("Excluding %s from ts_all: %d", excl_layer, len(ts_all))
 
     # leave only layers that match strings in checkpoints list
     ts_all = [
         t for t in ts_all
         if any(partial_match in t.name for partial_match in checkpoints)
     ]
-    logging.debug("leaving only %s in ts_all: %d", checkpoints, len(ts_all))
+    logging.info("Leaving only %s in ts_all: %d", checkpoints, len(ts_all))
     checkpoints = ts_all.copy()
 
   checkpoints = list(set(checkpoints).intersection(ts_all))
@@ -246,7 +246,7 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
   # assert isinstance(checkpoints, list)
 
   # TODO(NikZak): implement multithreading in graph recomputation
-  logging.debug("Checkpoint nodes used: %s", len(checkpoints))
+  logging.info("Checkpoint nodes used: %s", len(checkpoints))
   # better error handling of special cases
   # xs are already handled as checkpoint nodes, so no need to include them
   xs_intersect_checkpoints = set(xs).intersection(set(checkpoints))
@@ -322,8 +322,13 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
   d_xs = dv[len(checkpoints_disconnected):]
 
   # incorporate derivatives flowing through the checkpointed nodes
+  logging.info("Sorting nodes topologically")
   checkpoints_sorted_lists = tf_toposort(checkpoints, within_ops=fwd_ops)
-  for ts in checkpoints_sorted_lists[::-1]:
+  logging.info("Rebuilding graph with %d checkpoints",
+               len(checkpoints_sorted_lists))
+  for index, ts in enumerate(checkpoints_sorted_lists[::-1]):
+    if index % 50 == 0:
+      logging.info("Processed %d nodes", index)
     debug_print("Processing list %s", ts)
     checkpoints_other = [r for r in checkpoints if r not in ts]
     checkpoints_disconnected_other = [
