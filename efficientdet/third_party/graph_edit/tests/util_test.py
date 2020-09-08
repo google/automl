@@ -13,16 +13,12 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for tensorflow.contrib.third_party.graph_edit."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
-import third_party.graph_edit as ge
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.platform import test
+import third_party.graph_edit as ge
 
 
 class UtilTest(test.TestCase):

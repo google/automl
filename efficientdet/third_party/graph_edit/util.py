@@ -14,10 +14,6 @@
 # ==============================================================================
 """Utility functions for the graph_editor."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import re
 from six import iteritems
 from tensorflow.python.framework import ops as tf_ops
