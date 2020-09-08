@@ -628,7 +628,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
         loss=total_loss,
         train_op=train_op,
         eval_metric_ops=eval_metric_ops,
-        scaffold=scaffold_fn(),
+        scaffold=scaffold_fn() if scaffold_fn else None,
         training_hooks=training_hooks)
 
 
