@@ -118,23 +118,26 @@ flags.DEFINE_bool(
     'run in a separate process for train and eval and memory will be cleared.'
     'Drawback: need to kill 2 processes if trainining needs to be interrupted.')
 
-flags.DEFINE_multi_string(
-    'gradient_checkpointing', None,
+flags.DEFINE_bool(
+    'gradient_checkpointing', False,
     'This is an experimental option to reduce GPU memory usage during '
     'training. '
     'To get a high-level idea see: \n'
     '1) https://github.com/cybertronai/gradient-checkpointing and\n'
     '2) https://medium.com/tensorflow/'
     'fitting-larger-networks-into-memory-583e3c758ff9\n'
-    'It requires a list of strings as input that indicates '
-    'which layers of the network to use as checkpoints. '
-    'These strings are searched in the tensors name and only those '
-    'tensors that match are kept as checkpoints.\n'
+    'If True, strings defined by '
+    'gradient_checkpointing_list (["Add"] by default) '
+    'are searched in the tensors names and any '
+    'tensors that match a string from the list are kept as checkpoints.\n'
     'When this option is used the standard tensorflow.python.ops.gradients '
-    'method is being replaced with a custom method. Finding layers to save as '
-    'checkpoints for the best performance is an open problem that requires '
+    'method is being replaced with a custom method.')
+
+flags.DEFINE_multi_string(
+    'gradient_checkpointing_list', ["Add"], 'Optimizing layers saved as '
+    'checkpoints is an open problem that requires '
     'further investigation, however: \n\n'
-    'gradient_checkpointing: ["Add"]\n\n'
+    'gradient_checkpointing_list: ["Add"]\n\n'
     '(use layers with "Add" in the name as checkpoints) '
     'is a reasonably well working option that has been tested '
     'and gives following results: \n'
@@ -143,6 +146,7 @@ flags.DEFINE_multi_string(
     'it takes only 1/3.2 of memory with roughly 32% slower computation\n'
     '- It also allows to compute a d6 network with batch size of 2 '
     '(mixed precision enabled) on a 11Gb (2080Ti) GPU')
+
 flags.DEFINE_bool('nvgpu_logging', False,
                   'enable memory logging for NVIDIA cards')
 

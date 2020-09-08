@@ -263,7 +263,10 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
                 format_ops(ys_intersect_checkpoints))
 
   # remove initial and terminal nodes from checkpoints list if present
+
   checkpoints = list(set(checkpoints) - set(ys) - set(xs))
+  logging.info("Pruned initial and terminal nodes. Leaving %d",
+               len(checkpoints))
 
   # check that we have some nodes to checkpoint
   if not checkpoints:

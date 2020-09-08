@@ -383,13 +383,11 @@ Check these links for a high-level idea of what gradient checkpointing is doing:
 1. https://github.com/cybertronai/gradient-checkpointing
 2. https://medium.com/tensorflow/fitting-larger-networks-into-memory-583e3c758ff9
 
+**gradient_checkpointing: True**
 
-As input you need to provide a list of strings that would indicate which layers of the network to use as checkpoints. These strings will be searched in the tensors name and only those tensors that match will be kept as checkpoints.
-When this option is used the standard tensorflow.python.ops.gradients method is being replaced with a custom method. Finding layers to save as checkpoints for the best performance is an open problem that requires further investigation, however adding:
+If set to True, strings defined by gradient_checkpointing_list (["Add"] by default) are searched in the tensors names and any tensors that match a string from the list are kept as checkpoints. When this option is used the standard tensorflow.python.ops.gradients method is being replaced with a custom method.
 
-**gradient_checkpointing: ["Add"]**
-
-(use layers with "Add" in the name as checkpoints) to the config file is a reasonably well working option that has been tested and gives following results:
+Testing shows that:
 * On d4 network with batch-size of 1 (mixed precision enabled) it takes only 1/3.2 of memory with roughly 32% slower computation
 * It also allows to compute a d6 network with batch size of 2 (mixed precision enabled) on a 11Gb (2080Ti) GPU
 
