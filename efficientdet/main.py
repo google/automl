@@ -220,6 +220,7 @@ def main(_):
       FLAGS.iterations_per_loop if FLAGS.strategy == 'tpu' else 1,
       num_cores_per_replica=num_cores_per_replica,
       input_partition_dims=input_partition_dims,
+      save_checkpoints_steps=FLAGS.save_checkpoints_steps,
       per_host_input_for_training=tf.estimator.tpu.InputPipelineConfig
       .PER_HOST_V2)
 
