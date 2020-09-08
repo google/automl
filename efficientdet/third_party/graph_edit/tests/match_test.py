@@ -13,15 +13,13 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for tensorflow.contrib.graph_editor."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
-from third_party.graph_edit.tests import match
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.platform import test
+
+from third_party.graph_edit.tests import match
 
 
 class MatchTest(test.TestCase):

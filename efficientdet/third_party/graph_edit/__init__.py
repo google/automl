@@ -14,10 +14,6 @@
 # ==============================================================================
 """TensorFlow Graph Editor."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 # pylint: disable=wildcard-import
 from third_party.graph_edit.edit import *
 from third_party.graph_edit.reroute import *
@@ -35,7 +31,3 @@ from third_party.graph_edit import util as _util
 ph = _util.make_placeholder_from_dtype_and_shape
 sgv = _subgraph.make_view
 sgv_scope = _subgraph.make_view_from_scope
-
-del absolute_import
-del division
-del print_function

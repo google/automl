@@ -78,6 +78,8 @@ flags.DEFINE_integer('eval_samples', 5000, 'The number of samples for '
                      'evaluation.')
 flags.DEFINE_integer('iterations_per_loop', 100,
                      'Number of iterations per TPU training loop')
+flags.DEFINE_integer('save_checkpoints_steps', 100,
+                     'Number of iterations per checkpoint save')
 flags.DEFINE_string(
     'training_file_pattern', None,
     'Glob for training data files (e.g., COCO train - minival set)')
@@ -241,21 +243,21 @@ def main(_):
           tf.OptimizerOptions.ON_1)
     config_proto.gpu_options.allow_growth = True
 
-  tpu_config = tf.estimator.tpu.TPUConfig(
-      FLAGS.iterations_per_loop if FLAGS.strategy == 'tpu' else 1,
-      num_cores_per_replica=num_cores_per_replica,
-      input_partition_dims=input_partition_dims,
-      per_host_input_for_training=tf.estimator.tpu.InputPipelineConfig
-      .PER_HOST_V2)
-
   model_dir = FLAGS.model_dir
   if FLAGS.strategy == 'tpu':
+    tpu_config = tf.estimator.tpu.TPUConfig(
+        FLAGS.iterations_per_loop if FLAGS.strategy == 'tpu' else 1,
+        num_cores_per_replica=num_cores_per_replica,
+        input_partition_dims=input_partition_dims,
+        per_host_input_for_training=tf.estimator.tpu.InputPipelineConfig
+        .PER_HOST_V2)
     run_config = tf.estimator.tpu.RunConfig(
         cluster=tpu_cluster_resolver,
         model_dir=model_dir,
         log_step_count_steps=FLAGS.iterations_per_loop,
         session_config=config_proto,
         tpu_config=tpu_config,
+        save_checkpoints_steps=FLAGS.save_checkpoints_steps,
         tf_random_seed=FLAGS.tf_random_seed,
     )
   else:
@@ -267,7 +269,7 @@ def main(_):
         train_distribute=strategy,
         log_step_count_steps=FLAGS.iterations_per_loop,
         session_config=config_proto,
-        save_checkpoints_steps=5000,
+        save_checkpoints_steps=FLAGS.save_checkpoints_steps,
         tf_random_seed=FLAGS.tf_random_seed,
     )
 
@@ -299,6 +301,7 @@ def main(_):
   else:
     params['batch_size'] = (
         FLAGS.train_batch_size // getattr(strategy, 'num_replicas_in_sync', 1))
+    params['num_shards'] = getattr(strategy, 'num_replicas_in_sync', 1)
     estimator = tf.estimator.Estimator(
         model_fn=model_fn_instance, config=run_config, params=params)
 
@@ -306,13 +309,9 @@ def main(_):
   if FLAGS.mode == 'train':
     estimator.train(input_fn=train_input_fn, max_steps=train_steps)
     if FLAGS.eval_after_training:
-      estimator._params['batch_size'] = (
-          FLAGS.eval_batch_size // getattr(strategy, 'num_replicas_in_sync', 1))
       estimator.evaluate(input_fn=eval_input_fn, steps=eval_steps)
 
   elif FLAGS.mode == 'eval':
-    estimator._params['batch_size'] = (
-        FLAGS.eval_batch_size // getattr(strategy, 'num_replicas_in_sync', 1))
     # Run evaluation when there's a new checkpoint
     for ckpt in tf.train.checkpoints_iterator(
         FLAGS.model_dir,
