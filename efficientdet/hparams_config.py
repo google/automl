@@ -281,7 +281,8 @@ def default_detection_configs():
   h.positives_momentum = None
 
   # Reduces memory during training
-  h.gradient_checkpointing = None
+  h.gradient_checkpointing = False
+  h.gradient_checkpointing_list = ["Add"]
 
   # enable memory logging for NVIDIA cards
   h.nvgpu_logging = False

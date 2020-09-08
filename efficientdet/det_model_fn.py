@@ -430,7 +430,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
             ys,
             xs,
             grad_ys,
-            checkpoints=params['gradient_checkpointing'],
+            checkpoints=params['gradient_checkpointing_list'],
             **kwargs)
 
       gradients.__dict__["gradients"] = gradients_
