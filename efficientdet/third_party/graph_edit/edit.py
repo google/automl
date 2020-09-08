@@ -14,15 +14,11 @@
 # ==============================================================================
 """Various function for graph editing."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
+from tensorflow.python.ops import array_ops as tf_array_ops
 from third_party.graph_edit import reroute
 from third_party.graph_edit import select
 from third_party.graph_edit import subgraph
 from third_party.graph_edit import util
-from tensorflow.python.ops import array_ops as tf_array_ops
 
 __all__ = [
     "detach_control_inputs",
