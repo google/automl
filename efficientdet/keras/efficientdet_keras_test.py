@@ -44,7 +44,7 @@ class EfficientDetKerasTest(tf.test.TestCase):
       model = efficientdet_keras.EfficientDetNet(config=config)
       outputs = model(feats, True)
       sess.run(tf.global_variables_initializer())
-      keras_class_out, keras_box_out, keras_seg_out = sess.run(outputs)
+      keras_class_out, keras_box_out, _ = sess.run(outputs)
       grads = tf.nest.map_structure(lambda output: tf.gradients(output, feats),
                                     outputs)
       keras_class_grads, keras_box_grads, _ = sess.run(grads)
@@ -69,15 +69,30 @@ class EfficientDetKerasTest(tf.test.TestCase):
       self.assertAllClose(
           keras_box_grads[i - 3], legacy_box_grads[i], rtol=1e-4, atol=1e-4)
 
+  def test_eager_output(self):
+    inputs_shape = [1, 512, 512, 3]
+    config = hparams_config.get_efficientdet_config('efficientdet-d0')
+    config.heads = ['object_detection', 'segmentation']
+    tmp_ckpt = os.path.join(tempfile.mkdtemp(), 'ckpt2')
+
+    with tf.Session(graph=tf.Graph()) as sess:
+      feats = tf.ones(inputs_shape)
+      tf.random.set_random_seed(SEED)
+      model = efficientdet_keras.EfficientDetNet(config=config)
+      outputs = model(feats, True)
+      sess.run(tf.global_variables_initializer())
+      keras_class_out, keras_box_out, keras_seg_out = sess.run(outputs)
+      model.save_weights(tmp_ckpt)
+
     feats = tf.ones(inputs_shape)
     model = efficientdet_keras.EfficientDetNet(config=config)
     model.load_weights(tmp_ckpt)
     eager_class_out, eager_box_out, eager_seg_out = model(feats, True)
-    for i in range(3, 8):
+    for i in range(5):
       self.assertAllClose(
-          eager_class_out[i - 3], legacy_class_out[i], rtol=1e-4, atol=1e-4)
+          eager_class_out[i], keras_class_out[i], rtol=1e-4, atol=1e-4)
       self.assertAllClose(
-          eager_box_out[i - 3], legacy_box_out[i], rtol=1e-4, atol=1e-4)
+          eager_box_out[i], keras_box_out[i], rtol=1e-4, atol=1e-4)
     self.assertAllClose(
         eager_seg_out, keras_seg_out, rtol=1e-4, atol=1e-4)
 

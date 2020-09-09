@@ -231,8 +231,7 @@ def default_detection_configs():
 
   # regularization l2 loss.
   h.weight_decay = 4e-5
-  # use horovod for multi-gpu training. If None, use TF default.
-  h.strategy = None  # 'tpu', 'horovod', None
+  h.strategy = None  # 'tpu', 'gpus', None
   h.mixed_precision = False  # If False, use float32.
 
   # For detection.

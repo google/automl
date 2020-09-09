@@ -242,6 +242,7 @@ class TpuBatchNormalization(tf.keras.layers.BatchNormalization):
 
 class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
   """Cross replica batch normalization."""
+
   def __init__(self, fused=False, **kwargs):
     if not kwargs.get('name', None):
       kwargs['name'] = 'tpu_batch_normalization'
@@ -263,7 +264,7 @@ class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
       shard_mean_of_square = shard_variance + shard_square_of_mean
       shard_stack = tf.stack([shard_mean, shard_mean_of_square])
       group_mean, group_mean_of_square = tf.unstack(
-        replica_context.all_reduce(tf.distribute.ReduceOp.MEAN, shard_stack))
+          replica_context.all_reduce(tf.distribute.ReduceOp.MEAN, shard_stack))
       group_variance = group_mean_of_square - tf.math.square(group_mean)
       return (group_mean, group_variance)
     else:
@@ -297,8 +298,8 @@ def batch_norm_class(is_training, strategy=None):
   if is_training and strategy == 'tpu':
     return TpuBatchNormalization
   elif is_training and strategy == 'gpus':
-    # TODO(fsx950223): use SyncBatchNorm after the TF bug (incorrect nccl all_reduce) is fixed:
-    # see https://github.com/tensorflow/tensorflow/issues/41980
+    # TODO(fsx950223): use SyncBatchNorm after TF bug is fixed (incorrect nccl
+    # all_reduce). See https://github.com/tensorflow/tensorflow/issues/41980
     return BatchNormalization
   else:
     return BatchNormalization

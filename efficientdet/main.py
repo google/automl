@@ -18,13 +18,12 @@ from absl import app
 from absl import flags
 from absl import logging
 import numpy as np
+import tensorflow.compat.v1 as tf
 
 import dataloader
 import det_model_fn
 import hparams_config
 import utils
-
-import tensorflow.compat.v1 as tf
 
 
 flags.DEFINE_string(
@@ -67,11 +66,10 @@ flags.DEFINE_integer(
 flags.DEFINE_bool('use_spatial_partition', False, 'Use spatial partition.')
 flags.DEFINE_integer(
     'num_cores_per_replica',
-    default=8,
-    help='Number of TPU cores per'
-    'replica when using spatial partition.')
+    default=4,
+    help='Number of TPU cores per replica when using spatial partition.')
 flags.DEFINE_multi_integer(
-    'input_partition_dims', [1, 4, 2, 1],
+    'input_partition_dims', [1, 2, 2, 1],
     'A list that describes the partition dims for all the tensors.')
 flags.DEFINE_integer('train_batch_size', 64, 'training batch size')
 flags.DEFINE_integer('eval_batch_size', 1, 'evaluation batch size')
@@ -166,6 +164,7 @@ def main(_):
         'source_ids': None,
         'groundtruth_data': None,
         'image_scales': None,
+        'image_masks': None,
     }
     # The Input Partition Logic: We partition only the partition-able tensors.
     feat_sizes = utils.get_feat_sizes(
@@ -217,12 +216,13 @@ def main(_):
     config_proto.gpu_options.allow_growth = True
 
   model_dir = FLAGS.model_dir
+  strategy = None
   if FLAGS.strategy == 'tpu':
     tpu_config = tf.estimator.tpu.TPUConfig(
-      FLAGS.iterations_per_loop if FLAGS.strategy == 'tpu' else 1,
-      num_cores_per_replica=num_cores_per_replica,
-      input_partition_dims=input_partition_dims,
-      per_host_input_for_training=tf.estimator.tpu.InputPipelineConfig
+        FLAGS.iterations_per_loop if FLAGS.strategy == 'tpu' else 1,
+        num_cores_per_replica=num_cores_per_replica,
+        input_partition_dims=input_partition_dims,
+        per_host_input_for_training=tf.estimator.tpu.InputPipelineConfig
         .PER_HOST_V2)
     run_config = tf.estimator.tpu.RunConfig(
         cluster=tpu_cluster_resolver,
@@ -234,7 +234,6 @@ def main(_):
         tf_random_seed=FLAGS.tf_random_seed,
     )
   else:
-    strategy = None
     if FLAGS.strategy == 'gpus':
       strategy = tf.distribute.MirroredStrategy()
     run_config = tf.estimator.RunConfig(
@@ -264,17 +263,16 @@ def main(_):
       use_fake_data=FLAGS.use_fake_data,
       max_instances_per_image=max_instances_per_image)
 
-  """Build train estimator and run training if steps > 0."""
   if FLAGS.strategy == 'tpu':
     estimator = tf.estimator.tpu.TPUEstimator(
-      model_fn=model_fn_instance,
-      train_batch_size=FLAGS.train_batch_size,
-      eval_batch_size=FLAGS.eval_batch_size,
-      config=run_config,
-      params=params)
+        model_fn=model_fn_instance,
+        train_batch_size=FLAGS.train_batch_size,
+        eval_batch_size=FLAGS.eval_batch_size,
+        config=run_config,
+        params=params)
   else:
     params['batch_size'] = (
-      FLAGS.train_batch_size // getattr(strategy, 'num_replicas_in_sync', 1))
+        FLAGS.train_batch_size // getattr(strategy, 'num_replicas_in_sync', 1))
     params['num_shards'] = getattr(strategy, 'num_replicas_in_sync', 1)
     estimator = tf.estimator.Estimator(
         model_fn=model_fn_instance,
