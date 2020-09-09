@@ -670,7 +670,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
         mem_used = tensors["memory used"].decode("utf-8")
         mem_total = tensors["memory total"].decode("utf-8")
         mem_util = commonsize(mem_used) / commonsize(mem_total)
-        logstring = "GPU memory used: {} = {:.1%} of total memory: {}".format(
+        logstring = "GPU memory used: {} = {:.1%} of total GPU memory: {}".format(
             mem_used, mem_util, mem_total)
         return logstring
 
