@@ -276,7 +276,7 @@ def visualize_image(image,
   Returns:
     output_image: an output image with annotated boxes and classes.
   """
-  label_map = label_util.get_label_map(label_map)
+  label_map = label_util.get_label_map(label_map or 'coco')
   category_index = {k: {'id': k, 'name': label_map[k]} for k in label_map}
   img = np.array(image)
   vis_utils.visualize_boxes_and_labels_on_image_array(

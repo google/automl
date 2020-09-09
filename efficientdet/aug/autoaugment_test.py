@@ -29,6 +29,11 @@ class AutoaugmentTest(tf.test.TestCase):
     autoaugment.distort_image_with_autoaugment(
         image, bboxes, 'test', use_augmix=True)
 
+  def test_randaugment_policy(self):
+    image = tf.placeholder(tf.uint8, shape=[320, 320, 3])
+    bboxes = tf.placeholder(tf.float32, shape=[4, 4])
+    autoaugment.distort_image_with_randaugment(image, bboxes, 1, 15)
+
 
 if __name__ == '__main__':
   logging.set_verbosity(logging.WARNING)

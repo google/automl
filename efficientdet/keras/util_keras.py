@@ -14,8 +14,6 @@
 # ==============================================================================
 """Common keras utils."""
 from typing import Text
-import tensorflow as tf
-
 import utils
 
 
@@ -37,7 +35,7 @@ def build_batch_norm(is_training_bn: bool,
       width]` or "channels_last for `[batch, height, width, channels]`.
     momentum: `float`, momentume of batch norm.
     epsilon: `float`, small value for numerical stability.
-    strategy: `str`, whether to use tpu, horovod or other version of batch norm.
+    strategy: `str`, whether to use tpu, gpus or other version of batch norm.
     name: the name of the batch normalization layer
 
   Returns:
