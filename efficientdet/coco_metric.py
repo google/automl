@@ -120,8 +120,8 @@ class EvaluationMetric():
         # TxRxKxAxM: iouThrs x recThrs x catIds x areaRng x maxDets
         # Use areaRng_id=0 ('all') and maxDets_id=-1 (200) in default
         precision = coco_eval.eval['precision'][:, :, :, 0, -1]
-        ap_perclass = [0] * 100  # assumeing at most 100 classes.
         if len(self.label_map) <= precision.shape[-1]:
+          ap_perclass = [0] * precision.shape[-1]
           # This branch should always be True unless users use a wrong label map
           # where #classes larger than the actual available classes in gt.
           for c in range(precision.shape[-1]):  # iterate over all classes
