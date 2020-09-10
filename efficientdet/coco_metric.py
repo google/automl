@@ -131,7 +131,9 @@ class EvaluationMetric():
             ap_c = np.mean(precision_c) if precision_c.size else -1.
             ap_perclass[c] = ap_c
           coco_metrics = np.concatenate((coco_metrics, ap_perclass))
-        return np.array(coco_metrics, dtype=np.float32)
+
+      # Return the concat normal and per-class AP.
+      return np.array(coco_metrics, dtype=np.float32)
 
   def result(self):
     """Return the metric values (and compute it if needed)."""
