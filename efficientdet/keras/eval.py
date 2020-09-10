@@ -162,7 +162,9 @@ def main(_):
       groundtruth_per_source[img_id.numpy()] = groundtruth
 
   # calucate the AP scores for all the images
-  evaluator = coco_metric.EvaluationMetric(filename=config.val_json_file)
+  label_map = label_util.get_label_map(config.label_map)
+  evaluator = coco_metric.EvaluationMetric(
+      filename=config.val_json_file, label_map=label_map)
   for img_id, d in detections_per_source.items():
     if FLAGS.enable_tta:
       d = wbf.ensemble_detections(config, d, len(augmentations))
@@ -177,11 +179,10 @@ def main(_):
     for i, name in enumerate(evaluator.metric_names):
       metric_dict[name] = metrics[i]
 
-    label_map = label_util.get_label_map(config.label_map)
     if label_map:
       for i, cid in enumerate(sorted(label_map.keys())):
         name = 'AP_/%s' % label_map[cid]
-        metric_dict[name] = metrics[i - len(evaluator.metric_names)]
+        metric_dict[name] = metrics[i + len(evaluator.metric_names)]
     print(metric_dict)
 
 

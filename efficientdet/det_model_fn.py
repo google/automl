@@ -503,9 +503,9 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
       else:
         logging.info('Eval val with groudtruths %s.', params['val_json_file'])
         eval_metric = coco_metric.EvaluationMetric(
-            filename=params['val_json_file'])
+            filename=params['val_json_file'], label_map=params['label_map'])
         coco_metrics = eval_metric.estimator_metric_fn(
-            detections_bs, kwargs['groundtruth_data'], params['label_map'])
+            detections_bs, kwargs['groundtruth_data'])
 
       # Add metrics to output.
       cls_loss = tf.metrics.mean(kwargs['cls_loss_repeat'])
