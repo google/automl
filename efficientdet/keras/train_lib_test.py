@@ -60,7 +60,7 @@ class TrainLibTest(tf.test.TestCase):
         min_level=3,
         max_level=3,
         num_scales=1,
-        aspect_ratios=[(1.0, 1.0)],
+        aspect_ratios=[1.0],
         anchor_scale=1.0,
         image_size=32)
     alpha = 0.25

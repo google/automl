@@ -211,12 +211,12 @@ class EvaluationMetric():
     `self.detections` list. The metric op is invoked after all examples have
     been seen and computes the aggregate COCO metrics. Please find details API
     in: https://www.tensorflow.org/api_docs/python/tf/contrib/learn/MetricSpec
+
     Args:
       detections: Detection results in a tensor with each row representing
         [image_id, x, y, width, height, score, class]
       groundtruth_data: Groundtruth annotations in a tensor with each row
         representing [y1, x1, y2, x2, is_crowd, area, class].
-      label_map: optional, a map from class id to name.
     Returns:
       metrics_dict: A dictionary mapping from evaluation name to a tuple of
         operations (`metric_op`, `update_op`). `update_op` appends the

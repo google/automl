@@ -71,9 +71,9 @@ class Anchors():
       num_scales: integer number representing intermediate scales added
         on each level. For instances, num_scales=2 adds two additional
         anchor scales [2^0, 2^0.5] on each level.
-      aspect_ratios: list of tuples representing the aspect ratio anchors added
-        on each level. For instances, aspect_ratios =
-        [(1, 1), (1.4, 0.7), (0.7, 1.4)] adds three anchors on each level.
+      aspect_ratios: list of representing the aspect ratio anchors added
+        on each level. For instances, aspect_ratios = [1.0, 2.0, 0..5]
+        adds three anchors on each level.
       anchor_scale: float number representing the scale of size of the base
         anchor to the feature stride 2^level. Or a list, one value per layer.
       image_size: integer number or tuple of integer number of input image size.
@@ -116,8 +116,10 @@ class Anchors():
         stride, octave_scale, aspect, anchor_scale = config
         base_anchor_size_x = anchor_scale * stride[1] * 2**octave_scale
         base_anchor_size_y = anchor_scale * stride[0] * 2**octave_scale
-        anchor_size_x_2 = base_anchor_size_x * aspect[0] / 2.0
-        anchor_size_y_2 = base_anchor_size_y * aspect[1] / 2.0
+        aspect_x = np.sqrt(aspect)
+        aspect_y = 1.0 / aspect_x
+        anchor_size_x_2 = base_anchor_size_x * aspect_x / 2.0
+        anchor_size_y_2 = base_anchor_size_y * aspect_y / 2.0
 
         x = np.arange(stride[1] / 2, self.image_size[1], stride[1])
         y = np.arange(stride[0] / 2, self.image_size[0], stride[0])
