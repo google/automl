@@ -3,14 +3,16 @@ import logging
 import contextlib
 import time
 import sys
-from toposort import toposort
 import numpy as np
 import tensorflow.compat.v1 as tf
 
 # save original gradients since tf.gradient could be monkey-patched to point
 # to our version
 from tensorflow.python.ops import gradients as tf_gradients_lib
+
+from third_party.toposort import toposort
 import third_party.graph_edit as ge
+
 tf_gradient_function = tf_gradients_lib.gradients
 # logging.getLogger().setLevel(logging.DEBUG)
 
