@@ -75,6 +75,12 @@ class HparamsConfigTest(tf.test.TestCase):
     self.assertEqual(c.as_dict(), {'x': 1, 'y': {'y0': 5, 'y1': {'y11': 100}}})
     self.assertEqual(c.y.y1.y11, 100)
 
+  def test_config_override_list(self):
+    c = hparams_config.Config({'x': [1.0, 2.0]})
+    self.assertEqual(c.as_dict(), {'x': [1.0, 2.0]})
+    c.override('x=3.0*4.0*5.0')
+    self.assertEqual(c.as_dict(), {'x': [3.0, 4.0, 5.0]})
+
 
 if __name__ == '__main__':
   logging.set_verbosity(logging.WARNING)

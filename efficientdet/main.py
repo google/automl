@@ -251,6 +251,8 @@ def main(_):
   total_examples = int(config.num_epochs * FLAGS.num_examples_per_epoch)
   train_steps = total_examples // FLAGS.train_batch_size
   logging.info(params)
+  with tf.io.gfile.GFile(os.path.join(model_dir, 'config.yaml'), 'w') as f:
+    f.write(str(config))
 
   train_input_fn = dataloader.InputReader(
       FLAGS.training_file_pattern,
