@@ -120,17 +120,16 @@ class EvaluationMetric():
         # TxRxKxAxM: iouThrs x recThrs x catIds x areaRng x maxDets
         # Use areaRng_id=0 ('all') and maxDets_id=-1 (200) in default
         precision = coco_eval.eval['precision'][:, :, :, 0, -1]
-        if len(self.label_map) <= precision.shape[-1]:
-          ap_perclass = [0] * precision.shape[-1]
-          # This branch should always be True unless users use a wrong label map
-          # where #classes larger than the actual available classes in gt.
-          for c in range(precision.shape[-1]):  # iterate over all classes
-            precision_c = precision[:, :, c]
-            # Only consider values if > -1.
-            precision_c = precision_c[precision_c > -1]
-            ap_c = np.mean(precision_c) if precision_c.size else -1.
-            ap_perclass[c] = ap_c
-          coco_metrics = np.concatenate((coco_metrics, ap_perclass))
+        # Ideally, label_map should match the eval set, but it is possible that
+        # some classes has no data in the eval set.
+        ap_perclass = [0] * max(precision.shape[-1], len(self.label_map))
+        for c in range(precision.shape[-1]):  # iterate over all classes
+          precision_c = precision[:, :, c]
+          # Only consider values if > -1.
+          precision_c = precision_c[precision_c > -1]
+          ap_c = np.mean(precision_c) if precision_c.size else -1.
+          ap_perclass[c] = ap_c
+        coco_metrics = np.concatenate((coco_metrics, ap_perclass))
 
       # Return the concat normal and per-class AP.
       return np.array(coco_metrics, dtype=np.float32)
