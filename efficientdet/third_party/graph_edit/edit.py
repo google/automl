@@ -13,12 +13,13 @@
 # limitations under the License.
 # ==============================================================================
 """Various function for graph editing."""
+# pylint: disable=g-direct-tensorflow-import
 
-from tensorflow.python.ops import array_ops as tf_array_ops
 from third_party.graph_edit import reroute
 from third_party.graph_edit import select
 from third_party.graph_edit import subgraph
 from third_party.graph_edit import util
+from tensorflow.python.ops import array_ops as tf_array_ops
 
 __all__ = [
     "detach_control_inputs",

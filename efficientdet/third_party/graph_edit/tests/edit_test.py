@@ -13,14 +13,15 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for tensorflow.contrib.graph_editor."""
+# pylint: disable=g-direct-tensorflow-import,
+
+import third_party.graph_edit as ge
+from third_party.graph_edit.tests import match
 
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.platform import test
-
-import third_party.graph_edit as ge
-from third_party.graph_edit.tests import match
 
 
 class EditTest(test.TestCase):
@@ -33,6 +34,7 @@ class EditTest(test.TestCase):
 
   def setUp(self):
     """Set up."""
+    super().setUp()
     self.graph = ops.Graph()
     with self.graph.as_default():
       self.a = constant_op.constant([1., 1.], shape=[2], name="a")

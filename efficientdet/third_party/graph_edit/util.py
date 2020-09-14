@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """Utility functions for the graph_editor."""
+# pylint: disable=g-direct-tensorflow-import
 
 import re
 from six import iteritems

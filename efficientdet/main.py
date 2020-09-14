@@ -251,13 +251,13 @@ def main(_):
   total_examples = int(config.num_epochs * FLAGS.num_examples_per_epoch)
   train_steps = total_examples // FLAGS.train_batch_size
   logging.info(params)
+
   if not tf.io.gfile.exists(model_dir):
     tf.io.gfile.makedirs(model_dir)
 
-  if 'train' in FLAGS.mode:
-    # Only write config for train mode.
-    with tf.io.gfile.GFile(os.path.join(model_dir, 'config.yaml'), 'w') as f:
-      f.write(str(config))
+  config_file = os.path.join(model_dir, 'config.yaml')
+  if not tf.io.gfile.exists(config_file):
+    tf.io.gfile.GFile(config_file, 'w').write(str(config))
 
   train_input_fn = dataloader.InputReader(
       FLAGS.training_file_pattern,

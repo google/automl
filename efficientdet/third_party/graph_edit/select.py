@@ -13,17 +13,17 @@
 # limitations under the License.
 # ==============================================================================
 """Various ways of selecting operations and tensors in a graph."""
+# pylint: disable=g-direct-tensorflow-import,g-bool-id-comparison
 
 import re
-
 from six import iteritems
 from six import string_types
 
-from tensorflow.python.ops import op_selector
-from tensorflow.python.framework import ops as tf_ops
-from tensorflow.python.util import deprecation
-
 from third_party.graph_edit import util
+
+from tensorflow.python.framework import ops as tf_ops
+from tensorflow.python.ops import op_selector
+from tensorflow.python.util import deprecation
 
 __all__ = [
     "can_be_regex",
