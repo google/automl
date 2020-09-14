@@ -13,18 +13,19 @@
 # limitations under the License.
 # ==============================================================================
 """Class to transform an subgraph into another."""
+# pylint: disable=g-direct-tensorflow-import,g-importing-member
 
 from copy import deepcopy
 from functools import partial
 from six import iteritems
 from six import string_types
 from six import StringIO
-from tensorflow.python.framework import ops as tf_ops
-from tensorflow.python.platform import tf_logging as logging
 from third_party.graph_edit import reroute
 from third_party.graph_edit import select
 from third_party.graph_edit import subgraph
 from third_party.graph_edit import util
+from tensorflow.python.framework import ops as tf_ops
+from tensorflow.python.platform import tf_logging as logging
 
 __all__ = [
     "replace_t_with_placeholder_handler",

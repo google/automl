@@ -13,16 +13,16 @@
 # limitations under the License.
 # ==============================================================================
 """SubGraphView: a subgraph view on an existing tf.Graph."""
+# pylint: disable=g-direct-tensorflow-import
 
 import copy
-
 import six
 from six import iteritems
 from six import StringIO
 
-from tensorflow.python.framework import ops as tf_ops
 from third_party.graph_edit import select
 from third_party.graph_edit import util
+from tensorflow.python.framework import ops as tf_ops
 
 __all__ = [
     "SubGraphView",
@@ -182,6 +182,7 @@ class SubGraphView():
       TypeError: if inside_ops cannot be converted to a list of `tf.Operation`
         or if `passthrough_ts` cannot be converted to a list of `tf.Tensor`.
     """
+    self.name = "SubGraphView"
     inside_ops = util.make_list_of_op(inside_ops)
     passthrough_ts = util.make_list_of_t(passthrough_ts)
     ops_and_ts = inside_ops + passthrough_ts

@@ -13,12 +13,13 @@
 # limitations under the License.
 # ==============================================================================
 """Various function for graph rerouting."""
+# pylint: disable=g-direct-tensorflow-import
 
-from tensorflow.python.framework import ops as _tf_ops
-
-from tensorflow.python.util.all_util import remove_undocumented
 from third_party.graph_edit import subgraph as _subgraph
 from third_party.graph_edit import util as _util
+from tensorflow.python.framework import ops as _tf_ops
+from tensorflow.python.util.all_util import remove_undocumented
+
 
 _allowed_symbols = [
     "swap_ts",

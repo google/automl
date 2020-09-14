@@ -13,12 +13,12 @@
 # limitations under the License.
 # ==============================================================================
 """Simple graph matching functions."""
+# pylint: disable=g-direct-tensorflow-import,g-bool-id-comparison
 
 from six import string_types
 
-from tensorflow.python.framework import ops as tf_ops
-
 from third_party.graph_edit import select
+from tensorflow.python.framework import ops as tf_ops
 
 __all__ = [
     "op_type",
