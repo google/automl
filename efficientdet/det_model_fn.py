@@ -433,7 +433,10 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
         tvars = [gv[1] for gv in grads_and_vars]
         # First clip each variable's norm, then clip global norm.
         clip_norm = abs(params['clip_gradients_norm'])
-        clipped_grads = [tf.clip_by_norm(g, clip_norm) for g in grads]
+        clipped_grads = [
+            tf.clip_by_norm(g, clip_norm) if g is not None else None
+            for g in grads
+        ]
         clipped_grads, _ = tf.clip_by_global_norm(clipped_grads, clip_norm)
         utils.scalar('gradient_norm', tf.linalg.global_norm(clipped_grads))
         grads_and_vars = list(zip(clipped_grads, tvars))
