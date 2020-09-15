@@ -186,7 +186,7 @@ class ModelInspector(object):
         img_id = str(i * batch_size + j)
         output_image_path = os.path.join(output_dir, img_id + '.jpg')
         Image.fromarray(img).save(output_image_path)
-        logging.info('writing file to %s', output_image_path)
+        print('writing file to %s' % output_image_path)
 
   def saved_model_benchmark(self,
                             image_path_pattern,

@@ -691,6 +691,6 @@ class InferenceDriver(object):
             **kwargs)
         output_image_path = os.path.join(output_dir, str(i) + '.jpg')
         Image.fromarray(img).save(output_image_path)
-        logging.info('writing file to %s', output_image_path)
+        print('writing file to %s' % output_image_path)
 
       return predictions
