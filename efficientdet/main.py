@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """The main training script."""
+import multiprocessing
 import os
 from absl import app
 from absl import flags
@@ -322,11 +323,36 @@ def main(_):
         logging.info('Checkpoint %s no longer exists, skipping.', ckpt)
 
   elif FLAGS.mode == 'train_and_eval':
-    train_spec = tf.estimator.TrainSpec(
-        input_fn=train_input_fn, max_steps=train_steps)
-    eval_spec = tf.estimator.EvalSpec(
-        input_fn=eval_input_fn, steps=eval_steps, throttle_secs=600)
-    tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
+    ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
+    try:
+      step = int(os.path.basename(ckpt).split('-')[1])
+      current_epoch = (
+          step * FLAGS.train_batch_size // FLAGS.num_examples_per_epoch)
+      logging.info('found ckpt at step %d (epoch %d)', step, current_epoch)
+    except (IndexError, TypeError):
+      logging.info('Folder %s has no ckpt with valid step.', FLAGS.model_dir)
+      current_epoch = 0
+
+    def run_train_and_eval(e):
+      print('\n   =====> Starting training, epoch: %d.' % e)
+      estimator.train(
+          input_fn=train_input_fn,
+          max_steps=e * FLAGS.num_examples_per_epoch // FLAGS.train_batch_size)
+      print('\n   =====> Starting evaluation, epoch: %d.' % e)
+      eval_results = estimator.evaluate(
+          input_fn=eval_input_fn, steps=eval_steps)
+      ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
+      utils.archive_ckpt(eval_results, eval_results['AP'], ckpt)
+
+    epochs_per_cycle = 1  # higher number has less graph construction overhead.
+    for e in range(current_epoch + 1, config.num_epochs + 1, epochs_per_cycle):
+      if FLAGS.run_epoch_in_child_process:
+        p = multiprocessing.Process(target=run_train_and_eval, args=(e,))
+        p.start()
+        p.join()
+      else:
+        run_train_and_eval(e)
+
   else:
     logging.info('Invalid mode: %s', FLAGS.mode)
 
