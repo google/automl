@@ -72,8 +72,8 @@ flags.DEFINE_integer(
 flags.DEFINE_multi_integer(
     'input_partition_dims', [1, 2, 2, 1],
     'A list that describes the partition dims for all the tensors.')
-flags.DEFINE_integer('train_batch_size', 64, 'training batch size')
-flags.DEFINE_integer('eval_batch_size', 1, 'evaluation batch size')
+flags.DEFINE_integer('train_batch_size', 64, 'global training batch size')
+flags.DEFINE_integer('eval_batch_size', 1, 'global evaluation batch size')
 flags.DEFINE_integer('eval_samples', None, 'Number of samples for eval.')
 flags.DEFINE_integer('iterations_per_loop', 100,
                      'Number of iterations per TPU training loop')
@@ -213,38 +213,9 @@ def main(_):
     if FLAGS.use_xla:
       config_proto.graph_options.optimizer_options.global_jit_level = (
           tf.OptimizerOptions.ON_1)
-    config_proto.gpu_options.allow_growth = True
+      config_proto.gpu_options.allow_growth = True
 
   model_dir = FLAGS.model_dir
-  strategy = None
-  if FLAGS.strategy == 'tpu':
-    tpu_config = tf.estimator.tpu.TPUConfig(
-        FLAGS.iterations_per_loop if FLAGS.strategy == 'tpu' else 1,
-        num_cores_per_replica=num_cores_per_replica,
-        input_partition_dims=input_partition_dims,
-        per_host_input_for_training=tf.estimator.tpu.InputPipelineConfig
-        .PER_HOST_V2)
-    run_config = tf.estimator.tpu.RunConfig(
-        cluster=tpu_cluster_resolver,
-        model_dir=model_dir,
-        log_step_count_steps=FLAGS.iterations_per_loop,
-        session_config=config_proto,
-        tpu_config=tpu_config,
-        save_checkpoints_steps=FLAGS.save_checkpoints_steps,
-        tf_random_seed=FLAGS.tf_random_seed,
-    )
-  else:
-    if FLAGS.strategy == 'gpus':
-      strategy = tf.distribute.MirroredStrategy()
-    run_config = tf.estimator.RunConfig(
-        model_dir=model_dir,
-        train_distribute=strategy,
-        log_step_count_steps=FLAGS.iterations_per_loop,
-        session_config=config_proto,
-        save_checkpoints_steps=FLAGS.save_checkpoints_steps,
-        tf_random_seed=FLAGS.tf_random_seed,
-    )
-
   model_fn_instance = det_model_fn.get_model_fn(FLAGS.model_name)
   max_instances_per_image = config.max_instances_per_image
   if FLAGS.eval_samples:
@@ -274,26 +245,57 @@ def main(_):
       max_instances_per_image=max_instances_per_image)
 
   if FLAGS.strategy == 'tpu':
-    estimator = tf.estimator.tpu.TPUEstimator(
+    tpu_config = tf.estimator.tpu.TPUConfig(
+        FLAGS.iterations_per_loop if FLAGS.strategy == 'tpu' else 1,
+        num_cores_per_replica=num_cores_per_replica,
+        input_partition_dims=input_partition_dims,
+        per_host_input_for_training=tf.estimator.tpu.InputPipelineConfig
+        .PER_HOST_V2)
+    run_config = tf.estimator.tpu.RunConfig(
+        cluster=tpu_cluster_resolver,
+        model_dir=model_dir,
+        log_step_count_steps=FLAGS.iterations_per_loop,
+        session_config=config_proto,
+        tpu_config=tpu_config,
+        save_checkpoints_steps=FLAGS.save_checkpoints_steps,
+        tf_random_seed=FLAGS.tf_random_seed,
+    )
+    # TPUEstimator can do both train and eval.
+    train_est = tf.estimator.tpu.TPUEstimator(
         model_fn=model_fn_instance,
         train_batch_size=FLAGS.train_batch_size,
         eval_batch_size=FLAGS.eval_batch_size,
         config=run_config,
         params=params)
+    eval_est = train_est
   else:
-    params['batch_size'] = (
-        FLAGS.train_batch_size // getattr(strategy, 'num_replicas_in_sync', 1))
-    params['num_shards'] = getattr(strategy, 'num_replicas_in_sync', 1)
-    estimator = tf.estimator.Estimator(
-        model_fn=model_fn_instance,
-        config=run_config,
-        params=params)
+    strategy = None
+    if FLAGS.strategy == 'gpus':
+      strategy = tf.distribute.MirroredStrategy()
+    run_config = tf.estimator.RunConfig(
+        model_dir=model_dir,
+        train_distribute=strategy,
+        log_step_count_steps=FLAGS.iterations_per_loop,
+        session_config=config_proto,
+        save_checkpoints_steps=FLAGS.save_checkpoints_steps,
+        tf_random_seed=FLAGS.tf_random_seed,
+    )
+
+    def get_estimator(global_batch_size):
+      params['num_shards'] = getattr(strategy, 'num_replicas_in_sync', 1)
+      params['batch_size'] = global_batch_size // params['num_shards']
+      return tf.estimator.Estimator(
+          model_fn=model_fn_instance, config=run_config, params=params)
+
+    # train and eval need different estimator due to different batch size.
+    train_est = get_estimator(FLAGS.train_batch_size)
+    eval_est = get_estimator(FLAGS.eval_batch_size)
 
   # start train/eval flow.
   if FLAGS.mode == 'train':
-    estimator.train(input_fn=train_input_fn, max_steps=train_steps)
+    train_est.train(input_fn=train_input_fn, max_steps=train_steps)
     if FLAGS.eval_after_training:
-      estimator.evaluate(input_fn=eval_input_fn, steps=eval_steps)
+      eval_est.evaluate(input_fn=eval_input_fn, steps=eval_steps)
 
   elif FLAGS.mode == 'eval':
     # Run evaluation when there's a new checkpoint
@@ -304,7 +306,7 @@ def main(_):
 
       logging.info('Starting to evaluate.')
       try:
-        eval_results = estimator.evaluate(eval_input_fn, steps=eval_steps)
+        eval_results = eval_est.evaluate(eval_input_fn, steps=eval_steps)
         # Terminate eval job when final checkpoint is reached.
         try:
           current_step = int(os.path.basename(ckpt).split('-')[1])
@@ -335,11 +337,11 @@ def main(_):
 
     def run_train_and_eval(e):
       print('\n   =====> Starting training, epoch: %d.' % e)
-      estimator.train(
+      train_est.train(
           input_fn=train_input_fn,
           max_steps=e * FLAGS.num_examples_per_epoch // FLAGS.train_batch_size)
       print('\n   =====> Starting evaluation, epoch: %d.' % e)
-      eval_results = estimator.evaluate(
+      eval_results = eval_est.evaluate(
           input_fn=eval_input_fn, steps=eval_steps)
       ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
       utils.archive_ckpt(eval_results, eval_results['AP'], ckpt)
