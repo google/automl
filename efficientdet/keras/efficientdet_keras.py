@@ -269,11 +269,11 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
           padding='SAME',
           data_format=self.data_format)(inputs)
     elif self.pooling_type == 'avg':
-      self.pool2d = tf.keras.layers.AveragePooling2D(
+      return tf.keras.layers.AveragePooling2D(
           pool_size=[height_stride_size + 1, width_stride_size + 1],
           strides=[height_stride_size, width_stride_size],
           padding='SAME',
-          data_format=self.data_format)
+          data_format=self.data_format)(inputs)
     else:
       raise ValueError('Unsupported pooling type {}.'.format(self.pooling_type))
 
