@@ -20,7 +20,8 @@
 # pylint: disable=protected-access
 
 import contextlib
-import logging
+from absl import logging
+
 import sys
 import time
 import numpy as np
@@ -28,9 +29,7 @@ import tensorflow.compat.v1 as tf
 
 # save original gradients since tf.gradient could be monkey-patched.
 import third_party.graph_edit as ge
-from tensorflow.python.ops import gradients as tf_gradients_lib
-tf_gradient_function = tf_gradients_lib.gradients
-# logging.getLogger().setLevel(logging.DEBUG)
+tf_gradient_function = tf.gradients
 
 
 def toposort(x):
@@ -39,8 +38,6 @@ def toposort(x):
 
 
 sys.setrecursionlimit(10000)
-# refers back to current module if we decide to split helpers out
-util = sys.modules[__name__]
 
 # getting rid of "WARNING:tensorflow:VARIABLES collection name is deprecated"
 setattr(tf.GraphKeys, "VARIABLES", "variables")
@@ -164,7 +161,7 @@ def gradients(ys, xs, grad_ys=None, checkpoints="collection", **kwargs):
       ):  # tf.Dimension values are not compatible with int, convert manually
         try:
           return [int(e if e is not None else 64) for e in t.as_list()]
-        except AttributeError as e:
+        except ValueError as e:
           logging.exception("%s", e)
           logging.exception("unknown shape %s", t)
           return [0]  # unknown shape
@@ -185,7 +182,7 @@ def gradients(ys, xs, grad_ys=None, checkpoints="collection", **kwargs):
       logging.debug("ts_all: %s", len(ts_all))
 
       # filter out all tensors that are inputs of the backward graph
-      with util.capture_ops() as bwd_ops:
+      with capture_ops() as bwd_ops:
         tf_gradients(ys, xs, grad_ys, **kwargs)
 
       bwd_inputs = [t for op in bwd_ops for t in op.inputs]
