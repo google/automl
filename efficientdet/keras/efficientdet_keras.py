@@ -124,8 +124,7 @@ class FNode(tf.keras.layers.Layer):
       name = 'WSM' + ('' if i == 0 else '_' + str(i))
       self.vars.append(
           self.add_weight(
-              initializer=initializer, name=name,
-              trainable=self.is_training_bn))
+              initializer=initializer, name=name))
 
   def build(self, feats_shape):
     for i, input_offset in enumerate(self.inputs_offsets):
