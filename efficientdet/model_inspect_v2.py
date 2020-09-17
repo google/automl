@@ -108,6 +108,43 @@ def main(_):
     # transfer to tf2 format ckpt
     ckpt_path = tf.train.latest_checkpoint(FLAGS.ckpt_path)
     driver.model.save_weights(ckpt_path)
+  elif FLAGS.mode == 'video':
+    import cv2
+    if tf.saved_model.contains_saved_model(FLAGS.saved_model_dir):
+      driver.load(FLAGS.saved_model_dir)
+    cap = cv2.VideoCapture(FLAGS.input_video)
+    if not cap.isOpened():
+      print('Error opening input video: {}'.format(FLAGS.input_video))
+
+    out_ptr = None
+    if FLAGS.output_video:
+      frame_width, frame_height = int(cap.get(3)), int(cap.get(4))
+      out_ptr = cv2.VideoWriter(FLAGS.output_video,
+                                cv2.VideoWriter_fourcc('m', 'p', '4', 'v'), 25,
+                                (frame_width, frame_height))
+
+    while cap.isOpened():
+      # Capture frame-by-frame
+      ret, frame = cap.read()
+      if not ret:
+        break
+
+      raw_frames = np.array([frame])
+      detections_bs = driver.serve_images(raw_frames)
+      boxes, scores, classes, _ = tf.nest.map_structure(np.array, detections_bs)
+      new_frame = driver.visualize(raw_frames[0], boxes[0], scores[0], classes[0],
+                                   min_score_thresh=model_config.nms_configs.score_thresh,
+                                   max_boxes_to_draw=model_config.nms_configs.max_output_size)
+
+      if out_ptr:
+        # write frame into output file.
+        out_ptr.write(new_frame)
+      else:
+        # show the frame online, mainly used for real-time speed test.
+        cv2.imshow('Frame', new_frame)
+        # Press Q on keyboard to  exit
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+          break
 
 
 if __name__ == '__main__':
