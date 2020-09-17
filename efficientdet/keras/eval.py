@@ -30,33 +30,16 @@ from keras import postprocess
 from keras import wbf
 
 # Cloud TPU Cluster Resolvers
-flags.DEFINE_string(
-    'tpu',
-    default=None,
-    help='The Cloud TPU to use for training. This should be either the name '
-    'used when creating the Cloud TPU, or a grpc://ip.address.of.tpu:8470 '
-    'url.')
-flags.DEFINE_string(
-    'gcp_project',
-    default=None,
-    help='Project name for the Cloud TPU-enabled project. If not specified, we '
-    'will attempt to automatically detect the GCE project from metadata.')
-flags.DEFINE_string(
-    'tpu_zone',
-    default=None,
-    help='GCE zone where the Cloud TPU is located in. If not specified, we '
-    'will attempt to automatically detect the GCE project from metadata.')
+flags.DEFINE_string('tpu', None, 'The Cloud TPU name.')
+flags.DEFINE_string('gcp_project', None, 'Project name.')
+flags.DEFINE_string('tpu_zone', None, 'GCE zone name.')
 
-flags.DEFINE_enum('strategy', None, ['tpu', 'gpus', ''],
-                  'Training: gpus for multi-gpu, if None, use TF default.')
-
+flags.DEFINE_enum('strategy', None, ['tpu', 'gpus', ''], 'Device strategy.')
+flags.DEFINE_integer('eval_samples', None, 'Number of eval samples.')
 flags.DEFINE_string('val_file_pattern', None,
                     'Glob for eval tfrecords, e.g. coco/val-*.tfrecord.')
-flags.DEFINE_integer('eval_samples', None, 'The number of samples for '
-                     'evaluation.')
-flags.DEFINE_string(
-    'val_json_file', None,
-    'Groudtruth file, e.g. annotations/instances_val2017.json.')
+flags.DEFINE_string('val_json_file', None,
+                    'Groudtruth, e.g. annotations/instances_val2017.json.')
 flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model name to use.')
 flags.DEFINE_string('model_dir', None, 'Location of the checkpoint to run.')
 flags.DEFINE_integer('batch_size', 8, 'Batch size.')
@@ -72,6 +55,7 @@ def main(_):
   config.batch_size = FLAGS.batch_size
   config.val_json_file = FLAGS.val_json_file
   config.nms_configs.max_nms_inputs = anchors.MAX_DETECTION_POINTS
+  config.drop_remainder = False  # eval all examples w/o drop.
   base_height, base_width = utils.parse_image_size(config['image_size'])
 
   if FLAGS.strategy == 'tpu':
@@ -93,10 +77,8 @@ def main(_):
   # in format (height, width, flip)
   augmentations = []
   if FLAGS.enable_tta:
-    for size_offset in (0, 128, 256):
-      for flip in (False, True):
-        augmentations.append(
-            (base_height + size_offset, base_width + size_offset, flip))
+    for flip in (False, True):
+      augmentations.append((base_height, base_width, flip))
   else:
     augmentations.append((base_height, base_width, False))
 
@@ -131,7 +113,11 @@ def main(_):
                                                labels['source_ids'], flip)
 
       # inference
-      for images, labels in ds:
+      eval_samples = FLAGS.eval_samples or 5000
+      pbar = tf.keras.utils.Progbar(
+          len(augmentations) * eval_samples // config.batch_size)
+      for i, (images, labels) in enumerate(ds):
+        pbar.update(i)
         if flip:
           images = tf.image.flip_left_right(images)
         detections = f(images, labels)

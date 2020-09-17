@@ -425,7 +425,7 @@ class InputReader:
     dataset = dataset.map(
         map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     dataset = dataset.prefetch(batch_size)
-    dataset = dataset.batch(batch_size, drop_remainder=True)
+    dataset = dataset.batch(batch_size, drop_remainder=params['drop_remainder'])
     dataset = dataset.map(
         lambda *args: self.process_example(params, batch_size, *args))
     dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
