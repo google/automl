@@ -132,9 +132,13 @@ def main(_):
       raw_frames = np.array([frame])
       detections_bs = driver.serve_images(raw_frames)
       boxes, scores, classes, _ = tf.nest.map_structure(np.array, detections_bs)
-      new_frame = driver.visualize(raw_frames[0], boxes[0], scores[0], classes[0],
-                                   min_score_thresh=model_config.nms_configs.score_thresh,
-                                   max_boxes_to_draw=model_config.nms_configs.max_output_size)
+      new_frame = driver.visualize(
+          raw_frames[0],
+          boxes[0],
+          scores[0],
+          classes[0],
+          min_score_thresh=model_config.nms_configs.score_thresh,
+          max_boxes_to_draw=model_config.nms_configs.max_output_size)
 
       if out_ptr:
         # write frame into output file.
