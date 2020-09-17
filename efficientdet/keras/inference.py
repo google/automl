@@ -117,7 +117,7 @@ def get_ema_name(ema, var):
   if var.ref() in ema._averages:
     return ema._averages[var.ref()].name.split(':')[0]
   return tf.compat.v1.get_default_graph().unique_name(
-    var.name.split(':')[0] + "/" + ema.name, mark_as_used=False)
+      var.name.split(':')[0] + "/" + ema.name, mark_as_used=False)
 
 
 class ExportModel(tf.Module):
@@ -232,7 +232,9 @@ class ServingDriver(object):
     if ema_decay > 0:
       ema = tf.train.ExponentialMovingAverage(decay=0.0)
       ema_vars = util_keras.get_ema_vars(self.model)
-      var_dict = {get_ema_name(ema, var): var for (ref, var) in ema_vars.items()}
+      var_dict = {
+          get_ema_name(ema, var): var for (ref, var) in ema_vars.items()
+      }
     else:
       ema_vars = util_keras.get_ema_vars(self.model)
       var_dict = ema_vars
@@ -262,8 +264,8 @@ class ServingDriver(object):
 
   def visualize(self, image, boxes, classes, scores, **kwargs):
     """Visualize prediction on image."""
-    return visualize_image(image, boxes, classes.astype(int),
-                           scores, self.label_map, **kwargs)
+    return visualize_image(image, boxes, classes.astype(int), scores,
+                           self.label_map, **kwargs)
 
   def benchmark(self, image_arrays, bm_runs=10, trace_filename=None):
     """Benchmark inference latency/throughput.
@@ -279,6 +281,7 @@ class ServingDriver(object):
     @tf.function
     def test_func(image_arrays):
       return self.model(image_arrays)
+
     test_func(image_arrays)
 
     start = time.perf_counter()
@@ -305,10 +308,12 @@ class ServingDriver(object):
     Returns:
       A list of detections.
     """
+
     def _map_fn(file):
       image = tf.image.decode_image(file)
       image.set_shape((None, None, 3))
       return image
+
     images = tf.map_fn(_map_fn, image_files, dtype=tf.uint8)
     return self.serve_images(images)
 
@@ -360,16 +365,23 @@ class ServingDriver(object):
     if not self.model:
       self.build()
     export_model = ExportModel(self.model)
-    tf.saved_model.save(export_model, output_dir, signatures=export_model.__call__.get_concrete_function(
-      tf.TensorSpec(shape=[None, None, None, 3], dtype=tf.uint8, name="images")
-    ))
+    tf.saved_model.save(
+        export_model,
+        output_dir,
+        signatures=export_model.__call__.get_concrete_function(
+            tf.TensorSpec(
+                shape=[None, None, None, 3], dtype=tf.uint8, name="images")))
     logging.info('Model saved at %s', output_dir)
 
     # also save freeze pb file.
-    graphdef = self.freeze(export_model.__call__.get_concrete_function(
-        tf.TensorSpec(shape=[None, None, None, 3], dtype=tf.uint8, name="images")))
-    tf.io.write_graph(graphdef, output_dir, self.model_name + '_frozen.pb', as_text=False)
-    logging.info('Frozen graph saved at %s', os.path.join(output_dir, self.model_name + '_frozen.pb'))
+    graphdef = self.freeze(
+        export_model.__call__.get_concrete_function(
+            tf.TensorSpec(
+                shape=[None, None, None, 3], dtype=tf.uint8, name="images")))
+    tf.io.write_graph(
+        graphdef, output_dir, self.model_name + '_frozen.pb', as_text=False)
+    logging.info('Frozen graph saved at %s',
+                 os.path.join(output_dir, self.model_name + '_frozen.pb'))
 
     if tflite_path:
       converter = tf.lite.TFLiteConverter.from_saved_model(output_dir)
@@ -381,7 +393,9 @@ class ServingDriver(object):
 
     if tensorrt:
       trt_path = os.path.join(output_dir, 'tensorrt_' + tensorrt.lower())
-      conversion_params = tf.experimental.tensorrt.ConversionParams(precision_mode=tensorrt.upper())
-      converter = tf.experimental.tensorrt.Converter(output_dir, conversion_params=conversion_params)
+      conversion_params = tf.experimental.tensorrt.ConversionParams(
+          precision_mode=tensorrt.upper())
+      converter = tf.experimental.tensorrt.Converter(
+          output_dir, conversion_params=conversion_params)
       converter.convert()
       logging.info('TensorRT model is saved at %s', trt_path)
