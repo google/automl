@@ -55,3 +55,16 @@ def build_batch_norm(is_training_bn: bool,
       name=name)
 
   return bn_layer
+
+def get_ema_vars(model):
+  """Get all exponential moving average (ema) variables."""
+  ema_vars = model.trainable_variables
+  for v in model.variables:
+    # We maintain mva for batch norm moving mean and variance as well.
+    if 'moving_mean' in v.name or 'moving_variance' in v.name:
+      ema_vars.append(v)
+  ema_vars_dict = dict()
+  # Remove duplicate vars
+  for var in ema_vars:
+    ema_vars_dict[var.ref()] = var
+  return ema_vars_dict

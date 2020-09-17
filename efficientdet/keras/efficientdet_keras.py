@@ -874,7 +874,7 @@ class EfficientDetModel(EfficientDetNet):
                                                cls_outputs, box_outputs, scales)
     raise ValueError('Unsupported postprocess mode {}'.format(mode))
 
-  def call(self, inputs, training, pre_mode='infer', post_mode='global'):
+  def call(self, inputs, training=False, pre_mode='infer', post_mode='global'):
     """Call this model.
 
     Args:
