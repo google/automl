@@ -29,7 +29,7 @@ class InferenceTest(tf.test.TestCase):
 
   def test_export(self):
     driver = ServingDriver('efficientdet-d0', self.tmp_path)
-    driver.export(self.tmp_path, True, True)
+    driver.export(self.tmp_path)
     has_saved_model = tf.saved_model.contains_saved_model(self.tmp_path)
     self.assertAllEqual(has_saved_model, True)
 
