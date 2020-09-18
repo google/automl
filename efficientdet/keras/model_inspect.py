@@ -97,8 +97,10 @@ def main(_):
     if tf.saved_model.contains_saved_model(FLAGS.saved_model_dir):
       driver.load(FLAGS.saved_model_dir)
     image_file = tf.io.read_file(FLAGS.input_image)
-    image_file = tf.expand_dims(image_file, axis=0)
-    detections_bs = driver.serve_files(image_file)
+    image_arrays = tf.io.decode_image(image_file)
+    image_arrays.set_shape((None, None, 3))
+    image_arrays = tf.expand_dims(image_arrays, axis=0)
+    detections_bs = driver.serve(image_arrays)
     boxes, scores, classes, _ = tf.nest.map_structure(np.array, detections_bs)
     raw_image = Image.open(FLAGS.input_image)
     img = driver.visualize(
@@ -122,8 +124,10 @@ def main(_):
   elif FLAGS.mode == 'dry':
     # transfer to tf2 format ckpt
     driver.build()
-    ckpt_path = tf.train.latest_checkpoint(FLAGS.ckpt_path)
-    driver.model.save_weights(ckpt_path)
+    ckpt_path_or_file = FLAGS.ckpt_path
+    if tf.io.gfile.isdir(ckpt_path_or_file):
+      ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
+    driver.model.save_weights(ckpt_path_or_file)
   elif FLAGS.mode == 'video':
     import cv2
     if tf.saved_model.contains_saved_model(FLAGS.saved_model_dir):

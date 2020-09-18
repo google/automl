@@ -23,6 +23,7 @@ from keras.inference import ServingDriver
 class InferenceTest(tf.test.TestCase):
 
   def setUp(self):
+    super().setUp()
     model = EfficientDetModel('efficientdet-d0')
     self.tmp_path = tempfile.mkdtemp()
     model.save_weights(os.path.join(self.tmp_path, 'model'))
@@ -36,7 +37,7 @@ class InferenceTest(tf.test.TestCase):
   def test_inference(self):
     driver = ServingDriver('efficientdet-d0', self.tmp_path)
     images = tf.ones((1, 512, 512, 3))
-    boxes, scores, classes, valid_lens = driver.serve_images(images)
+    boxes, scores, classes, valid_lens = driver.serve(images)
     self.assertEqual(boxes.shape, (1, 100, 4))
     self.assertEqual(scores.shape, (1, 100))
     self.assertEqual(classes.shape, (1, 100))

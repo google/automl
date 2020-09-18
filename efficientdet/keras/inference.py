@@ -26,7 +26,7 @@ import utils
 from keras import util_keras
 from keras import label_util
 from visualize import vis_utils
-from keras.efficientdet_keras import EfficientDetModel
+from keras import efficientdet_keras
 
 
 def visualize_image(image,
@@ -178,7 +178,7 @@ class ServingDriver(object):
       params.update(params_override)
     config = hparams_config.get_efficientdet_config(self.model_name)
     config.override(params)
-    self.model = EfficientDetModel(config=config)
+    self.model = efficientdet_keras.EfficientDetModel(config=config)
     image_size = utils.parse_image_size(params['image_size'])
     self.model.build((self.batch_size, *image_size, 3))
     util_keras.restore_ckpt(self.model, self.ckpt_path, params['moving_average_decay'])
@@ -220,25 +220,7 @@ class ServingDriver(object):
       test_func(image_arrays)
       tf.profiler.experimental.stop()
 
-  def serve_files(self, image_files: List[Text]):
-    """Serve a list of input image files.
-
-    Args:
-      image_files: a list of image files with shape [1] and type string.
-
-    Returns:
-      A list of detections.
-    """
-
-    def _map_fn(file):
-      image = tf.image.decode_image(file)
-      image.set_shape((None, None, 3))
-      return image
-
-    images = tf.map_fn(_map_fn, image_files, dtype=tf.uint8)
-    return self.serve_images(images)
-
-  def serve_images(self, image_arrays):
+  def serve(self, image_arrays):
     """Serve a list of image arrays.
 
     Args:

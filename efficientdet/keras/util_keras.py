@@ -92,15 +92,18 @@ def average_name(ema, var):
       var.name.split(':')[0] + '/' + ema.name, mark_as_used=False)
 
 
-def restore_ckpt(model, ckpt_path, ema_decay=0.9998):
+def restore_ckpt(model, ckpt_path_or_file, ema_decay=0.9998):
   """Restore variables from a given checkpoint.
 
   Args:
     ckpt_path: the path of the checkpoint. Can be a file path or a folder path.
     ema_decay: ema decay rate. If None or zero or negative value, disable ema.
   """
-  if tf.io.gfile.isdir(ckpt_path):
-    ckpt_path = tf.train.latest_checkpoint(ckpt_path)
+  if ckpt_path_or_file == '_':
+    logging.info('Running test: do not load any ckpt.')
+    return
+  if tf.io.gfile.isdir(ckpt_path_or_file):
+    ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
   if ema_decay > 0:
     ema = tf.train.ExponentialMovingAverage(decay=0.0)
     ema_vars = get_ema_vars(model)
@@ -110,15 +113,14 @@ def restore_ckpt(model, ckpt_path, ema_decay=0.9998):
   else:
     ema_vars = get_ema_vars(model)
     var_dict = ema_vars
+  # add variables that not in var_dict
   for v in model.variables:
     if v.ref() not in ema_vars:
       var_dict[v.name.split(':')[0]] = v
-  # add variables that not in var_dict
-  if ckpt_path == '_':
-    logging.info('Running test: do not load any ckpt.')
-    return
+  # try to load graph-based checkpoint with ema support,
+  # else load checkpoint via keras.load_weights which doesn't support ema.
   try:
     for key, var in var_dict.items():
-      var.assign(tf.train.load_variable(ckpt_path, key))
+      var.assign(tf.train.load_variable(ckpt_path_or_file, key))
   except tf.errors.NotFoundError:
-    model.load_weights(ckpt_path)
+    model.load_weights(ckpt_path_or_file)
