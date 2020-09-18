@@ -16,7 +16,7 @@ r"""Inference related utilities."""
 import copy
 import os
 import time
-from typing import Text, Dict, Any, List, Tuple, Union
+from typing import Text, Dict, Any, List
 from absl import logging
 import numpy as np
 import tensorflow as tf
@@ -341,10 +341,9 @@ class ServingDriver(object):
         export_model.__call__.get_concrete_function(
             tf.TensorSpec(
                 shape=[None, None, None, 3], dtype=tf.uint8, name="images")))
-    tf.io.write_graph(
+    proto_path = tf.io.write_graph(
         graphdef, output_dir, self.model_name + '_frozen.pb', as_text=False)
-    logging.info('Frozen graph saved at %s',
-                 os.path.join(output_dir, self.model_name + '_frozen.pb'))
+    logging.info('Frozen graph saved at %s', proto_path)
 
     if tflite_path:
       converter = tf.lite.TFLiteConverter.from_saved_model(output_dir)
@@ -361,4 +360,5 @@ class ServingDriver(object):
       converter = tf.experimental.tensorrt.Converter(
           output_dir, conversion_params=conversion_params)
       converter.convert()
+      converter.save(trt_path)
       logging.info('TensorRT model is saved at %s', trt_path)
