@@ -137,7 +137,8 @@ class ServingDriver(object):
     driver.build()
     for m in image_iterator():
       predictions = driver.serve_files([m])
-      driver.visualize(m, predictions[0])
+      boxes, scores, classes, _ = tf.nest.map_structure(np.array, predictions)
+      driver.visualize(m, boxes[0], scores[0], classes[0])
       # m is the new image with annotated boxes.
 
   Example 2. Serving batch image contents:
@@ -150,8 +151,9 @@ class ServingDriver(object):
       'efficientdet-d0', '/tmp/efficientdet-d0', batch_size=len(imgs))
     driver.build()
     predictions = driver.serve_images(imgs)
+    boxes, scores, classes, _ = tf.nest.map_structure(np.array, predictions)
     for i in range(len(imgs)):
-      driver.visualize(imgs[i], predictions[i])
+      driver.visualize(imgs[i], boxes[i], scores[i], classes[i])
 
   Example 3: another way is to use SavedModel:
 
@@ -161,16 +163,14 @@ class ServingDriver(object):
     driver.export('/tmp/saved_model_path')
 
     # step2: Serve a model.
-    with tf.Session() as sess:
-      tf.saved_model.load(sess, ['serve'], self.saved_model_dir)
-      raw_images = []
-      for f in tf.io.gfile.glob('/tmp/images/*.jpg'):
-        raw_images.append(np.array(PIL.Image.open(f)))
-      detections = sess.run('detections:0', {'image_arrays:0': raw_images})
-      driver = inference.ServingDriver(
-        'efficientdet-d0', '/tmp/efficientdet-d0')
-      driver.visualize(raw_images[0], detections[0])
-      PIL.Image.fromarray(raw_images[0]).save(output_image_path)
+    driver.load(self.saved_model_dir)
+    raw_images = []
+    for f in tf.io.gfile.glob('/tmp/images/*.jpg'):
+      raw_images.append(np.array(PIL.Image.open(f)))
+    detections = driver.serve_images(raw_images)
+    boxes, scores, classes, _ = tf.nest.map_structure(np.array, detections)
+    for i in range(len(imgs)):
+      driver.visualize(imgs[i], boxes[i], scores[i], classes[i])
   """
 
   def __init__(self,
