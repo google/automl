@@ -314,6 +314,8 @@ class ServingDriver(object):
     if tensorrt:
       trt_path = os.path.join(output_dir, 'tensorrt_' + tensorrt.lower())
       conversion_params = tf.experimental.tensorrt.ConversionParams(
+          max_workspace_size_bytes=(2 << 20),
+          maximum_cached_engines=1,
           precision_mode=tensorrt.upper())
       converter = tf.experimental.tensorrt.Converter(
           output_dir, conversion_params=conversion_params)

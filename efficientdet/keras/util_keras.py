@@ -57,6 +57,7 @@ def build_batch_norm(is_training_bn: bool,
 
   return bn_layer
 
+
 def get_ema_vars(model):
   """Get all exponential moving average (ema) variables."""
   ema_vars = model.trainable_variables
@@ -71,11 +72,24 @@ def get_ema_vars(model):
   return ema_vars_dict
 
 
-def get_ema_name(ema, var):
+def average_name(ema, var):
+  """Returns the name of the `Variable` holding the average for `var`.
+
+  A hacker for tf2.
+
+  Args:
+    ema: A `ExponentialMovingAverage` object.
+    var: A `Variable` object.
+
+  Returns:
+    A string: The name of the variable that will be used or was used
+    by the `ExponentialMovingAverage class` to hold the moving average of
+    `var`.
+  """
   if var.ref() in ema._averages:
     return ema._averages[var.ref()].name.split(':')[0]
   return tf.compat.v1.get_default_graph().unique_name(
-      var.name.split(':')[0] + "/" + ema.name, mark_as_used=False)
+      var.name.split(':')[0] + '/' + ema.name, mark_as_used=False)
 
 
 def restore_ckpt(model, ckpt_path, ema_decay=0.9998):
@@ -91,7 +105,7 @@ def restore_ckpt(model, ckpt_path, ema_decay=0.9998):
     ema = tf.train.ExponentialMovingAverage(decay=0.0)
     ema_vars = get_ema_vars(model)
     var_dict = {
-        get_ema_name(ema, var): var for (ref, var) in ema_vars.items()
+        average_name(ema, var): var for (ref, var) in ema_vars.items()
     }
   else:
     ema_vars = get_ema_vars(model)
