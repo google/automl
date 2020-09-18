@@ -15,7 +15,8 @@
 """Common keras utils."""
 from typing import Text
 import utils
-
+import tensorflow as tf
+from absl import logging
 
 def build_batch_norm(is_training_bn: bool,
                      beta_initializer: Text = 'zeros',
@@ -68,3 +69,42 @@ def get_ema_vars(model):
   for var in ema_vars:
     ema_vars_dict[var.ref()] = var
   return ema_vars_dict
+
+
+def get_ema_name(ema, var):
+  if var.ref() in ema._averages:
+    return ema._averages[var.ref()].name.split(':')[0]
+  return tf.compat.v1.get_default_graph().unique_name(
+      var.name.split(':')[0] + "/" + ema.name, mark_as_used=False)
+
+
+def restore_ckpt(model, ckpt_path, ema_decay=0.9998):
+  """Restore variables from a given checkpoint.
+
+  Args:
+    ckpt_path: the path of the checkpoint. Can be a file path or a folder path.
+    ema_decay: ema decay rate. If None or zero or negative value, disable ema.
+  """
+  if tf.io.gfile.isdir(ckpt_path):
+    ckpt_path = tf.train.latest_checkpoint(ckpt_path)
+  if ema_decay > 0:
+    ema = tf.train.ExponentialMovingAverage(decay=0.0)
+    ema_vars = get_ema_vars(model)
+    var_dict = {
+        get_ema_name(ema, var): var for (ref, var) in ema_vars.items()
+    }
+  else:
+    ema_vars = get_ema_vars(model)
+    var_dict = ema_vars
+  for v in model.variables:
+    if v.ref() not in ema_vars:
+      var_dict[v.name.split(':')[0]] = v
+  # add variables that not in var_dict
+  if ckpt_path == '_':
+    logging.info('Running test: do not load any ckpt.')
+    return
+  try:
+    for key, var in var_dict.items():
+      var.assign(tf.train.load_variable(ckpt_path, key))
+  except tf.errors.NotFoundError:
+    model.load_weights(ckpt_path)

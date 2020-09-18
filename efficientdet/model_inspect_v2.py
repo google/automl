@@ -106,6 +106,7 @@ def main(_):
     driver.benchmark(image_arrays, FLAGS.bm_runs, FLAGS.trace_filename)
   elif FLAGS.mode == 'dry':
     # transfer to tf2 format ckpt
+    driver.build()
     ckpt_path = tf.train.latest_checkpoint(FLAGS.ckpt_path)
     driver.model.save_weights(ckpt_path)
   elif FLAGS.mode == 'video':
