@@ -25,50 +25,8 @@ import hparams_config
 import utils
 from keras import util_keras
 from keras import label_util
-from keras import postprocess
 from visualize import vis_utils
 from keras.efficientdet_keras import EfficientDetModel
-
-
-def det_post_process(params: Dict[Any, Any], cls_outputs: Dict[int, tf.Tensor],
-                     box_outputs: Dict[int, tf.Tensor], scales: List[float]):
-  """Post preprocessing the box/class predictions.
-
-  Args:
-    params: a parameter dictionary that includes `min_level`, `max_level`,
-      `batch_size`, and `num_classes`.
-    cls_outputs: an OrderDict with keys representing levels and values
-      representing logits in [batch_size, height, width, num_anchors].
-    box_outputs: an OrderDict with keys representing levels and values
-      representing box regression targets in [batch_size, height, width,
-      num_anchors * 4].
-    scales: a list of float values indicating image scale.
-
-  Returns:
-    detections_batch: a batch of detection results. Each detection is a tensor
-      with each row as [image_id, ymin, xmin, ymax, xmax, score, class].
-  """
-  if params.get('combined_nms', None):
-    # Use combined version for dynamic batch size.
-    nms_boxes, nms_scores, nms_classes, _ = postprocess.postprocess_combined(
-        params, cls_outputs, box_outputs, scales)
-  else:
-    nms_boxes, nms_scores, nms_classes, _ = postprocess.postprocess_global(
-        params, cls_outputs, box_outputs, scales)
-
-  batch_size = tf.shape(cls_outputs[params['min_level']])[0]
-  img_ids = tf.expand_dims(
-      tf.cast(tf.range(0, batch_size), nms_scores.dtype), -1)
-  detections = [
-      img_ids * tf.ones_like(nms_scores),
-      nms_boxes[:, :, 0],
-      nms_boxes[:, :, 1],
-      nms_boxes[:, :, 2],
-      nms_boxes[:, :, 3],
-      nms_scores,
-      nms_classes,
-  ]
-  return tf.stack(detections, axis=-1, name='detections')
 
 
 def visualize_image(image,
