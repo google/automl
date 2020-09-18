@@ -221,7 +221,8 @@ class ServingDriver(object):
     config = hparams_config.get_efficientdet_config(self.model_name)
     config.override(params)
     self.model = EfficientDetModel(config=config)
-    self.model.build((self.batch_size, *params['image_size'], 3))
+    image_size = utils.parse_image_size(params['image_size'])
+    self.model.build((self.batch_size, *image_size, 3))
     util_keras.restore_ckpt(self.model, self.ckpt_path, params['moving_average_decay'])
 
   def visualize(self, image, boxes, classes, scores, **kwargs):
