@@ -14,9 +14,10 @@
 # ==============================================================================
 """Common keras utils."""
 from typing import Text
-import utils
-import tensorflow as tf
 from absl import logging
+import tensorflow as tf
+import utils
+
 
 def build_batch_norm(is_training_bn: bool,
                      beta_initializer: Text = 'zeros',
@@ -83,11 +84,11 @@ def average_name(ema, var):
 
   Returns:
     A string: The name of the variable that will be used or was used
-    by the `ExponentialMovingAverage class` to hold the moving average of
-    `var`.
+    by the `ExponentialMovingAverage class` to hold the moving average of `var`.
   """
-  if var.ref() in ema._averages:
-    return ema._averages[var.ref()].name.split(':')[0]
+
+  if var.ref() in ema._averages:  # pylint: disable=protected-access
+    return ema._averages[var.ref()].name.split(':')[0]  # pylint: disable=protected-access
   return tf.compat.v1.get_default_graph().unique_name(
       var.name.split(':')[0] + '/' + ema.name, mark_as_used=False)
 
@@ -96,7 +97,8 @@ def restore_ckpt(model, ckpt_path_or_file, ema_decay=0.9998):
   """Restore variables from a given checkpoint.
 
   Args:
-    ckpt_path: the path of the checkpoint. Can be a file path or a folder path.
+    model: the keras model to be restored.
+    ckpt_path_or_file: the path or file for checkpoint.
     ema_decay: ema decay rate. If None or zero or negative value, disable ema.
   """
   if ckpt_path_or_file == '_':

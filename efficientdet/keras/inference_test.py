@@ -16,26 +16,26 @@ r"""Inference test cases."""
 import os
 import tempfile
 import tensorflow as tf
-from keras.efficientdet_keras import EfficientDetModel
-from keras.inference import ServingDriver
+from keras import efficientdet_keras
+from keras import inference
 
 
 class InferenceTest(tf.test.TestCase):
 
   def setUp(self):
     super().setUp()
-    model = EfficientDetModel('efficientdet-d0')
+    model = efficientdet_keras.EfficientDetModel('efficientdet-d0')
     self.tmp_path = tempfile.mkdtemp()
     model.save_weights(os.path.join(self.tmp_path, 'model'))
 
   def test_export(self):
-    driver = ServingDriver('efficientdet-d0', self.tmp_path)
+    driver = inference.ServingDriver('efficientdet-d0', self.tmp_path)
     driver.export(self.tmp_path)
     has_saved_model = tf.saved_model.contains_saved_model(self.tmp_path)
     self.assertAllEqual(has_saved_model, True)
 
   def test_inference(self):
-    driver = ServingDriver('efficientdet-d0', self.tmp_path)
+    driver = inference.ServingDriver('efficientdet-d0', self.tmp_path)
     images = tf.ones((1, 512, 512, 3))
     boxes, scores, classes, valid_lens = driver.serve(images)
     self.assertEqual(boxes.shape, (1, 100, 4))

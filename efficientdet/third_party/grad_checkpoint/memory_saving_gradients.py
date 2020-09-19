@@ -20,10 +20,9 @@
 # pylint: disable=protected-access
 
 import contextlib
-from absl import logging
-
 import sys
 import time
+from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
 

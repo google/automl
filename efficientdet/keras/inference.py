@@ -16,17 +16,17 @@ r"""Inference related utilities."""
 import copy
 import os
 import time
-from typing import Text, Dict, Any, List
+from typing import Text, Dict, Any
 from absl import logging
 import numpy as np
 import tensorflow as tf
 
 import hparams_config
 import utils
-from keras import util_keras
-from keras import label_util
-from visualize import vis_utils
 from keras import efficientdet_keras
+from keras import label_util
+from keras import util_keras
+from visualize import vis_utils
 
 
 def visualize_image(image,
@@ -108,7 +108,7 @@ class ServingDriver(object):
     driver = inference.ServingDriver(
       'efficientdet-d0', '/tmp/efficientdet-d0', batch_size=len(imgs))
     driver.build()
-    predictions = driver.serve_images(imgs)
+    predictions = driver.serve(imgs)
     boxes, scores, classes, _ = tf.nest.map_structure(np.array, predictions)
     for i in range(len(imgs)):
       driver.visualize(imgs[i], boxes[i], scores[i], classes[i])
@@ -125,7 +125,7 @@ class ServingDriver(object):
     raw_images = []
     for f in tf.io.gfile.glob('/tmp/images/*.jpg'):
       raw_images.append(np.array(PIL.Image.open(f)))
-    detections = driver.serve_images(raw_images)
+    detections = driver.serve(raw_images)
     boxes, scores, classes, _ = tf.nest.map_structure(np.array, detections)
     for i in range(len(imgs)):
       driver.visualize(imgs[i], boxes[i], scores[i], classes[i])
@@ -144,7 +144,6 @@ class ServingDriver(object):
       model_name: target model name, such as efficientdet-d0.
       ckpt_path: checkpoint path, such as /tmp/efficientdet-d0/.
       batch_size: batch size for inference.
-      use_xla: Whether run with xla optimization.
       min_score_thresh: minimal score threshold for filtering predictions.
       max_boxes_to_draw: the maximum number of boxes per image.
       model_params: model parameters for overriding the config.
@@ -181,7 +180,8 @@ class ServingDriver(object):
     self.model = efficientdet_keras.EfficientDetModel(config=config)
     image_size = utils.parse_image_size(params['image_size'])
     self.model.build((self.batch_size, *image_size, 3))
-    util_keras.restore_ckpt(self.model, self.ckpt_path, params['moving_average_decay'])
+    util_keras.restore_ckpt(self.model, self.ckpt_path,
+                            params['moving_average_decay'])
 
   def visualize(self, image, boxes, classes, scores, **kwargs):
     """Visualize prediction on image."""
@@ -249,8 +249,9 @@ class ServingDriver(object):
 
   def freeze(self, func):
     """Freeze the graph."""
+    # pylint: disable=g-import-not-at-top,disable=g-direct-tensorflow-import
     from tensorflow.python.framework.convert_to_constants \
-      import convert_variables_to_constants_v2_as_graph # pylint: disable=g-direct-tensorflow-import
+      import convert_variables_to_constants_v2_as_graph
     _, graphdef = convert_variables_to_constants_v2_as_graph(func)
     return graphdef
 
@@ -273,14 +274,14 @@ class ServingDriver(object):
         output_dir,
         signatures=export_model.__call__.get_concrete_function(
             tf.TensorSpec(
-                shape=[None, None, None, 3], dtype=tf.uint8, name="images")))
+                shape=[None, None, None, 3], dtype=tf.uint8, name='images')))
     logging.info('Model saved at %s', output_dir)
 
     # also save freeze pb file.
     graphdef = self.freeze(
         export_model.__call__.get_concrete_function(
             tf.TensorSpec(
-                shape=[None, None, None, 3], dtype=tf.uint8, name="images")))
+                shape=[None, None, None, 3], dtype=tf.uint8, name='images')))
     proto_path = tf.io.write_graph(
         graphdef, output_dir, self.model_name + '_frozen.pb', as_text=False)
     logging.info('Frozen graph saved at %s', proto_path)
