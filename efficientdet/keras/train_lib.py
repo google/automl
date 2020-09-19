@@ -186,7 +186,7 @@ def get_optimizer(params):
     # TODO(tanmingxing): potentially add dynamic_decay for new tfa release.
     import tensorflow_addons as tfa  # pylint: disable=g-import-not-at-top
     optimizer = tfa.optimizers.MovingAverage(
-        optimizer, average_decay=moving_average_decay)
+        optimizer, average_decay=moving_average_decay, dynamic_decay=True)
   if params['mixed_precision']:
     optimizer = tf.keras.mixed_precision.experimental.LossScaleOptimizer(
         optimizer, loss_scale='dynamic')

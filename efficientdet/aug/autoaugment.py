@@ -279,8 +279,7 @@ def contrast(image, factor):
   # Compute the grayscale histogram, then compute the mean pixel value,
   # and create a constant image size of that value.  Use that as the
   # blending degenerate target of the original image.
-  hist = tf.histogram_fixed_width(degenerate, [0, 255], nbins=256)
-  mean = tf.reduce_sum(tf.cast(hist, tf.float32)) / 256.0
+  mean = tf.reduce_mean(tf.cast(degenerate, tf.float32))
   degenerate = tf.ones_like(degenerate, dtype=tf.float32) * mean
   degenerate = tf.clip_by_value(degenerate, 0.0, 255.0)
   degenerate = tf.image.grayscale_to_rgb(tf.cast(degenerate, tf.uint8))
@@ -1682,3 +1681,41 @@ def distort_image_with_autoaugment(image,
   return build_and_apply_nas_policy(policy, image, bboxes,
                                     augmentation_hparams, use_augmix,
                                     mixture_width, mixture_depth, alpha)
+
+
+def distort_image_with_randaugment(image, bboxes, num_layers, magnitude):
+  """Applies the RandAugment to `image` and `bboxes`."""
+  replace_value = [128, 128, 128]
+  tf.logging.info('Using RandAugment.')
+
+  augmentation_hparams = hparams_config.Config(
+      dict(
+          cutout_max_pad_fraction=0.75,
+          cutout_bbox_replace_with_mean=False,
+          cutout_const=100,
+          translate_const=250,
+          cutout_bbox_const=50,
+          translate_bbox_const=120))
+
+  available_ops = [
+      'Equalize', 'Solarize', 'Color', 'Cutout', 'SolarizeAdd',
+      'TranslateX_BBox', 'TranslateY_BBox', 'ShearX_BBox', 'ShearY_BBox',
+      'Rotate_BBox']
+
+  if bboxes is None:
+    bboxes = tf.constant(0.0)
+
+  for layer_num in range(num_layers):
+    op_to_select = tf.random_uniform(
+        [], maxval=len(available_ops), dtype=tf.int32)
+    random_magnitude = float(magnitude)
+    with tf.name_scope('randaug_layer_{}'.format(layer_num)):
+      for (i, op_name) in enumerate(available_ops):
+        prob = tf.random_uniform([], minval=0.2, maxval=0.8, dtype=tf.float32)
+        func, _, args = _parse_policy_info(op_name, prob, random_magnitude,
+                                           replace_value, augmentation_hparams)
+        image, bboxes = tf.cond(
+            tf.equal(i, op_to_select),
+            lambda fn=func, fn_args=args: fn(image, bboxes, *fn_args),
+            lambda: (image, bboxes))
+  return (image, bboxes)

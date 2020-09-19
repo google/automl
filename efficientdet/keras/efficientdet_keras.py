@@ -122,10 +122,7 @@ class FNode(tf.keras.layers.Layer):
   def _add_wsm(self, initializer):
     for i, _ in enumerate(self.inputs_offsets):
       name = 'WSM' + ('' if i == 0 else '_' + str(i))
-      self.vars.append(
-          self.add_weight(
-              initializer=initializer, name=name,
-              trainable=self.is_training_bn))
+      self.vars.append(self.add_weight(initializer=initializer, name=name))
 
   def build(self, feats_shape):
     for i, input_offset in enumerate(self.inputs_offsets):
@@ -269,11 +266,11 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
           padding='SAME',
           data_format=self.data_format)(inputs)
     elif self.pooling_type == 'avg':
-      self.pool2d = tf.keras.layers.AveragePooling2D(
+      return tf.keras.layers.AveragePooling2D(
           pool_size=[height_stride_size + 1, width_stride_size + 1],
           strides=[height_stride_size, width_stride_size],
           padding='SAME',
-          data_format=self.data_format)
+          data_format=self.data_format)(inputs)
     else:
       raise ValueError('Unsupported pooling type {}.'.format(self.pooling_type))
 
@@ -875,7 +872,7 @@ class EfficientDetModel(EfficientDetNet):
                                                cls_outputs, box_outputs, scales)
     raise ValueError('Unsupported postprocess mode {}'.format(mode))
 
-  def call(self, inputs, training, pre_mode='infer', post_mode='global'):
+  def call(self, inputs, training=False, pre_mode='infer', post_mode='global'):
     """Call this model.
 
     Args:
