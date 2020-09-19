@@ -673,8 +673,9 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
           mem_used = tensors["memory used"].decode("utf-8")
           mem_total = tensors["memory total"].decode("utf-8")
           mem_util = commonsize(mem_used) / commonsize(mem_total)
-          logstring = "GPU memory used: {} = {:.1%} ".format(mem_used, mem_util)
-          "of total GPU memory: {}".format(mem_total)
+          logstring = (
+              "GPU memory used: {} = {:.1%} ".format(mem_used, mem_util) +
+              "of total GPU memory: {}".format(mem_total))
           return logstring
 
         mem_used = tf.py_func(nvgpu_gpu_info, ['gpu, fb_memory_usage, used'],
