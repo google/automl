@@ -13,15 +13,15 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for tensorflow.contrib.graph_editor."""
+# pylint: disable=g-direct-tensorflow-import
 
 import re
 
+import third_party.graph_edit as ge
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import ops as ops_lib
 from tensorflow.python.ops import math_ops
 from tensorflow.python.platform import test
-
-import third_party.graph_edit as ge
 
 
 class SelectTest(test.TestCase):
@@ -29,6 +29,7 @@ class SelectTest(test.TestCase):
 
   def setUp(self):
     """Set up."""
+    super().setUp()
     self.graph = ops_lib.Graph()
     with self.graph.as_default():
       self.a = constant_op.constant([1., 1.], shape=[2], name="a")
@@ -52,8 +53,8 @@ class SelectTest(test.TestCase):
 
   def test_get_input_output_ts(self):
     """Test for ge._get_input_ts abd ge._get_output_ts."""
-    self.assertEqual(len(ge.select._get_input_ts(self.graph)), 6)  # pylint: disable=W0212
-    self.assertEqual(len(ge.select._get_output_ts(self.graph)), 8)  # pylint: disable=W0212
+    self.assertEqual(len(ge.select._get_input_ts(self.graph)), 6)
+    self.assertEqual(len(ge.select._get_output_ts(self.graph)), 8)
 
   def test_get_filter(self):
     """Test for various filtering operations on ts ops."""
@@ -135,9 +136,9 @@ class SelectTest(test.TestCase):
 
     ops = ge.get_walks_intersection_ops([self.a.op], [self.f.op])
     self.assertEqual(len(ops), 3)
-    self.assertTrue(self.a.op in ops)
-    self.assertTrue(self.c.op in ops)
-    self.assertTrue(self.f.op in ops)
+    self.assertIn(self.a.op, ops)
+    self.assertIn(self.c.op, ops)
+    self.assertIn(self.f.op, ops)
 
     within_ops = [self.a.op, self.f.op]
     ops = ge.get_walks_intersection_ops([self.a.op], [self.f.op],
@@ -161,14 +162,14 @@ class SelectTest(test.TestCase):
     ops = ge.get_walks_union_ops([self.a.op], [self.f.op],
                                  within_ops=within_ops)
     self.assertEqual(len(ops), 4)
-    self.assertTrue(self.b.op not in ops)
+    self.assertNotIn(self.b.op, ops)
 
     within_ops_fn = lambda op: op in [self.a.op, self.c.op, self.f.op]
     ops = ge.get_walks_union_ops([self.a.op], [self.f.op],
                                  within_ops_fn=within_ops_fn)
     self.assertEqual(len(ops), 3)
-    self.assertTrue(self.b.op not in ops)
-    self.assertTrue(self.d.op not in ops)
+    self.assertNotIn(self.b.op, ops)
+    self.assertNotIn(self.d.op, ops)
 
   def test_select_ops(self):
     """Test select ops."""

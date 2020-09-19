@@ -207,6 +207,7 @@ class DetectionInputProcessor(InputProcessor):
 
 def pad_to_fixed_size(data, pad_value, output_shape):
   """Pad data to a fixed length at the first dimension.
+
   Args:
     data: Tensor to be padded to output_shape.
     pad_value: A constant value assigned to the paddings.
@@ -296,14 +297,15 @@ class InputReader:
         classes = tf.gather_nd(classes, indices)
         boxes = tf.gather_nd(boxes, indices)
 
-      # NOTE: The autoaugment method works best when used alongside the
-      # standard horizontal flipping of images along with size jittering
-      # and normalization.
       if params.get('autoaugment_policy', None) and self._is_training:
         from aug import autoaugment  # pylint: disable=g-import-not-at-top
-        image, boxes = autoaugment.distort_image_with_autoaugment(
-            image, boxes, params['autoaugment_policy'], params['use_augmix'],
-            *params['augmix_params'])
+        if params['autoaugment_policy'] == 'randaug':
+          image, boxes = autoaugment.distort_image_with_randaugment(
+              image, boxes, num_layers=1, magnitude=15)
+        else:
+          image, boxes = autoaugment.distort_image_with_autoaugment(
+              image, boxes, params['autoaugment_policy'],
+              params['use_augmix'], *params['augmix_params'])
 
       input_processor = DetectionInputProcessor(image, params['image_size'],
                                                 boxes, classes)
@@ -372,7 +374,6 @@ class InputReader:
     labels['image_masks'] = image_masks
     return images, labels
 
-
   def __call__(self, params, input_context=None):
     input_anchors = anchors.Anchors(params['min_level'], params['max_level'],
                                     params['num_scales'],
@@ -424,7 +425,7 @@ class InputReader:
     dataset = dataset.map(
         map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     dataset = dataset.prefetch(batch_size)
-    dataset = dataset.batch(batch_size, drop_remainder=True)
+    dataset = dataset.batch(batch_size, drop_remainder=params['drop_remainder'])
     dataset = dataset.map(
         lambda *args: self.process_example(params, batch_size, *args))
     dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)

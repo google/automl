@@ -131,6 +131,9 @@ class Config(object):
         def add_kv_recursive(k, v):
           """Recursively parse x.y.z=tt to {x: {y: {z: tt}}}."""
           if '.' not in k:
+            if '*' in v:
+              # we reserve * to split arrays.
+              return {k: [eval_str_fn(vv) for vv in v.split('*')]}
             return {k: eval_str_fn(v)}
           pos = k.index('.')
           return {k[:pos]: add_kv_recursive(k[pos + 1:], v)}
@@ -182,7 +185,7 @@ def default_detection_configs():
   h.autoaugment_policy = None
   h.use_augmix = False
   # mixture_width, mixture_depth, alpha
-  h.augmix_params = (3, -1, 1)
+  h.augmix_params = [3, -1, 1]
   h.sample_image = None
 
   # dataset specific parameters
@@ -200,8 +203,8 @@ def default_detection_configs():
   h.min_level = 3
   h.max_level = 7
   h.num_scales = 3
-  # aspect ratio with format (w, h). Can be computed with k-mean per dataset.
-  h.aspect_ratios = [(1.0, 1.0), (1.4, 0.7), (0.7, 1.4)]
+  # ratio w/h: 2.0 means w=1.4, h=0.7. Can be computed with k-mean per dataset.
+  h.aspect_ratios = [1.0, 2.0, 0.5]
   h.anchor_scale = 4.0
   # is batchnorm training mode
   h.is_training_bn = True
@@ -233,8 +236,7 @@ def default_detection_configs():
 
   # regularization l2 loss.
   h.weight_decay = 4e-5
-  # use horovod for multi-gpu training. If None, use TF default.
-  h.strategy = None  # 'tpu', 'horovod', None
+  h.strategy = None  # 'tpu', 'gpus', None
   h.mixed_precision = False  # If False, use float32.
 
   # For detection.
@@ -245,6 +247,7 @@ def default_detection_configs():
   h.apply_bn_for_resampling = True
   h.conv_after_downsample = False
   h.conv_bn_act_pattern = False
+  h.drop_remainder = True  # drop remainder for the final batch eval.
 
   # For post-processing nms, must be a dict.
   h.nms_configs = {

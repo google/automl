@@ -449,7 +449,10 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
         tvars = [gv[1] for gv in grads_and_vars]
         # First clip each variable's norm, then clip global norm.
         clip_norm = abs(params['clip_gradients_norm'])
-        clipped_grads = [tf.clip_by_norm(g, clip_norm) for g in grads]
+        clipped_grads = [
+            tf.clip_by_norm(g, clip_norm) if g is not None else None
+            for g in grads
+        ]
         clipped_grads, _ = tf.clip_by_global_norm(clipped_grads, clip_norm)
         utils.scalar('gradient_norm', tf.linalg.global_norm(clipped_grads))
         grads_and_vars = list(zip(clipped_grads, tvars))
@@ -519,9 +522,9 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
       else:
         logging.info('Eval val with groudtruths %s.', params['val_json_file'])
         eval_metric = coco_metric.EvaluationMetric(
-            filename=params['val_json_file'])
+            filename=params['val_json_file'], label_map=params['label_map'])
         coco_metrics = eval_metric.estimator_metric_fn(
-            detections_bs, kwargs['groundtruth_data'], params['label_map'])
+            detections_bs, kwargs['groundtruth_data'])
 
       # Add metrics to output.
       cls_loss = tf.metrics.mean(kwargs['cls_loss_repeat'])
@@ -631,7 +634,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
     if params["nvgpu_logging"]:
       try:
-        from third_party import nvgpu  # pylint: disable=g-import-not-at-top
+        from third_party.tools import nvgpu  # pylint: disable=g-import-not-at-top
         from functools import reduce  # pylint: disable=g-import-not-at-top
 
         def get_nested_value(d, path):
@@ -670,8 +673,9 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
           mem_used = tensors["memory used"].decode("utf-8")
           mem_total = tensors["memory total"].decode("utf-8")
           mem_util = commonsize(mem_used) / commonsize(mem_total)
-          logstring = "GPU memory used: {} = {:.1%} of total GPU memory: {}".format(
-              mem_used, mem_util, mem_total)
+          logstring = (
+              "GPU memory used: {} = {:.1%} ".format(mem_used, mem_util) +
+              "of total GPU memory: {}".format(mem_total))
           return logstring
 
         mem_used = tf.py_func(nvgpu_gpu_info, ['gpu, fb_memory_usage, used'],
@@ -701,15 +705,15 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
         scaffold_fn=scaffold_fn,
         training_hooks=training_hooks)
   else:
-    eval_metric_ops = eval_metrics[0](
-        **eval_metrics[1]) if eval_metrics else None
+    eval_metric_ops = (
+        eval_metrics[0](**eval_metrics[1]) if eval_metrics else None)
     utils.get_tpu_host_call(global_step, params)
     return tf.estimator.EstimatorSpec(
         mode=mode,
         loss=total_loss,
         train_op=train_op,
         eval_metric_ops=eval_metric_ops,
-        scaffold=scaffold_fn(),
+        scaffold=scaffold_fn() if scaffold_fn else None,
         training_hooks=training_hooks)
 
 

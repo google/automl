@@ -13,18 +13,18 @@
 # limitations under the License.
 # ==============================================================================
 """The main training script."""
+import multiprocessing
 import os
 from absl import app
 from absl import flags
 from absl import logging
 import numpy as np
+import tensorflow.compat.v1 as tf
 
 import dataloader
 import det_model_fn
 import hparams_config
 import utils
-
-import tensorflow.compat.v1 as tf
 
 flags.DEFINE_string(
     'tpu',
@@ -66,16 +66,14 @@ flags.DEFINE_integer(
 flags.DEFINE_bool('use_spatial_partition', False, 'Use spatial partition.')
 flags.DEFINE_integer(
     'num_cores_per_replica',
-    default=8,
-    help='Number of TPU cores per'
-    'replica when using spatial partition.')
+    default=4,
+    help='Number of TPU cores per replica when using spatial partition.')
 flags.DEFINE_multi_integer(
-    'input_partition_dims', [1, 4, 2, 1],
+    'input_partition_dims', [1, 2, 2, 1],
     'A list that describes the partition dims for all the tensors.')
-flags.DEFINE_integer('train_batch_size', 64, 'training batch size')
-flags.DEFINE_integer('eval_batch_size', 1, 'evaluation batch size')
-flags.DEFINE_integer('eval_samples', 5000, 'The number of samples for '
-                     'evaluation.')
+flags.DEFINE_integer('train_batch_size', 64, 'global training batch size')
+flags.DEFINE_integer('eval_batch_size', 1, 'global evaluation batch size')
+flags.DEFINE_integer('eval_samples', None, 'Number of samples for eval.')
 flags.DEFINE_integer('iterations_per_loop', 100,
                      'Number of iterations per TPU training loop')
 flags.DEFINE_integer('save_checkpoints_steps', 100,
@@ -197,6 +195,7 @@ def main(_):
         'source_ids': None,
         'groundtruth_data': None,
         'image_scales': None,
+        'image_masks': None,
     }
     # The Input Partition Logic: We partition only the partition-able tensors.
     feat_sizes = utils.get_feat_sizes(
@@ -245,9 +244,37 @@ def main(_):
     if FLAGS.use_xla:
       config_proto.graph_options.optimizer_options.global_jit_level = (
           tf.OptimizerOptions.ON_1)
-    config_proto.gpu_options.allow_growth = True
+      config_proto.gpu_options.allow_growth = True
 
   model_dir = FLAGS.model_dir
+  model_fn_instance = det_model_fn.get_model_fn(FLAGS.model_name)
+  max_instances_per_image = config.max_instances_per_image
+  if FLAGS.eval_samples:
+    eval_steps = int(FLAGS.eval_samples // FLAGS.eval_batch_size)
+  else:
+    eval_steps = None
+  total_examples = int(config.num_epochs * FLAGS.num_examples_per_epoch)
+  train_steps = total_examples // FLAGS.train_batch_size
+  logging.info(params)
+
+  if not tf.io.gfile.exists(model_dir):
+    tf.io.gfile.makedirs(model_dir)
+
+  config_file = os.path.join(model_dir, 'config.yaml')
+  if not tf.io.gfile.exists(config_file):
+    tf.io.gfile.GFile(config_file, 'w').write(str(config))
+
+  train_input_fn = dataloader.InputReader(
+      FLAGS.training_file_pattern,
+      is_training=True,
+      use_fake_data=FLAGS.use_fake_data,
+      max_instances_per_image=max_instances_per_image)
+  eval_input_fn = dataloader.InputReader(
+      FLAGS.validation_file_pattern,
+      is_training=False,
+      use_fake_data=FLAGS.use_fake_data,
+      max_instances_per_image=max_instances_per_image)
+
   if FLAGS.strategy == 'tpu':
     tpu_config = tf.estimator.tpu.TPUConfig(
         FLAGS.iterations_per_loop if FLAGS.strategy == 'tpu' else 1,
@@ -264,6 +291,14 @@ def main(_):
         save_checkpoints_steps=FLAGS.save_checkpoints_steps,
         tf_random_seed=FLAGS.tf_random_seed,
     )
+    # TPUEstimator can do both train and eval.
+    train_est = tf.estimator.tpu.TPUEstimator(
+        model_fn=model_fn_instance,
+        train_batch_size=FLAGS.train_batch_size,
+        eval_batch_size=FLAGS.eval_batch_size,
+        config=run_config,
+        params=params)
+    eval_est = train_est
   else:
     strategy = None
     if FLAGS.strategy == 'gpus':
@@ -277,43 +312,21 @@ def main(_):
         tf_random_seed=FLAGS.tf_random_seed,
     )
 
-  model_fn_instance = det_model_fn.get_model_fn(FLAGS.model_name)
-  max_instances_per_image = config.max_instances_per_image
-  eval_steps = int(FLAGS.eval_samples // FLAGS.eval_batch_size)
-  total_examples = int(config.num_epochs * FLAGS.num_examples_per_epoch)
-  train_steps = total_examples // FLAGS.train_batch_size
-  logging.info(params)
+    def get_estimator(global_batch_size):
+      params['num_shards'] = getattr(strategy, 'num_replicas_in_sync', 1)
+      params['batch_size'] = global_batch_size // params['num_shards']
+      return tf.estimator.Estimator(
+          model_fn=model_fn_instance, config=run_config, params=params)
 
-  train_input_fn = dataloader.InputReader(
-      FLAGS.training_file_pattern,
-      is_training=True,
-      use_fake_data=FLAGS.use_fake_data,
-      max_instances_per_image=max_instances_per_image)
-  eval_input_fn = dataloader.InputReader(
-      FLAGS.validation_file_pattern,
-      is_training=False,
-      use_fake_data=FLAGS.use_fake_data,
-      max_instances_per_image=max_instances_per_image)
-  """Build train estimator and run training if steps > 0."""
-  if FLAGS.strategy == 'tpu':
-    estimator = tf.estimator.tpu.TPUEstimator(
-        model_fn=model_fn_instance,
-        train_batch_size=FLAGS.train_batch_size,
-        eval_batch_size=FLAGS.eval_batch_size,
-        config=run_config,
-        params=params)
-  else:
-    params['batch_size'] = (
-        FLAGS.train_batch_size // getattr(strategy, 'num_replicas_in_sync', 1))
-    params['num_shards'] = getattr(strategy, 'num_replicas_in_sync', 1)
-    estimator = tf.estimator.Estimator(
-        model_fn=model_fn_instance, config=run_config, params=params)
+    # train and eval need different estimator due to different batch size.
+    train_est = get_estimator(FLAGS.train_batch_size)
+    eval_est = get_estimator(FLAGS.eval_batch_size)
 
   # start train/eval flow.
   if FLAGS.mode == 'train':
-    estimator.train(input_fn=train_input_fn, max_steps=train_steps)
+    train_est.train(input_fn=train_input_fn, max_steps=train_steps)
     if FLAGS.eval_after_training:
-      estimator.evaluate(input_fn=eval_input_fn, steps=eval_steps)
+      eval_est.evaluate(input_fn=eval_input_fn, steps=eval_steps)
 
   elif FLAGS.mode == 'eval':
     # Run evaluation when there's a new checkpoint
@@ -324,7 +337,7 @@ def main(_):
 
       logging.info('Starting to evaluate.')
       try:
-        eval_results = estimator.evaluate(eval_input_fn, steps=eval_steps)
+        eval_results = eval_est.evaluate(eval_input_fn, steps=eval_steps)
         # Terminate eval job when final checkpoint is reached.
         try:
           current_step = int(os.path.basename(ckpt).split('-')[1])
@@ -343,11 +356,35 @@ def main(_):
         logging.info('Checkpoint %s no longer exists, skipping.', ckpt)
 
   elif FLAGS.mode == 'train_and_eval':
-    train_spec = tf.estimator.TrainSpec(
-        input_fn=train_input_fn, max_steps=train_steps)
-    eval_spec = tf.estimator.EvalSpec(
-        input_fn=eval_input_fn, steps=eval_steps, throttle_secs=600)
-    tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
+    ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
+    try:
+      step = int(os.path.basename(ckpt).split('-')[1])
+      current_epoch = (
+          step * FLAGS.train_batch_size // FLAGS.num_examples_per_epoch)
+      logging.info('found ckpt at step %d (epoch %d)', step, current_epoch)
+    except (IndexError, TypeError):
+      logging.info('Folder %s has no ckpt with valid step.', FLAGS.model_dir)
+      current_epoch = 0
+
+    def run_train_and_eval(e):
+      print('\n   =====> Starting training, epoch: %d.' % e)
+      train_est.train(
+          input_fn=train_input_fn,
+          max_steps=e * FLAGS.num_examples_per_epoch // FLAGS.train_batch_size)
+      print('\n   =====> Starting evaluation, epoch: %d.' % e)
+      eval_results = eval_est.evaluate(input_fn=eval_input_fn, steps=eval_steps)
+      ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
+      utils.archive_ckpt(eval_results, eval_results['AP'], ckpt)
+
+    epochs_per_cycle = 1  # higher number has less graph construction overhead.
+    for e in range(current_epoch + 1, config.num_epochs + 1, epochs_per_cycle):
+      if FLAGS.run_epoch_in_child_process:
+        p = multiprocessing.Process(target=run_train_and_eval, args=(e,))
+        p.start()
+        p.join()
+      else:
+        run_train_and_eval(e)
+
   else:
     logging.info('Invalid mode: %s', FLAGS.mode)
 

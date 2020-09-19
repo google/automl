@@ -1,27 +1,68 @@
+# Copyright 2020 Google Research. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# This file is a re-distribution based on the copyright in LICENSE.txt
+# ==============================================================================
 """Recompute tensorflow graph reducing GPU memory usage."""
-import logging
+# pylint: disable=g-direct-tensorflow-import,g-doc-args,g-doc-return-or-yield
+# pylint: disable=g-complex-comprehension,g-doc-exception
+# pylint: disable=protected-access
+
 import contextlib
-import time
+import functools
 import sys
+import time
+from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
 
-# save original gradients since tf.gradient could be monkey-patched to point
-# to our version
-from tensorflow.python.ops import gradients as tf_gradients_lib
-
-from third_party.toposort import toposort
+# save original gradients since tf.gradient could be monkey-patched.
 import third_party.graph_edit as ge
-
-tf_gradient_function = tf_gradients_lib.gradients
-# logging.getLogger().setLevel(logging.DEBUG)
-
+tf_gradient_function = tf.gradients
 sys.setrecursionlimit(10000)
-# refers back to current module if we decide to split helpers out
-util = sys.modules[__name__]
-
 # getting rid of "WARNING:tensorflow:VARIABLES collection name is deprecated"
 setattr(tf.GraphKeys, "VARIABLES", "variables")
+
+
+def toposort(nodes):
+  """Sort topologically nodes based on https://pypi.org/project/toposort/."""
+  # Special case empty input.
+  if len(nodes) == 0:
+    return
+
+  # Copy the input so as to leave it unmodified.
+  nodes = nodes.copy()
+  # Ignore self dependencies.
+  for k, v in nodes.items():
+    v.discard(k)
+  # Find all items that don't depend on anything.
+  isolated_items = functools.reduce(set.union, nodes.values()) - set(
+      nodes.keys())
+  # Add empty dependences where needed.
+  nodes.update({item: set() for item in isolated_items})
+  while True:
+    ordered = set(item for item, dep in nodes.items() if len(dep) == 0)
+    if not ordered:
+      break
+    yield ordered
+    nodes = {
+        item: (dep - ordered)
+        for item, dep in nodes.items()
+        if item not in ordered
+    }
+  if len(nodes) != 0:
+    raise ValueError('expected empty, but got {}'.format(nodes))
 
 
 # ISSUE: https://github.com/cybertronai/gradient-checkpointing/issues/38
@@ -43,20 +84,20 @@ MIN_CHECKPOINT_NODE_SIZE = 1024  # use lower value during testing
 # specific versions we can use to do process-wide replacement of tf.gradients
 def gradients_speed(ys, xs, grad_ys=None, **kwargs):
   """Optimize for speed."""
-  return gradients(ys, xs, grad_ys, checkpoints='speed', **kwargs)
+  return gradients(ys, xs, grad_ys, checkpoints="speed", **kwargs)
 
 
 def gradients_memory(ys, xs, grad_ys=None, **kwargs):
   """Optimize for memory."""
-  return gradients(ys, xs, grad_ys, checkpoints='memory', **kwargs)
+  return gradients(ys, xs, grad_ys, checkpoints="memory", **kwargs)
 
 
 def gradients_collection(ys, xs, grad_ys=None, **kwargs):
   """Use user-provided collection."""
-  return gradients(ys, xs, grad_ys, checkpoints='collection', **kwargs)
+  return gradients(ys, xs, grad_ys, checkpoints="collection", **kwargs)
 
 
-def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
+def gradients(ys, xs, grad_ys=None, checkpoints="collection", **kwargs):
   """Recompute gradients.
 
   Authors: Tim Salimans & Yaroslav Bulatov
@@ -112,29 +153,29 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
   logging.debug("fwd_ops: %s", len(fwd_ops))
   # don't recompute xs, remove variables
   xs_ops = _to_ops(xs)
-  fwd_ops = [op for op in fwd_ops if not op in xs_ops]
-  fwd_ops = [op for op in fwd_ops if not '/assign' in op.name]
-  fwd_ops = [op for op in fwd_ops if not '/Assign' in op.name]
-  fwd_ops = [op for op in fwd_ops if not '/read' in op.name]
+  fwd_ops = [op for op in fwd_ops if op not in xs_ops]
+  fwd_ops = [op for op in fwd_ops if "/assign" not in op.name]
+  fwd_ops = [op for op in fwd_ops if "/Assign" not in op.name]
+  fwd_ops = [op for op in fwd_ops if "/read" not in op.name]
   logging.debug("fwd_ops: %s", len(fwd_ops))
   ts_all = ge.filter_ts(fwd_ops, True)  # get the tensors
   logging.debug("ts_all: %s", len(ts_all))
 
-  ts_all = [t for t in ts_all if '/read' not in t.name]
+  ts_all = [t for t in ts_all if "/read" not in t.name]
   ts_all = set(ts_all) - set(xs) - set(ys)
   logging.debug("ts_all: %s", len(ts_all))
 
   # construct list of tensors to checkpoint during forward pass, if not
   # given as input
   if not isinstance(checkpoints, list):
-    if checkpoints == 'collection':
-      checkpoints = tf.get_collection('checkpoints')
+    if checkpoints == "collection":
+      checkpoints = tf.get_collection("checkpoints")
 
-    elif checkpoints == 'speed':
+    elif checkpoints == "speed":
       # checkpoint all expensive ops to maximize running speed
-      checkpoints = ge.filter_ts_from_regex(fwd_ops, 'conv2d|Conv|MatMul')
+      checkpoints = ge.filter_ts_from_regex(fwd_ops, "conv2d|Conv|MatMul")
 
-    elif checkpoints == 'memory':
+    elif checkpoints == "memory":
 
       # remove very small tensors and some weird ops
       def fixdims(
@@ -142,9 +183,9 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
       ):  # tf.Dimension values are not compatible with int, convert manually
         try:
           return [int(e if e is not None else 64) for e in t.as_list()]
-        except AttributeError as e:
-          logging.error("%s", e)
-          logging.error("unknown shape %s", t)
+        except ValueError as e:
+          logging.exception("%s", e)
+          logging.exception("unknown shape %s", t)
           return [0]  # unknown shape
 
       ts_all = [
@@ -153,17 +194,17 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
           # if (tf.size(t) > MIN_CHECKPOINT_NODE_SIZE)
       ]
       logging.debug("ts_all: %s", len(ts_all))
-      ts_all = [t for t in ts_all if 'L2Loss' not in t.name]
-      ts_all = [t for t in ts_all if 'entropy' not in t.name]
-      ts_all = [t for t in ts_all if 'FusedBatchNorm' not in t.name]
-      ts_all = [t for t in ts_all if 'Switch' not in t.name]
-      ts_all = [t for t in ts_all if 'dropout' not in t.name]
+      ts_all = [t for t in ts_all if "L2Loss" not in t.name]
+      ts_all = [t for t in ts_all if "entropy" not in t.name]
+      ts_all = [t for t in ts_all if "FusedBatchNorm" not in t.name]
+      ts_all = [t for t in ts_all if "Switch" not in t.name]
+      ts_all = [t for t in ts_all if "dropout" not in t.name]
       # DV: FP16_FIX - need to add 'Cast' layer here to make it work for FP16
-      ts_all = [t for t in ts_all if 'Cast' not in t.name]
+      ts_all = [t for t in ts_all if "Cast" not in t.name]
       logging.debug("ts_all: %s", len(ts_all))
 
       # filter out all tensors that are inputs of the backward graph
-      with util.capture_ops() as bwd_ops:
+      with capture_ops() as bwd_ops:
         tf_gradients(ys, xs, grad_ys, **kwargs)
 
       bwd_inputs = [t for op in bwd_ops for t in op.inputs]
@@ -206,7 +247,7 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
 
       if not bottleneck_ts:
         raise Exception(
-            'unable to find bottleneck tensors! please provide checkpoint '
+            "unable to find bottleneck tensors! please provide checkpoint "
             'nodes manually, or use checkpoints="speed" or a list of strings.')
       logging.debug("len(bottleneck_ts): %s", len(bottleneck_ts))
 
@@ -229,7 +270,7 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
     # exclude some layers as was done in the original bottleneck searching
     # algorithm
     for excl_layer in [
-        'L2Loss', 'entropy', 'FusedBatchNorm', 'Switch', 'dropout', 'Cast'
+        "L2Loss", "entropy", "FusedBatchNorm", "Switch", "dropout", "Cast"
     ]:
       ts_all = [t for t in ts_all if excl_layer not in t.name]
       logging.info("Excluding %s from ts_all: %d", excl_layer, len(ts_all))
@@ -247,7 +288,7 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
   # at this point selection happened and checkpoints is list of nodes
   # assert isinstance(checkpoints, list)
 
-  # TODO(NikZak): implement multithreading in graph recomputation
+  # TODO(nikzak): implement multithreading in graph recomputation
   logging.info("Checkpoint nodes used: %s", len(checkpoints))
   # better error handling of special cases
   # xs are already handled as checkpoint nodes, so no need to include them
@@ -272,7 +313,7 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
 
   # check that we have some nodes to checkpoint
   if not checkpoints:
-    raise Exception('no checkpoints nodes found or given as input! ')
+    raise Exception("no checkpoints nodes found or given as input! ")
 
   # disconnect dependencies between checkpointed tensors
   checkpoints_disconnected = {}
@@ -281,7 +322,7 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
       grad_node = tf.stop_gradient(x, name=x.op.name + "_sg")
     else:
       grad_node = tf.stop_gradient(x)
-    grad_node.op._set_device(x.op.node_def.device)  # pylint: disable=W0212
+    grad_node.op._set_device(x.op.node_def.device)
     checkpoints_disconnected[x] = grad_node
 
   # partial derivatives to the checkpointed tensors and xs
@@ -292,9 +333,9 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
   debug_print("ops_to_copy = %s", ops_to_copy)
   debug_print("Processing list %s", ys)
   _, info = ge.copy_with_input_replacements(ge.sgv(ops_to_copy), {})
-  for origin_op, op in info._transformed_ops.items():  # pylint: disable=W0212
-    op._set_device(origin_op.node_def.device)  # pylint: disable=W0212
-  copied_ops = info._transformed_ops.values()  # pylint: disable=W0212
+  for origin_op, op in info._transformed_ops.items():
+    op._set_device(origin_op.node_def.device)
+  copied_ops = info._transformed_ops.values()
   debug_print("Copied %s to %s", ops_to_copy, copied_ops)
   ge.reroute_ts(
       checkpoints_disconnected.values(),
@@ -305,7 +346,7 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
               checkpoints_disconnected.keys(), copied_ops)
 
   # get gradients with respect to current boundary + original x's
-  copied_ys = [info._transformed_ops[y.op]._outputs[0] for y in ys]  # pylint: disable=W0212
+  copied_ys = [info._transformed_ops[y.op]._outputs[0] for y in ys]
   boundary = list(checkpoints_disconnected.values())
   dv = tf_gradients(ys=copied_ys, xs=boundary + xs, grad_ys=grad_ys, **kwargs)
   debug_print("Got gradients %s", dv)
@@ -353,9 +394,9 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
     if not ops_to_copy:  # we're done!
       break
     _, info = ge.copy_with_input_replacements(ge.sgv(ops_to_copy), {})
-    for origin_op, op in info._transformed_ops.items():  # pylint: disable=W0212
-      op._set_device(origin_op.node_def.device)  # pylint: disable=W0212
-    copied_ops = info._transformed_ops.values()  # pylint: disable=W0212
+    for origin_op, op in info._transformed_ops.items():
+      op._set_device(origin_op.node_def.device)
+    copied_ops = info._transformed_ops.values()
     debug_print("Copied %s to %s", ops_to_copy, copied_ops)
     ge.reroute_ts(
         checkpoints_disconnected_other,
@@ -365,7 +406,7 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
                 checkpoints_disconnected_other, checkpoints_other, copied_ops)
 
     # gradient flowing through the checkpointed node
-    boundary = [info._transformed_ops[r.op]._outputs[0] for r in ts]  # pylint: disable=W0212
+    boundary = [info._transformed_ops[r.op]._outputs[0] for r in ts]
     substitute_backprops = [d_checkpoints[r] for r in ts]
     dv = tf_gradients(
         boundary,
@@ -394,8 +435,7 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
         return x
       if x.dense_shape is None:
         raise ValueError(
-            "memory_saving_gradients encountered " \
-            "sparse gradients of unknown shape")
+            "memory_saving_gradients has sparse gradients of unknown shape.")
 
       indices = x.indices
       while indices.shape.ndims < x.values.shape.ndims:
@@ -503,7 +543,7 @@ def format_ops(ops, sort_outputs=True):
   Helper method for printing ops. Converts Tensor/Operation op to op.name,
   rest to str(op).
   """
-  if hasattr(ops, '__iter__') and not isinstance(ops, str):
+  if hasattr(ops, "__iter__") and not isinstance(ops, str):
     l = [(op.name if hasattr(op, "name") else str(op)) for op in ops]
     if sort_outputs:
       return sorted(l)

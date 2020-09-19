@@ -13,32 +13,26 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for tensorflow.contrib.graph_editor."""
+# pylint: disable=g-direct-tensorflow-import
 
-import sys
 import collections
 import functools
 import numpy as np
 import tensorflow.compat.v1 as tf
 
+import third_party.graph_edit as ge
+from third_party.graph_edit.tests import match
 from tensorflow.core.framework import attr_value_pb2
 from tensorflow.python.client import session
 from tensorflow.python.framework import constant_op
-from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops import gradients_impl
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import variables
 from tensorflow.python.platform import test
 
-import third_party.graph_edit as ge
-from third_party.graph_edit.tests import match
-
-tf.disable_eager_execution()
-
 # Precision tolerance for floating-point value tests.
-
 ERROR_TOLERANCE = 1e-3
 
 
@@ -47,10 +41,11 @@ class TransformTest(test.TestCase):
 
   def setUp(self):
     """Set up."""
+    super().setUp()
     self.graph = ops.Graph()
     with self.graph.as_default():
-      c0 = constant_op.constant(1.0, shape=[10], name="Const")  # pylint: disable=W0212
-      c0.op._set_attr("_foo", attr_value_pb2.AttrValue(s=b"foo"))  # pylint: disable=W0212
+      c0 = constant_op.constant(1.0, shape=[10], name="Const")
+      c0.op._set_attr("_foo", attr_value_pb2.AttrValue(s=b"foo"))
       c1 = constant_op.constant(1.0, shape=[10], name="Const")
       c2 = constant_op.constant(1.0, shape=[10], name="Const")
       i = constant_op.constant(1.0, shape=[10], name="Input")
@@ -67,14 +62,14 @@ class TransformTest(test.TestCase):
     dst_ops = graph.get_operations()
     for op in src_ops:
       op_ = info.transformed(op)
-      self.assertTrue(op_ in dst_ops)
+      self.assertIn(op_, dst_ops)
       self.assertEqual(op.name, op_.name)
       self.assertEqual(info.original(op_), op)
     src_ts = ge.util.get_tensors(self.graph)
     dst_ts = ge.util.get_tensors(graph)
     for t in src_ts:
       t_ = info.transformed(t)
-      self.assertTrue(t_ in dst_ts)
+      self.assertIn(t_, dst_ts)
       self.assertEqual(t.name, t_.name)
       self.assertEqual(info.original(t_), t)
 
@@ -146,13 +141,13 @@ class TransformTest(test.TestCase):
 
     c0_before = self.graph.get_operation_by_name("Const")
     c0_after = graph.get_operation_by_name("Const")
-    self.assertEquals(c0_before.get_attr("_foo"), b"foo")
+    self.assertEqual(c0_before.get_attr("_foo"), b"foo")
     with self.assertRaises(ValueError):
       c0_after.get_attr("_foo")
 
     all_ops = graph.get_operations()
     for op in all_ops:
-      self.assertEquals(op.get_attr("_bar"), b"bar")
+      self.assertEqual(op.get_attr("_bar"), b"bar")
 
   def test_copy_with_input_replacements(self):
     """Test copy with input replacements."""
@@ -189,11 +184,11 @@ class TransformTest(test.TestCase):
     c = array_ops.identity(a + b + eps, name="c")
     a_new = constant_op.constant(2.0, name="a_new")
     c_new = ge.graph_replace({"c": c}, {a: a_new})
-    self.assertTrue(isinstance(c_new, dict))
+    self.assertIsInstance(c_new, dict)
     with session.Session() as sess:
       sess.run(variables.global_variables_initializer())
       c_val, c_new_val = sess.run([c, c_new])
-    self.assertTrue(isinstance(c_new_val, dict))
+    self.assertIsInstance(c_new_val, dict)
     self.assertNear(c_val, 2.001, ERROR_TOLERANCE)
     self.assertNear(c_new_val["c"], 3.001, ERROR_TOLERANCE)
 
@@ -206,7 +201,7 @@ class TransformTest(test.TestCase):
     c = array_ops.identity(a + b + eps, name="c")
     a_new = constant_op.constant(2.0, name="a_new")
     c_new = ge.graph_replace(collections.OrderedDict({"c": c}), {a: a_new})
-    self.assertTrue(isinstance(c_new, collections.OrderedDict))
+    self.assertIsInstance(c_new, collections.OrderedDict)
 
   def test_graph_replace_named_tuple(self):
     """Test replace graph with named tuple."""
@@ -218,7 +213,7 @@ class TransformTest(test.TestCase):
     a_new = constant_op.constant(2.0, name="a_new")
     one_tensor = collections.namedtuple("OneTensor", ["t"])
     c_new = ge.graph_replace(one_tensor(c), {a: a_new})
-    self.assertTrue(isinstance(c_new, one_tensor))
+    self.assertIsInstance(c_new, one_tensor)
 
   def test_graph_replace_missing(self):
     """Test replace missing."""
@@ -253,8 +248,8 @@ class TransformTest(test.TestCase):
             "res/grad/mul1_grad/Mul_1"))
 
     # Make sure _original_ops are as expected.
-    self.assertEqual(original_mul1_grad._original_op.name, u"mul1")  # pylint: disable=W0212
-    self.assertEqual(result_mul1_grad._original_op.name, u"res/mul1")  # pylint: disable=W0212
+    self.assertEqual(original_mul1_grad._original_op.name, u"mul1")
+    self.assertEqual(result_mul1_grad._original_op.name, u"res/mul1")
     self.assertNotEqual(res.name, g.name)
     with session.Session() as sess:
       sess.run(variables.global_variables_initializer())
@@ -263,45 +258,7 @@ class TransformTest(test.TestCase):
     self.assertNear(g_val, 0.0, ERROR_TOLERANCE)
     self.assertNear(res_val, 0.0, ERROR_TOLERANCE)
 
-  # def test_graph_while_loop(self):
-  #   """Test while loop in copied graph."""
-  #   graph = ops.Graph()
-  #   with graph.as_default():
-  #     max_index = array_ops.placeholder(dtype=dtypes.int32, shape=tuple())
-  #     index_start = constant_op.constant(1)
-  #     sum_start = constant_op.constant(0)
-  #     _, result = control_flow_ops.while_loop(
-  #         cond=lambda i, unused_s: i <= max_index,
-  #         body=lambda i, s: (i + 1, s + i),
-  #         loop_vars=[index_start, sum_start])
-  #   copied_graph = ops.Graph()
-  #   _, copy_info = ge.copy(graph, dst_graph=copied_graph, dst_scope="imported")
-  #   copied_result = copy_info.transformed(result)
-  #   copied_max_index = copy_info.transformed(max_index)
-  #   with copied_graph.as_default():
-  #     with session.Session() as sess:
-  #       n = 10
-  #       sum_val = sess.run(copied_result, feed_dict={copied_max_index: n})
-  #       self.assertEqual(sum_val, 55)
-
-  # def test_graph_cond(self):
-  #   """Test cond in copied graph."""
-  #   graph = ops.Graph()
-  #   with graph.as_default():
-  #     choice = array_ops.placeholder(shape=(), dtype=dtypes.bool)
-  #     result = tf.cond(choice, lambda: constant_op.constant(1),
-  #                      lambda: constant_op.constant(2))
-  #   copied_graph = ops.Graph()
-  #   _, copy_info = ge.copy(graph, dst_graph=copied_graph, dst_scope="imported")
-  #   copied_result = copy_info.transformed(result)
-  #   copied_choice = copy_info.transformed(choice)
-  #   with copied_graph.as_default():
-  #     with session.Session() as sess:
-  #       res = sess.run(copied_result, feed_dict={copied_choice: True})
-  #       self.assertEqual(res, 1)
-  #       res = sess.run(copied_result, feed_dict={copied_choice: False})
-  #       self.assertEqual(res, 2)
-
 
 if __name__ == "__main__":
+  tf.disable_eager_execution()
   test.main()

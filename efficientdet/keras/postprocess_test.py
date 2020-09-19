@@ -27,7 +27,7 @@ class PostprocessTest(tf.test.TestCase):
     self.params = {
         'min_level': 1,
         'max_level': 2,
-        'aspect_ratios': [(1.0, 1.0)],
+        'aspect_ratios': [1.0],
         'num_scales': 1,
         'anchor_scale': 1,
         'image_size': 8,
