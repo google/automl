@@ -24,8 +24,8 @@ from PIL import Image
 import tensorflow as tf
 
 import hparams_config
-from keras import inference
 import utils
+from keras import inference
 
 flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model.')
 flags.DEFINE_string('mode', 'infer',
@@ -34,7 +34,6 @@ flags.DEFINE_string('trace_filename', None, 'Trace file name.')
 
 flags.DEFINE_integer('bm_runs', 10, 'Number of benchmark runs.')
 flags.DEFINE_string('tensorrt', None, 'TensorRT mode: {None, FP32, FP16, INT8}')
-flags.DEFINE_bool('use_xla', False, 'Run with xla optimization.')
 flags.DEFINE_integer('batch_size', 1, 'Batch size for inference.')
 
 flags.DEFINE_string('ckpt_path', None, 'checkpoint dir used for eval.')
@@ -129,7 +128,7 @@ def main(_):
       ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
     driver.model.save_weights(ckpt_path_or_file)
   elif FLAGS.mode == 'video':
-    import cv2
+    import cv2  # pylint: disable=g-import-not-at-top
     if tf.saved_model.contains_saved_model(FLAGS.saved_model_dir):
       driver.load(FLAGS.saved_model_dir)
     cap = cv2.VideoCapture(FLAGS.input_video)
@@ -150,7 +149,7 @@ def main(_):
         break
 
       raw_frames = np.array([frame])
-      detections_bs = driver.serve_images(raw_frames)
+      detections_bs = driver.serve(raw_frames)
       boxes, scores, classes, _ = tf.nest.map_structure(np.array, detections_bs)
       new_frame = driver.visualize(
           raw_frames[0],
