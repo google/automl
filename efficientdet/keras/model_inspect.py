@@ -37,6 +37,7 @@ flags.DEFINE_string('tensorrt', None, 'TensorRT mode: {None, FP32, FP16, INT8}')
 flags.DEFINE_integer('batch_size', 1, 'Batch size for inference.')
 
 flags.DEFINE_string('ckpt_path', None, 'checkpoint dir used for eval.')
+flags.DEFINE_string('export_path', None, 'Output model path.')
 
 flags.DEFINE_string(
     'hparams', '', 'Comma separated k=v pairs of hyperparameters or a module'
@@ -93,7 +94,7 @@ def main(_):
       tf.io.gfile.rmtree(FLAGS.saved_model_dir)
     driver.export(FLAGS.saved_model_dir, FLAGS.tflite_path, FLAGS.tensorrt)
   elif FLAGS.mode == 'infer':
-    if tf.saved_model.contains_saved_model(FLAGS.saved_model_dir):
+    if FLAGS.saved_model_dir:
       driver.load(FLAGS.saved_model_dir)
     image_file = tf.io.read_file(FLAGS.input_image)
     image_arrays = tf.io.decode_image(image_file)
@@ -126,7 +127,8 @@ def main(_):
     ckpt_path_or_file = FLAGS.ckpt_path
     if tf.io.gfile.isdir(ckpt_path_or_file):
       ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
-    driver.model.save_weights(ckpt_path_or_file)
+    if FLAGS.export_path:
+      driver.model.save_weights(FLAGS.export_path)
   elif FLAGS.mode == 'video':
     import cv2  # pylint: disable=g-import-not-at-top
     if tf.saved_model.contains_saved_model(FLAGS.saved_model_dir):

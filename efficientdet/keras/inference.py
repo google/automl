@@ -203,7 +203,8 @@ class ServingDriver(object):
     def test_func(image_arrays):
       return self.model(image_arrays)
 
-    test_func(image_arrays)
+    for _ in range(3):  # warmup 3 runs.
+      test_func(image_arrays)
 
     start = time.perf_counter()
     for _ in range(bm_runs):
@@ -236,16 +237,30 @@ class ServingDriver(object):
 
   def load(self, saved_model_dir_or_frozen_graph: Text):
     """Load the model using saved model or a frozen graph."""
-
     # Load saved model if it is a folder.
     if tf.saved_model.contains_saved_model(saved_model_dir_or_frozen_graph):
       self.model = tf.saved_model.load(saved_model_dir_or_frozen_graph)
       return
+
     # Load a frozen graph.
+    def wrap_frozen_graph(graph_def, inputs, outputs):
+      # https://www.tensorflow.org/guide/migrate
+      def _imports_graph_def():
+        tf.compat.v1.import_graph_def(graph_def, name="")
+      wrapped_import = tf.compat.v1.wrap_function(_imports_graph_def, [])
+      import_graph = wrapped_import.graph
+      return wrapped_import.prune(
+          tf.nest.map_structure(import_graph.as_graph_element, inputs),
+          tf.nest.map_structure(import_graph.as_graph_element, outputs))
+
     graph_def = tf.Graph().as_graph_def()
     with tf.io.gfile.GFile(saved_model_dir_or_frozen_graph, 'rb') as f:
       graph_def.ParseFromString(f.read())
     self.model = tf.import_graph_def(graph_def, name='')
+    self.model = wrap_frozen_graph(
+        graph_def,
+        inputs='images:0',
+        outputs=['Identity:0', 'Identity_1:0', 'Identity_2:0', 'Identity_3:0'])
 
   def freeze(self, func):
     """Freeze the graph."""
