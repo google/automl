@@ -20,6 +20,7 @@
 # pylint: disable=protected-access
 
 import contextlib
+import functools
 import sys
 import time
 from absl import logging
@@ -29,17 +30,39 @@ import tensorflow.compat.v1 as tf
 # save original gradients since tf.gradient could be monkey-patched.
 import third_party.graph_edit as ge
 tf_gradient_function = tf.gradients
-
-
-def toposort(x):
-  # TODO(someone): should be the same as "from toposort import toposort".
-  return x
-
-
 sys.setrecursionlimit(10000)
-
 # getting rid of "WARNING:tensorflow:VARIABLES collection name is deprecated"
 setattr(tf.GraphKeys, "VARIABLES", "variables")
+
+
+def toposort(nodes):
+  """Sort topologically nodes based on https://pypi.org/project/toposort/."""
+  # Special case empty input.
+  if len(nodes) == 0:
+    return
+
+  # Copy the input so as to leave it unmodified.
+  nodes = nodes.copy()
+  # Ignore self dependencies.
+  for k, v in nodes.items():
+    v.discard(k)
+  # Find all items that don't depend on anything.
+  isolated_items = functools.reduce(set.union, nodes.values()) - set(
+      nodes.keys())
+  # Add empty dependences where needed.
+  nodes.update({item: set() for item in isolated_items})
+  while True:
+    ordered = set(item for item, dep in nodes.items() if len(dep) == 0)
+    if not ordered:
+      break
+    yield ordered
+    nodes = {
+        item: (dep - ordered)
+        for item, dep in nodes.items()
+        if item not in ordered
+    }
+  if len(nodes) != 0:
+    raise ValueError('expected empty, but got {}'.format(nodes))
 
 
 # ISSUE: https://github.com/cybertronai/gradient-checkpointing/issues/38
