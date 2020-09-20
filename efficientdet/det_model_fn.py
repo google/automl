@@ -418,10 +418,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     if params['strategy'] == 'tpu':
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)
     if params['gradient_checkpointing']:
-      from third_party.grad_checkpoint \
-          import memory_saving_gradients  # pylint: disable=g-import-not-at-top
-      from tensorflow.python.ops \
-          import gradients  # pylint: disable=g-import-not-at-top
+      from third_party.grad_checkpoint import memory_saving_gradients  # pylint: disable=import-outside-toplevel
+      from tensorflow.python.ops import gradients  # pylint: disable=import-outside-toplevel
 
       # monkey patch tf.gradients to point to our custom version,
       # with automatic checkpoint selection
@@ -634,64 +632,18 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
     if params["nvgpu_logging"]:
       try:
-        from third_party.tools import nvgpu  # pylint: disable=g-import-not-at-top
-        from functools import reduce  # pylint: disable=g-import-not-at-top
+        from third_party.tools.nvgpu import gpu_memory_util_message  # pylint: disable=import-outside-toplevel
 
-        def get_nested_value(d, path):
-          return reduce(dict.get, path, d)
+        mem_message = tf.py_func(gpu_memory_util_message, [], [tf.string])[0]
 
-        def nvgpu_gpu_info(inp):
-          inp = inp.decode("utf-8")
-          inp = inp.split(",")
-          inp = [x.strip() for x in inp]
-          value = get_nested_value(nvgpu.gpu_info(), inp)
-          return np.str(value)
-
-        def commonsize(inp):
-          const_sizes = {
-              'B': 1,
-              'KB': 1e3,
-              'MB': 1e6,
-              'GB': 1e9,
-              'TB': 1e12,
-              'PB': 1e15,
-              'KiB': 1024,
-              'MiB': 1048576,
-              'GiB': 1073741824
-          }
-          inp = inp.split(" ")
-          # convert all to MiB
-          if inp[1] != 'MiB':
-            inp_ = float(inp[0]) * (const_sizes[inp[1]] / 1048576.0)
-          else:
-            inp_ = float(inp[0])
-
-          return inp_
-
-        def formatter_log(tensors):
-          """Format the output."""
-          mem_used = tensors["memory used"].decode("utf-8")
-          mem_total = tensors["memory total"].decode("utf-8")
-          mem_util = commonsize(mem_used) / commonsize(mem_total)
-          logstring = (
-              "GPU memory used: {} = {:.1%} ".format(mem_used, mem_util) +
-              "of total GPU memory: {}".format(mem_total))
-          return logstring
-
-        mem_used = tf.py_func(nvgpu_gpu_info, ['gpu, fb_memory_usage, used'],
-                              [tf.string])[0]
-        mem_total = tf.py_func(nvgpu_gpu_info, ['gpu, fb_memory_usage, total'],
-                               [tf.string])[0]
-
-        logging_hook3 = tf.estimator.LoggingTensorHook(
+        logging_hook_nvgpu = tf.estimator.LoggingTensorHook(
             tensors={
-                "memory used": mem_used,
-                "memory total": mem_total,
+                "mem_message": mem_message,
             },
             every_n_iter=params.get('iterations_per_loop', 100),
-            formatter=formatter_log,
+            formatter=lambda x: x["mem_message"].decode("utf-8"),
         )
-        training_hooks.append(logging_hook3)
+        training_hooks.append(logging_hook_nvgpu)
       except:
         logging.error("nvgpu error: nvidia-smi format not recognized")
 

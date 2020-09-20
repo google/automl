@@ -161,9 +161,7 @@ class Config(object):
       else:
         config_dict[k] = copy.deepcopy(v)
     return config_dict
-
-
-# pylint: enable=protected-access
+    # pylint: enable=protected-access
 
 
 def default_detection_configs():
@@ -285,6 +283,9 @@ def default_detection_configs():
 
   # Reduces memory during training
   h.gradient_checkpointing = False
+
+  # Values that could be used "Add", "Mul", "Conv2d", "Floor", "Sigmoid", etc
+  # or more specific, e.g. "blocks_10/se/conv2d_1"
   h.gradient_checkpointing_list = ["Add"]
 
   # enable memory logging for NVIDIA cards

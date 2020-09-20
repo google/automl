@@ -852,7 +852,7 @@ class EfficientDetModel(EfficientDetNet):
       return [tf.stack(y) for y in zip(*outputs)]
 
     # otherwise treat it as dynamic batch size.
-    return tf.map_fn(map_fn, raw_images, dtype=(tf.float32, tf.float32))
+    return tf.vectorized_map(map_fn, raw_images)
 
   def _postprocess(self, cls_outputs, box_outputs, scales, mode='global'):
     """Postprocess class and box predictions."""
