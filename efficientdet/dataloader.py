@@ -434,5 +434,4 @@ class InputReader:
       # first batch. This reduces variance in performance and is useful in
       # testing.
       dataset = dataset.take(1).cache().repeat()
-    dataset = dataset.apply(tf.data.experimental.ignore_errors())
     return dataset

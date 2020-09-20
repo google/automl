@@ -44,8 +44,6 @@ flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model name to use.')
 flags.DEFINE_string('model_dir', None, 'Location of the checkpoint to run.')
 flags.DEFINE_integer('batch_size', 8, 'Batch size.')
 flags.DEFINE_string('hparams', '', 'Comma separated k=v pairs or a yaml file')
-flags.DEFINE_boolean('enable_tta', False,
-                     'Use test time augmentation (slower, but more accurate).')
 FLAGS = flags.FLAGS
 
 
@@ -56,7 +54,7 @@ def main(_):
   config.val_json_file = FLAGS.val_json_file
   config.nms_configs.max_nms_inputs = anchors.MAX_DETECTION_POINTS
   config.drop_remainder = False  # eval all examples w/o drop.
-  base_height, base_width = utils.parse_image_size(config['image_size'])
+  config.image_size = utils.parse_image_size(config['image_size'])
 
   if FLAGS.strategy == 'tpu':
     tpu_cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
@@ -74,102 +72,54 @@ def main(_):
     else:
       ds_strategy = tf.distribute.OneDeviceStrategy('device:CPU:0')
 
-  # in format (height, width, flip)
-  augmentations = []
-  if FLAGS.enable_tta:
-    for flip in (False, True):
-      augmentations.append((base_height, base_width, flip))
-  else:
-    augmentations.append((base_height, base_width, False))
-
-  all_detections = []
-  all_labels = []
   with ds_strategy.scope():
     # Network
     model = efficientdet_keras.EfficientDetNet(config=config)
-    model.build((config.batch_size, base_height, base_width, 3))
+    model.build((config.batch_size, *config.image_size, 3))
     model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
 
-    first_loop = True
-    for height, width, flip in augmentations:
-      config.image_size = (height, width)
-      # dataset
-      ds = dataloader.InputReader(
-          FLAGS.val_file_pattern,
-          is_training=False,
-          use_fake_data=False,
-          max_instances_per_image=config.max_instances_per_image)(
-              config)
-      if FLAGS.eval_samples:
-        ds = ds.take(FLAGS.eval_samples // config.batch_size)
+    @tf.function
+    def f(images, labels):
+      cls_outputs, box_outputs = model(images, training=False)
+      return postprocess.generate_detections(config, cls_outputs, box_outputs,
+                                             labels['image_scales'],
+                                             labels['source_ids'])
 
-      # create the function once per augmentation, since it closes over the
-      # value of config, which gets updated with the new image size
-      @tf.function
-      def f(images, labels):
-        cls_outputs, box_outputs = model(images, training=False)
-        return postprocess.generate_detections(config, cls_outputs, box_outputs,
-                                               labels['image_scales'],
-                                               labels['source_ids'], flip)
+    # dataset
+    ds = dataloader.InputReader(
+        FLAGS.val_file_pattern,
+        is_training=False,
+        max_instances_per_image=config.max_instances_per_image)(
+            config)
+    if FLAGS.eval_samples:
+      ds = ds.take(FLAGS.eval_samples // config.batch_size)
 
-      # inference
-      eval_samples = FLAGS.eval_samples or 5000
-      pbar = tf.keras.utils.Progbar(
-          len(augmentations) * eval_samples // config.batch_size)
-      for i, (images, labels) in enumerate(ds):
-        pbar.update(i)
-        if flip:
-          images = tf.image.flip_left_right(images)
-        detections = f(images, labels)
+    # create a evaluator for AP calculation.
+    label_map = label_util.get_label_map(config.label_map)
+    evaluator = coco_metric.EvaluationMetric(
+        filename=config.val_json_file, label_map=label_map)
 
-        all_detections.append(detections)
-        if first_loop:
-          all_labels.append(labels)
-
-      first_loop = False
-
-  # collect the giant list of detections into a map from image id to
-  # detections
-  detections_per_source = dict()
-  for batch in all_detections:
-    for d in batch:
-      img_id = d[0][0]
-      if img_id.numpy() in detections_per_source:
-        detections_per_source[img_id.numpy()] = tf.concat(
-            [d, detections_per_source[img_id.numpy()]], 0)
-      else:
-        detections_per_source[img_id.numpy()] = d
-
-  # collect the groundtruth per image id
-  groundtruth_per_source = dict()
-  for batch in all_labels:
-    for img_id, groundtruth in zip(batch['source_ids'],
-                                   batch['groundtruth_data']):
-      groundtruth_per_source[img_id.numpy()] = groundtruth
-
-  # calucate the AP scores for all the images
-  label_map = label_util.get_label_map(config.label_map)
-  evaluator = coco_metric.EvaluationMetric(
-      filename=config.val_json_file, label_map=label_map)
-  for img_id, d in detections_per_source.items():
-    if FLAGS.enable_tta:
-      d = wbf.ensemble_detections(config, d, len(augmentations))
-    evaluator.update_state(
-        tf.stack([groundtruth_per_source[img_id]]).numpy(),
-        postprocess.transform_detections(tf.stack([d])).numpy())
+    # evaluate all images.
+    eval_samples = FLAGS.eval_samples or 5000
+    pbar = tf.keras.utils.Progbar(eval_samples // config.batch_size)
+    for i, (images, labels) in enumerate(ds):
+      detections = f(images, labels)
+      evaluator.update_state(
+          labels['groundtruth_data'].numpy(),
+          postprocess.transform_detections(detections).numpy())
+      pbar.update(i)
 
   # compute the final eval results.
-  if evaluator:
-    metrics = evaluator.result()
-    metric_dict = {}
-    for i, name in enumerate(evaluator.metric_names):
-      metric_dict[name] = metrics[i]
+  metrics = evaluator.result()
+  metric_dict = {}
+  for i, name in enumerate(evaluator.metric_names):
+    metric_dict[name] = metrics[i]
 
-    if label_map:
-      for i, cid in enumerate(sorted(label_map.keys())):
-        name = 'AP_/%s' % label_map[cid]
-        metric_dict[name] = metrics[i + len(evaluator.metric_names)]
-    print(metric_dict)
+  if label_map:
+    for i, cid in enumerate(sorted(label_map.keys())):
+      name = 'AP_/%s' % label_map[cid]
+      metric_dict[name] = metrics[i + len(evaluator.metric_names)]
+  print(FLAGS.model_name, metric_dict)
 
 
 if __name__ == '__main__':
