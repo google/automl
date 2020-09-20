@@ -37,7 +37,7 @@ flags.DEFINE_string('tensorrt', None, 'TensorRT mode: {None, FP32, FP16, INT8}')
 flags.DEFINE_integer('batch_size', 1, 'Batch size for inference.')
 
 flags.DEFINE_string('ckpt_path', None, 'checkpoint dir used for eval.')
-flags.DEFINE_string('export_path', None, 'Output model path.')
+flags.DEFINE_string('export_ckpt', None, 'Output model ckpt path.')
 
 flags.DEFINE_string(
     'hparams', '', 'Comma separated k=v pairs of hyperparameters or a module'
@@ -61,7 +61,6 @@ flags.DEFINE_string('saved_model_dir', '/tmp/saved_model',
                     'Folder path for saved model.')
 flags.DEFINE_string('tflite_path', None, 'Path for exporting tflite file.')
 flags.DEFINE_bool('debug', False, 'Debug mode.')
-
 FLAGS = flags.FLAGS
 
 
@@ -114,12 +113,21 @@ def main(_):
     Image.fromarray(img).save(output_image_path)
     print('writing file to %s' % output_image_path)
   elif FLAGS.mode == 'benchmark':
-    if tf.saved_model.contains_saved_model(FLAGS.saved_model_dir):
+    if FLAGS.saved_model_dir:
       driver.load(FLAGS.saved_model_dir)
-    image_file = tf.io.read_file(FLAGS.input_image)
-    image_arrays = tf.image.decode_image(image_file)
-    image_arrays.set_shape((None, None, 3))
-    image_arrays = tf.expand_dims(image_arrays, axis=0)
+
+    batch_size = FLAGS.batch_size or 1
+    if FLAGS.input_image:
+      image_file = tf.io.read_file(FLAGS.input_image)
+      image_arrays = tf.image.decode_image(image_file)
+      image_arrays.set_shape((None, None, 3))
+      image_arrays = tf.expand_dims(image_arrays, 0)
+      if batch_size > 1:
+        image_arrays = tf.repeat(image_arrays, batch_size, axis=0)
+    else:
+      # use synthetic data if no image is provided.
+      image_arrays = tf.ones((batch_size, *model_config.image_size, 3),
+                             dtype=tf.uint8)
     driver.benchmark(image_arrays, FLAGS.bm_runs, FLAGS.trace_filename)
   elif FLAGS.mode == 'dry':
     # transfer to tf2 format ckpt
@@ -127,8 +135,8 @@ def main(_):
     ckpt_path_or_file = FLAGS.ckpt_path
     if tf.io.gfile.isdir(ckpt_path_or_file):
       ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
-    if FLAGS.export_path:
-      driver.model.save_weights(FLAGS.export_path)
+    if FLAGS.export_ckpt:
+      driver.model.save_weights(FLAGS.export_ckpt)
   elif FLAGS.mode == 'video':
     import cv2  # pylint: disable=g-import-not-at-top
     if tf.saved_model.contains_saved_model(FLAGS.saved_model_dir):

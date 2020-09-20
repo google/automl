@@ -42,8 +42,8 @@ def batch_map_fn(map_fn, inputs, *args, **kwargs):
     batch_size = inputs[0].shape.as_list()[0]
 
   if not batch_size:
-    # use tf.map_fn to handle dynamic batch_size.
-    return tf.map_fn(map_fn, inputs, *args, **kwargs)
+    # handle dynamic batch size: tf.vectorized_map is faster than tf.map_fn.
+    return tf.vectorized_map(map_fn, inputs, *args)
 
   outputs = []
   for i in range(batch_size):
