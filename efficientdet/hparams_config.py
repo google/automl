@@ -284,8 +284,22 @@ def default_detection_configs():
   # Reduces memory during training
   h.gradient_checkpointing = False
 
-  # Values that could be used "Add", "Mul", "Conv2d", "Floor", "Sigmoid", etc
+  # Values that could be used are "Add", "Mul", "Conv2d", "Floor", "Sigmoid",
+  # and other ops names
   # or more specific, e.g. "blocks_10/se/conv2d_1"
+  # E.g. if you use ["Add", "Sigmoid"] it would automatically checkpoint
+  # all "Add" and "Sigmoid" ops
+  # The advantage of adding more ops is that the GPU does not need to recompute
+  # them during the backward pass and can use them as a base to recompute
+  # other nodes, so it improves the speed
+  # The disadvantage of adding more ops is it requires more GPU memory to cache
+  # the computation
+  # The default is ["Add"] as it is a "bottleneck" node in the backbone network
+  # EfficientNet. It has been tested and works reasonably well:
+  # 1) For d4 network with batch-size of 1 (mixed precision enabled) it takes
+  # only 1/3.2 of memory with roughly 32% slower computation.
+  # 2) It allows to train a d6 network with batch size of 2 and mixed precision
+  # on a 11Gb (2080ti) GPU, without this option there is an OOM error
   h.gradient_checkpointing_list = ["Add"]
 
   # enable memory logging for NVIDIA cards

@@ -111,8 +111,8 @@ def gpu_memory_util_message():
   return None
 
 
-def commonsize(inp):
-  """Convert all to MiB."""
+def commonsize(input_size):
+  """Convert memory information to a common size (MiB)."""
   const_sizes = {
       'B': 1,
       'KB': 1e3,
@@ -124,11 +124,12 @@ def commonsize(inp):
       'MiB': 1048576,
       'GiB': 1073741824
   }
-  inp = inp.split(" ")
+  input_size = input_size.split(" ")
   # convert all to MiB
-  if inp[1] != 'MiB':
-    inp_ = float(inp[0]) * (const_sizes[inp[1]] / 1048576.0)
+  if input_size[1] != 'MiB':
+    converted_size = float(input_size[0]) * (
+        const_sizes[input_size[1]] / 1048576.0)
   else:
-    inp_ = float(inp[0])
+    converted_size = float(input_size[0])
 
-  return inp_
+  return converted_size
