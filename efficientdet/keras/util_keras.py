@@ -114,7 +114,7 @@ def restore_ckpt(model, ckpt_path_or_file, ema_decay=0.9998):
     }
   else:
     ema_vars = get_ema_vars(model)
-    var_dict = ema_vars
+    var_dict = {var.name.split(':')[0]: var for (ref, var) in ema_vars.items()}
   # add variables that not in var_dict
   for v in model.variables:
     if v.ref() not in ema_vars:
