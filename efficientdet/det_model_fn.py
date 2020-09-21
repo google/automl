@@ -18,7 +18,6 @@ import re
 from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
-
 import coco_metric
 import efficientdet_arch
 import hparams_config
@@ -153,7 +152,7 @@ def focal_loss(y_pred, y_true, alpha, gamma, normalizer, label_smoothing=0.0):
     pred_prob = tf.sigmoid(y_pred)
     p_t = (y_true * pred_prob) + ((1 - y_true) * (1 - pred_prob))
     alpha_factor = y_true * alpha + (1 - y_true) * (1 - alpha)
-    modulating_factor = (1.0 - p_t) ** gamma
+    modulating_factor = (1.0 - p_t)**gamma
 
     # apply label smoothing for cross_entropy for each entry.
     y_true = y_true * (1.0 - label_smoothing) + 0.5 * label_smoothing
@@ -302,8 +301,7 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
   box_loss = tf.add_n(box_losses) if box_losses else 0
 
   total_loss = (
-      cls_loss +
-      params['box_loss_weight'] * box_loss +
+      cls_loss + params['box_loss_weight'] * box_loss +
       params['iou_loss_weight'] * box_iou_loss)
 
   return total_loss, cls_loss, box_loss, box_iou_loss
@@ -347,6 +345,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   params['is_training_bn'] = (mode == tf.estimator.ModeKeys.TRAIN)
 
   if params['use_keras_model']:
+
     def model_fn(inputs):
       model = efficientdet_keras.EfficientDetNet(
           config=hparams_config.Config(params))
@@ -418,6 +417,21 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
     if params['strategy'] == 'tpu':
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)
+    if params['gradient_checkpointing']:
+      from third_party.grad_checkpoint import memory_saving_gradients  # pylint: disable=import-outside-toplevel
+      from tensorflow.python.ops import gradients  # pylint: disable=import-outside-toplevel
+
+      # monkey patch tf.gradients to point to our custom version,
+      # with automatic checkpoint selection
+      def gradients_(ys, xs, grad_ys=None, **kwargs):
+        return memory_saving_gradients.gradients(
+            ys,
+            xs,
+            grad_ys,
+            checkpoints=params['gradient_checkpointing_list'],
+            **kwargs)
+
+      gradients.__dict__["gradients"] = gradients_
 
     # Batch norm requires update_ops to be added as a train_op dependency.
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -615,6 +629,24 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
         every_n_iter=params.get('iterations_per_loop', 100),
     )
     training_hooks.append(logging_hook)
+
+    if params["nvgpu_logging"]:
+      try:
+        from third_party.tools.nvgpu import gpu_memory_util_message  # pylint: disable=import-outside-toplevel
+
+        mem_message = tf.py_func(gpu_memory_util_message, [], [tf.string])[0]
+
+        logging_hook_nvgpu = tf.estimator.LoggingTensorHook(
+            tensors={
+                "mem_message": mem_message,
+            },
+            every_n_iter=params.get('iterations_per_loop', 100),
+            formatter=lambda x: x["mem_message"].decode("utf-8"),
+        )
+        training_hooks.append(logging_hook_nvgpu)
+      except:
+        logging.error("nvgpu error: nvidia-smi format not recognized")
+
   if params['strategy'] == 'tpu':
     return tf.estimator.tpu.TPUEstimatorSpec(
         mode=mode,

@@ -369,4 +369,26 @@ For more instructions about training on TPUs, please refer to the following tuto
 
   * EfficientNet tutorial: https://cloud.google.com/tpu/docs/tutorials/efficientnet
 
+## 11. Reducing Memory Usage when Training EfficientDets on GPU.
+
+EfficientDets use a lot of GPU memory for a few reasons:
+
+* Large input resolution: because resolution is one of the scaling dimension, our resolution tends to be higher, which significantly increase activations (although no parameter increase).
+* Large internal activations for backbone: our backbone uses a relatively large expansion ratio (6), causing the large expanded activations.
+* Deep BiFPN: our BiFPN has multiple top-down and bottom-up paths, which leads to a lot of intermediate memory usage during training.
+
+To train this model on GPU with low memory there is an experimental option gradient_checkpointing.
+
+Check these links for a high-level idea of what gradient checkpointing is doing:
+1. https://github.com/cybertronai/gradient-checkpointing
+2. https://medium.com/tensorflow/fitting-larger-networks-into-memory-583e3c758ff9
+
+**gradient_checkpointing: True**
+
+If set to True, strings defined by gradient_checkpointing_list (["Add"] by default) are searched in the tensors names and any tensors that match a string from the list are kept as checkpoints. When this option is used the standard tensorflow.python.ops.gradients method is being replaced with a custom method.
+
+Testing shows that:
+* On d4 network with batch-size of 1 (mixed precision enabled) it takes only 1/3.2 of memory with roughly 32% slower computation
+* It also allows to compute a d6 network with batch size of 2 (mixed precision enabled) on a 11Gb (2080Ti) GPU
+
 NOTE: this is not an official Google product.

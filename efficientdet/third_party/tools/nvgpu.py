@@ -96,3 +96,40 @@ def gpu_info():
     return XmlDictConfig(root)
   except FileNotFoundError:
     return None
+
+
+def gpu_memory_util_message():
+  """Provide information about GPUs."""
+  gpu_info_d = gpu_info()
+  if gpu_info_d is not None:
+    mem_used = gpu_info_d['gpu']['fb_memory_usage']['used']
+    mem_total = gpu_info_d['gpu']['fb_memory_usage']['total']
+    mem_util = commonsize(mem_used) / commonsize(mem_total)
+    logstring = ("GPU memory used: {} = {:.1%} ".format(mem_used, mem_util) +
+                 "of total GPU memory: {}".format(mem_total))
+    return logstring
+  return None
+
+
+def commonsize(input_size):
+  """Convert memory information to a common size (MiB)."""
+  const_sizes = {
+      'B': 1,
+      'KB': 1e3,
+      'MB': 1e6,
+      'GB': 1e9,
+      'TB': 1e12,
+      'PB': 1e15,
+      'KiB': 1024,
+      'MiB': 1048576,
+      'GiB': 1073741824
+  }
+  input_size = input_size.split(" ")
+  # convert all to MiB
+  if input_size[1] != 'MiB':
+    converted_size = float(input_size[0]) * (
+        const_sizes[input_size[1]] / 1048576.0)
+  else:
+    converted_size = float(input_size[0])
+
+  return converted_size

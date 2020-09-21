@@ -26,7 +26,6 @@ import det_model_fn
 import hparams_config
 import utils
 
-
 flags.DEFINE_string(
     'tpu',
     default=None,
@@ -341,8 +340,7 @@ def main(_):
           input_fn=train_input_fn,
           max_steps=e * FLAGS.num_examples_per_epoch // FLAGS.train_batch_size)
       print('\n   =====> Starting evaluation, epoch: %d.' % e)
-      eval_results = eval_est.evaluate(
-          input_fn=eval_input_fn, steps=eval_steps)
+      eval_results = eval_est.evaluate(input_fn=eval_input_fn, steps=eval_steps)
       ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
       utils.archive_ckpt(eval_results, eval_results['AP'], ckpt)
 
