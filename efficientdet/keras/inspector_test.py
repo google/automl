@@ -16,12 +16,10 @@ r"""Tests for model inspect tool."""
 import os
 import shutil
 import tempfile
+import subprocess
 
 from absl import logging
-
 import tensorflow as tf
-
-import subprocess
 
 
 class ModelInspectTest(tf.test.TestCase):
@@ -42,19 +40,31 @@ class ModelInspectTest(tf.test.TestCase):
     shutil.rmtree(self.tempdir)
 
   def test_dry(self):
-    result = subprocess.run(['python3','keras/inspector.py','--mode=dry', '--ckpt_path=_'])
+    result = subprocess.run(
+        ['python3', 'keras/inspector.py', '--mode=dry', '--ckpt_path=_'])
     self.assertEqual(result.returncode, 0)
 
   def test_infer(self):
-    result = subprocess.run(['python3','keras/inspector.py','--mode=infer', '--ckpt_path=_', '--input_image={}'.format('testdata/img1.jpg'), '--output_image_dir={}'.format('testdata')])
+    result = subprocess.run([
+        'python3', 'keras/inspector.py', '--mode=infer', '--ckpt_path=_',
+        '--input_image={}'.format('testdata/img1.jpg'),
+        '--output_image_dir={}'.format('testdata')
+    ])
     self.assertEqual(result.returncode, 0)
 
   def test_benchmark(self):
-    result = subprocess.run(['python3','keras/inspector.py','--mode=benchmark', '--ckpt_path=_', '--input_image={}'.format('testdata/img1.jpg'), '--output_image_dir={}'.format('testdata')])
+    result = subprocess.run([
+        'python3', 'keras/inspector.py', '--mode=benchmark', '--ckpt_path=_',
+        '--input_image={}'.format('testdata/img1.jpg'),
+        '--output_image_dir={}'.format('testdata')
+    ])
     self.assertEqual(result.returncode, 0)
 
   def test_export(self):
-    result = subprocess.run(['python3', 'keras/inspector.py','--mode=export', '--ckpt_path=_', '--saved_model_dir={}'.format(self.savedmodel_dir)])
+    result = subprocess.run([
+        'python3', 'keras/inspector.py', '--mode=export', '--ckpt_path=_',
+        '--saved_model_dir={}'.format(self.savedmodel_dir)
+    ])
     self.assertEqual(result.returncode, 0)
 
 
