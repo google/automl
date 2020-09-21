@@ -532,6 +532,11 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     return loss_vals
 
   def _graph_gradients(self, images, labels):
+    if self.config.gradient_checkpointing_list:
+      from third_party.grad_checkpoint import memory_saving_gradients  # pylint: disable=import-outside-toplevel
+      tf_gradients = memory_saving_gradients.gradients_speed
+    else:
+      tf_gradients = tf.gradients
     cls_outputs, box_outputs, seg_outputs = None, None, None
     if len(self.config.heads) == 2:
       cls_outputs, box_outputs, seg_outputs = self(images, training=True)
@@ -558,7 +563,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       scaled_loss = total_loss
     loss_vals['loss'] = total_loss
     trainable_vars = self._freeze_vars()
-    scaled_gradients = tf.gradients(scaled_loss, trainable_vars)
+    scaled_gradients = tf_gradients(scaled_loss, trainable_vars)
     if isinstance(self.optimizer,
                   tf.keras.mixed_precision.experimental.LossScaleOptimizer):
       gradients = self.optimizer.get_unscaled_gradients(scaled_gradients)
