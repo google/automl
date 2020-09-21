@@ -251,7 +251,11 @@ def main(_):
   if FLAGS.year != 'merged':
     years = [FLAGS.year]
 
-  logging.info('writing to output path: %s', FLAGS.output_path)
+  output_dir = os.path.dirname(FLAGS.output_path)
+  if not tf.io.gfile.exists(output_dir):
+    tf.io.gfile.makedirs(output_dir)
+  logging.info('Writing to output directory: %s', output_dir)
+
   writers = [
       tf.python_io.TFRecordWriter(FLAGS.output_path + '-%05d-of-%05d.tfrecord' %
                                   (i, FLAGS.num_shards))
