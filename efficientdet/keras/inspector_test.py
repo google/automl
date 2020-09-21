@@ -17,13 +17,11 @@ import os
 import shutil
 import tempfile
 
-from absl import flags
 from absl import logging
 
 import tensorflow as tf
 
 import subprocess
-FLAGS = flags.FLAGS
 
 
 class ModelInspectTest(tf.test.TestCase):
