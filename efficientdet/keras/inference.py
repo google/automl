@@ -246,7 +246,7 @@ class ServingDriver(object):
     def wrap_frozen_graph(graph_def, inputs, outputs):
       # https://www.tensorflow.org/guide/migrate
       def _imports_graph_def():
-        tf.compat.v1.import_graph_def(graph_def, name="")
+        tf.import_graph_def(graph_def, name="")
       wrapped_import = tf.compat.v1.wrap_function(_imports_graph_def, [])
       import_graph = wrapped_import.graph
       return wrapped_import.prune(
@@ -256,7 +256,7 @@ class ServingDriver(object):
     graph_def = tf.Graph().as_graph_def()
     with tf.io.gfile.GFile(saved_model_dir_or_frozen_graph, 'rb') as f:
       graph_def.ParseFromString(f.read())
-    self.model = tf.import_graph_def(graph_def, name='')
+
     self.model = wrap_frozen_graph(
         graph_def,
         inputs='images:0',
