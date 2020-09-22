@@ -36,7 +36,7 @@ flags.DEFINE_integer('bm_runs', 10, 'Number of benchmark runs.')
 flags.DEFINE_string('tensorrt', None, 'TensorRT mode: {None, FP32, FP16, INT8}')
 flags.DEFINE_integer('batch_size', 1, 'Batch size for inference.')
 
-flags.DEFINE_string('ckpt_path', None, 'checkpoint dir used for eval.')
+flags.DEFINE_string('ckpt_path', '_', 'checkpoint dir used for eval.')
 flags.DEFINE_string('export_ckpt', None, 'Output model ckpt path.')
 
 flags.DEFINE_string(
@@ -84,7 +84,10 @@ def main(_):
     model_config.nms_configs.max_output_size = FLAGS.max_boxes_to_draw
 
   model_params = model_config.as_dict()
-  driver = inference.ServingDriver(FLAGS.model_name, FLAGS.ckpt_path,
+  ckpt_path_or_file = FLAGS.ckpt_path
+  if tf.io.gfile.isdir(ckpt_path_or_file):
+    ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
+  driver = inference.ServingDriver(FLAGS.model_name, ckpt_path_or_file,
                                    FLAGS.batch_size or None,
                                    FLAGS.min_score_thresh,
                                    FLAGS.max_boxes_to_draw, model_params)
@@ -132,9 +135,6 @@ def main(_):
   elif FLAGS.mode == 'dry':
     # transfer to tf2 format ckpt
     driver.build()
-    ckpt_path_or_file = FLAGS.ckpt_path
-    if tf.io.gfile.isdir(ckpt_path_or_file):
-      ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
     if FLAGS.export_ckpt:
       driver.model.save_weights(FLAGS.export_ckpt)
   elif FLAGS.mode == 'video':

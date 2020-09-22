@@ -133,7 +133,7 @@ class ServingDriver(object):
 
   def __init__(self,
                model_name: Text,
-               ckpt_path: Text,
+               ckpt_path: Text = None,
                batch_size: int = 1,
                min_score_thresh: float = None,
                max_boxes_to_draw: float = None,
