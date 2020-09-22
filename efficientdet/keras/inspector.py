@@ -126,7 +126,7 @@ def main(_):
       image_arrays.set_shape((None, None, 3))
       image_arrays = tf.expand_dims(image_arrays, 0)
       if batch_size > 1:
-        image_arrays = tf.repeat(image_arrays, batch_size, axis=0)
+        image_arrays = tf.tile(image_arrays, [batch_size, 1, 1, 1])
     else:
       # use synthetic data if no image is provided.
       image_arrays = tf.ones((batch_size, *model_config.image_size, 3),
