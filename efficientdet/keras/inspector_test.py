@@ -16,10 +16,13 @@ r"""Tests for model inspect tool."""
 import os
 import shutil
 import tempfile
-import subprocess
 
+from absl import flags
 from absl import logging
 import tensorflow as tf
+from keras import inspector
+
+FLAGS = flags.FLAGS
 
 
 class ModelInspectTest(tf.test.TestCase):
@@ -40,32 +43,28 @@ class ModelInspectTest(tf.test.TestCase):
     shutil.rmtree(self.tempdir)
 
   def test_dry(self):
-    result = subprocess.run(
-        ['python3', 'keras/inspector.py', '--mode=dry', '--ckpt_path=_'])
-    self.assertEqual(result.returncode, 0)
+    FLAGS.mode = 'dry'
+    FLAGS.export_ckpt = os.path.join(self.tempdir, 'model')
+    inspector.main(None)
+    self.assertIsNot(tf.train.get_checkpoint_state(self.tempdir), None)
 
   def test_infer(self):
-    result = subprocess.run([
-        'python3', 'keras/inspector.py', '--mode=infer', '--ckpt_path=_',
-        '--input_image={}'.format('testdata/img1.jpg'),
-        '--output_image_dir={}'.format('testdata')
-    ])
-    self.assertEqual(result.returncode, 0)
+    FLAGS.mode = 'infer'
+    FLAGS.input_image = 'testdata/img1.jpg'
+    FLAGS.output_image_dir = self.tempdir
+    inspector.main(None)
+    self.assertTrue(tf.io.gfile.exists(os.path.join(self.tempdir, '0.jpg')))
 
   def test_benchmark(self):
-    result = subprocess.run([
-        'python3', 'keras/inspector.py', '--mode=benchmark', '--ckpt_path=_',
-        '--input_image={}'.format('testdata/img1.jpg'),
-        '--output_image_dir={}'.format('testdata')
-    ])
-    self.assertEqual(result.returncode, 0)
+    FLAGS.mode = 'benchmark'
+    inspector.main(None)
+    self.assertFalse(tf.io.gfile.exists(os.path.join(self.tempdir, '0.jpg')))
 
   def test_export(self):
-    result = subprocess.run([
-        'python3', 'keras/inspector.py', '--mode=export', '--ckpt_path=_',
-        '--saved_model_dir={}'.format(self.savedmodel_dir)
-    ])
-    self.assertEqual(result.returncode, 0)
+    FLAGS.mode = 'export'
+    FLAGS.saved_model_dir = self.savedmodel_dir
+    inspector.main(None)
+    self.assertTrue(tf.saved_model.contains_saved_model(self.savedmodel_dir))
 
 
 if __name__ == '__main__':
