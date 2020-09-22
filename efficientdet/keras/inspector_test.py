@@ -40,25 +40,25 @@ class InspectorTest(tf.test.TestCase):
     super().tearDown()
     shutil.rmtree(self.tempdir)
 
-  # @flagsaver.flagsaver(mode='dry')
-  # def test_dry(self):
-  #   FLAGS.export_ckpt = os.path.join(self.tempdir, 'model')
-  #   inspector.main(None)
-  #   self.assertIsNot(tf.train.get_checkpoint_state(self.tempdir), None)
+  @flagsaver.flagsaver(mode='dry')
+  def test_dry(self):
+    FLAGS.export_ckpt = os.path.join(self.tempdir, 'model')
+    inspector.main(None)
+    self.assertIsNot(tf.train.get_checkpoint_state(self.tempdir), None)
 
-  # @flagsaver.flagsaver(mode='infer', saved_model_dir=None)
-  # def test_infer(self):
-  #   test_image = np.random.randint(0, 244, (640, 720, 3)).astype(np.uint8)
-  #   FLAGS.input_image = os.path.join(self.tempdir, 'img.jpg')
-  #   Image.fromarray(test_image).save(FLAGS.input_image)
-  #   FLAGS.output_image_dir = self.tempdir
-  #   inspector.main(None)
-  #   self.assertTrue(tf.io.gfile.exists(os.path.join(self.tempdir, '0.jpg')))
+  @flagsaver.flagsaver(mode='infer', saved_model_dir=None)
+  def test_infer(self):
+    test_image = np.random.randint(0, 244, (640, 720, 3)).astype(np.uint8)
+    FLAGS.input_image = os.path.join(self.tempdir, 'img.jpg')
+    Image.fromarray(test_image).save(FLAGS.input_image)
+    FLAGS.output_image_dir = self.tempdir
+    inspector.main(None)
+    self.assertTrue(tf.io.gfile.exists(os.path.join(self.tempdir, '0.jpg')))
 
-  # @flagsaver.flagsaver(mode='benchmark', saved_model_dir=None)
-  # def test_benchmark(self):
-  #   inspector.main(None)
-  #   self.assertFalse(tf.io.gfile.exists(os.path.join(self.tempdir, '0.jpg')))
+  @flagsaver.flagsaver(mode='benchmark', saved_model_dir=None)
+  def test_benchmark(self):
+    inspector.main(None)
+    self.assertFalse(tf.io.gfile.exists(os.path.join(self.tempdir, '0.jpg')))
 
   @flagsaver.flagsaver(mode='export')
   def test_export(self):
