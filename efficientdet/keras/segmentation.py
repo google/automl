@@ -17,6 +17,8 @@ from absl import app
 from absl import logging
 import tensorflow as tf
 import tensorflow_datasets as tfds
+
+import hparams_config
 from keras import efficientdet_keras
 
 
@@ -71,8 +73,9 @@ def main(_):
   train_dataset = train_dataset.prefetch(
       buffer_size=tf.data.experimental.AUTOTUNE)
   test_dataset = test.batch(batch_size)
-
-  model = efficientdet_keras.EfficientDetNet('efficientdet-d0')
+  config = hparams_config.get_efficientdet_config('efficientdet-d0')
+  config.heads = ['segmentation']
+  model = efficientdet_keras.EfficientDetNet(config=config)
   model.build((1, 512, 512, 3))
   model.compile(
       optimizer='adam',
