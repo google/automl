@@ -327,7 +327,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     labels: the input labels in a dictionary. The labels include class targets
       and box targets which are dense label maps. The labels are generated from
       get_input_fn function in data/dataloader.py
-    mode: the mode of TPUEstimator including TRAIN, EVAL, and PREDICT.
+    mode: the mode of TPUEstimator including TRAIN and EVAL.
     params: the dictionary defines hyperparameters of model. The default
       settings are in default_hparams function in this file.
     model: the model outputs class logits and box regression outputs.
@@ -366,16 +366,6 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   for level in levels:
     cls_outputs[level] = tf.cast(cls_outputs[level], tf.float32)
     box_outputs[level] = tf.cast(box_outputs[level], tf.float32)
-
-  # First check if it is in PREDICT mode.
-  if mode == tf.estimator.ModeKeys.PREDICT:
-    predictions = {
-        'image': features,
-    }
-    for level in levels:
-      predictions['cls_outputs_%d' % level] = cls_outputs[level]
-      predictions['box_outputs_%d' % level] = box_outputs[level]
-    return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
 
   # Set up training loss and learning rate.
   update_learning_rate_schedule_parameters(params)
