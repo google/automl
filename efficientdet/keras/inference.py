@@ -302,10 +302,14 @@ class ServingDriver(object):
     logging.info('Frozen graph saved at %s', proto_path)
 
     if tflite_path:
-      converter = tf.lite.TFLiteConverter.from_saved_model(output_dir)
-      converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
-      tflite_model = converter.convert()
+      # Neither of the two approaches works so far.
+      converter = tf.lite.TFLiteConverter.from_keras_model(self.model)
+      converter.optimizations = [tf.lite.Optimize.DEFAULT]
+      converter.target_spec.supported_types = [tf.float16]
+      # converter = tf.lite.TFLiteConverter.from_saved_model(output_dir)
+      # converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
 
+      tflite_model = converter.convert()
       tf.io.gfile.GFile(tflite_path, 'wb').write(tflite_model)
       logging.info('TFLite is saved at %s', tflite_path)
 

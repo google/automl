@@ -36,7 +36,7 @@ flags.DEFINE_integer('bm_runs', 10, 'Number of benchmark runs.')
 flags.DEFINE_string('tensorrt', None, 'TensorRT mode: {None, FP32, FP16, INT8}')
 flags.DEFINE_integer('batch_size', 1, 'Batch size for inference.')
 
-flags.DEFINE_string('ckpt_path', '_', 'checkpoint dir used for eval.')
+flags.DEFINE_string('ckpt_path', None, 'checkpoint dir used for eval.')
 flags.DEFINE_string('export_ckpt', None, 'Output model ckpt path.')
 
 flags.DEFINE_string(
