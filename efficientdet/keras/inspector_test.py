@@ -16,55 +16,58 @@ r"""Tests for model inspect tool."""
 import os
 import shutil
 import tempfile
+import numpy as np
 
 from absl import flags
 from absl import logging
+from absl.testing import flagsaver
+from PIL import Image
 import tensorflow as tf
-from keras import inspector
 
+from keras import inspector
 FLAGS = flags.FLAGS
 
 
-class ModelInspectTest(tf.test.TestCase):
+class InspectorTest(tf.test.TestCase):
   """Model inspect tests."""
 
   def setUp(self):
     super().setUp()
-    sys_tempdir = tempfile.mkdtemp()
-    self.tempdir = os.path.join(sys_tempdir, '_inspect_test')
-    os.mkdir(self.tempdir)
-
-    self.savedmodel_dir = os.path.join(self.tempdir, 'savedmodel')
-    if os.path.exists(self.savedmodel_dir):
-      shutil.rmtree(self.savedmodel_dir)
+    self.tempdir = tempfile.mkdtemp()
+    FLAGS.ckpt_path = '_'
 
   def tearDown(self):
     super().tearDown()
     shutil.rmtree(self.tempdir)
 
+  @flagsaver.flagsaver(mode='dry')
   def test_dry(self):
-    FLAGS.mode = 'dry'
     FLAGS.export_ckpt = os.path.join(self.tempdir, 'model')
     inspector.main(None)
     self.assertIsNot(tf.train.get_checkpoint_state(self.tempdir), None)
 
+  @flagsaver.flagsaver(mode='infer', saved_model_dir=None)
   def test_infer(self):
-    FLAGS.mode = 'infer'
-    FLAGS.input_image = 'testdata/img1.jpg'
+    test_image = np.random.randint(0, 244, (640, 720, 3)).astype(np.uint8)
+    FLAGS.input_image = os.path.join(self.tempdir, 'img.jpg')
+    Image.fromarray(test_image).save(FLAGS.input_image)
     FLAGS.output_image_dir = self.tempdir
     inspector.main(None)
     self.assertTrue(tf.io.gfile.exists(os.path.join(self.tempdir, '0.jpg')))
 
+  @flagsaver.flagsaver(mode='benchmark', saved_model_dir=None)
   def test_benchmark(self):
-    FLAGS.mode = 'benchmark'
     inspector.main(None)
     self.assertFalse(tf.io.gfile.exists(os.path.join(self.tempdir, '0.jpg')))
 
+  @flagsaver.flagsaver(mode='export')
   def test_export(self):
-    FLAGS.mode = 'export'
-    FLAGS.saved_model_dir = self.savedmodel_dir
+    # TODO(xxx): add support for tflite.
+    # FLAGS.tflite_path = os.path.join(self.tempdir, 'test.tflite')
+    FLAGS.saved_model_dir = os.path.join(self.tempdir, 'savedmodel')
     inspector.main(None)
-    self.assertTrue(tf.saved_model.contains_saved_model(self.savedmodel_dir))
+    self.assertTrue(tf.saved_model.contains_saved_model(FLAGS.saved_model_dir))
+    # self.assertTrue(tf.io.gfile.exists(FLAGS.tflite_path))
 
 
 if __name__ == '__main__':

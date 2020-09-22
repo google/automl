@@ -15,6 +15,7 @@
 r"""Inference test cases."""
 import os
 import tempfile
+from absl import logging
 import tensorflow as tf
 from keras import efficientdet_keras
 from keras import inference
@@ -84,3 +85,8 @@ class InferenceTest(tf.test.TestCase):
     self.assertEqual(scores.shape, (1, 100))
     self.assertEqual(classes.shape, (1, 100))
     self.assertEqual(valid_lens.shape, (1,))
+
+
+if __name__ == '__main__':
+  logging.set_verbosity(logging.WARNING)
+  tf.test.main()
