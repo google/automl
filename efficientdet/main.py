@@ -352,9 +352,9 @@ def main(_):
         raise excp
 
     epochs_per_cycle = 1  # higher number has less graph construction overhead.
+    p_return = multiprocessing.Value('i', 0)
     for e in range(current_epoch + 1, config.num_epochs + 1, epochs_per_cycle):
       if FLAGS.run_epoch_in_child_process:
-        p_return = multiprocessing.Value('i', 0)
         p = multiprocessing.Process(
             target=run_train_and_eval, args=(e, p_return))
         p.start()
