@@ -133,7 +133,7 @@ class ServingDriver(object):
 
   def __init__(self,
                model_name: Text,
-               ckpt_path: Text,
+               ckpt_path: Text = None,
                batch_size: int = 1,
                min_score_thresh: float = None,
                max_boxes_to_draw: float = None,
@@ -246,7 +246,7 @@ class ServingDriver(object):
     def wrap_frozen_graph(graph_def, inputs, outputs):
       # https://www.tensorflow.org/guide/migrate
       def _imports_graph_def():
-        tf.compat.v1.import_graph_def(graph_def, name="")
+        tf.import_graph_def(graph_def, name="")
       wrapped_import = tf.compat.v1.wrap_function(_imports_graph_def, [])
       import_graph = wrapped_import.graph
       return wrapped_import.prune(
@@ -256,7 +256,7 @@ class ServingDriver(object):
     graph_def = tf.Graph().as_graph_def()
     with tf.io.gfile.GFile(saved_model_dir_or_frozen_graph, 'rb') as f:
       graph_def.ParseFromString(f.read())
-    self.model = tf.import_graph_def(graph_def, name='')
+
     self.model = wrap_frozen_graph(
         graph_def,
         inputs='images:0',
@@ -302,10 +302,14 @@ class ServingDriver(object):
     logging.info('Frozen graph saved at %s', proto_path)
 
     if tflite_path:
-      converter = tf.lite.TFLiteConverter.from_saved_model(output_dir)
-      converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
-      tflite_model = converter.convert()
+      # Neither of the two approaches works so far.
+      converter = tf.lite.TFLiteConverter.from_keras_model(self.model)
+      converter.optimizations = [tf.lite.Optimize.DEFAULT]
+      converter.target_spec.supported_types = [tf.float16]
+      # converter = tf.lite.TFLiteConverter.from_saved_model(output_dir)
+      # converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
 
+      tflite_model = converter.convert()
       tf.io.gfile.GFile(tflite_path, 'wb').write(tflite_model)
       logging.info('TFLite is saved at %s', tflite_path)
 
