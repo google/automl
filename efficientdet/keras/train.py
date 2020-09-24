@@ -192,7 +192,7 @@ def main(_):
         loss={
             'box_loss':
                 train_lib.BoxLoss(
-                    params['delta'], reduction=tf.keras.losses.Reduction.SUM),
+                    params['delta'], reduction=tf.keras.losses.Reduction.NONE),
             'box_iou_loss':
                 train_lib.BoxIouLoss(
                     params['iou_loss_type'],
@@ -202,17 +202,17 @@ def main(_):
                     params['aspect_ratios'],
                     params['anchor_scale'],
                     params['image_size'],
-                    reduction=tf.keras.losses.Reduction.SUM),
+                    reduction=tf.keras.losses.Reduction.NONE),
             'class_loss':
                 train_lib.FocalLoss(
                     params['alpha'],
                     params['gamma'],
                     label_smoothing=params['label_smoothing'],
-                    reduction=tf.keras.losses.Reduction.SUM),
+                    reduction=tf.keras.losses.Reduction.NONE),
             'seg_loss':
                 tf.keras.losses.SparseCategoricalCrossentropy(
                     from_logits=True,
-                    reduction=tf.keras.losses.Reduction.SUM)
+                    reduction=tf.keras.losses.Reduction.NONE)
         })
 
     if FLAGS.pretrained_ckpt:
