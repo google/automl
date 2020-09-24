@@ -358,16 +358,16 @@ class Pair(tuple):
 
 def scalar(name, tensor, is_tpu=True):
   """Stores a (name, Tensor) tuple in a custom collection."""
+  logging.info('Adding scale summary {}'.format(Pair(name, tensor)))
   if is_tpu:
-    logging.info('Adding scale summary {}'.format(Pair(name, tensor)))
     tf.add_to_collection('scalar_summaries', Pair(name, tf.reduce_mean(tensor)))
   else:
     tf.summary.scalar(name, tf.reduce_mean(tensor))
 
 
 def image(name, tensor, is_tpu=True):
+  logging.info('Adding image summary {}'.format(Pair(name, tensor)))
   if is_tpu:
-    logging.info('Adding image summary {}'.format(Pair(name, tensor)))
     tf.add_to_collection('image_summaries', Pair(name, tensor))
   else:
     tf.summary.image(name, tensor)
