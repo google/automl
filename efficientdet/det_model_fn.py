@@ -340,7 +340,9 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   Raises:
     RuntimeError: if both ckpt and backbone_ckpt are set.
   """
-  utils.image('input_image', features)
+  is_tpu = params['strategy'] == 'tpu'
+  if params['img_summary_steps']:
+    utils.image('input_image', features, is_tpu)
   training_hooks = []
   params['is_training_bn'] = (mode == tf.estimator.ModeKeys.TRAIN)
 
@@ -379,16 +381,16 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   total_loss = det_loss + reg_l2loss
 
   if mode == tf.estimator.ModeKeys.TRAIN:
-    utils.scalar('lrn_rate', learning_rate)
-    utils.scalar('trainloss/cls_loss', cls_loss)
-    utils.scalar('trainloss/box_loss', box_loss)
-    utils.scalar('trainloss/det_loss', det_loss)
-    utils.scalar('trainloss/reg_l2_loss', reg_l2loss)
-    utils.scalar('trainloss/loss', total_loss)
+    utils.scalar('lrn_rate', learning_rate, is_tpu)
+    utils.scalar('trainloss/cls_loss', cls_loss, is_tpu)
+    utils.scalar('trainloss/box_loss', box_loss, is_tpu)
+    utils.scalar('trainloss/det_loss', det_loss, is_tpu)
+    utils.scalar('trainloss/reg_l2_loss', reg_l2loss, is_tpu)
+    utils.scalar('trainloss/loss', total_loss, is_tpu)
     if params['iou_loss_type']:
-      utils.scalar('trainloss/box_iou_loss', box_iou_loss)
+      utils.scalar('trainloss/box_iou_loss', box_iou_loss, is_tpu)
     train_epochs = tf.cast(global_step, tf.float32) / params['steps_per_epoch']
-    utils.scalar('train_epochs', train_epochs)
+    utils.scalar('train_epochs', train_epochs, is_tpu)
 
   moving_average_decay = params['moving_average_decay']
   if moving_average_decay:
@@ -405,7 +407,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     else:
       raise ValueError('optimizers should be adam or sgd')
 
-    if params['strategy'] == 'tpu':
+    if is_tpu:
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)
     if params['gradient_checkpointing']:
       from third_party.grad_checkpoint import memory_saving_gradients  # pylint: disable=import-outside-toplevel
@@ -442,7 +444,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
             for g in grads
         ]
         clipped_grads, _ = tf.clip_by_global_norm(clipped_grads, clip_norm)
-        utils.scalar('gradient_norm', tf.linalg.global_norm(clipped_grads))
+        utils.scalar('gradient_norm', tf.linalg.global_norm(clipped_grads), is_tpu)
         grads_and_vars = list(zip(clipped_grads, tvars))
 
       with tf.control_dependencies(update_ops):
@@ -592,7 +594,16 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   else:
     scaffold_fn = None
 
-  if params['strategy'] != 'tpu':
+  if is_tpu:
+    return tf.estimator.tpu.TPUEstimatorSpec(
+      mode=mode,
+      loss=total_loss,
+      train_op=train_op,
+      eval_metrics=eval_metrics,
+      host_call=utils.get_tpu_host_call(global_step, params),
+      scaffold_fn=scaffold_fn,
+      training_hooks=training_hooks)
+  else:
     # Profile every 1K steps.
     if params.get('profile', False):
       profile_hook = tf.estimator.ProfilerHook(
@@ -637,19 +648,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
       except:
         logging.error("nvgpu error: nvidia-smi format not recognized")
 
-  if params['strategy'] == 'tpu':
-    return tf.estimator.tpu.TPUEstimatorSpec(
-        mode=mode,
-        loss=total_loss,
-        train_op=train_op,
-        eval_metrics=eval_metrics,
-        host_call=utils.get_tpu_host_call(global_step, params),
-        scaffold_fn=scaffold_fn,
-        training_hooks=training_hooks)
-  else:
     eval_metric_ops = (
         eval_metrics[0](**eval_metrics[1]) if eval_metrics else None)
-    utils.get_tpu_host_call(global_step, params)
     return tf.estimator.EstimatorSpec(
         mode=mode,
         loss=total_loss,
