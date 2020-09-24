@@ -334,33 +334,24 @@ def main(_):
       logging.info('Folder %s has no ckpt with valid step.', FLAGS.model_dir)
       current_epoch = 0
 
-    def run_train_and_eval(e, p_return=None):
-      try:
-        print('\n   =====> Starting training, epoch: %d.' % e)
-        train_est.train(
-            input_fn=train_input_fn,
-            max_steps=e * FLAGS.num_examples_per_epoch //
-            FLAGS.train_batch_size)
-        print('\n   =====> Starting evaluation, epoch: %d.' % e)
-        eval_results = eval_est.evaluate(
-            input_fn=eval_input_fn, steps=eval_steps)
-        ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
-        utils.archive_ckpt(eval_results, eval_results['AP'], ckpt)
-      except Exception as excp:
-        if p_return is not None:
-          p_return.value = 1
-        raise excp
+    def run_train_and_eval(e):
+      print('\n   =====> Starting training, epoch: %d.' % e)
+      train_est.train(
+          input_fn=train_input_fn,
+          max_steps=e * FLAGS.num_examples_per_epoch // FLAGS.train_batch_size)
+      print('\n   =====> Starting evaluation, epoch: %d.' % e)
+      eval_results = eval_est.evaluate(input_fn=eval_input_fn, steps=eval_steps)
+      ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
+      utils.archive_ckpt(eval_results, eval_results['AP'], ckpt)
 
     epochs_per_cycle = 1  # higher number has less graph construction overhead.
-    p_return = multiprocessing.Value('i', 0)
     for e in range(current_epoch + 1, config.num_epochs + 1, epochs_per_cycle):
       if FLAGS.run_epoch_in_child_process:
-        p = multiprocessing.Process(
-            target=run_train_and_eval, args=(e, p_return))
+        p = multiprocessing.Process(target=run_train_and_eval, args=(e,))
         p.start()
         p.join()
-        if p_return.value == 1:
-          break
+        if p.exitcode != 0:
+          return p.exitcode
       else:
         run_train_and_eval(e)
 
