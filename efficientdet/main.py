@@ -350,6 +350,8 @@ def main(_):
         p = multiprocessing.Process(target=run_train_and_eval, args=(e,))
         p.start()
         p.join()
+        if p.exitcode != 0:
+          return p.exitcode
       else:
         run_train_and_eval(e)
 
