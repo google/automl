@@ -385,7 +385,7 @@ Check these links for a high-level idea of what gradient checkpointing is doing:
 
 **gradient_checkpointing: True**
 
-If set to True, strings defined by gradient_checkpointing_list (["Add"] by default) are searched in the tensors names and any tensors that match a string from the list are kept as checkpoints. When this option is used the standard tensorflow.python.ops.gradients method is being replaced with a custom method.
+If set to True, strings defined by gradient_checkpointing_list (["Add\_", "AddN"] by default) are searched in the tensors names and any tensors that match a string from the list are kept as checkpoints. When this option is used the standard tensorflow.python.ops.gradients method is being replaced with a custom method.
 
 Testing shows that:
 * On d4 network with batch-size of 1 (mixed precision enabled) it takes only 1/3.2 of memory with roughly 32% slower computation
