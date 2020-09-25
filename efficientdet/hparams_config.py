@@ -294,8 +294,9 @@ def default_detection_configs():
   # other nodes, so it improves the speed
   # The disadvantage of adding more ops is it requires more GPU memory to cache
   # the computation
-  # The default is ["Add_", "AddN"] as it is a "bottleneck" node in the backbone network
-  # EfficientNet. It has been tested and works reasonably well:
+  # The default are ["Add_", "AddN"] as these are "bottleneck" nodes
+  # in the backbone network EfficientNet and in FPN network
+  # It has been tested and works reasonably well:
   # 1) For d4 network with batch-size of 1 (mixed precision enabled) it takes
   # only 1/3.2 of memory with roughly 32% slower computation.
   # 2) It allows to train a d6 network with batch size of 2 and mixed precision
