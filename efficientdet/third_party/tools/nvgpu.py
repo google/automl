@@ -13,7 +13,6 @@
 # limitations under the License.
 # ==============================================================================
 """Python interface for nvidia-smi."""
-
 import subprocess
 from xml.etree import cElementTree as ElementTree
 
@@ -91,7 +90,7 @@ class XmlDictConfig(dict):
 def gpu_info():
   """Provide information about GPUs."""
   try:
-    query = subprocess.check_output(["nvidia-smi", "-q", "-x"])
+    query = subprocess.check_output(['nvidia-smi', '-q', '-x'])
     root = ElementTree.XML(query)
     return XmlDictConfig(root)
   except FileNotFoundError:
@@ -105,13 +104,13 @@ def gpu_memory_util_message():
     mem_used = gpu_info_d['gpu']['fb_memory_usage']['used']
     mem_total = gpu_info_d['gpu']['fb_memory_usage']['total']
     mem_util = commonsize(mem_used) / commonsize(mem_total)
-    logstring = ("GPU memory used: {} = {:.1%} ".format(mem_used, mem_util) +
-                 "of total GPU memory: {}".format(mem_total))
+    logstring = ('GPU memory used: {} = {:.1%} '.format(mem_used, mem_util) +
+                 'of total GPU memory: {}'.format(mem_total))
     return logstring
   return None
 
 
-def commonsize(input_size):
+def commonsize(input_size: str):
   """Convert memory information to a common size (MiB)."""
   const_sizes = {
       'B': 1,
@@ -124,7 +123,7 @@ def commonsize(input_size):
       'MiB': 1048576,
       'GiB': 1073741824
   }
-  input_size = input_size.split(" ")
+  input_size = input_size.split(' ')
   # convert all to MiB
   if input_size[1] != 'MiB':
     converted_size = float(input_size[0]) * (

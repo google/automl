@@ -27,7 +27,6 @@ from keras import anchors
 from keras import efficientdet_keras
 from keras import label_util
 from keras import postprocess
-from keras import wbf
 
 # Cloud TPU Cluster Resolvers
 flags.DEFINE_string('tpu', None, 'The Cloud TPU name.')

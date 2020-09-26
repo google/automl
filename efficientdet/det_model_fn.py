@@ -409,21 +409,23 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
     if is_tpu:
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)
-    if params['gradient_checkpointing']:
-      from third_party.grad_checkpoint import memory_saving_gradients  # pylint: disable=import-outside-toplevel
-      from tensorflow.python.ops import gradients  # pylint: disable=import-outside-toplevel
+    if params['device']['gradient_checkpointing']:
+      # pylint: disable=g-import-not-at-top,g-direct-tensorflow-import
+      from brain_automl.efficientdet.third_party.grad_checkpoint import grad
+      from tensorflow.python.ops import gradients
+      # pylint: enable=g-import-not-at-top,g-direct-tensorflow-import
 
       # monkey patch tf.gradients to point to our custom version,
       # with automatic checkpoint selection
       def gradients_(ys, xs, grad_ys=None, **kwargs):
-        return memory_saving_gradients.gradients(
+        return grad.gradients(
             ys,
             xs,
             grad_ys,
             checkpoints=params['gradient_checkpointing_list'],
             **kwargs)
 
-      gradients.__dict__["gradients"] = gradients_
+      gradients.__dict__['gradients'] = gradients_
 
     # Batch norm requires update_ops to be added as a train_op dependency.
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -444,7 +446,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
             for g in grads
         ]
         clipped_grads, _ = tf.clip_by_global_norm(clipped_grads, clip_norm)
-        utils.scalar('gradient_norm', tf.linalg.global_norm(clipped_grads), is_tpu)
+        utils.scalar('gradient_norm', tf.linalg.global_norm(clipped_grads),
+                     is_tpu)
         grads_and_vars = list(zip(clipped_grads, tvars))
 
       with tf.control_dependencies(update_ops):
@@ -596,13 +599,13 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
   if is_tpu:
     return tf.estimator.tpu.TPUEstimatorSpec(
-      mode=mode,
-      loss=total_loss,
-      train_op=train_op,
-      eval_metrics=eval_metrics,
-      host_call=utils.get_tpu_host_call(global_step, params),
-      scaffold_fn=scaffold_fn,
-      training_hooks=training_hooks)
+        mode=mode,
+        loss=total_loss,
+        train_op=train_op,
+        eval_metrics=eval_metrics,
+        host_call=utils.get_tpu_host_call(global_step, params),
+        scaffold_fn=scaffold_fn,
+        training_hooks=training_hooks)
   else:
     # Profile every 1K steps.
     if params.get('profile', False):
@@ -631,22 +634,19 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     )
     training_hooks.append(logging_hook)
 
-    if params["nvgpu_logging"]:
+    if params['device']['nvgpu_logging']:
       try:
-        from third_party.tools.nvgpu import gpu_memory_util_message  # pylint: disable=import-outside-toplevel
-
-        mem_message = tf.py_func(gpu_memory_util_message, [], [tf.string])[0]
-
+        from third_party.tools import nvgpu  # pylint: disable=g-import-not-at-top
+        mem_message = tf.py_func(nvgpu.gpu_memory_util_message, [],
+                                 [tf.string])[0]
         logging_hook_nvgpu = tf.estimator.LoggingTensorHook(
-            tensors={
-                "mem_message": mem_message,
-            },
+            tensors={'mem_message': mem_message},
             every_n_iter=params.get('iterations_per_loop', 100),
-            formatter=lambda x: x["mem_message"].decode("utf-8"),
+            formatter=lambda x: x['mem_message'].decode('utf-8'),
         )
         training_hooks.append(logging_hook_nvgpu)
-      except:
-        logging.error("nvgpu error: nvidia-smi format not recognized")
+      except:  # pylint: disable=bare-except
+        logging.error('nvgpu error: nvidia-smi format not recognized.')
 
     eval_metric_ops = (
         eval_metrics[0](**eval_metrics[1]) if eval_metrics else None)

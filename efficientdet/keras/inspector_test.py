@@ -16,11 +16,10 @@ r"""Tests for model inspect tool."""
 import os
 import shutil
 import tempfile
-import numpy as np
-
 from absl import flags
 from absl import logging
 from absl.testing import flagsaver
+import numpy as np
 from PIL import Image
 import tensorflow as tf
 
