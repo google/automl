@@ -245,9 +245,8 @@ class ServingDriver(object):
     # Load a frozen graph.
     def wrap_frozen_graph(graph_def, inputs, outputs):
       # https://www.tensorflow.org/guide/migrate
-      def _imports_graph_def():
-        tf.import_graph_def(graph_def, name="")
-      wrapped_import = tf.compat.v1.wrap_function(_imports_graph_def, [])
+      imports_graph_def_fn = lambda: tf.import_graph_def(graph_def, name='')
+      wrapped_import = tf.compat.v1.wrap_function(imports_graph_def_fn, [])
       import_graph = wrapped_import.graph
       return wrapped_import.prune(
           tf.nest.map_structure(import_graph.as_graph_element, inputs),

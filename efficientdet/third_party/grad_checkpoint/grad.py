@@ -38,7 +38,7 @@ setattr(tf.GraphKeys, "VARIABLES", "variables")
 def toposort(nodes):
   """Sort topologically nodes based on https://pypi.org/project/toposort/."""
   # Special case empty input.
-  if len(nodes) == 0:
+  if not nodes:
     return
 
   # Copy the input so as to leave it unmodified.
@@ -52,7 +52,7 @@ def toposort(nodes):
   # Add empty dependences where needed.
   nodes.update({item: set() for item in isolated_items})
   while True:
-    ordered = set(item for item, dep in nodes.items() if len(dep) == 0)
+    ordered = set(item for item, dep in nodes.items() if not dep)
     if not ordered:
       break
     yield ordered
@@ -61,8 +61,8 @@ def toposort(nodes):
         for item, dep in nodes.items()
         if item not in ordered
     }
-  if len(nodes) != 0:
-    raise ValueError('expected empty, but got {}'.format(nodes))
+  if nodes:
+    raise ValueError("expected empty, but got {}".format(nodes))
 
 
 # ISSUE: https://github.com/cybertronai/gradient-checkpointing/issues/38

@@ -73,7 +73,7 @@ flags.DEFINE_multi_integer(
     'A list that describes the partition dims for all the tensors.')
 flags.DEFINE_integer('train_batch_size', 64, 'global training batch size')
 flags.DEFINE_integer('eval_batch_size', 1, 'global evaluation batch size')
-flags.DEFINE_integer('eval_samples', None, 'Number of samples for eval.')
+flags.DEFINE_integer('eval_samples', 5000, 'Number of samples for eval.')
 flags.DEFINE_integer('iterations_per_loop', 100,
                      'Number of iterations per TPU training loop')
 flags.DEFINE_integer('save_checkpoints_steps', 100,
@@ -218,7 +218,8 @@ def main(_):
   model_fn_instance = det_model_fn.get_model_fn(FLAGS.model_name)
   max_instances_per_image = config.max_instances_per_image
   if FLAGS.eval_samples:
-    eval_steps = int(FLAGS.eval_samples // FLAGS.eval_batch_size)
+    eval_steps = int((FLAGS.eval_samples + FLAGS.eval_batch_size - 1) //
+                     FLAGS.eval_batch_size)
   else:
     eval_steps = None
   total_examples = int(config.num_epochs * FLAGS.num_examples_per_epoch)
