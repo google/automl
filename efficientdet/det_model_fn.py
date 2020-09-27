@@ -409,9 +409,9 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
     if is_tpu:
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)
-    if params['device']['gradient_checkpointing']:
+    if params['device']['grad_ckpting']:
       # pylint: disable=g-import-not-at-top,g-direct-tensorflow-import
-      from brain_automl.efficientdet.third_party.grad_checkpoint import grad
+      from third_party.grad_checkpoint import grad
       from tensorflow.python.ops import gradients
       # pylint: enable=g-import-not-at-top,g-direct-tensorflow-import
 
@@ -422,7 +422,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
             ys,
             xs,
             grad_ys,
-            checkpoints=params['gradient_checkpointing_list'],
+            checkpoints=params['device']['grad_ckpting_list'],
             **kwargs)
 
       gradients.__dict__['gradients'] = gradients_
