@@ -21,6 +21,7 @@
 
 import contextlib
 import functools
+import re
 import sys
 import time
 from absl import logging
@@ -276,10 +277,12 @@ def gradients(ys, xs, grad_ys=None, checkpoints="collection", **kwargs):
       logging.info("Excluding %s from ts_all: %d", excl_layer, len(ts_all))
 
     # leave only layers that match strings in checkpoints list
-    ts_all = [
-        t for t in ts_all
-        if any(partial_match in t.name for partial_match in checkpoints)
-    ]
+    matchers = {c: re.compile('.*' + c + '.*') for c in checkpoints}
+    ts_set = set()
+    for c, matcher in matchers.items():
+      ts_match = [t for t in ts_all if matcher.match(t.name)]
+      ts_set.update(ts_match)
+    ts_all = list(ts_set)
     logging.info("Leaving only %s in ts_all: %d", checkpoints, len(ts_all))
     checkpoints = ts_all.copy()
 

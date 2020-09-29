@@ -288,8 +288,9 @@ def default_detection_configs():
       # All ops in the list will be checkpointed, such as Add/Mul/Conv2d/Floor/
       # Sigmoid and other ops, or more specific, e.g. blocks_10/se/conv2d_1.
       # Adding more ops will save more memory at the cost of more computation.
-      # For EfficientNet, [Add_, AddN] reduces mbconv memory to 1/3.2
-      # with 32% cost, enabling training d6 with batch size 2 on 11Gb (2080ti).
+      # For EfficientDet, [Add_, AddN] reduces mbconv memory to one third
+      # with one third more compute, in particular enabling training d6 with
+      # batch size 2 on 11Gb (2080ti).
       'grad_ckpting_list': ['Add_', 'AddN'],
       # enable memory logging for NVIDIA cards.
       'nvgpu_logging': False,
