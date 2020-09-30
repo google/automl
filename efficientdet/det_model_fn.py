@@ -612,15 +612,15 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
           save_steps=1000, output_dir=params['model_dir'], show_memory=True)
       training_hooks.append(profile_hook)
 
-    # Report memory allocation if OOM
-    class OomReportingHook(tf.estimator.SessionRunHook):
+      # Report memory allocation if OOM; it will slow down the running.
+      class OomReportingHook(tf.estimator.SessionRunHook):
 
-      def before_run(self, run_context):
-        return tf.estimator.SessionRunArgs(
-            fetches=[],
-            options=tf.RunOptions(report_tensor_allocations_upon_oom=True))
+        def before_run(self, run_context):
+          return tf.estimator.SessionRunArgs(
+              fetches=[],
+              options=tf.RunOptions(report_tensor_allocations_upon_oom=True))
 
-    training_hooks.append(OomReportingHook())
+      training_hooks.append(OomReportingHook())
 
     logging_hook = tf.estimator.LoggingTensorHook(
         {

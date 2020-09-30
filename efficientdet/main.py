@@ -205,6 +205,7 @@ def main(_):
       ckpt=FLAGS.ckpt,
       val_json_file=FLAGS.val_json_file,
       testdev_dir=FLAGS.testdev_dir,
+      profile=FLAGS.profile,
       mode=FLAGS.mode)
   config_proto = tf.ConfigProto(
       allow_soft_placement=True, log_device_placement=False)
