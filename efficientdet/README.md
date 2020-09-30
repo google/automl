@@ -124,7 +124,7 @@ use the following command:
 
     !rm  -rf /tmp/benchmark/
     !python model_inspect.py --runmode=saved_model --model_name=efficientdet-d0 \
-      --ckpt_path=efficientdet-d0 --saved_model_dir=/tmp/benchmark/
+      --ckpt_path=efficientdet-d0 --saved_model_dir=/tmp/benchmark/ \
       --hparams=mixed_precision=true
 
     !python model_inspect.py --runmode=saved_model_benchmark \
