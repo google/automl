@@ -130,13 +130,13 @@ def focal_loss(y_pred, y_true, alpha, gamma, normalizer, label_smoothing=0.0):
   where pt is the probability of being classified to the true class.
 
   Args:
-    y_pred: A float32 tensor of size [batch, height_in, width_in,
+    y_pred: A float tensor of size [batch, height_in, width_in,
       num_predictions].
-    y_true: A float32 tensor of size [batch, height_in, width_in,
+    y_true: A float tensor of size [batch, height_in, width_in,
       num_predictions].
-    alpha: A float32 scalar multiplying alpha to the loss from positive examples
+    alpha: A float scalar multiplying alpha to the loss from positive examples
       and (1-alpha) to the loss from negative examples.
-    gamma: A float32 scalar modulating loss from hard and easy examples.
+    gamma: A float scalar modulating loss from hard and easy examples.
     normalizer: Divide loss by this value.
     label_smoothing: Float in [0, 1]. If > `0` then smooth the labels.
 
@@ -144,8 +144,7 @@ def focal_loss(y_pred, y_true, alpha, gamma, normalizer, label_smoothing=0.0):
     loss: A float32 scalar representing normalized total loss.
   """
   with tf.name_scope('focal_loss'):
-    alpha = tf.convert_to_tensor(alpha, dtype=y_pred.dtype)
-    gamma = tf.convert_to_tensor(gamma, dtype=y_pred.dtype)
+    normalizer = tf.cast(normalizer, dtype=y_pred.dtype)
 
     # compute focal loss multipliers before label smoothing, such that it will
     # not blow up the loss.
@@ -155,7 +154,8 @@ def focal_loss(y_pred, y_true, alpha, gamma, normalizer, label_smoothing=0.0):
     modulating_factor = (1.0 - p_t)**gamma
 
     # apply label smoothing for cross_entropy for each entry.
-    y_true = y_true * (1.0 - label_smoothing) + 0.5 * label_smoothing
+    if label_smoothing:
+      y_true = y_true * (1.0 - label_smoothing) + 0.5 * label_smoothing
     ce = tf.nn.sigmoid_cross_entropy_with_logits(labels=y_true, logits=y_pred)
 
     # compute the final loss and return
@@ -234,8 +234,10 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
   box_losses = []
   for level in levels:
     # Onehot encoding for classification labels.
-    cls_targets_at_level = tf.one_hot(labels['cls_targets_%d' % level],
-                                      params['num_classes'])
+    cls_targets_at_level = tf.one_hot(
+        labels['cls_targets_%d' % level],
+        params['num_classes'],
+        dtype=cls_outputs[level].dtype)
 
     if params['data_format'] == 'channels_first':
       bs, _, width, height, _ = cls_targets_at_level.get_shape().as_list()
@@ -261,10 +263,12 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
     else:
       cls_loss = tf.reshape(cls_loss,
                             [bs, width, height, -1, params['num_classes']])
+
     cls_loss *= tf.cast(
         tf.expand_dims(tf.not_equal(labels['cls_targets_%d' % level], -2), -1),
-        tf.float32)
-    cls_losses.append(tf.clip_by_value(tf.reduce_sum(cls_loss), 0.0, 2.0))
+        cls_loss.dtype)
+    cls_loss_sum = tf.clip_by_value(tf.reduce_sum(cls_loss), 0.0, 2.0)
+    cls_losses.append(tf.cast(cls_loss_sum, tf.float32))
 
     if params['box_loss_weight']:
       box_losses.append(
@@ -363,11 +367,6 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   precision = utils.get_precision(params['strategy'], params['mixed_precision'])
   cls_outputs, box_outputs = utils.build_model_with_precision(
       precision, model_fn, features, params['is_training_bn'])
-
-  levels = cls_outputs.keys()
-  for level in levels:
-    cls_outputs[level] = tf.cast(cls_outputs[level], tf.float32)
-    box_outputs[level] = tf.cast(box_outputs[level], tf.float32)
 
   # Set up training loss and learning rate.
   update_learning_rate_schedule_parameters(params)
@@ -613,7 +612,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
           save_steps=1000, output_dir=params['model_dir'], show_memory=True)
       training_hooks.append(profile_hook)
 
-      # Report memory allocation if OOM
+      # Report memory allocation if OOM; it will slow down the running.
       class OomReportingHook(tf.estimator.SessionRunHook):
 
         def before_run(self, run_context):
@@ -637,8 +636,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     if params['device']['nvgpu_logging']:
       try:
         from third_party.tools import nvgpu  # pylint: disable=g-import-not-at-top
-        mem_message = tf.py_func(nvgpu.gpu_memory_util_message, [],
-                                 [tf.string])[0]
+        mem_message = tf.numpy_function(nvgpu.gpu_memory_util_message, [],
+                                        [tf.string])[0]
         logging_hook_nvgpu = tf.estimator.LoggingTensorHook(
             tensors={'mem_message': mem_message},
             every_n_iter=params.get('iterations_per_loop', 100),
