@@ -113,7 +113,7 @@ class FNode(tf.keras.layers.Layer):
       ]
       new_node = tf.add_n(nodes)
     elif self.weight_method == 'sum':
-      new_node = tf.add_n(nodes)
+      new_node = sum(nodes)  # tf.add_n is not supported by tflite gpu.
     else:
       raise ValueError('unknown weight_method %s' % self.weight_method)
 

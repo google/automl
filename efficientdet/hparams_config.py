@@ -395,51 +395,56 @@ efficientdet_lite_param_dict = {
         dict(
             name='efficientdet-lite0',
             backbone_name='efficientnet-lite0',
-            image_size=512,
+            image_size=320,
             fpn_num_filters=64,
             fpn_cell_repeats=3,
             box_class_repeats=3,
             act_type='relu',
+            fpn_weight_method='sum',
         ),
     'efficientdet-lite1':
         dict(
             name='efficientdet-lite1',
             backbone_name='efficientnet-lite1',
-            image_size=640,
+            image_size=384,
             fpn_num_filters=88,
             fpn_cell_repeats=4,
             box_class_repeats=3,
             act_type='relu',
+            fpn_weight_method='sum',
         ),
     'efficientdet-lite2':
         dict(
             name='efficientdet-lite2',
             backbone_name='efficientnet-lite2',
-            image_size=768,
+            image_size=480,
             fpn_num_filters=112,
             fpn_cell_repeats=5,
             box_class_repeats=3,
             act_type='relu',
+            fpn_weight_method='sum',
         ),
     'efficientdet-lite3':
         dict(
             name='efficientdet-lite3',
             backbone_name='efficientnet-lite3',
-            image_size=896,
+            image_size=512,
             fpn_num_filters=160,
             fpn_cell_repeats=6,
             box_class_repeats=4,
             act_type='relu',
+            fpn_weight_method='sum',
         ),
     'efficientdet-lite4':
         dict(
             name='efficientdet-lite4',
             backbone_name='efficientnet-lite4',
-            image_size=1024,
+            image_size=640,
             fpn_num_filters=224,
             fpn_cell_repeats=7,
             box_class_repeats=4,
             act_type='relu',
+            fpn_weight_method='sum',
         ),
 }
 
