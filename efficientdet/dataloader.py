@@ -297,6 +297,10 @@ class InputReader:
         classes = tf.gather_nd(classes, indices)
         boxes = tf.gather_nd(boxes, indices)
 
+      if params.get("grid_mask", None) and self._is_training:
+        from aug import gridmask  # pylint: disable=g-import-not-at-top
+        image, boxes = gridmask.gridmask(image, boxes)
+
       if params.get('autoaugment_policy', None) and self._is_training:
         from aug import autoaugment  # pylint: disable=g-import-not-at-top
         if params['autoaugment_policy'] == 'randaug':
