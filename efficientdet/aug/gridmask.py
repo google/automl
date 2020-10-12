@@ -134,8 +134,7 @@ class GridMask(object):
         return image, label
 
 
-# function builds a callable instance of GridMask
-
+# function builds callable instance of GridMask and transforms input image.
 
 def gridmask(
     image, boxes, ratio=0.6, rotate=10, gridmask_size_ratio=0.5, fill=1

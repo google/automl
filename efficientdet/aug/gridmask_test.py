@@ -36,6 +36,7 @@ class GridMaskTest(tf.test.TestCase):
         self.assertEqual(images.shape[1], transform_images.shape[1])
 
     def test_gridmask_tiny_images(self):
+        """Verify  transform image shape on very tiny image."""
         images = tf.zeros(shape=(4, 4, 3))
         bboxes = tf.random.uniform(
             shape=(2, 4), minval=1, maxval=511, dtype=tf.int32
@@ -43,7 +44,8 @@ class GridMaskTest(tf.test.TestCase):
         transform_images, transform_bboxes = gridmask.gridmask(images, bboxes)
         self.assertEqual(images.shape[1], transform_images.shape[1])
 
-    def test_varying_image_shape(self):
+    def test_rectangle_image_shape(self):
+        """Verify transform image shape on rectangle image"""
         images = tf.zeros(shape=(1028, 512, 3))
         bboxes = tf.random.uniform(
             shape=(2, 4), minval=1, maxval=511, dtype=tf.int32
