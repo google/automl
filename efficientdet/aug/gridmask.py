@@ -13,7 +13,10 @@
 # limitations under the License.
 # ==============================================================================
 
+import math
+
 import tensorflow as tf
+import tensorflow_addons as tfa
 
 """Grid Masking Augmentation Reference: https://arxiv.org/abs/2001.04086"""
 
@@ -24,19 +27,38 @@ class GridMask(object):
             masks a grid with fill_value on the image.
     """
 
-    # TODO(kartik4949): random rotation support for mask.
-    def __init__(self, ratio=0.6, rotate=10, gridmask_size_ratio=0.5, fill=1):
+    def __init__(
+        self,
+        prob=0.6,
+        ratio=0.6,
+        rotate=10,
+        gridmask_size_ratio=0.5,
+        fill=1,
+        interpolation="BILINEAR",
+    ):
         """__init__.
         Args:
-            ratio: grid mask ratio i.e if 0.5 grid and spacing will be equal
-            rotate: Rotation of grid mesh
+            prob: probablity of occurance.
+            ratio: grid mask ratio i.e if 0.5 grid and spacing will be equal.
+            rotate: Rotation of grid mesh.
             gridmask_size_ratio: Grid mask size, grid to image size ratio.
             fill: Fill value for grids.
+            interpolation: Interpolation method for rotation.
         """
+        self.prob = prob
         self.ratio = ratio
         self.rotate = rotate
         self.gridmask_size_ratio = gridmask_size_ratio
         self.fill = fill
+        self.interpolation = interpolation
+
+    @tf.function
+    def random_rotate(self, mask):
+        """Randomly rotates mask on given range."""
+
+        angle = self.rotate * tf.random.normal([], -1, 1)
+        angle = math.pi * angle / 180
+        return tfa.image.rotate(mask, angle, interpolation=self.interpolation)
 
     @staticmethod
     def crop(mask, h, w):
@@ -56,8 +78,7 @@ class GridMask(object):
 
     @tf.function
     def mask(self, h, w):
-        """mask helper function for initializing grid mask of required size.
-        """
+        """mask helper function for initializing grid mask of required size."""
         mask_w = mask_h = tf.cast(
             tf.cast((self.gridmask_size_ratio + 1), tf.float32)
             * tf.cast(tf.math.maximum(h, w), tf.float32),
@@ -124,22 +145,32 @@ class GridMask(object):
         h = tf.shape(image)[0]
         w = tf.shape(image)[1]
         grid = self.mask(h, w)
+        grid = self.random_rotate(grid)
         mask = self.crop(grid, h, w)
         mask = tf.cast(mask, image.dtype)
         mask = tf.reshape(mask, (h, w))
         mask = (
             tf.expand_dims(mask, -1) if image._rank() != mask._rank() else mask
         )
-        image *= mask
+        occur = tf.random.normal([], 0, 1) < self.prob
+        image = tf.cond(occur, lambda: image * mask, lambda: image)
         return image, label
 
 
 # function builds callable instance of GridMask and transforms input image.
 
+
 def gridmask(
-    image, boxes, ratio=0.6, rotate=10, gridmask_size_ratio=0.5, fill=1
+    image,
+    boxes,
+    prob=0.5,
+    ratio=0.6,
+    rotate=10,
+    gridmask_size_ratio=0.5,
+    fill=1,
 ):
     gridmask_obj = GridMask(
+        prob=prob,
         ratio=ratio,
         rotate=rotate,
         gridmask_size_ratio=gridmask_size_ratio,
