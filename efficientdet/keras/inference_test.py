@@ -32,12 +32,21 @@ class InferenceTest(tf.test.TestCase):
 
   def test_export(self):
     saved_model_path = os.path.join(self.tmp_path, 'saved_model')
+    tflite_path = os.path.join(self.tmp_path, 'test.tflite')
     driver = inference.ServingDriver('efficientdet-d0', self.tmp_path)
-    driver.export(saved_model_path)
+    driver.export(saved_model_path, tflite_path)
     has_saved_model = tf.saved_model.contains_saved_model(saved_model_path)
     self.assertAllEqual(has_saved_model, True)
+    self.assertTrue(tf.io.gfile.exists(tflite_path))
     driver.load(saved_model_path)
     driver.load(os.path.join(saved_model_path, 'efficientdet-d0_frozen.pb'))
+
+    # Test quantized tflite model as well.
+    quantized_tflite_path = os.path.join(self.tmp_path, 'test_quant.tflite')
+    driver = inference.ServingDriver('efficientdet-d0', self.tmp_path)
+    driver.export(
+        tflite_path=quantized_tflite_path, quantization_type='float16')
+    self.assertTrue(tf.io.gfile.exists(quantized_tflite_path))
 
   def test_inference(self):
     driver = inference.ServingDriver('efficientdet-d0', self.tmp_path)

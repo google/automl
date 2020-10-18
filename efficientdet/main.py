@@ -66,10 +66,10 @@ flags.DEFINE_integer(
 flags.DEFINE_bool('use_spatial_partition', False, 'Use spatial partition.')
 flags.DEFINE_integer(
     'num_cores_per_replica',
-    default=4,
+    default=2,
     help='Number of TPU cores per replica when using spatial partition.')
 flags.DEFINE_multi_integer(
-    'input_partition_dims', [1, 2, 2, 1],
+    'input_partition_dims', [1, 2, 1, 1],
     'A list that describes the partition dims for all the tensors.')
 flags.DEFINE_integer('train_batch_size', 64, 'global training batch size')
 flags.DEFINE_integer('eval_batch_size', 1, 'global evaluation batch size')

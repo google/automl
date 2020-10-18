@@ -72,6 +72,7 @@ def visualize_image(image,
 
 
 class ExportModel(tf.Module):
+  """Model to be exported as SavedModel/TFLite format."""
 
   def __init__(self, model):
     super().__init__()
@@ -80,6 +81,10 @@ class ExportModel(tf.Module):
   @tf.function
   def __call__(self, imgs):
     return self.model(imgs, training=False, post_mode='global')
+
+  @tf.function
+  def tflite_call(self, imgs):
+    return self.model(imgs, training=False, pre_mode=None, post_mode=None)
 
 
 class ServingDriver(object):
@@ -270,43 +275,54 @@ class ServingDriver(object):
     return graphdef
 
   def export(self,
-             output_dir: Text,
+             output_dir: Text = None,
              tflite_path: Text = None,
-             tensorrt: Text = None):
+             tensorrt: Text = None,
+             quantization_type: Text = None):
     """Export a saved model, frozen graph, and potential tflite/tensorrt model.
 
     Args:
       output_dir: the output folder for saved model.
       tflite_path: the path for saved tflite file.
       tensorrt: If not None, must be {'FP32', 'FP16', 'INT8'}.
+      quantization_type: Type for post-training quantization. If not None, must
+        be {'float16'}.
     """
     if not self.model:
       self.build()
-    export_model = ExportModel(self.model)
-    tf.saved_model.save(
-        export_model,
-        output_dir,
-        signatures=export_model.__call__.get_concrete_function(
-            tf.TensorSpec(
-                shape=[None, None, None, 3], dtype=tf.uint8, name='images')))
-    logging.info('Model saved at %s', output_dir)
 
-    # also save freeze pb file.
-    graphdef = self.freeze(
-        export_model.__call__.get_concrete_function(
-            tf.TensorSpec(
-                shape=[None, None, None, 3], dtype=tf.uint8, name='images')))
-    proto_path = tf.io.write_graph(
-        graphdef, output_dir, self.model_name + '_frozen.pb', as_text=False)
-    logging.info('Frozen graph saved at %s', proto_path)
+    export_model = ExportModel(self.model)
+    if output_dir:
+      tf.saved_model.save(
+          export_model,
+          output_dir,
+          signatures=export_model.__call__.get_concrete_function(
+              tf.TensorSpec(
+                  shape=[None, None, None, 3], dtype=tf.uint8, name='images')))
+      logging.info('Model saved at %s', output_dir)
+
+      # also save freeze pb file.
+      graphdef = self.freeze(
+          export_model.__call__.get_concrete_function(
+              tf.TensorSpec(
+                  shape=[None, None, None, 3], dtype=tf.uint8, name='images')))
+      proto_path = tf.io.write_graph(
+          graphdef, output_dir, self.model_name + '_frozen.pb', as_text=False)
+      logging.info('Frozen graph saved at %s', proto_path)
 
     if tflite_path:
-      # Neither of the two approaches works so far.
-      converter = tf.lite.TFLiteConverter.from_keras_model(self.model)
-      converter.optimizations = [tf.lite.Optimize.DEFAULT]
-      converter.target_spec.supported_types = [tf.float16]
-      # converter = tf.lite.TFLiteConverter.from_saved_model(output_dir)
-      # converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
+      image_size = utils.parse_image_size(self.params['image_size'])
+      converter = tf.lite.TFLiteConverter.from_concrete_functions([
+          export_model.tflite_call.get_concrete_function(
+              tf.TensorSpec(shape=[1, *image_size, 3]))
+      ])
+
+      if quantization_type == 'float16':
+        converter.optimizations = [tf.lite.Optimize.DEFAULT]
+        converter.target_spec.supported_types = [tf.float16]
+      elif quantization_type:
+        raise ValueError('Quantization Type %s not support yet.' %
+                         quantization_type)
 
       tflite_model = converter.convert()
       tf.io.gfile.GFile(tflite_path, 'wb').write(tflite_model)

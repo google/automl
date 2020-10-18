@@ -368,6 +368,11 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   cls_outputs, box_outputs = utils.build_model_with_precision(
       precision, model_fn, features, params['is_training_bn'])
 
+  levels = cls_outputs.keys()
+  for level in levels:
+    cls_outputs[level] = tf.cast(cls_outputs[level], tf.float32)
+    box_outputs[level] = tf.cast(box_outputs[level], tf.float32)
+
   # Set up training loss and learning rate.
   update_learning_rate_schedule_parameters(params)
   global_step = tf.train.get_or_create_global_step()
