@@ -61,12 +61,11 @@ class InspectorTest(tf.test.TestCase):
 
   @flagsaver.flagsaver(mode='export')
   def test_export(self):
-    # TODO(xxx): add support for tflite.
-    # FLAGS.tflite_path = os.path.join(self.tempdir, 'test.tflite')
+    FLAGS.tflite_path = os.path.join(self.tempdir, 'test.tflite')
     FLAGS.saved_model_dir = os.path.join(self.tempdir, 'savedmodel')
     inspector.main(None)
     self.assertTrue(tf.saved_model.contains_saved_model(FLAGS.saved_model_dir))
-    # self.assertTrue(tf.io.gfile.exists(FLAGS.tflite_path))
+    self.assertTrue(tf.io.gfile.exists(FLAGS.tflite_path))
 
 
 if __name__ == '__main__':

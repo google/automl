@@ -277,7 +277,7 @@ def gradients(ys, xs, grad_ys=None, checkpoints="collection", **kwargs):
       logging.info("Excluding %s from ts_all: %d", excl_layer, len(ts_all))
 
     # leave only layers that match strings in checkpoints list
-    matchers = {c: re.compile('.*' + c + '.*') for c in checkpoints}
+    matchers = {c: re.compile(".*" + c + ".*") for c in checkpoints}
     ts_set = set()
     for c, matcher in matchers.items():
       ts_match = [t for t in ts_all if matcher.match(t.name)]

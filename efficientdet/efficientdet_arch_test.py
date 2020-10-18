@@ -25,11 +25,12 @@ class EfficientDetArchTest(tf.test.TestCase):
 
   def build_model(self,
                   model_name,
-                  isize,
+                  isize=None,
                   is_training=False,
                   data_format='channels_last'):
-    if isinstance(isize, int):
-      isize = (isize, isize)
+    config = hparams_config.get_efficientdet_config(model_name)
+    config.image_size = isize or config.image_size
+    isize = utils.parse_image_size(config.image_size)
     if data_format == 'channels_first':
       inputs_shape = [1, 3, isize[0], isize[1]]
     else:
@@ -89,24 +90,24 @@ class EfficientDetArchTest(tf.test.TestCase):
                              self.build_model('efficientdet-d7', 1536))
 
   def test_efficientdet_lite0(self):
-    self.assertSequenceEqual((3243527.0, 2504524987),
-                             self.build_model('efficientdet-lite0', 512))
+    self.assertSequenceEqual((3243470, 979428213),
+                             self.build_model('efficientdet-lite0'))
 
   def test_efficientdet_lite1(self):
-    self.assertSequenceEqual((4248394.0, 3515526105),
-                             self.build_model('efficientdet-lite1', 512))
+    self.assertSequenceEqual((4248318, 1976353506),
+                             self.build_model('efficientdet-lite1'))
 
   def test_efficientdet_lite2(self):
-    self.assertSequenceEqual((5252429.0, 4428869862),
-                             self.build_model('efficientdet-lite2', 512))
+    self.assertSequenceEqual((5252334, 3386596870),
+                             self.build_model('efficientdet-lite2'))
 
   def test_efficientdet_lite3(self):
-    self.assertSequenceEqual((8350976.0, 7523573252),
-                             self.build_model('efficientdet-lite3', 512))
+    self.assertSequenceEqual((8350862, 7509226979),
+                             self.build_model('efficientdet-lite3'))
 
   def test_efficientdet_lite4(self):
-    self.assertSequenceEqual((15131027.0, 12977398945),
-                             self.build_model('efficientdet-lite4', 512))
+    self.assertSequenceEqual((15130894, 12953966715),
+                             self.build_model('efficientdet-lite4'))
 
 
 class EfficientDetArchPrecisionTest(tf.test.TestCase):

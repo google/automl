@@ -292,31 +292,34 @@ class InputReader:
       image_masks = data.get('groundtruth_instance_masks', [])
       classes = tf.reshape(tf.cast(classes, dtype=tf.float32), [-1, 1])
 
-      if params['skip_crowd_during_training'] and self._is_training:
-        indices = tf.where(tf.logical_not(data['groundtruth_is_crowd']))
-        classes = tf.gather_nd(classes, indices)
-        boxes = tf.gather_nd(boxes, indices)
+      if self._is_training:
+        # Training time preprocessing.
+        if params['skip_crowd_during_training']:
+          indices = tf.where(tf.logical_not(data['groundtruth_is_crowd']))
+          classes = tf.gather_nd(classes, indices)
+          boxes = tf.gather_nd(boxes, indices)
 
-      if params.get("grid_mask", None) and self._is_training:
-        from aug import gridmask  # pylint: disable=g-import-not-at-top
-        image, boxes = gridmask.gridmask(image, boxes)
+        if params.get('grid_mask', None):
+          from aug import gridmask  # pylint: disable=g-import-not-at-top
+          image, boxes = gridmask.gridmask(image, boxes)
 
-      if params.get('autoaugment_policy', None) and self._is_training:
-        from aug import autoaugment  # pylint: disable=g-import-not-at-top
-        if params['autoaugment_policy'] == 'randaug':
-          image, boxes = autoaugment.distort_image_with_randaugment(
-              image, boxes, num_layers=1, magnitude=15)
-        else:
-          image, boxes = autoaugment.distort_image_with_autoaugment(
-              image, boxes, params['autoaugment_policy'],
-              params['use_augmix'], *params['augmix_params'])
+        if params.get('autoaugment_policy', None):
+          from aug import autoaugment  # pylint: disable=g-import-not-at-top
+          if params['autoaugment_policy'] == 'randaug':
+            image, boxes = autoaugment.distort_image_with_randaugment(
+                image, boxes, num_layers=1, magnitude=15)
+          else:
+            image, boxes = autoaugment.distort_image_with_autoaugment(
+                image, boxes, params['autoaugment_policy'],
+                params['use_augmix'], *params['augmix_params'])
 
       input_processor = DetectionInputProcessor(image, params['image_size'],
                                                 boxes, classes)
       input_processor.normalize_image()
-      if self._is_training and params['input_rand_hflip']:
-        input_processor.random_horizontal_flip()
       if self._is_training:
+        if params['input_rand_hflip']:
+          input_processor.random_horizontal_flip()
+
         input_processor.set_training_random_scale_factors(
             params['jitter_min'], params['jitter_max'],
             params.get('target_size', None))
