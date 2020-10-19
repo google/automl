@@ -15,7 +15,6 @@
 """Common utils."""
 import contextlib
 import os
-import re
 from typing import Text, Tuple, Union
 from absl import logging
 import numpy as np
@@ -146,61 +145,6 @@ def get_ckpt_var_map(ckpt_path, ckpt_scope, var_scope, skip_mismatch=None):
   return var_map
 
 
-def get_ckpt_var_map_ema(ckpt_path, ckpt_scope, var_scope, var_exclude_expr):
-  """Get a ema var map for restoring from pretrained checkpoints.
-
-  Args:
-    ckpt_path: string. A pretrained checkpoint path.
-    ckpt_scope: string. Scope name for checkpoint variables.
-    var_scope: string. Scope name for model variables.
-    var_exclude_expr: string. A regex for excluding variables.
-      This is useful for finetuning with different classes, where
-      var_exclude_expr='.*class-predict.*' can be used.
-
-  Returns:
-    var_map: a dictionary from checkpoint name to model variables.
-  """
-  logging.info('Init model from checkpoint {}'.format(ckpt_path))
-  if not ckpt_scope.endswith('/') or not var_scope.endswith('/'):
-    raise ValueError('Please specific scope name ending with /')
-  if ckpt_scope.startswith('/'):
-    ckpt_scope = ckpt_scope[1:]
-  if var_scope.startswith('/'):
-    var_scope = var_scope[1:]
-
-  var_map = {}
-  # Get the list of vars to restore.
-  model_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=var_scope)
-  reader = tf.train.load_checkpoint(ckpt_path)
-  ckpt_var_names = set(reader.get_variable_to_shape_map().keys())
-  exclude_matcher = re.compile(var_exclude_expr) if var_exclude_expr else None
-  for v in model_vars:
-    if exclude_matcher and exclude_matcher.match(v.op.name):
-      logging.info(
-          'skip {} -- excluded by {}'.format(v.op.name, var_exclude_expr))
-      continue
-
-    if not v.op.name.startswith(var_scope):
-      logging.info('skip {} -- does not match scope {}'.format(
-          v.op.name, var_scope))
-
-    if v.op.name.endswith('/ExponentialMovingAverage'):
-      logging.info('skip ema var {}'.format(v.op.name))
-      continue
-
-    ckpt_var = ckpt_scope + v.op.name[len(var_scope):]
-    ckpt_var_ema = ckpt_var + '/ExponentialMovingAverage'
-    if ckpt_var_ema in ckpt_var_names:
-      var_map[ckpt_var_ema] = v
-      logging.info('Init {} from ckpt var {}'.format(v.op.name, ckpt_var_ema))
-    elif ckpt_var in ckpt_var_names:
-      var_map[ckpt_var] = v
-      logging.info('Init {} from ckpt var {}'.format(v.op.name, ckpt_var))
-    else:
-      logging.info('skip {} ({}) -- not in ckpt'.format(v.op.name, ckpt_var))
-  return var_map
-
-
 class TpuBatchNormalization(tf.keras.layers.BatchNormalization):
   """Cross replica batch normalization."""
 
@@ -262,9 +206,9 @@ class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
       # Compute variance using: Var[X]= E[X^2] - E[X]^2.
       shard_square_of_mean = tf.math.square(shard_mean)
       shard_mean_of_square = shard_variance + shard_square_of_mean
-      shard_stack = tf.stack([shard_mean, shard_mean_of_square])
-      group_mean, group_mean_of_square = tf.unstack(
-          replica_context.all_reduce(tf.distribute.ReduceOp.MEAN, shard_stack))
+      group_mean, group_mean_of_square = (
+          replica_context.all_reduce(tf.distribute.ReduceOp.MEAN,
+                                     [shard_mean, shard_mean_of_square]))
       group_variance = group_mean_of_square - tf.math.square(group_mean)
       return (group_mean, group_variance)
     else:
@@ -412,15 +356,21 @@ class Pair(tuple):
     self.name = name
 
 
-def scalar(name, tensor):
+def scalar(name, tensor, is_tpu=True):
   """Stores a (name, Tensor) tuple in a custom collection."""
   logging.info('Adding scale summary {}'.format(Pair(name, tensor)))
-  tf.add_to_collection('scalar_summaries', Pair(name, tf.reduce_mean(tensor)))
+  if is_tpu:
+    tf.add_to_collection('scalar_summaries', Pair(name, tf.reduce_mean(tensor)))
+  else:
+    tf.summary.scalar(name, tf.reduce_mean(tensor))
 
 
-def image(name, tensor):
+def image(name, tensor, is_tpu=True):
   logging.info('Adding image summary {}'.format(Pair(name, tensor)))
-  tf.add_to_collection('image_summaries', Pair(name, tensor))
+  if is_tpu:
+    tf.add_to_collection('image_summaries', Pair(name, tensor))
+  else:
+    tf.summary.image(name, tensor)
 
 
 def get_tpu_host_call(global_step, params):

@@ -26,7 +26,6 @@ import det_model_fn
 import hparams_config
 import utils
 
-
 flags.DEFINE_string(
     'tpu',
     default=None,
@@ -74,7 +73,7 @@ flags.DEFINE_multi_integer(
     'A list that describes the partition dims for all the tensors.')
 flags.DEFINE_integer('train_batch_size', 64, 'global training batch size')
 flags.DEFINE_integer('eval_batch_size', 1, 'global evaluation batch size')
-flags.DEFINE_integer('eval_samples', None, 'Number of samples for eval.')
+flags.DEFINE_integer('eval_samples', 5000, 'Number of samples for eval.')
 flags.DEFINE_integer('iterations_per_loop', 100,
                      'Number of iterations per TPU training loop')
 flags.DEFINE_integer('save_checkpoints_steps', 100,
@@ -206,6 +205,7 @@ def main(_):
       ckpt=FLAGS.ckpt,
       val_json_file=FLAGS.val_json_file,
       testdev_dir=FLAGS.testdev_dir,
+      profile=FLAGS.profile,
       mode=FLAGS.mode)
   config_proto = tf.ConfigProto(
       allow_soft_placement=True, log_device_placement=False)
@@ -219,7 +219,8 @@ def main(_):
   model_fn_instance = det_model_fn.get_model_fn(FLAGS.model_name)
   max_instances_per_image = config.max_instances_per_image
   if FLAGS.eval_samples:
-    eval_steps = int(FLAGS.eval_samples // FLAGS.eval_batch_size)
+    eval_steps = int((FLAGS.eval_samples + FLAGS.eval_batch_size - 1) //
+                     FLAGS.eval_batch_size)
   else:
     eval_steps = None
   total_examples = int(config.num_epochs * FLAGS.num_examples_per_epoch)
@@ -341,8 +342,7 @@ def main(_):
           input_fn=train_input_fn,
           max_steps=e * FLAGS.num_examples_per_epoch // FLAGS.train_batch_size)
       print('\n   =====> Starting evaluation, epoch: %d.' % e)
-      eval_results = eval_est.evaluate(
-          input_fn=eval_input_fn, steps=eval_steps)
+      eval_results = eval_est.evaluate(input_fn=eval_input_fn, steps=eval_steps)
       ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
       utils.archive_ckpt(eval_results, eval_results['AP'], ckpt)
 
@@ -352,6 +352,8 @@ def main(_):
         p = multiprocessing.Process(target=run_train_and_eval, args=(e,))
         p.start()
         p.join()
+        if p.exitcode != 0:
+          return p.exitcode
       else:
         run_train_and_eval(e)
 

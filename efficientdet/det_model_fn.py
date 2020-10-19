@@ -18,7 +18,6 @@ import re
 from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
-
 import coco_metric
 import efficientdet_arch
 import hparams_config
@@ -131,13 +130,13 @@ def focal_loss(y_pred, y_true, alpha, gamma, normalizer, label_smoothing=0.0):
   where pt is the probability of being classified to the true class.
 
   Args:
-    y_pred: A float32 tensor of size [batch, height_in, width_in,
+    y_pred: A float tensor of size [batch, height_in, width_in,
       num_predictions].
-    y_true: A float32 tensor of size [batch, height_in, width_in,
+    y_true: A float tensor of size [batch, height_in, width_in,
       num_predictions].
-    alpha: A float32 scalar multiplying alpha to the loss from positive examples
+    alpha: A float scalar multiplying alpha to the loss from positive examples
       and (1-alpha) to the loss from negative examples.
-    gamma: A float32 scalar modulating loss from hard and easy examples.
+    gamma: A float scalar modulating loss from hard and easy examples.
     normalizer: Divide loss by this value.
     label_smoothing: Float in [0, 1]. If > `0` then smooth the labels.
 
@@ -145,18 +144,18 @@ def focal_loss(y_pred, y_true, alpha, gamma, normalizer, label_smoothing=0.0):
     loss: A float32 scalar representing normalized total loss.
   """
   with tf.name_scope('focal_loss'):
-    alpha = tf.convert_to_tensor(alpha, dtype=y_pred.dtype)
-    gamma = tf.convert_to_tensor(gamma, dtype=y_pred.dtype)
+    normalizer = tf.cast(normalizer, dtype=y_pred.dtype)
 
     # compute focal loss multipliers before label smoothing, such that it will
     # not blow up the loss.
     pred_prob = tf.sigmoid(y_pred)
     p_t = (y_true * pred_prob) + ((1 - y_true) * (1 - pred_prob))
     alpha_factor = y_true * alpha + (1 - y_true) * (1 - alpha)
-    modulating_factor = (1.0 - p_t) ** gamma
+    modulating_factor = (1.0 - p_t)**gamma
 
     # apply label smoothing for cross_entropy for each entry.
-    y_true = y_true * (1.0 - label_smoothing) + 0.5 * label_smoothing
+    if label_smoothing:
+      y_true = y_true * (1.0 - label_smoothing) + 0.5 * label_smoothing
     ce = tf.nn.sigmoid_cross_entropy_with_logits(labels=y_true, logits=y_pred)
 
     # compute the final loss and return
@@ -235,8 +234,10 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
   box_losses = []
   for level in levels:
     # Onehot encoding for classification labels.
-    cls_targets_at_level = tf.one_hot(labels['cls_targets_%d' % level],
-                                      params['num_classes'])
+    cls_targets_at_level = tf.one_hot(
+        labels['cls_targets_%d' % level],
+        params['num_classes'],
+        dtype=cls_outputs[level].dtype)
 
     if params['data_format'] == 'channels_first':
       bs, _, width, height, _ = cls_targets_at_level.get_shape().as_list()
@@ -262,10 +263,12 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
     else:
       cls_loss = tf.reshape(cls_loss,
                             [bs, width, height, -1, params['num_classes']])
+
     cls_loss *= tf.cast(
         tf.expand_dims(tf.not_equal(labels['cls_targets_%d' % level], -2), -1),
-        tf.float32)
-    cls_losses.append(tf.clip_by_value(tf.reduce_sum(cls_loss), 0.0, 2.0))
+        cls_loss.dtype)
+    cls_loss_sum = tf.clip_by_value(tf.reduce_sum(cls_loss), 0.0, 2.0)
+    cls_losses.append(tf.cast(cls_loss_sum, tf.float32))
 
     if params['box_loss_weight']:
       box_losses.append(
@@ -302,8 +305,7 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
   box_loss = tf.add_n(box_losses) if box_losses else 0
 
   total_loss = (
-      cls_loss +
-      params['box_loss_weight'] * box_loss +
+      cls_loss + params['box_loss_weight'] * box_loss +
       params['iou_loss_weight'] * box_iou_loss)
 
   return total_loss, cls_loss, box_loss, box_iou_loss
@@ -329,7 +331,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     labels: the input labels in a dictionary. The labels include class targets
       and box targets which are dense label maps. The labels are generated from
       get_input_fn function in data/dataloader.py
-    mode: the mode of TPUEstimator including TRAIN, EVAL, and PREDICT.
+    mode: the mode of TPUEstimator including TRAIN and EVAL.
     params: the dictionary defines hyperparameters of model. The default
       settings are in default_hparams function in this file.
     model: the model outputs class logits and box regression outputs.
@@ -342,11 +344,14 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   Raises:
     RuntimeError: if both ckpt and backbone_ckpt are set.
   """
-  utils.image('input_image', features)
+  is_tpu = params['strategy'] == 'tpu'
+  if params['img_summary_steps']:
+    utils.image('input_image', features, is_tpu)
   training_hooks = []
   params['is_training_bn'] = (mode == tf.estimator.ModeKeys.TRAIN)
 
   if params['use_keras_model']:
+
     def model_fn(inputs):
       model = efficientdet_keras.EfficientDetNet(
           config=hparams_config.Config(params))
@@ -363,21 +368,6 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   cls_outputs, box_outputs = utils.build_model_with_precision(
       precision, model_fn, features, params['is_training_bn'])
 
-  levels = cls_outputs.keys()
-  for level in levels:
-    cls_outputs[level] = tf.cast(cls_outputs[level], tf.float32)
-    box_outputs[level] = tf.cast(box_outputs[level], tf.float32)
-
-  # First check if it is in PREDICT mode.
-  if mode == tf.estimator.ModeKeys.PREDICT:
-    predictions = {
-        'image': features,
-    }
-    for level in levels:
-      predictions['cls_outputs_%d' % level] = cls_outputs[level]
-      predictions['box_outputs_%d' % level] = box_outputs[level]
-    return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
-
   # Set up training loss and learning rate.
   update_learning_rate_schedule_parameters(params)
   global_step = tf.train.get_or_create_global_step()
@@ -390,16 +380,16 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   total_loss = det_loss + reg_l2loss
 
   if mode == tf.estimator.ModeKeys.TRAIN:
-    utils.scalar('lrn_rate', learning_rate)
-    utils.scalar('trainloss/cls_loss', cls_loss)
-    utils.scalar('trainloss/box_loss', box_loss)
-    utils.scalar('trainloss/det_loss', det_loss)
-    utils.scalar('trainloss/reg_l2_loss', reg_l2loss)
-    utils.scalar('trainloss/loss', total_loss)
+    utils.scalar('lrn_rate', learning_rate, is_tpu)
+    utils.scalar('trainloss/cls_loss', cls_loss, is_tpu)
+    utils.scalar('trainloss/box_loss', box_loss, is_tpu)
+    utils.scalar('trainloss/det_loss', det_loss, is_tpu)
+    utils.scalar('trainloss/reg_l2_loss', reg_l2loss, is_tpu)
+    utils.scalar('trainloss/loss', total_loss, is_tpu)
     if params['iou_loss_type']:
-      utils.scalar('trainloss/box_iou_loss', box_iou_loss)
+      utils.scalar('trainloss/box_iou_loss', box_iou_loss, is_tpu)
     train_epochs = tf.cast(global_step, tf.float32) / params['steps_per_epoch']
-    utils.scalar('train_epochs', train_epochs)
+    utils.scalar('train_epochs', train_epochs, is_tpu)
 
   moving_average_decay = params['moving_average_decay']
   if moving_average_decay:
@@ -416,8 +406,25 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     else:
       raise ValueError('optimizers should be adam or sgd')
 
-    if params['strategy'] == 'tpu':
+    if is_tpu:
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)
+    if params['device']['grad_ckpting']:
+      # pylint: disable=g-import-not-at-top,g-direct-tensorflow-import
+      from third_party.grad_checkpoint import grad
+      from tensorflow.python.ops import gradients
+      # pylint: enable=g-import-not-at-top,g-direct-tensorflow-import
+
+      # monkey patch tf.gradients to point to our custom version,
+      # with automatic checkpoint selection
+      def gradients_(ys, xs, grad_ys=None, **kwargs):
+        return grad.gradients(
+            ys,
+            xs,
+            grad_ys,
+            checkpoints=params['device']['grad_ckpting_list'],
+            **kwargs)
+
+      gradients.__dict__['gradients'] = gradients_
 
     # Batch norm requires update_ops to be added as a train_op dependency.
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -438,7 +445,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
             for g in grads
         ]
         clipped_grads, _ = tf.clip_by_global_norm(clipped_grads, clip_norm)
-        utils.scalar('gradient_norm', tf.linalg.global_norm(clipped_grads))
+        utils.scalar('gradient_norm', tf.linalg.global_norm(clipped_grads),
+                     is_tpu)
         grads_and_vars = list(zip(clipped_grads, tvars))
 
       with tf.control_dependencies(update_ops):
@@ -588,14 +596,23 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   else:
     scaffold_fn = None
 
-  if params['strategy'] != 'tpu':
+  if is_tpu:
+    return tf.estimator.tpu.TPUEstimatorSpec(
+        mode=mode,
+        loss=total_loss,
+        train_op=train_op,
+        eval_metrics=eval_metrics,
+        host_call=utils.get_tpu_host_call(global_step, params),
+        scaffold_fn=scaffold_fn,
+        training_hooks=training_hooks)
+  else:
     # Profile every 1K steps.
     if params.get('profile', False):
       profile_hook = tf.estimator.ProfilerHook(
           save_steps=1000, output_dir=params['model_dir'], show_memory=True)
       training_hooks.append(profile_hook)
 
-      # Report memory allocation if OOM
+      # Report memory allocation if OOM; it will slow down the running.
       class OomReportingHook(tf.estimator.SessionRunHook):
 
         def before_run(self, run_context):
@@ -615,19 +632,23 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
         every_n_iter=params.get('iterations_per_loop', 100),
     )
     training_hooks.append(logging_hook)
-  if params['strategy'] == 'tpu':
-    return tf.estimator.tpu.TPUEstimatorSpec(
-        mode=mode,
-        loss=total_loss,
-        train_op=train_op,
-        eval_metrics=eval_metrics,
-        host_call=utils.get_tpu_host_call(global_step, params),
-        scaffold_fn=scaffold_fn,
-        training_hooks=training_hooks)
-  else:
+
+    if params['device']['nvgpu_logging']:
+      try:
+        from third_party.tools import nvgpu  # pylint: disable=g-import-not-at-top
+        mem_message = tf.numpy_function(nvgpu.gpu_memory_util_message, [],
+                                        [tf.string])[0]
+        logging_hook_nvgpu = tf.estimator.LoggingTensorHook(
+            tensors={'mem_message': mem_message},
+            every_n_iter=params.get('iterations_per_loop', 100),
+            formatter=lambda x: x['mem_message'].decode('utf-8'),
+        )
+        training_hooks.append(logging_hook_nvgpu)
+      except:  # pylint: disable=bare-except
+        logging.error('nvgpu error: nvidia-smi format not recognized.')
+
     eval_metric_ops = (
         eval_metrics[0](**eval_metrics[1]) if eval_metrics else None)
-    utils.get_tpu_host_call(global_step, params)
     return tf.estimator.EstimatorSpec(
         mode=mode,
         loss=total_loss,

@@ -23,6 +23,7 @@ import dataloader
 import hparams_config
 import utils
 from keras import train_lib
+from keras import util_keras
 
 # Cloud TPU Cluster Resolvers
 flags.DEFINE_string(
@@ -209,12 +210,14 @@ def main(_):
                     label_smoothing=params['label_smoothing'],
                     reduction=tf.keras.losses.Reduction.NONE),
             'seg_loss':
-                tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+                tf.keras.losses.SparseCategoricalCrossentropy(
+                    from_logits=True,
+                    reduction=tf.keras.losses.Reduction.NONE)
         })
 
     if FLAGS.pretrained_ckpt:
       ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)
-      model.load_weights(ckpt_path)
+      util_keras.restore_ckpt(model, ckpt_path, params['moving_average_decay'])
     tf.io.gfile.makedirs(FLAGS.model_dir)
     model.fit(
         get_dataset(True, params=params),

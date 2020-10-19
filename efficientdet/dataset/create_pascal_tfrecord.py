@@ -251,7 +251,11 @@ def main(_):
   if FLAGS.year != 'merged':
     years = [FLAGS.year]
 
-  logging.info('writing to output path: %s', FLAGS.output_path)
+  output_dir = os.path.dirname(FLAGS.output_path)
+  if not tf.io.gfile.exists(output_dir):
+    tf.io.gfile.makedirs(output_dir)
+  logging.info('Writing to output directory: %s', output_dir)
+
   writers = [
       tf.python_io.TFRecordWriter(FLAGS.output_path + '-%05d-of-%05d.tfrecord' %
                                   (i, FLAGS.num_shards))
@@ -271,15 +275,17 @@ def main(_):
       'categories': []
   }
   for year in years:
+    example_class = list(label_map_dict.keys())[1]
+    examples_path = os.path.join(data_dir, year, 'ImageSets', 'Main',
+                                 example_class + '_' + FLAGS.set + '.txt')
+    examples_list = tfrecord_util.read_examples_list(examples_path)
+    annotations_dir = os.path.join(data_dir, year, FLAGS.annotations_dir)
+
     for class_name, class_id in label_map_dict.items():
       cls = {'supercategory': 'none', 'id': class_id, 'name': class_name}
       ann_json_dict['categories'].append(cls)
 
     logging.info('Reading from PASCAL %s dataset.', year)
-    examples_path = os.path.join(data_dir, year, 'ImageSets', 'Main',
-                                 'aeroplane_' + FLAGS.set + '.txt')
-    annotations_dir = os.path.join(data_dir, year, FLAGS.annotations_dir)
-    examples_list = tfrecord_util.read_examples_list(examples_path)
     for idx, example in enumerate(examples_list):
       if FLAGS.num_images and idx >= FLAGS.num_images:
         break

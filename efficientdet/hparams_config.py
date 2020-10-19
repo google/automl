@@ -136,13 +136,13 @@ class Config(object):
               return {k: [eval_str_fn(vv) for vv in v.split('*')]}
             return {k: eval_str_fn(v)}
           pos = k.index('.')
-          return {k[:pos]: add_kv_recursive(k[pos+1:], v)}
+          return {k[:pos]: add_kv_recursive(k[pos + 1:], v)}
 
         def merge_dict_recursive(target, src):
           """Recursively merge two nested dictionary."""
           for k in src.keys():
             if ((k in target and isinstance(target[k], dict) and
-                 isinstance(src[k], collections.Mapping))):
+                 isinstance(src[k], collections.abc.Mapping))):
               merge_dict_recursive(target[k], src[k])
             else:
               target[k] = src[k]
@@ -161,7 +161,7 @@ class Config(object):
       else:
         config_dict[k] = copy.deepcopy(v)
     return config_dict
-# pylint: enable=protected-access
+    # pylint: enable=protected-access
 
 
 def default_detection_configs():
@@ -182,6 +182,7 @@ def default_detection_configs():
   h.jitter_max = 2.0
   h.autoaugment_policy = None
   h.use_augmix = False
+  h.grid_mask = False
   # mixture_width, mixture_depth, alpha
   h.augmix_params = [3, -1, 1]
   h.sample_image = None
@@ -280,6 +281,21 @@ def default_detection_configs():
   h.use_keras_model = True
   h.dataset_type = None
   h.positives_momentum = None
+
+  # For device specific options.
+  h.device = {
+      # If true, apply gradient checkpointing to reduce memory usage.
+      'grad_ckpting': False,
+      # All ops in the list will be checkpointed, such as Add/Mul/Conv2d/Floor/
+      # Sigmoid and other ops, or more specific, e.g. blocks_10/se/conv2d_1.
+      # Adding more ops will save more memory at the cost of more computation.
+      # For EfficientDet, [Add_, AddN] reduces mbconv memory to one third
+      # with one third more compute, in particular enabling training d6 with
+      # batch size 2 on 11Gb (2080ti).
+      'grad_ckpting_list': ['Add_', 'AddN'],
+      # enable memory logging for NVIDIA cards.
+      'nvgpu_logging': False,
+  }
 
   return h
 
@@ -380,51 +396,56 @@ efficientdet_lite_param_dict = {
         dict(
             name='efficientdet-lite0',
             backbone_name='efficientnet-lite0',
-            image_size=512,
+            image_size=320,
             fpn_num_filters=64,
             fpn_cell_repeats=3,
             box_class_repeats=3,
             act_type='relu',
+            fpn_weight_method='sum',
         ),
     'efficientdet-lite1':
         dict(
             name='efficientdet-lite1',
             backbone_name='efficientnet-lite1',
-            image_size=640,
+            image_size=384,
             fpn_num_filters=88,
             fpn_cell_repeats=4,
             box_class_repeats=3,
             act_type='relu',
+            fpn_weight_method='sum',
         ),
     'efficientdet-lite2':
         dict(
             name='efficientdet-lite2',
             backbone_name='efficientnet-lite2',
-            image_size=768,
+            image_size=480,
             fpn_num_filters=112,
             fpn_cell_repeats=5,
             box_class_repeats=3,
             act_type='relu',
+            fpn_weight_method='sum',
         ),
     'efficientdet-lite3':
         dict(
             name='efficientdet-lite3',
             backbone_name='efficientnet-lite3',
-            image_size=896,
+            image_size=512,
             fpn_num_filters=160,
             fpn_cell_repeats=6,
             box_class_repeats=4,
             act_type='relu',
+            fpn_weight_method='sum',
         ),
     'efficientdet-lite4':
         dict(
             name='efficientdet-lite4',
             backbone_name='efficientnet-lite4',
-            image_size=1024,
+            image_size=640,
             fpn_num_filters=224,
             fpn_cell_repeats=7,
             box_class_repeats=4,
             act_type='relu',
+            fpn_weight_method='sum',
         ),
 }
 

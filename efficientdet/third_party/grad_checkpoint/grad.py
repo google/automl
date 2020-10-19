@@ -20,27 +20,50 @@
 # pylint: disable=protected-access
 
 import contextlib
-from absl import logging
-
+import functools
+import re
 import sys
 import time
+from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
 
 # save original gradients since tf.gradient could be monkey-patched.
 import third_party.graph_edit as ge
 tf_gradient_function = tf.gradients
-
-
-def toposort(x):
-  # TODO(someone): should be the same as "from toposort import toposort".
-  return x
-
-
 sys.setrecursionlimit(10000)
-
 # getting rid of "WARNING:tensorflow:VARIABLES collection name is deprecated"
 setattr(tf.GraphKeys, "VARIABLES", "variables")
+
+
+def toposort(nodes):
+  """Sort topologically nodes based on https://pypi.org/project/toposort/."""
+  # Special case empty input.
+  if not nodes:
+    return
+
+  # Copy the input so as to leave it unmodified.
+  nodes = nodes.copy()
+  # Ignore self dependencies.
+  for k, v in nodes.items():
+    v.discard(k)
+  # Find all items that don't depend on anything.
+  isolated_items = functools.reduce(set.union, nodes.values()) - set(
+      nodes.keys())
+  # Add empty dependences where needed.
+  nodes.update({item: set() for item in isolated_items})
+  while True:
+    ordered = set(item for item, dep in nodes.items() if not dep)
+    if not ordered:
+      break
+    yield ordered
+    nodes = {
+        item: (dep - ordered)
+        for item, dep in nodes.items()
+        if item not in ordered
+    }
+  if nodes:
+    raise ValueError("expected empty, but got {}".format(nodes))
 
 
 # ISSUE: https://github.com/cybertronai/gradient-checkpointing/issues/38
@@ -254,10 +277,12 @@ def gradients(ys, xs, grad_ys=None, checkpoints="collection", **kwargs):
       logging.info("Excluding %s from ts_all: %d", excl_layer, len(ts_all))
 
     # leave only layers that match strings in checkpoints list
-    ts_all = [
-        t for t in ts_all
-        if any(partial_match in t.name for partial_match in checkpoints)
-    ]
+    matchers = {c: re.compile('.*' + c + '.*') for c in checkpoints}
+    ts_set = set()
+    for c, matcher in matchers.items():
+      ts_match = [t for t in ts_all if matcher.match(t.name)]
+      ts_set.update(ts_match)
+    ts_all = list(ts_set)
     logging.info("Leaving only %s in ts_all: %d", checkpoints, len(ts_all))
     checkpoints = ts_all.copy()
 

@@ -184,9 +184,9 @@ def get_optimizer(params):
   moving_average_decay = params['moving_average_decay']
   if moving_average_decay:
     # TODO(tanmingxing): potentially add dynamic_decay for new tfa release.
-    import tensorflow_addons as tfa  # pylint: disable=g-import-not-at-top
-    optimizer = tfa.optimizers.MovingAverage(
-        optimizer, average_decay=moving_average_decay)
+    from tensorflow_addons import optimizers as tfa_optimizers  # pylint: disable=g-import-not-at-top
+    optimizer = tfa_optimizers.MovingAverage(
+        optimizer, average_decay=moving_average_decay, dynamic_decay=True)
   if params['mixed_precision']:
     optimizer = tf.keras.mixed_precision.experimental.LossScaleOptimizer(
         optimizer, loss_scale='dynamic')
@@ -559,11 +559,11 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     """
     images, labels = data
     if len(self.config.heads) == 2:
-      cls_outputs, box_outputs, seg_outputs = self(images, training=True)
+      cls_outputs, box_outputs, seg_outputs = self(images, training=False)
     elif 'object_detection' in self.config.heads:
-      cls_outputs, box_outputs = self(images, training=True)
+      cls_outputs, box_outputs = self(images, training=False)
     elif 'segmentation' in self.config.heads:
-      seg_outputs, = self(images, training=True)
+      seg_outputs, = self(images, training=False)
     reg_l2loss = self._reg_l2_loss(self.config.weight_decay)
     total_loss = reg_l2loss
     loss_vals = {}

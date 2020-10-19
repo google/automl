@@ -297,6 +297,10 @@ class InputReader:
         classes = tf.gather_nd(classes, indices)
         boxes = tf.gather_nd(boxes, indices)
 
+      if params.get("grid_mask", None) and self._is_training:
+        from aug import gridmask  # pylint: disable=g-import-not-at-top
+        image, boxes = gridmask.gridmask(image, boxes)
+
       if params.get('autoaugment_policy', None) and self._is_training:
         from aug import autoaugment  # pylint: disable=g-import-not-at-top
         if params['autoaugment_policy'] == 'randaug':
@@ -374,7 +378,7 @@ class InputReader:
     labels['image_masks'] = image_masks
     return images, labels
 
-  def __call__(self, params, input_context=None):
+  def __call__(self, params, input_context=None, batch_size=None):
     input_anchors = anchors.Anchors(params['min_level'], params['max_level'],
                                     params['num_scales'],
                                     params['aspect_ratios'],
@@ -386,7 +390,7 @@ class InputReader:
         regenerate_source_id=params['regenerate_source_id']
     )
 
-    batch_size = params['batch_size']
+    batch_size = batch_size or params['batch_size']
     dataset = tf.data.Dataset.list_files(
         self._file_pattern, shuffle=self._is_training)
     if self._is_training:
@@ -434,5 +438,4 @@ class InputReader:
       # first batch. This reduces variance in performance and is useful in
       # testing.
       dataset = dataset.take(1).cache().repeat()
-    dataset = dataset.apply(tf.data.experimental.ignore_errors())
     return dataset
