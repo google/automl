@@ -24,6 +24,7 @@ import hparams_config
 import utils
 from keras import train_lib
 from keras import util_keras
+from keras import model_optimization
 
 # Cloud TPU Cluster Resolvers
 flags.DEFINE_string(
@@ -82,26 +83,16 @@ flags.DEFINE_string('validation_file_pattern', None,
 flags.DEFINE_string(
     'val_json_file', None,
     'COCO validation JSON containing golden bounding boxes. If None, use the '
-    'ground truth from the dataloader. Ignored if testdev_dir is not None.')
-flags.DEFINE_string('testdev_dir', None,
-                    'COCO testdev dir. If not None, ignorer val_json_file.')
+    'ground truth from the dataloader.')
+
 flags.DEFINE_integer('num_examples_per_epoch', 120000,
                      'Number of examples in one epoch')
 flags.DEFINE_integer('num_epochs', None, 'Number of epochs for training')
-flags.DEFINE_string('mode', 'train',
-                    'Mode to run: train or eval (default: train)')
 flags.DEFINE_string('model_name', 'efficientdet-d1', 'Model name.')
 flags.DEFINE_bool('eval_after_training', False, 'Run one eval after the '
                   'training finishes.')
 flags.DEFINE_bool('debug', False, 'Enable debug mode')
 flags.DEFINE_bool('profile', False, 'Enable profile mode')
-
-# For Eval mode
-flags.DEFINE_integer('min_eval_interval', 180,
-                     'Minimum seconds between evaluations.')
-flags.DEFINE_integer(
-    'eval_timeout', None,
-    'Maximum seconds between checkpoints before evaluation terminates.')
 
 FLAGS = flags.FLAGS
 
@@ -143,18 +134,11 @@ def main(_):
     else:
       ds_strategy = tf.distribute.OneDeviceStrategy('device:CPU:0')
 
-  # Check data path
-  if FLAGS.mode in ('train',
-                    'train_and_eval') and FLAGS.training_file_pattern is None:
-    raise RuntimeError('You must specify --training_file_pattern for training.')
-  if FLAGS.mode in ('eval', 'train_and_eval'):
-    if FLAGS.validation_file_pattern is None:
-      raise RuntimeError('You must specify --validation_file_pattern '
-                         'for evaluation.')
 
   steps_per_epoch = FLAGS.num_examples_per_epoch // FLAGS.batch_size
   params = dict(
       config.as_dict(),
+      profile=FLAGS.profile,
       model_name=FLAGS.model_name,
       iterations_per_loop=FLAGS.iterations_per_loop,
       model_dir=FLAGS.model_dir,
@@ -162,9 +146,7 @@ def main(_):
       strategy=FLAGS.strategy,
       batch_size=FLAGS.batch_size // ds_strategy.num_replicas_in_sync,
       num_shards=ds_strategy.num_replicas_in_sync,
-      val_json_file=FLAGS.val_json_file,
-      testdev_dir=FLAGS.testdev_dir,
-      mode=FLAGS.mode)
+      val_json_file=FLAGS.val_json_file)
 
   # set mixed precision policy by keras api.
   precision = utils.get_precision(params['strategy'], params['mixed_precision'])
@@ -176,7 +158,7 @@ def main(_):
         FLAGS.training_file_pattern
         if is_training else FLAGS.validation_file_pattern)
     if not file_pattern:
-      raise ValueError('No matching files.')
+      return None
 
     return dataloader.InputReader(
         file_pattern,
@@ -219,11 +201,14 @@ def main(_):
       ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)
       util_keras.restore_ckpt(model, ckpt_path, params['moving_average_decay'])
     tf.io.gfile.makedirs(FLAGS.model_dir)
+    if params['model_optimizations']:
+      model_optimization.set_config(params['model_optimizations'])
+      model.build((FLAGS.batch_size, *config.image_size, 3))
     model.fit(
         get_dataset(True, params=params),
         epochs=params['num_epochs'],
         steps_per_epoch=steps_per_epoch,
-        callbacks=train_lib.get_callbacks(params, FLAGS.profile),
+        callbacks=train_lib.get_callbacks(params),
         validation_data=get_dataset(False, params=params),
         validation_steps=(FLAGS.eval_samples // FLAGS.batch_size))
   model.save_weights(os.path.join(FLAGS.model_dir, 'ckpt-final'))
