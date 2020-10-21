@@ -27,6 +27,167 @@ import utils
 from keras import anchors
 from keras import efficientdet_keras
 
+from tensorflow_model_optimization.python.core.sparsity.keras import pruning_wrapper
+
+
+class MomentumOptimizer(tf.keras.optimizers.Optimizer):
+  def __init__(self, learning_rate, momentum,
+               use_nesterov=False, name='Momentum', **kwargs):
+    super().__init__(name=name, **kwargs)
+    self._set_hyper('learning_rate', learning_rate)
+    self._set_hyper('decay', self._initial_decay)
+
+    if isinstance(momentum, (int, float)) and (momentum < 0 or momentum > 1):
+      raise ValueError('`momentum` must be between [0, 1].')
+    self._set_hyper('momentum', momentum)
+    self._use_locking = True
+    self._use_nesterov = use_nesterov
+
+  def _create_slots(self, var_list):
+    for var in var_list:
+      self.add_slot(var, 'momentum')
+
+  def _prepare_local(self, var_device, var_dtype, apply_state):
+    super()._prepare_local(var_device, var_dtype, apply_state)
+    apply_state[(var_device, var_dtype)]['momentum'] = tf.identity(
+        self._get_hyper('momentum', var_dtype))
+
+  def _resource_apply_dense(self, grad, var, apply_state=None):
+    var_device, var_dtype = var.device, var.dtype.base_dtype
+    coefficients = ((apply_state or {}).get((var_device, var_dtype))
+                    or self._fallback_apply_state(var_device, var_dtype))
+    mom = self.get_slot(var, 'momentum')
+    return tf.raw_ops.ResourceApplyMomentum(
+        var=var.handle, accum=mom.handle,
+        lr=coefficients['lr_t'],
+        grad=grad,
+        momentum=coefficients['momentum'],
+        use_locking=self._use_locking,
+        use_nesterov=self._use_nesterov)
+
+  def get_config(self):
+    config = super().get_config()
+    config.update({
+        'learning_rate': self._serialize_hyperparameter('learning_rate'),
+        'decay': self._serialize_hyperparameter('decay'),
+        'momentum': self._serialize_hyperparameter('momentum'),
+        'nesterov': self._use_nesterov,
+    })
+    return config
+
+def _collect_prunable_layers(model):
+  """Recursively collect the prunable layers in the model."""
+  prunable_layers = []
+  for layer in model._flatten_layers(recursive=False, include_self=False):
+    # A keras model may have other models as layers.
+    if isinstance(layer, pruning_wrapper.PruneLowMagnitude):
+      prunable_layers.append(layer)
+    elif isinstance(layer, (tf.keras.Model, tf.keras.layers.Layer)):
+      prunable_layers += _collect_prunable_layers(layer)
+
+  return prunable_layers
+
+
+class UpdatePruningStep(tf.keras.callbacks.Callback):
+  """Keras callback which updates pruning wrappers with the optimizer step.
+  This callback must be used when training a model which needs to be pruned. Not
+  doing so will throw an error.
+  Example:
+  ```python
+  model.fit(x, y,
+      callbacks=[UpdatePruningStep()])
+  ```
+  """
+
+  def __init__(self):
+    super(UpdatePruningStep, self).__init__()
+    self.prunable_layers = []
+
+  def on_train_begin(self, logs=None):
+    # Collect all the prunable layers in the model.
+    self.prunable_layers = _collect_prunable_layers(self.model)
+    self.step = tf.keras.backend.get_value(self.model.optimizer.iterations)
+
+  def on_train_batch_begin(self, batch, logs=None):
+    tuples = []
+
+    for layer in self.prunable_layers:
+      if layer.built:
+        tuples.append((layer.pruning_step, self.step))
+
+    tf.keras.backend.batch_set_value(tuples)
+    self.step = self.step + 1
+
+  def on_epoch_end(self, batch, logs=None):
+    # At the end of every epoch, remask the weights. This ensures that when
+    # the model is saved after completion, the weights represent mask*weights.
+    weight_mask_ops = []
+
+    for layer in self.prunable_layers:
+      if layer.built and isinstance(layer, pruning_wrapper.PruneLowMagnitude):
+        if tf.executing_eagerly():
+          layer.pruning_obj.weight_mask_op()
+        else:
+          weight_mask_ops.append(layer.pruning_obj.weight_mask_op())
+
+    tf.keras.backend.batch_get_value(weight_mask_ops)
+
+
+class PruningSummaries(tf.keras.callbacks.TensorBoard):
+  """A Keras callback for adding pruning summaries to tensorboard.
+
+  Logs the sparsity(%) and threshold at a given iteration step.
+  """
+
+  def __init__(self, log_dir, update_freq='epoch', **kwargs):
+    if not isinstance(log_dir, str) or not log_dir:
+      raise ValueError(
+          '`log_dir` must be a non-empty string. You passed `log_dir`='
+          '{input}.'.format(input=log_dir))
+
+    super().__init__(
+        log_dir=log_dir, update_freq=update_freq, **kwargs)
+
+    log_dir = self.log_dir + '/metrics'
+    self._file_writer = tf.summary.create_file_writer(log_dir)
+
+  def _log_pruning_metrics(self, logs, step):
+    with self._file_writer.as_default():
+      for name, value in logs.items():
+        tf.summary.scalar(name, value, step=step)
+
+      self._file_writer.flush()
+
+  def on_epoch_begin(self, epoch, logs=None):
+    if logs is not None:
+      super().on_epoch_begin(epoch, logs)
+
+    pruning_logs = {}
+    params = []
+    prunable_layers = _collect_prunable_layers(self.model)
+    for layer in prunable_layers:
+      for _, mask, threshold in layer.pruning_vars:
+        params.append(mask)
+        params.append(threshold)
+
+    params.append(self.model.optimizer.iterations)
+
+    values = tf.keras.backend.batch_get_value(params)
+    iteration = values[-1]
+    del values[-1]
+    del params[-1]
+
+    param_value_pairs = list(zip(params, values))
+
+    for mask, mask_value in param_value_pairs[::2]:
+      pruning_logs.update({
+          mask.name + '/sparsity': 1 - np.mean(mask_value)
+      })
+
+    for threshold, threshold_value in param_value_pairs[1::2]:
+      pruning_logs.update({threshold.name + '/threshold': threshold_value})
+
+    self._log_pruning_metrics(pruning_logs, iteration)
 
 def update_learning_rate_schedule_parameters(params):
   """Updates params that are related to the learning rate schedule."""
@@ -173,7 +334,7 @@ def get_optimizer(params):
   learning_rate = learning_rate_schedule(params)
   if params['optimizer'].lower() == 'sgd':
     logging.info('Use SGD optimizer')
-    optimizer = tf.keras.optimizers.SGD(
+    optimizer = MomentumOptimizer(
         learning_rate, momentum=params['momentum'])
   elif params['optimizer'].lower() == 'adam':
     logging.info('Use Adam optimizer')
@@ -241,10 +402,11 @@ class DisplayCallback(tf.keras.callbacks.Callback):
       tf.summary.image('Test image', tf.expand_dims(image, axis=0), step=epoch)
 
 
-def get_callbacks(params, profile=False):
+def get_callbacks(params):
   """Get callbacks for given params."""
   tb_callback = tf.keras.callbacks.TensorBoard(
-      log_dir=params['model_dir'], profile_batch=2 if profile else 0)
+      log_dir=params['model_dir'], update_freq=params['iterations_per_loop'],
+      profile_batch=2 if params['profile'] else 0)
   ckpt_callback = tf.keras.callbacks.ModelCheckpoint(
       os.path.join(params['model_dir'], 'ckpt'),
       verbose=1,
@@ -252,6 +414,13 @@ def get_callbacks(params, profile=False):
   early_stopping = tf.keras.callbacks.EarlyStopping(
       monitor='val_loss', min_delta=0, patience=10, verbose=1)
   callbacks = [tb_callback, ckpt_callback, early_stopping]
+  if params['model_optimizations'] and 'prune' in params['model_optimizations']:
+    prune_callback = UpdatePruningStep()
+    prune_summaries = PruningSummaries(
+        log_dir=params['model_dir'],
+        update_freq=params['iterations_per_loop'],
+        profile_batch=2 if params['profile'] else 0)
+    callbacks += [prune_callback, prune_summaries]
   if params.get('sample_image', None):
     display_callback = DisplayCallback(
         params.get('sample_image', None),
