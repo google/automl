@@ -276,17 +276,14 @@ class ServingDriver(object):
 
   def export(self,
              output_dir: Text = None,
-             tflite_path: Text = None,
              tensorrt: Text = None,
-             quantization_type: Text = None):
+             tflite: Text = None):
     """Export a saved model, frozen graph, and potential tflite/tensorrt model.
 
     Args:
       output_dir: the output folder for saved model.
-      tflite_path: the path for saved tflite file.
       tensorrt: If not None, must be {'FP32', 'FP16', 'INT8'}.
-      quantization_type: Type for post-training quantization. If not None, must
-        be {'float16'}.
+      tflite: If not None, must be {'FP32', 'FP16', 'INT8'}.
     """
     if not self.model:
       self.build()
@@ -310,20 +307,38 @@ class ServingDriver(object):
           graphdef, output_dir, self.model_name + '_frozen.pb', as_text=False)
       logging.info('Frozen graph saved at %s', proto_path)
 
-    if tflite_path:
+    if tflite:
       image_size = utils.parse_image_size(self.params['image_size'])
       converter = tf.lite.TFLiteConverter.from_concrete_functions([
           export_model.tflite_call.get_concrete_function(
               tf.TensorSpec(shape=[1, *image_size, 3]))
       ])
 
-      if quantization_type == 'float16':
+      if tflite == 'FP32':
+        converter.optimizations = [tf.lite.Optimize.DEFAULT]
+        converter.target_spec.supported_types = [tf.float32]
+      elif tflite == 'FP16':
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
         converter.target_spec.supported_types = [tf.float16]
-      elif quantization_type:
-        raise ValueError('Quantization Type %s not support yet.' %
-                         quantization_type)
+      elif tflite == 'INT8':
+        num_calibration_steps = 10
 
+        def representative_dataset_gen():  # rewrite this for real data.
+          for _ in range(num_calibration_steps):
+            yield [np.ones((1, *image_size, 3), dtype=np.float32)]
+
+        converter.representative_dataset = representative_dataset_gen
+
+        converter.optimizations = [tf.lite.Optimize.DEFAULT]
+        converter.inference_input_type = tf.uint8
+        converter.inference_output_type = tf.uint8
+        converter.target_spec.supported_ops = [
+            tf.lite.OpsSet.TFLITE_BUILTINS_INT8
+        ]
+      else:
+        raise ValueError('tflite must be one of {FP32, FP16, INT8}.')
+
+      tflite_path = os.path.join(output_dir, tflite.lower() + '.tflite')
       tflite_model = converter.convert()
       tf.io.gfile.GFile(tflite_path, 'wb').write(tflite_model)
       logging.info('TFLite is saved at %s', tflite_path)

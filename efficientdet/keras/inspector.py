@@ -14,6 +14,7 @@
 # ==============================================================================
 r"""Tool to inspect a model."""
 import os
+import tempfile
 
 from absl import app
 from absl import flags
@@ -58,12 +59,8 @@ flags.DEFINE_float('min_score_thresh', 0.4, 'Score threshold to show box.')
 flags.DEFINE_string('nms_method', 'hard', 'nms method, hard or gaussian.')
 
 # For saved model.
-flags.DEFINE_string('saved_model_dir', '/tmp/saved_model',
-                    'Folder path for saved model.')
-flags.DEFINE_string('tflite_path', None, 'Path for exporting tflite file.')
-flags.DEFINE_string(
-    'quantization_type', None, 'Type for post-training quantization. Support '
-    '{float16, None} for now. If None, don\'t quantize the model.')
+flags.DEFINE_string('saved_model_dir', None, 'Folder path for saved model.')
+flags.DEFINE_string('tflite', None, 'tflite type: {FP32, FP16, INT8}.')
 flags.DEFINE_bool('debug', False, 'Debug mode.')
 FLAGS = flags.FLAGS
 
@@ -98,10 +95,13 @@ def main(_):
                                    FLAGS.min_score_thresh,
                                    FLAGS.max_boxes_to_draw, model_params)
   if FLAGS.mode == 'export':
-    if tf.io.gfile.exists(FLAGS.saved_model_dir):
-      tf.io.gfile.rmtree(FLAGS.saved_model_dir)
-    driver.export(FLAGS.saved_model_dir, FLAGS.tflite_path, FLAGS.tensorrt,
-                  FLAGS.quantization_type)
+    if not  FLAGS.saved_model_dir:
+      raise ValueError('Please specify --saved_model_dir=')
+    model_dir = FLAGS.saved_model_dir
+    if tf.io.gfile.exists(model_dir):
+      tf.io.gfile.rmtree(model_dir)
+    driver.export(model_dir, FLAGS.tensorrt, FLAGS.tflite)
+    print('Model are exported to %s' % model_dir)
   elif FLAGS.mode == 'infer':
     if FLAGS.saved_model_dir:
       driver.load(FLAGS.saved_model_dir)
@@ -146,7 +146,7 @@ def main(_):
       driver.model.save_weights(FLAGS.export_ckpt)
   elif FLAGS.mode == 'video':
     import cv2  # pylint: disable=g-import-not-at-top
-    if tf.saved_model.contains_saved_model(FLAGS.saved_model_dir):
+    if FLAGS.saved_model_dir:
       driver.load(FLAGS.saved_model_dir)
     cap = cv2.VideoCapture(FLAGS.input_video)
     if not cap.isOpened():
