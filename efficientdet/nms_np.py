@@ -25,42 +25,6 @@ _DUMMY_DETECTION_SCORE = -1e5
 MAX_DETECTION_POINTS = 5000
 
 
-def sigmoid(x):
-  """Sigmoid function for use with Numpy for CPU evaluation."""
-  return 1 / (1 + np.exp(-x))
-
-
-def decode_box_outputs_np(rel_codes, anchors):
-  """Transforms relative regression coordinates to absolute positions.
-
-  Network predictions are normalized and relative to a given anchor; this
-  reverses the transformation and outputs absolute coordinates for the input
-  image.
-
-  Args:
-    rel_codes: box regression targets.
-    anchors: anchors on all feature levels.
-  Returns:
-    outputs: bounding boxes.
-
-  """
-  ycenter_a = (anchors[0] + anchors[2]) / 2
-  xcenter_a = (anchors[1] + anchors[3]) / 2
-  ha = anchors[2] - anchors[0]
-  wa = anchors[3] - anchors[1]
-  ty, tx, th, tw = rel_codes
-
-  w = np.exp(tw) * wa
-  h = np.exp(th) * ha
-  ycenter = ty * ha + ycenter_a
-  xcenter = tx * wa + xcenter_a
-  ymin = ycenter - h / 2.
-  xmin = xcenter - w / 2.
-  ymax = ycenter + h / 2.
-  xmax = xcenter + w / 2.
-  return np.column_stack([ymin, xmin, ymax, xmax])
-
-
 def diou_nms(dets, iou_thresh=None):
   """DIOU non-maximum suppression.
 
@@ -299,43 +263,3 @@ def per_class_nms(boxes, scores, classes, image_id, image_scale, num_classes,
 
   return detections
 
-
-def _generate_detections(cls_outputs, box_outputs, anchor_boxes, indices,
-                         classes, image_id, image_scale, num_classes,
-                         max_boxes_to_draw, nms_configs):
-  """Generates detections with model outputs and anchors.
-
-  Args:
-    cls_outputs: a numpy array with shape [N, 1], which has the highest class
-      scores on all feature levels. The N is the number of selected
-      top-K total anchors on all levels.  (k being MAX_DETECTION_POINTS)
-    box_outputs: a numpy array with shape [N, 4], which stacks box regression
-      outputs on all feature levels. The N is the number of selected top-k
-      total anchors on all levels. (k being MAX_DETECTION_POINTS)
-    anchor_boxes: a numpy array with shape [N, 4], which stacks anchors on all
-      feature levels. The N is the number of selected top-k total anchors on
-      all levels.
-    indices: a numpy array with shape [N], which is the indices from top-k
-      selection.
-    classes: a numpy array with shape [N], which represents the class
-      prediction on all selected anchors from top-k selection.
-    image_id: an integer number to specify the image id.
-    image_scale: a float tensor representing the scale between original image
-      and input image for the detector. It is used to rescale detections for
-      evaluating with the original groundtruth annotations.
-    num_classes: a integer that indicates the number of classes.
-    max_boxes_to_draw: max number of boxes to draw per image.
-    nms_configs: A dict of NMS configs.
-
-  Returns:
-    detections: detection results in a tensor with each row representing
-      [image_id, x, y, width, height, score, class]
-  """
-  anchor_boxes = anchor_boxes[indices, :]
-  scores = sigmoid(cls_outputs)
-  # apply bounding box regression to anchors
-  boxes = decode_box_outputs_np(
-      box_outputs.swapaxes(0, 1), anchor_boxes.swapaxes(0, 1))
-  # run class-wise nms
-  return per_class_nms(boxes, scores, classes, image_id, image_scale,
-                       num_classes, max_boxes_to_draw, nms_configs)
