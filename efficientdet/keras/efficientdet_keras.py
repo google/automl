@@ -211,7 +211,8 @@ class OpAfterCombine(tf.keras.layers.Layer):
         name='conv')
     if model_optimizations:
       for method in model_optimizations.keys():
-        self.conv_op = model_optimization.get_methods()[method](self.conv_op)
+        self.conv_op = (
+            model_optimization.get_method(method)(self.conv_op))
     self.bn = util_keras.build_batch_norm(
         is_training_bn=self.is_training_bn,
         data_format=self.data_format,
@@ -261,7 +262,7 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
         name='conv2d')
     if model_optimizations:
       for method in model_optimizations.keys():
-        self.conv2d = model_optimization.get_methods()[method](self.conv2d)
+        self.conv2d = model_optimization.get_method(method)(self.conv2d)
     self.bn = util_keras.build_batch_norm(
         is_training_bn=self.is_training_bn,
         data_format=self.data_format,
