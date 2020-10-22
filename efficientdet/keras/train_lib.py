@@ -30,99 +30,6 @@ from keras import efficientdet_keras
 from tensorflow_model_optimization.python.core.sparsity.keras import pruning_wrapper
 
 
-class MomentumOptimizer(tf.keras.optimizers.Optimizer):
-  """Optimizer that implements the Momentum algorithm.
-
-  Computes (if `use_nesterov = False`):
-
-  ```
-  accumulation = momentum * accumulation + gradient
-  variable -= learning_rate * accumulation
-  ```
-
-  Note that in the dense version of this algorithm, `accumulation` is updated
-  and applied regardless of a gradient's value, whereas the sparse version (when
-  the gradient is an `IndexedSlices`, typically because of `tf.gather` or an
-  embedding) only updates variable slices and corresponding `accumulation` terms
-  when that part of the variable was used in the forward pass.
-
-  A tf1.x MomentumOptimizer for tf2.x
-  """
-  def __init__(self, learning_rate, momentum,
-               use_nesterov=False, name='Momentum', **kwargs):
-    """Construct a new Momentum optimizer.
-
-    Args:
-      learning_rate: A `Tensor` or a floating point value.  The learning rate.
-      momentum: A `Tensor` or a floating point value.  The momentum.
-      use_nesterov: If `True` use Nesterov Momentum.
-        See (Sutskever et al., 2013).
-        This implementation always computes gradients at the value of the
-        variable(s) passed to the optimizer. Using Nesterov Momentum makes the
-        variable(s) track the values called `theta_t + mu*v_t` in the paper.
-        This implementation is an approximation of the original formula, valid
-        for high values of momentum. It will compute the "adjusted gradient"
-        in NAG by assuming that the new gradient will be estimated by the
-        current average gradient plus the product of momentum and the change
-        in the average gradient.
-      name: Optional name prefix for the operations created when applying
-        gradients.  Defaults to "Momentum".
-
-    References:
-      On the importance of initialization and momentum in deep learning:
-        [Sutskever et al., 2013]
-        (http://proceedings.mlr.press/v28/sutskever13.html)
-        ([pdf](http://proceedings.mlr.press/v28/sutskever13.pdf))
-
-    @compatibility(eager)
-    When eager execution is enabled, `learning_rate` and `momentum` can each be
-    a callable that takes no arguments and returns the actual value to use. This
-    can be useful for changing these values across different invocations of
-    optimizer functions.
-    @end_compatibility
-    """
-    super().__init__(name=name, **kwargs)
-    self._set_hyper('learning_rate', learning_rate)
-    self._set_hyper('decay', self._initial_decay)
-
-    if isinstance(momentum, (int, float)) and (momentum < 0 or momentum > 1):
-      raise ValueError('`momentum` must be between [0, 1].')
-    self._set_hyper('momentum', momentum)
-    self._use_locking = True
-    self._use_nesterov = use_nesterov
-
-  def _create_slots(self, var_list):
-    for var in var_list:
-      self.add_slot(var, 'momentum')
-
-  def _prepare_local(self, var_device, var_dtype, apply_state):
-    super()._prepare_local(var_device, var_dtype, apply_state)
-    apply_state[(var_device, var_dtype)]['momentum'] = tf.identity(
-        self._get_hyper('momentum', var_dtype))
-
-  def _resource_apply_dense(self, grad, var, apply_state=None):
-    var_device, var_dtype = var.device, var.dtype.base_dtype
-    coefficients = ((apply_state or {}).get((var_device, var_dtype))
-                    or self._fallback_apply_state(var_device, var_dtype))
-    mom = self.get_slot(var, 'momentum')
-    return tf.raw_ops.ResourceApplyMomentum(
-        var=var.handle, accum=mom.handle,
-        lr=coefficients['lr_t'],
-        grad=grad,
-        momentum=coefficients['momentum'],
-        use_locking=self._use_locking,
-        use_nesterov=self._use_nesterov)
-
-  def get_config(self):
-    config = super().get_config()
-    config.update({
-        'learning_rate': self._serialize_hyperparameter('learning_rate'),
-        'decay': self._serialize_hyperparameter('decay'),
-        'momentum': self._serialize_hyperparameter('momentum'),
-        'nesterov': self._use_nesterov,
-    })
-    return config
-
 def _collect_prunable_layers(model):
   """Recursively collect the prunable layers in the model."""
   prunable_layers = []
@@ -382,8 +289,8 @@ def get_optimizer(params):
   learning_rate = learning_rate_schedule(params)
   if params['optimizer'].lower() == 'sgd':
     logging.info('Use SGD optimizer')
-    optimizer = MomentumOptimizer(
-        learning_rate, momentum=params['momentum'])
+    optimizer = tf.keras.optimizers.SGD(
+        learning_rate, momentum=params['momentum'], nesterov=True)
   elif params['optimizer'].lower() == 'adam':
     logging.info('Use Adam optimizer')
     optimizer = tf.keras.optimizers.Adam(learning_rate)
