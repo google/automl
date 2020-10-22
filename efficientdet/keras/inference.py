@@ -140,8 +140,6 @@ class ServingDriver(object):
                model_name: Text,
                ckpt_path: Text = None,
                batch_size: int = 1,
-               min_score_thresh: float = None,
-               max_boxes_to_draw: float = None,
                model_params: Dict[Text, Any] = None):
     """Initialize the inference driver.
 
@@ -149,8 +147,6 @@ class ServingDriver(object):
       model_name: target model name, such as efficientdet-d0.
       ckpt_path: checkpoint path, such as /tmp/efficientdet-d0/.
       batch_size: batch size for inference.
-      min_score_thresh: minimal score threshold for filtering predictions.
-      max_boxes_to_draw: the maximum number of boxes per image.
       model_params: model parameters for overriding the config.
     """
     super().__init__()
@@ -167,8 +163,6 @@ class ServingDriver(object):
 
     self.model = None
 
-    self.min_score_thresh = min_score_thresh
-    self.max_boxes_to_draw = max_boxes_to_draw
     mixed_precision = self.params.get('mixed_precision', None)
     precision = utils.get_precision(
         self.params.get('strategy', None), mixed_precision)
