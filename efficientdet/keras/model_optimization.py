@@ -14,6 +14,8 @@ def set_config(configs):
           tfmot.sparsity.keras.prune_low_magnitude,
           **configs[key])
 
-def get_methods():
-  return optimzation_methods
+def get_method(method):
+  if method not in optimzation_methods:
+    raise KeyError(f'only support {optimzation_methods.keys()}')
+  return optimzation_methods[method]
 
