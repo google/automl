@@ -53,11 +53,6 @@ flags.DEFINE_string('input_video', None, 'Input video path for inference.')
 flags.DEFINE_string('output_video', None,
                     'Output video path. If None, play it online instead.')
 
-# For visualization.
-flags.DEFINE_integer('max_boxes_to_draw', 100, 'Max number of boxes to draw.')
-flags.DEFINE_float('min_score_thresh', 0.4, 'Score threshold to show box.')
-flags.DEFINE_string('nms_method', 'hard', 'nms method, hard or gaussian.')
-
 # For saved model.
 flags.DEFINE_string('saved_model_dir', None, 'Folder path for saved model.')
 flags.DEFINE_string('tflite', None, 'tflite type: {FP32, FP16, INT8}.')
@@ -78,22 +73,12 @@ def main(_):
     model_config.image_size = FLAGS.image_size
   model_config.image_size = utils.parse_image_size(model_config.image_size)
 
-  # A hack to make flag consistent with nms configs.
-  if FLAGS.min_score_thresh:
-    model_config.nms_configs.score_thresh = FLAGS.min_score_thresh
-  if FLAGS.nms_method:
-    model_config.nms_configs.method = FLAGS.nms_method
-  if FLAGS.max_boxes_to_draw:
-    model_config.nms_configs.max_output_size = FLAGS.max_boxes_to_draw
-
   model_params = model_config.as_dict()
   ckpt_path_or_file = FLAGS.ckpt_path
   if tf.io.gfile.isdir(ckpt_path_or_file):
     ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
   driver = inference.ServingDriver(FLAGS.model_name, ckpt_path_or_file,
-                                   FLAGS.batch_size or None,
-                                   FLAGS.min_score_thresh,
-                                   FLAGS.max_boxes_to_draw, model_params)
+                                   FLAGS.batch_size or None, model_params)
   if FLAGS.mode == 'export':
     if not  FLAGS.saved_model_dir:
       raise ValueError('Please specify --saved_model_dir=')
