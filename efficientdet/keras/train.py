@@ -144,7 +144,7 @@ def main(_):
       model_dir=FLAGS.model_dir,
       steps_per_epoch=steps_per_epoch,
       strategy=FLAGS.strategy,
-      batch_size=FLAGS.batch_size // ds_strategy.num_replicas_in_sync,
+      batch_size=FLAGS.batch_size,
       num_shards=ds_strategy.num_replicas_in_sync,
       val_json_file=FLAGS.val_json_file)
 
