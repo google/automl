@@ -158,7 +158,7 @@ def main(_):
         FLAGS.training_file_pattern
         if is_training else FLAGS.validation_file_pattern)
     if not file_pattern:
-      return None
+      raise ValueError('No matching files.')
 
     return dataloader.InputReader(
         file_pattern,

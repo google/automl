@@ -536,13 +536,25 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       box_loss: an integer tensor representing total box regression loss.
       box_iou_loss: an integer tensor representing total box iou loss.
     """
-    # convert to float32 for loss computing.
-    cls_outputs = [tf.cast(i, tf.float32) for i in cls_outputs]
-    box_outputs = [tf.cast(i, tf.float32) for i in box_outputs]
-
     # Sum all positives in a batch for normalization and avoid zero
     # num_positives_sum, which would lead to inf loss during training
     num_positives_sum = tf.reduce_sum(labels['mean_num_positives']) + 1.0
+    positives_momentum = self.config.positives_momentum or 0
+    if positives_momentum > 0:
+      # normalize the num_positive_examples for training stability.
+      moving_normalizer_var = tf.Variable(
+        0.0,
+        name='moving_normalizer',
+        dtype=tf.float32,
+        synchronization=tf.VariableSynchronization.ON_READ,
+        trainable=False,
+        aggregation=tf.VariableAggregation.MEAN)
+      num_positives_sum = tf.keras.backend.moving_average_update(
+        moving_normalizer_var,
+        num_positives_sum,
+        momentum=self.config.positives_momentum)
+    elif positives_momentum < 0:
+      num_positives_sum = utils.cross_replica_mean(num_positives_sum)
     levels = range(len(cls_outputs))
     cls_losses = []
     box_losses = []
@@ -552,26 +564,18 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
                                         self.config.num_classes)
 
       if self.config.data_format == 'channels_first':
-        targets_shape = tf.shape(cls_targets_at_level)
-        bs = targets_shape[0]
-        width = targets_shape[2]
-        height = targets_shape[3]
+        bs, _, width, height, _ = cls_targets_at_level.get_shape().as_list()
         cls_targets_at_level = tf.reshape(cls_targets_at_level,
                                           [bs, -1, width, height])
       else:
-        targets_shape = tf.shape(cls_targets_at_level)
-        bs = targets_shape[0]
-        width = targets_shape[1]
-        height = targets_shape[2]
+        bs, width, height, _, _ = cls_targets_at_level.get_shape().as_list()
         cls_targets_at_level = tf.reshape(cls_targets_at_level,
                                           [bs, width, height, -1])
       box_targets_at_level = labels['box_targets_%d' % (level + 3)]
-
       class_loss_layer = self.loss.get('class_loss', None)
       if class_loss_layer:
         cls_loss = class_loss_layer([num_positives_sum, cls_targets_at_level],
                                     cls_outputs[level])
-
         if self.config.data_format == 'channels_first':
           cls_loss = tf.reshape(
               cls_loss, [bs, -1, width, height, self.config.num_classes])
@@ -582,7 +586,8 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
             tf.expand_dims(
                 tf.not_equal(labels['cls_targets_%d' % (level + 3)], -2), -1),
             tf.float32)
-        cls_losses.append(tf.reduce_sum(cls_loss))
+        cls_loss_sum = tf.clip_by_value(tf.reduce_sum(cls_loss), 0.0, 2.0)
+        cls_losses.append(tf.cast(cls_loss_sum, tf.float32))
 
       if self.config.box_loss_weight and self.loss.get('box_loss', None):
         box_loss_layer = self.loss['box_loss']
@@ -688,8 +693,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       cls_outputs, box_outputs = self(images, training=False)
     elif 'segmentation' in self.config.heads:
       seg_outputs, = self(images, training=False)
-    reg_l2loss = self._reg_l2_loss(self.config.weight_decay)
-    total_loss = reg_l2loss
+    total_loss = 0
     loss_vals = {}
     if 'object_detection' in self.config.heads:
       det_loss = self._detection_loss(cls_outputs, box_outputs, labels,
@@ -700,5 +704,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       seg_loss = seg_loss_layer(labels['image_masks'], seg_outputs)
       total_loss += seg_loss
       loss_vals['seg_loss'] = seg_loss
-    loss_vals['loss'] = total_loss
+    reg_l2_loss = self._reg_l2_loss(self.config.weight_decay)
+    loss_vals['reg_l2_loss'] = reg_l2_loss
+    loss_vals['loss'] = total_loss + reg_l2_loss
     return loss_vals
