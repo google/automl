@@ -217,7 +217,6 @@ class CosineLrSchedule(tf.optimizers.schedules.LearningRateSchedule):
     self.decay_steps = tf.cast(total_steps - lr_warmup_step, tf.float32)
 
   def __call__(self, step):
-
     linear_warmup = (
         self.lr_warmup_init +
         (tf.cast(step, dtype=tf.float32) / self.lr_warmup_step *
@@ -511,7 +510,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     var_match = re.compile(regex)
     return weight_decay * tf.add_n([
         tf.nn.l2_loss(v)
-        for v in self.trainable_variables
+        for v in self._freeze_vars()
         if var_match.match(v.name)
     ])
 
@@ -641,8 +640,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
         cls_outputs, box_outputs = self(images, training=True)
       elif 'segmentation' in self.config.heads:
         seg_outputs, = self(images, training=True)
-      reg_l2loss = self._reg_l2_loss(self.config.weight_decay)
-      total_loss = reg_l2loss
+      total_loss = 0
       loss_vals = {}
       if 'object_detection' in self.config.heads:
         det_loss = self._detection_loss(cls_outputs, box_outputs, labels,
@@ -653,12 +651,18 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
         seg_loss = seg_loss_layer(labels['image_masks'], seg_outputs)
         total_loss += seg_loss
         loss_vals['seg_loss'] = seg_loss
+
+      reg_l2_loss = self._reg_l2_loss(self.config.weight_decay)
+      loss_vals['reg_l2_loss'] = reg_l2_loss
+      total_loss += reg_l2_loss
       if isinstance(self.optimizer,
                     tf.keras.mixed_precision.experimental.LossScaleOptimizer):
         scaled_loss = self.optimizer.get_scaled_loss(total_loss)
       else:
         scaled_loss = total_loss
     loss_vals['loss'] = total_loss
+    loss_vals['learning_rate'] = self.optimizer.learning_rate(
+        self.optimizer.iterations)
     trainable_vars = self._freeze_vars()
     scaled_gradients = tape.gradient(scaled_loss, trainable_vars)
     if isinstance(self.optimizer,
@@ -667,9 +671,14 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     else:
       gradients = scaled_gradients
     if self.config.clip_gradients_norm > 0:
-      gradients, gnorm = tf.clip_by_global_norm(gradients,
-                                                self.config.clip_gradients_norm)
-      loss_vals['gnorm'] = gnorm
+      clip_norm = abs(self.config.clip_gradients_norm)
+      gradients = [
+          tf.clip_by_norm(g, clip_norm) if g is not None else None
+          for g in gradients
+      ]
+      gradients, _ = tf.clip_by_global_norm(gradients,
+                                                clip_norm)
+      loss_vals['gradient_norm'] = tf.linalg.global_norm(gradients)
     self.optimizer.apply_gradients(zip(gradients, trainable_vars))
     return loss_vals
 
