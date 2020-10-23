@@ -559,8 +559,9 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     box_losses = []
     for level in levels:
       # Onehot encoding for classification labels.
-      cls_targets_at_level = tf.one_hot(labels['cls_targets_%d' % (level + 3)],
-                                        self.config.num_classes)
+      cls_targets_at_level = tf.one_hot(
+          labels['cls_targets_%d' % (level + self.config.min_level)],
+          self.config.num_classes)
 
       if self.config.data_format == 'channels_first':
         bs, _, width, height, _ = cls_targets_at_level.get_shape().as_list()
@@ -570,7 +571,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
         bs, width, height, _, _ = cls_targets_at_level.get_shape().as_list()
         cls_targets_at_level = tf.reshape(cls_targets_at_level,
                                           [bs, width, height, -1])
-      box_targets_at_level = labels['box_targets_%d' % (level + 3)]
+
       class_loss_layer = self.loss.get('class_loss', None)
       if class_loss_layer:
         cls_loss = class_loss_layer([num_positives_sum, cls_targets_at_level],
@@ -583,10 +584,15 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
               cls_loss, [bs, width, height, -1, self.config.num_classes])
         cls_loss *= tf.cast(
             tf.expand_dims(
-                tf.not_equal(labels['cls_targets_%d' % (level + 3)], -2), -1),
+                tf.not_equal(
+                    labels['cls_targets_%d' % (level + self.config.min_level)],
+                    -2), -1),
             tf.float32)
         cls_loss_sum = tf.clip_by_value(tf.reduce_sum(cls_loss), 0.0, 2.0)
         cls_losses.append(tf.cast(cls_loss_sum, tf.float32))
+
+      box_targets_at_level = (
+          labels['box_targets_%d' % (level + self.config.min_level)])
 
       if self.config.box_loss_weight and self.loss.get('box_loss', None):
         box_loss_layer = self.loss['box_loss']
@@ -598,10 +604,11 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       box_outputs = tf.concat([tf.reshape(v, [-1, 4]) for v in box_outputs],
                               axis=0)
       box_targets = tf.concat([
-          tf.reshape(labels['box_targets_%d' % (level + 3)], [-1, 4])
+          tf.reshape(
+              labels['box_targets_%d' % (level + self.config.min_level)],
+              [-1, 4])
           for level in levels
-      ],
-                              axis=0)
+      ], axis=0)
       box_iou_loss_layer = self.loss['box_iou_loss']
       box_iou_loss = box_iou_loss_layer([num_positives_sum, box_targets],
                                         box_outputs)
