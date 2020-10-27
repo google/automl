@@ -286,13 +286,14 @@ def learning_rate_schedule(params):
 def get_optimizer(params):
   """Get optimizer."""
   learning_rate = learning_rate_schedule(params)
+  momentum = params['momentum']
   if params['optimizer'].lower() == 'sgd':
     logging.info('Use SGD optimizer')
     optimizer = tf.keras.optimizers.SGD(
-        learning_rate, momentum=params['momentum'], nesterov=True)
+        learning_rate, momentum=momentum)
   elif params['optimizer'].lower() == 'adam':
     logging.info('Use Adam optimizer')
-    optimizer = tf.keras.optimizers.Adam(learning_rate)
+    optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=momentum)
   else:
     raise ValueError('optimizers should be adam or sgd')
 
@@ -365,9 +366,7 @@ def get_callbacks(params):
       os.path.join(params['model_dir'], 'ckpt'),
       verbose=1,
       save_weights_only=True)
-  early_stopping = tf.keras.callbacks.EarlyStopping(
-      monitor='val_loss', min_delta=0, patience=10, verbose=1)
-  callbacks = [tb_callback, ckpt_callback, early_stopping]
+  callbacks = [tb_callback, ckpt_callback]
   if params['model_optimizations'] and 'prune' in params['model_optimizations']:
     prune_callback = UpdatePruningStep()
     prune_summaries = PruningSummaries(
@@ -378,7 +377,7 @@ def get_callbacks(params):
   if params.get('sample_image', None):
     display_callback = DisplayCallback(
         params.get('sample_image', None),
-        os.path.join(params['model_dir'], 'train'))
+        params['model_dir'])
     callbacks.append(display_callback)
   return callbacks
 
@@ -542,16 +541,16 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     if positives_momentum > 0:
       # normalize the num_positive_examples for training stability.
       moving_normalizer_var = tf.Variable(
-        0.0,
-        name='moving_normalizer',
-        dtype=tf.float32,
-        synchronization=tf.VariableSynchronization.ON_READ,
-        trainable=False,
-        aggregation=tf.VariableAggregation.MEAN)
+          0.0,
+          name='moving_normalizer',
+          dtype=tf.float32,
+          synchronization=tf.VariableSynchronization.ON_READ,
+          trainable=False,
+          aggregation=tf.VariableAggregation.MEAN)
       num_positives_sum = tf.keras.backend.moving_average_update(
-        moving_normalizer_var,
-        num_positives_sum,
-        momentum=self.config.positives_momentum)
+          moving_normalizer_var,
+          num_positives_sum,
+          momentum=self.config.positives_momentum)
     elif positives_momentum < 0:
       num_positives_sum = utils.cross_replica_mean(num_positives_sum)
     levels = range(len(cls_outputs))
@@ -591,10 +590,9 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
         cls_loss_sum = tf.clip_by_value(tf.reduce_sum(cls_loss), 0.0, 2.0)
         cls_losses.append(tf.cast(cls_loss_sum, tf.float32))
 
-      box_targets_at_level = (
-          labels['box_targets_%d' % (level + self.config.min_level)])
-
       if self.config.box_loss_weight and self.loss.get('box_loss', None):
+        box_targets_at_level = (
+          labels['box_targets_%d' % (level + self.config.min_level)])
         box_loss_layer = self.loss['box_loss']
         box_losses.append(
             box_loss_layer([num_positives_sum, box_targets_at_level],
@@ -683,8 +681,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
           tf.clip_by_norm(g, clip_norm) if g is not None else None
           for g in gradients
       ]
-      gradients, _ = tf.clip_by_global_norm(gradients,
-                                                clip_norm)
+      gradients, _ = tf.clip_by_global_norm(gradients, clip_norm)
       loss_vals['gradient_norm'] = tf.linalg.global_norm(gradients)
     self.optimizer.apply_gradients(zip(gradients, trainable_vars))
     return loss_vals
