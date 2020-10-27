@@ -16,8 +16,14 @@
 import functools
 
 import tensorflow_model_optimization as tfmot
+from tensorflow_model_optimization.python.core.quantization.keras import quantize_wrapper
+from tensorflow_model_optimization.python.core.quantization.keras.default_8bit import default_8bit_quantize_configs
 
-optimzation_methods = {'prune': tfmot.sparsity.keras.prune_low_magnitude}
+
+def quantize(layer, quantize_config=default_8bit_quantize_configs.Default8BitOutputQuantizeConfig()):
+  return quantize_wrapper.QuantizeWrapper(layer, quantize_config=quantize_config)
+
+optimzation_methods = {'prune': tfmot.sparsity.keras.prune_low_magnitude, 'quantize': quantize}
 
 
 def set_config(configs):

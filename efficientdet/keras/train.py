@@ -80,10 +80,6 @@ flags.DEFINE_string(
     'Glob for training data files (e.g., COCO train - minival set)')
 flags.DEFINE_string('validation_file_pattern', None,
                     'Glob for evaluation tfrecords (e.g., COCO val2017 set)')
-flags.DEFINE_string(
-    'val_json_file', None,
-    'COCO validation JSON containing golden bounding boxes. If None, use the '
-    'ground truth from the dataloader.')
 
 flags.DEFINE_integer('num_examples_per_epoch', 120000,
                      'Number of examples in one epoch')
@@ -145,8 +141,7 @@ def main(_):
       steps_per_epoch=steps_per_epoch,
       strategy=FLAGS.strategy,
       batch_size=FLAGS.batch_size,
-      num_shards=ds_strategy.num_replicas_in_sync,
-      val_json_file=FLAGS.val_json_file)
+      num_shards=ds_strategy.num_replicas_in_sync)
 
   # set mixed precision policy by keras api.
   precision = utils.get_precision(params['strategy'], params['mixed_precision'])
@@ -203,7 +198,7 @@ def main(_):
     tf.io.gfile.makedirs(FLAGS.model_dir)
     if params['model_optimizations']:
       model_optimization.set_config(params['model_optimizations'])
-      model.build((FLAGS.batch_size, *config.image_size, 3))
+    model.build((FLAGS.batch_size, *config.image_size, 3))
     model.fit(
         get_dataset(True, params=params),
         epochs=params['num_epochs'],
