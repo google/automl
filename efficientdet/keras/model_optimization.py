@@ -31,6 +31,9 @@ def set_config(configs):
     if key == 'prune':
       optimzation_methods[key] = functools.partial(
           tfmot.sparsity.keras.prune_low_magnitude, **configs[key])
+    if key == 'quantize':
+      optimzation_methods[key] = functools.partial(
+          quantize, **configs[key])
 
 
 def get_method(method):

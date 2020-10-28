@@ -85,8 +85,6 @@ flags.DEFINE_integer('num_examples_per_epoch', 120000,
                      'Number of examples in one epoch')
 flags.DEFINE_integer('num_epochs', None, 'Number of epochs for training')
 flags.DEFINE_string('model_name', 'efficientdet-d1', 'Model name.')
-flags.DEFINE_bool('eval_after_training', False, 'Run one eval after the '
-                  'training finishes.')
 flags.DEFINE_bool('debug', False, 'Enable debug mode')
 flags.DEFINE_bool('profile', False, 'Enable profile mode')
 
@@ -204,7 +202,7 @@ def main(_):
         epochs=params['num_epochs'],
         steps_per_epoch=steps_per_epoch,
         callbacks=train_lib.get_callbacks(params),
-        validation_data=get_dataset(False, params=params),
+        validation_data=get_dataset(False, params=params).repeat(),
         validation_steps=(FLAGS.eval_samples // FLAGS.batch_size))
   model.save_weights(os.path.join(FLAGS.model_dir, 'ckpt-final'))
 
