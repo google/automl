@@ -196,7 +196,7 @@ def main(_):
     tf.io.gfile.makedirs(FLAGS.model_dir)
     if params['model_optimizations']:
       model_optimization.set_config(params['model_optimizations'])
-    model.build((FLAGS.batch_size, *config.image_size, 3))
+    model.build((None, *config.image_size, 3))
     model.fit(
         get_dataset(True, params=params),
         epochs=params['num_epochs'],

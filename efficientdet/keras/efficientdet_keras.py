@@ -348,6 +348,7 @@ class ClassNet(tf.keras.layers.Layer):
                survival_prob=None,
                strategy=None,
                data_format='channels_last',
+               gradient_checkpoints=False,
                name='class_net',
                **kwargs):
     """Initialize the ClassNet.
@@ -384,6 +385,7 @@ class ClassNet(tf.keras.layers.Layer):
     self.data_format = data_format
     self.conv_ops = []
     self.bns = []
+    self.gradient_checkpoints = gradient_checkpoints
     if separable_conv:
       conv2d_layer = functools.partial(
           tf.keras.layers.SeparableConv2D,
@@ -427,19 +429,23 @@ class ClassNet(tf.keras.layers.Layer):
 
   def call(self, inputs, training, **kwargs):
     """Call ClassNet."""
-
     class_outputs = []
     for level_id in range(0, self.max_level - self.min_level + 1):
       image = inputs[level_id]
       for i in range(self.repeats):
-        original_image = image
-        image = self.conv_ops[i](image)
-        image = self.bns[i][level_id](image, training=training)
-        if self.act_type:
-          image = utils.activation_fn(image, self.act_type)
-        if i > 0 and self.survival_prob:
-          image = utils.drop_connect(image, training, self.survival_prob)
-          image = image + original_image
+        @utils.recompute_grad(self.gradient_checkpoints)
+        def _fuse_image(image):
+          original_image = image
+          image = self.conv_ops[i](image)
+          image = self.bns[i][level_id](image, training=training)
+          if self.act_type:
+            image = utils.activation_fn(image, self.act_type)
+          if i > 0 and self.survival_prob:
+            image = utils.drop_connect(image, training, self.survival_prob)
+            image = image + original_image
+          return image
+
+        image = _fuse_image(image)
 
       class_outputs.append(self.classes(image))
 
@@ -461,6 +467,7 @@ class BoxNet(tf.keras.layers.Layer):
                survival_prob=None,
                strategy=None,
                data_format='channels_last',
+               gradient_checkpoints=False,
                name='box_net',
                **kwargs):
     """Initialize BoxNet.
@@ -494,6 +501,7 @@ class BoxNet(tf.keras.layers.Layer):
     self.act_type = act_type
     self.strategy = strategy
     self.data_format = data_format
+    self.gradient_checkpoints = gradient_checkpoints
 
     self.conv_ops = []
     self.bns = []
@@ -564,16 +572,21 @@ class BoxNet(tf.keras.layers.Layer):
     box_outputs = []
     for level_id in range(0, self.max_level - self.min_level + 1):
       image = inputs[level_id]
-      for i in range(self.repeats):
-        original_image = image
-        image = self.conv_ops[i](image)
-        image = self.bns[i][level_id](image, training=training)
-        if self.act_type:
-          image = utils.activation_fn(image, self.act_type)
-        if i > 0 and self.survival_prob:
-          image = utils.drop_connect(image, training, self.survival_prob)
-          image = image + original_image
 
+      for i in range(self.repeats):
+        @utils.recompute_grad(self.gradient_checkpoints)
+        def _fuse_image(image):
+          original_image = image
+          image = self.conv_ops[i](image)
+          image = self.bns[i][level_id](image, training=training)
+          if self.act_type:
+            image = utils.activation_fn(image, self.act_type)
+          if i > 0 and self.survival_prob:
+            image = utils.drop_connect(image, training, self.survival_prob)
+            image = image + original_image
+          return image
+
+        image = _fuse_image(image)
       box_outputs.append(self.boxes(image))
 
     return box_outputs
@@ -712,9 +725,12 @@ class FPNCell(tf.keras.layers.Layer):
       self.fnodes.append(fnode)
 
   def call(self, feats, training):
-    for fnode in self.fnodes:
-      feats = fnode(feats, training)
-    return feats
+    @utils.recompute_grad(self.config.gradient_checkpoints)
+    def _call(feats):
+      for fnode in self.fnodes:
+        feats = fnode(feats, training)
+      return feats
+    return _call(feats)
 
 
 class EfficientDetNet(tf.keras.Model):
@@ -736,6 +752,7 @@ class EfficientDetNet(tf.keras.Model):
               utils.batch_norm_class(is_training_bn, config.strategy),
           'relu_fn':
               functools.partial(utils.activation_fn, act_type=config.act_type),
+          'gradient_checkpoints': self.config.gradient_checkpoints
       }
       if 'b0' in backbone_name:
         override_params['survival_prob'] = 0.0
@@ -782,6 +799,7 @@ class EfficientDetNet(tf.keras.Model):
             separable_conv=config.separable_conv,
             survival_prob=config.survival_prob,
             strategy=config.strategy,
+            gradient_checkpoints=config.gradient_checkpoints,
             data_format=config.data_format)
 
         self.box_net = BoxNet(
@@ -795,6 +813,7 @@ class EfficientDetNet(tf.keras.Model):
             separable_conv=config.separable_conv,
             survival_prob=config.survival_prob,
             strategy=config.strategy,
+            gradient_checkpoints=config.gradient_checkpoints,
             data_format=config.data_format)
 
       if head == 'segmentation':

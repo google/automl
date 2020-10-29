@@ -634,3 +634,13 @@ def build_model_with_precision(pp, mm, ii, tt, *args, **kwargs):
 
   # Users are responsible to convert the dtype of all outputs.
   return outputs
+
+
+def recompute_grad(recompute=False):
+  def _wrapper(f):
+    """ Decorator determine whether use gradient checkpoint. """
+    if recompute:
+      return tf.recompute_grad(f)
+    return f
+  return _wrapper
+
