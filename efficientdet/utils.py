@@ -638,7 +638,6 @@ def build_model_with_precision(pp, mm, ii, tt, *args, **kwargs):
 
 
 def _recompute_grad(f):
-  #TODO(fsx950223): Wait for https://github.com/tensorflow/tensorflow/pull/44373 to be merged.
   """An eager-compatible version of recompute_grad.
 
   For f(*args, **kwargs), this supports gradients with respect to args or
@@ -659,7 +658,7 @@ def _recompute_grad(f):
    pass of a gradient call.
   """
 
-  # TODO(cdfreeman) Add is_recomputing functionality from graph mode version
+  # TODO(fsx950223): Wait for https://github.com/tensorflow/tensorflow/pull/44373 to be merged.
 
   @tf.custom_gradient
   def inner(*args, **kwargs):
