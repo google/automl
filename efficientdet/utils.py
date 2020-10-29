@@ -713,7 +713,7 @@ def recompute_grad(recompute=False):
   def _wrapper(f):
     """ Decorator determine whether use gradient checkpoint. """
     if recompute:
-      return tf.recompute_grad(f)
+      return _recompute_grad(f)
     return f
   return _wrapper
 
