@@ -348,6 +348,7 @@ class ClassNet(tf.keras.layers.Layer):
                survival_prob=None,
                strategy=None,
                data_format='channels_last',
+               grad_checkpoint=False,
                name='class_net',
                **kwargs):
     """Initialize the ClassNet.
@@ -384,13 +385,14 @@ class ClassNet(tf.keras.layers.Layer):
     self.data_format = data_format
     self.conv_ops = []
     self.bns = []
+    self.grad_checkpoint = grad_checkpoint
     if separable_conv:
       conv2d_layer = functools.partial(
           tf.keras.layers.SeparableConv2D,
           depth_multiplier=1,
           data_format=data_format,
-          pointwise_initializer=tf.initializers.VarianceScaling(),
-          depthwise_initializer=tf.initializers.VarianceScaling())
+          pointwise_initializer=tf.initializers.variance_scaling(),
+          depthwise_initializer=tf.initializers.variance_scaling())
     else:
       conv2d_layer = functools.partial(
           tf.keras.layers.Conv2D,
@@ -425,18 +427,30 @@ class ClassNet(tf.keras.layers.Layer):
         padding='same',
         name='class-predict')
 
+  @tf.autograph.experimental.do_not_convert
+  def _conv_bn_act(self, image, i, level_id, training):
+    conv_op = self.conv_ops[i]
+    bn = self.bns[i][level_id]
+    act_type = self.act_type
+
+    @utils.recompute_grad(self.grad_checkpoint)
+    def _call(image):
+      image = conv_op(image)
+      image = bn(image, training=training)
+      if self.act_type:
+        image = utils.activation_fn(image, act_type)
+      return image
+
+    return _call(image)
+
   def call(self, inputs, training, **kwargs):
     """Call ClassNet."""
-
     class_outputs = []
     for level_id in range(0, self.max_level - self.min_level + 1):
       image = inputs[level_id]
       for i in range(self.repeats):
         original_image = image
-        image = self.conv_ops[i](image)
-        image = self.bns[i][level_id](image, training=training)
-        if self.act_type:
-          image = utils.activation_fn(image, self.act_type)
+        image = self._conv_bn_act(image, i, level_id, training)
         if i > 0 and self.survival_prob:
           image = utils.drop_connect(image, training, self.survival_prob)
           image = image + original_image
@@ -461,6 +475,7 @@ class BoxNet(tf.keras.layers.Layer):
                survival_prob=None,
                strategy=None,
                data_format='channels_last',
+               grad_checkpoint=False,
                name='box_net',
                **kwargs):
     """Initialize BoxNet.
@@ -494,6 +509,7 @@ class BoxNet(tf.keras.layers.Layer):
     self.act_type = act_type
     self.strategy = strategy
     self.data_format = data_format
+    self.grad_checkpoint = grad_checkpoint
 
     self.conv_ops = []
     self.bns = []
@@ -505,8 +521,8 @@ class BoxNet(tf.keras.layers.Layer):
             tf.keras.layers.SeparableConv2D(
                 filters=self.num_filters,
                 depth_multiplier=1,
-                pointwise_initializer=tf.initializers.VarianceScaling(),
-                depthwise_initializer=tf.initializers.VarianceScaling(),
+                pointwise_initializer=tf.initializers.variance_scaling(),
+                depthwise_initializer=tf.initializers.variance_scaling(),
                 data_format=self.data_format,
                 kernel_size=3,
                 activation=None,
@@ -540,8 +556,8 @@ class BoxNet(tf.keras.layers.Layer):
       self.boxes = tf.keras.layers.SeparableConv2D(
           filters=4 * self.num_anchors,
           depth_multiplier=1,
-          pointwise_initializer=tf.initializers.VarianceScaling(),
-          depthwise_initializer=tf.initializers.VarianceScaling(),
+          pointwise_initializer=tf.initializers.variance_scaling(),
+          depthwise_initializer=tf.initializers.variance_scaling(),
           data_format=self.data_format,
           kernel_size=3,
           activation=None,
@@ -559,6 +575,22 @@ class BoxNet(tf.keras.layers.Layer):
           padding='same',
           name='box-predict')
 
+  @tf.autograph.experimental.do_not_convert
+  def _conv_bn_act(self, image, i, level_id, training):
+    conv_op = self.conv_ops[i]
+    bn = self.bns[i][level_id]
+    act_type = self.act_type
+
+    @utils.recompute_grad(self.grad_checkpoint)
+    def _call(image):
+      image = conv_op(image)
+      image = bn(image, training=training)
+      if self.act_type:
+        image = utils.activation_fn(image, act_type)
+      return image
+
+    return _call(image)
+
   def call(self, inputs, training):
     """Call boxnet."""
     box_outputs = []
@@ -566,10 +598,7 @@ class BoxNet(tf.keras.layers.Layer):
       image = inputs[level_id]
       for i in range(self.repeats):
         original_image = image
-        image = self.conv_ops[i](image)
-        image = self.bns[i][level_id](image, training=training)
-        if self.act_type:
-          image = utils.activation_fn(image, self.act_type)
+        image = self._conv_bn_act(image, i, level_id, training)
         if i > 0 and self.survival_prob:
           image = utils.drop_connect(image, training, self.survival_prob)
           image = image + original_image
@@ -712,9 +741,12 @@ class FPNCell(tf.keras.layers.Layer):
       self.fnodes.append(fnode)
 
   def call(self, feats, training):
-    for fnode in self.fnodes:
-      feats = fnode(feats, training)
-    return feats
+    @utils.recompute_grad(self.config.grad_checkpoint)
+    def _call(feats):
+      for fnode in self.fnodes:
+        feats = fnode(feats, training)
+      return feats
+    return _call(feats)
 
 
 class EfficientDetNet(tf.keras.Model):
@@ -736,6 +768,7 @@ class EfficientDetNet(tf.keras.Model):
               utils.batch_norm_class(is_training_bn, config.strategy),
           'relu_fn':
               functools.partial(utils.activation_fn, act_type=config.act_type),
+          'grad_checkpoint': self.config.grad_checkpoint
       }
       if 'b0' in backbone_name:
         override_params['survival_prob'] = 0.0
@@ -782,6 +815,7 @@ class EfficientDetNet(tf.keras.Model):
             separable_conv=config.separable_conv,
             survival_prob=config.survival_prob,
             strategy=config.strategy,
+            grad_checkpoint=config.grad_checkpoint,
             data_format=config.data_format)
 
         self.box_net = BoxNet(
@@ -795,6 +829,7 @@ class EfficientDetNet(tf.keras.Model):
             separable_conv=config.separable_conv,
             survival_prob=config.survival_prob,
             strategy=config.strategy,
+            grad_checkpoint=config.grad_checkpoint,
             data_format=config.data_format)
 
       if head == 'segmentation':

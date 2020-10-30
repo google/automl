@@ -282,7 +282,7 @@ def default_detection_configs():
   h.use_keras_model = True
   h.dataset_type = None
   h.positives_momentum = None
-
+  h.grad_checkpoint = False
   # For device specific options.
   h.device = {
       # If true, apply gradient checkpointing to reduce memory usage.
