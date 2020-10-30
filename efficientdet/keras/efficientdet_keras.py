@@ -348,7 +348,7 @@ class ClassNet(tf.keras.layers.Layer):
                survival_prob=None,
                strategy=None,
                data_format='channels_last',
-               gradient_checkpoints=False,
+               grad_checkpoint=False,
                name='class_net',
                **kwargs):
     """Initialize the ClassNet.
@@ -385,7 +385,7 @@ class ClassNet(tf.keras.layers.Layer):
     self.data_format = data_format
     self.conv_ops = []
     self.bns = []
-    self.gradient_checkpoints = gradient_checkpoints
+    self.grad_checkpoint = grad_checkpoint
     if separable_conv:
       conv2d_layer = functools.partial(
           tf.keras.layers.SeparableConv2D,
@@ -427,25 +427,33 @@ class ClassNet(tf.keras.layers.Layer):
         padding='same',
         name='class-predict')
 
+  @tf.autograph.experimental.do_not_convert
+  def _conv_bn_act(self, image, i, level_id, training):
+    conv_op = self.conv_ops[i]
+    bn = self.bns[i][level_id]
+    act_type = self.act_type
+
+    @utils.recompute_grad(self.grad_checkpoint)
+    def _call(image):
+      image = conv_op(image)
+      image = bn(image, training=training)
+      if self.act_type:
+        image = utils.activation_fn(image, act_type)
+      return image
+
+    return _call(image)
+
   def call(self, inputs, training, **kwargs):
     """Call ClassNet."""
     class_outputs = []
     for level_id in range(0, self.max_level - self.min_level + 1):
       image = inputs[level_id]
       for i in range(self.repeats):
-        @utils.recompute_grad(self.gradient_checkpoints)
-        def _fuse_image(image):
-          original_image = image
-          image = self.conv_ops[i](image)
-          image = self.bns[i][level_id](image, training=training)
-          if self.act_type:
-            image = utils.activation_fn(image, self.act_type)
-          if i > 0 and self.survival_prob:
-            image = utils.drop_connect(image, training, self.survival_prob)
-            image = image + original_image
-          return image
-
-        image = _fuse_image(image)
+        original_image = image
+        image = self._conv_bn_act(image, i, level_id, training)
+        if i > 0 and self.survival_prob:
+          image = utils.drop_connect(image, training, self.survival_prob)
+          image = image + original_image
 
       class_outputs.append(self.classes(image))
 
@@ -467,7 +475,7 @@ class BoxNet(tf.keras.layers.Layer):
                survival_prob=None,
                strategy=None,
                data_format='channels_last',
-               gradient_checkpoints=False,
+               grad_checkpoint=False,
                name='box_net',
                **kwargs):
     """Initialize BoxNet.
@@ -501,7 +509,7 @@ class BoxNet(tf.keras.layers.Layer):
     self.act_type = act_type
     self.strategy = strategy
     self.data_format = data_format
-    self.gradient_checkpoints = gradient_checkpoints
+    self.grad_checkpoint = grad_checkpoint
 
     self.conv_ops = []
     self.bns = []
@@ -567,26 +575,34 @@ class BoxNet(tf.keras.layers.Layer):
           padding='same',
           name='box-predict')
 
+  @tf.autograph.experimental.do_not_convert
+  def _conv_bn_act(self, image, i, level_id, training):
+    conv_op = self.conv_ops[i]
+    bn = self.bns[i][level_id]
+    act_type = self.act_type
+
+    @utils.recompute_grad(self.grad_checkpoint)
+    def _call(image):
+      image = conv_op(image)
+      image = bn(image, training=training)
+      if self.act_type:
+        image = utils.activation_fn(image, act_type)
+      return image
+
+    return _call(image)
+
   def call(self, inputs, training):
     """Call boxnet."""
     box_outputs = []
     for level_id in range(0, self.max_level - self.min_level + 1):
       image = inputs[level_id]
-
       for i in range(self.repeats):
-        @utils.recompute_grad(self.gradient_checkpoints)
-        def _fuse_image(image):
-          original_image = image
-          image = self.conv_ops[i](image)
-          image = self.bns[i][level_id](image, training=training)
-          if self.act_type:
-            image = utils.activation_fn(image, self.act_type)
-          if i > 0 and self.survival_prob:
-            image = utils.drop_connect(image, training, self.survival_prob)
-            image = image + original_image
-          return image
+        original_image = image
+        image = self._conv_bn_act(image, i, level_id, training)
+        if i > 0 and self.survival_prob:
+          image = utils.drop_connect(image, training, self.survival_prob)
+          image = image + original_image
 
-        image = _fuse_image(image)
       box_outputs.append(self.boxes(image))
 
     return box_outputs
@@ -725,7 +741,7 @@ class FPNCell(tf.keras.layers.Layer):
       self.fnodes.append(fnode)
 
   def call(self, feats, training):
-    @utils.recompute_grad(self.config.gradient_checkpoints)
+    @utils.recompute_grad(self.config.grad_checkpoint)
     def _call(feats):
       for fnode in self.fnodes:
         feats = fnode(feats, training)
@@ -752,7 +768,7 @@ class EfficientDetNet(tf.keras.Model):
               utils.batch_norm_class(is_training_bn, config.strategy),
           'relu_fn':
               functools.partial(utils.activation_fn, act_type=config.act_type),
-          'gradient_checkpoints': self.config.gradient_checkpoints
+          'grad_checkpoint': self.config.grad_checkpoint
       }
       if 'b0' in backbone_name:
         override_params['survival_prob'] = 0.0
@@ -799,7 +815,7 @@ class EfficientDetNet(tf.keras.Model):
             separable_conv=config.separable_conv,
             survival_prob=config.survival_prob,
             strategy=config.strategy,
-            gradient_checkpoints=config.gradient_checkpoints,
+            grad_checkpoint=config.grad_checkpoint,
             data_format=config.data_format)
 
         self.box_net = BoxNet(
@@ -813,7 +829,7 @@ class EfficientDetNet(tf.keras.Model):
             separable_conv=config.separable_conv,
             survival_prob=config.survival_prob,
             strategy=config.strategy,
-            gradient_checkpoints=config.gradient_checkpoints,
+            grad_checkpoint=config.grad_checkpoint,
             data_format=config.data_format)
 
       if head == 'segmentation':

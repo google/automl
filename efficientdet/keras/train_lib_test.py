@@ -92,7 +92,7 @@ class TrainLibTest(tf.test.TestCase):
     self.assertLen(cls_outputs, 5)
     self.assertLen(box_outputs, 5)
 
-  def _build_model(self):
+  def _build_model(self, grad_checkpoint=False):
     tf.random.set_seed(1111)
     config = hparams_config.get_detection_config('efficientdet-d0')
     config.heads = ['object_detection', 'segmentation']
@@ -100,6 +100,7 @@ class TrainLibTest(tf.test.TestCase):
     config.num_examples_per_epoch = 1
     config.model_dir = tempfile.mkdtemp()
     config.steps_per_epoch = 1
+    config.grad_checkpoint = grad_checkpoint
     x = tf.ones((1, 512, 512, 3))
     labels = {
         'box_targets_%d' % i: tf.ones((1, 512 // 2**i, 512 // 2**i, 36))
@@ -185,6 +186,28 @@ class TrainLibTest(tf.test.TestCase):
     self.assertAllClose(hist.history['box_loss'], [420.], rtol=.1, atol=100.)
     self.assertAllClose(hist.history['seg_loss'], [1.2299], rtol=.1, atol=100.)
     # skip gnorm test because it is flaky.
+
+  def test_recompute_grad(self):
+    tf.config.run_functions_eagerly(True)
+    _, x, labels, model = self._build_model(False)
+    with tf.GradientTape() as tape:
+      loss_vals = {}
+      cls_outputs, box_outputs, _ = model(x, training=True)
+      det_loss = model._detection_loss(cls_outputs, box_outputs, labels,
+                                      loss_vals)
+      grads1 = tape.gradient(det_loss, model.trainable_variables)
+
+    _, x, labels, model = self._build_model(True)
+    with tf.GradientTape() as tape:
+      loss_vals = {}
+      cls_outputs2, box_outputs2, _ = model(x, training=True)
+      det_loss2 = model._detection_loss(cls_outputs2, box_outputs2, labels,
+                                      loss_vals)
+      grads2 = tape.gradient(det_loss2, model.trainable_variables)
+    for grad1, grad2 in zip(grads1, grads2):
+      if grad1 is None or grad2 is None:
+        continue
+      self.assertAllClose(grad1, grad2)
 
 
 if __name__ == '__main__':

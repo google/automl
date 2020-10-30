@@ -36,7 +36,7 @@ GlobalParams = collections.namedtuple('GlobalParams', [
     'num_classes', 'width_coefficient', 'depth_coefficient', 'depth_divisor',
     'min_depth', 'survival_prob', 'relu_fn', 'batch_norm', 'use_se',
     'local_pooling', 'condconv_num_experts', 'clip_projection_output',
-    'blocks_args', 'fix_head_stem', 'gradient_checkpoints'
+    'blocks_args', 'fix_head_stem', 'grad_checkpoint'
 ])
 GlobalParams.__new__.__defaults__ = (None,) * len(GlobalParams._fields)
 
@@ -369,7 +369,7 @@ class MBConvBlock(tf.keras.layers.Layer):
     Returns:
       A output tensor.
     """
-    @utils.recompute_grad(self._global_params.gradient_checkpoints)
+    @utils.recompute_grad(self._global_params.grad_checkpoint)
     def _call(inputs):
       logging.info('Block %s input shape: %s', self.name, inputs.shape)
       x = inputs
@@ -462,7 +462,7 @@ class MBConvBlockWithoutDepthwise(MBConvBlock):
       A output tensor.
     """
 
-    @utils.recompute_grad(self._global_params.gradient_checkpoints)
+    @utils.recompute_grad(self._global_params.grad_checkpoint)
     def _call(inputs):
       logging.info('Block %s  input shape: %s', self.name, inputs.shape)
       if self._block_args.expand_ratio != 1:
