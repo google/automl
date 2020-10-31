@@ -380,15 +380,14 @@ EfficientDets use a lot of GPU memory for a few reasons:
 To train this model on GPU with low memory there is an experimental option gradient_checkpointing.
 
 Check these links for a high-level idea of what gradient checkpointing is doing:
-1. https://github.com/cybertronai/gradient-checkpointing
-2. https://medium.com/tensorflow/fitting-larger-networks-into-memory-583e3c758ff9
+1. https://medium.com/tensorflow/fitting-larger-networks-into-memory-583e3c758ff9
 
-**gradient_checkpointing: True**
+**grad_checkpoint: True**
 
-If set to True, strings defined by gradient_checkpointing_list (["Add\_", "AddN"] by default) are searched in the tensors names and any tensors that match a string from the list are kept as checkpoints. When this option is used the standard tensorflow.python.ops.gradients method is being replaced with a custom method.
+If set to True, keras model uses ```tf.recompute_grad``` to achieve gradient checkpoints.
 
 Testing shows that:
-* On d4 network with batch-size of 1 (mixed precision enabled) it takes only 1/3.2 of memory with roughly 32% slower computation
-* It also allows to compute a d6 network with batch size of 2 (mixed precision enabled) on a 11Gb (2080Ti) GPU
+* It allows to train a d7x network with batch size of 2 by keras/train.py on a 11Gb (1080Ti) GPU
+* It also allows to train a d6 network with batch size of 2 by main.py on a 11Gb (1080Ti) GPU
 
 NOTE: this is not an official Google product.
