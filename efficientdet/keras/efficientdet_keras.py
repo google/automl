@@ -435,10 +435,14 @@ class ClassNet(tf.keras.layers.Layer):
 
     @utils.recompute_grad(self.grad_checkpoint)
     def _call(image):
+      original_image = image
       image = conv_op(image)
       image = bn(image, training=training)
       if self.act_type:
         image = utils.activation_fn(image, act_type)
+      if i > 0 and self.survival_prob:
+        image = utils.drop_connect(image, training, self.survival_prob)
+        image = image + original_image
       return image
 
     return _call(image)
@@ -449,11 +453,7 @@ class ClassNet(tf.keras.layers.Layer):
     for level_id in range(0, self.max_level - self.min_level + 1):
       image = inputs[level_id]
       for i in range(self.repeats):
-        original_image = image
         image = self._conv_bn_act(image, i, level_id, training)
-        if i > 0 and self.survival_prob:
-          image = utils.drop_connect(image, training, self.survival_prob)
-          image = image + original_image
 
       class_outputs.append(self.classes(image))
 
@@ -583,10 +583,14 @@ class BoxNet(tf.keras.layers.Layer):
 
     @utils.recompute_grad(self.grad_checkpoint)
     def _call(image):
+      original_image = image
       image = conv_op(image)
       image = bn(image, training=training)
       if self.act_type:
         image = utils.activation_fn(image, act_type)
+      if i > 0 and self.survival_prob:
+        image = utils.drop_connect(image, training, self.survival_prob)
+        image = image + original_image
       return image
 
     return _call(image)
@@ -597,12 +601,7 @@ class BoxNet(tf.keras.layers.Layer):
     for level_id in range(0, self.max_level - self.min_level + 1):
       image = inputs[level_id]
       for i in range(self.repeats):
-        original_image = image
         image = self._conv_bn_act(image, i, level_id, training)
-        if i > 0 and self.survival_prob:
-          image = utils.drop_connect(image, training, self.survival_prob)
-          image = image + original_image
-
       box_outputs.append(self.boxes(image))
 
     return box_outputs
