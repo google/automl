@@ -16,11 +16,8 @@
 import functools
 
 import tensorflow_model_optimization as tfmot
-try:
-  from tensorflow_model_optimization.python.core.quantization.keras import quantize_wrapper
-  from tensorflow_model_optimization.python.core.quantization.keras.default_8bit import default_8bit_quantize_configs
-except:
-  pass
+from tensorflow_model_optimization.python.core.quantization.keras import quantize_wrapper
+from tensorflow_model_optimization.python.core.quantization.keras.default_8bit import default_8bit_quantize_configs
 
 
 def quantize(layer, quantize_config=None):
