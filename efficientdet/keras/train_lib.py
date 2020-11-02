@@ -312,7 +312,7 @@ def get_optimizer(params):
 class DisplayCallback(tf.keras.callbacks.Callback):
   """Display inference result callback."""
 
-  def __init__(self, sample_image, output_dir, update_freq=1):
+  def __init__(self, sample_image, output_dir, update_freq=None):
     super().__init__()
     image_file = tf.io.read_file(sample_image)
     self.sample_image = tf.expand_dims(
@@ -327,20 +327,21 @@ class DisplayCallback(tf.keras.callbacks.Callback):
       self.model = efficientdet_keras.EfficientDetModel(config=model.config)
     height, width = utils.parse_image_size(model.config.image_size)
     self.model.build((1, height, width, 3))
-    self.file_writer = tf.summary.create_file_writer(self.output_dir)
+    log_dir = os.path.join(self.output_dir, 'test_images')
+    self.file_writer = tf.summary.create_file_writer(log_dir)
     self.min_score_thresh = self.model.config.nms_configs['score_thresh'] or 0.4
     self.max_boxes_to_draw = (
         self.model.config.nms_configs['max_output_size'] or 100)
 
-  def on_epoch_end(self, epoch, logs=None):
-    if epoch % self.update_freq == 0:
-      self.executor.submit(self.draw_inference, epoch)
+  def on_train_batch_end(self, batch, logs=None):
+    if self.update_freq and batch % self.update_freq == 0:
+      self.executor.submit(self.draw_inference, batch)
 
   @tf.function
   def inference(self):
     return self.model(self.sample_image, training=False)
 
-  def draw_inference(self, epoch):
+  def draw_inference(self, step):
     self.model.set_weights(self.train_model.get_weights())
     boxes, scores, classes, valid_len = self.inference()
     length = valid_len[0]
@@ -354,19 +355,16 @@ class DisplayCallback(tf.keras.callbacks.Callback):
         max_boxes_to_draw=self.max_boxes_to_draw)
 
     with self.file_writer.as_default():
-      tf.summary.image('Test image', tf.expand_dims(image, axis=0), step=epoch)
+      tf.summary.image('Test image', tf.expand_dims(image, axis=0), step=step)
 
 
 def get_callbacks(params):
   """Get callbacks for given params."""
-  tb_callback = tf.keras.callbacks.TensorBoard(
-      log_dir=params['model_dir'], update_freq=params['iterations_per_loop'],
-      profile_batch=2 if params['profile'] else 0)
   ckpt_callback = tf.keras.callbacks.ModelCheckpoint(
       os.path.join(params['model_dir'], 'ckpt'),
       verbose=1,
       save_weights_only=True)
-  callbacks = [tb_callback, ckpt_callback]
+  callbacks = [ckpt_callback]
   if params['model_optimizations'] and 'prune' in params['model_optimizations']:
     prune_callback = UpdatePruningStep()
     prune_summaries = PruningSummaries(
@@ -374,10 +372,16 @@ def get_callbacks(params):
         update_freq=params['iterations_per_loop'],
         profile_batch=2 if params['profile'] else 0)
     callbacks += [prune_callback, prune_summaries]
+  else:
+    tb_callback = tf.keras.callbacks.TensorBoard(
+        log_dir=params['model_dir'], update_freq=params['iterations_per_loop'],
+        profile_batch=2 if params['profile'] else 0)
+    callbacks.append(tb_callback)
   if params.get('sample_image', None):
     display_callback = DisplayCallback(
         params.get('sample_image', None),
-        params['model_dir'])
+        params['model_dir'],
+        params['img_summary_steps'])
     callbacks.append(display_callback)
   return callbacks
 
@@ -495,6 +499,10 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
 
   see https://www.tensorflow.org/guide/keras/customizing_what_happens_in_fit
   """
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    log_dir = os.path.join(self.config.model_dir, 'train_images')
+    self.summary_writer = tf.summary.create_file_writer(log_dir)
 
   def _freeze_vars(self):
     if self.config.var_freeze_expr:
@@ -638,6 +646,9 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       A dict record loss info.
     """
     images, labels = data
+    if self.config.img_summary_steps:
+      with self.summary_writer.as_default():
+        tf.summary.image('input_image', images)
     with tf.GradientTape() as tape:
       if len(self.config.heads) == 2:
         cls_outputs, box_outputs, seg_outputs = self(images, training=True)
