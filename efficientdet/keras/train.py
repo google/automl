@@ -91,6 +91,48 @@ flags.DEFINE_bool('profile', False, 'Enable profile mode')
 FLAGS = flags.FLAGS
 
 
+def setup_model(config):
+  """Build and compile model"""
+  model = train_lib.EfficientDetNetTrain(config=config)
+  model.build((None, *config.image_size, 3))
+  model.compile(
+    optimizer=train_lib.get_optimizer(config.as_dict()),
+    loss={
+      'box_loss':
+        train_lib.BoxLoss(
+          config.delta, reduction=tf.keras.losses.Reduction.NONE),
+      'box_iou_loss':
+        train_lib.BoxIouLoss(
+          config.iou_loss_type,
+          config.min_level,
+          config.max_level,
+          config.num_scales,
+          config.aspect_ratios,
+          config.anchor_scale,
+          config.image_size,
+          reduction=tf.keras.losses.Reduction.NONE),
+      'class_loss':
+        train_lib.FocalLoss(
+          config.alpha,
+          config.gamma,
+          label_smoothing=config.label_smoothing,
+          reduction=tf.keras.losses.Reduction.NONE),
+      'seg_loss':
+        tf.keras.losses.SparseCategoricalCrossentropy(
+          from_logits=True,
+          reduction=tf.keras.losses.Reduction.NONE)
+    })
+  return model
+
+
+def init_experimental(config):
+  """Serialize train config to model directory"""
+  tf.io.gfile.makedirs(config.model_dir)
+  config_file = os.path.join(config.model_dir, 'config.yaml')
+  if not tf.io.gfile.exists(config_file):
+    tf.io.gfile.GFile(config_file, 'w').write(str(config))
+
+
 def main(_):
   # Parse and override hparams
   config = hparams_config.get_detection_config(FLAGS.model_name)
@@ -131,7 +173,6 @@ def main(_):
 
   steps_per_epoch = FLAGS.num_examples_per_epoch // FLAGS.batch_size
   params = dict(
-      config.as_dict(),
       profile=FLAGS.profile,
       model_name=FLAGS.model_name,
       iterations_per_loop=FLAGS.iterations_per_loop,
@@ -140,13 +181,13 @@ def main(_):
       strategy=FLAGS.strategy,
       batch_size=FLAGS.batch_size,
       num_shards=ds_strategy.num_replicas_in_sync)
-
+  config.override(params, True)
   # set mixed precision policy by keras api.
-  precision = utils.get_precision(params['strategy'], params['mixed_precision'])
+  precision = utils.get_precision(config.strategy, config.mixed_precision)
   policy = tf.keras.mixed_precision.experimental.Policy(precision)
   tf.keras.mixed_precision.experimental.set_policy(policy)
 
-  def get_dataset(is_training, params):
+  def get_dataset(is_training, config):
     file_pattern = (
         FLAGS.training_file_pattern
         if is_training else FLAGS.validation_file_pattern)
@@ -158,51 +199,22 @@ def main(_):
         is_training=is_training,
         use_fake_data=FLAGS.use_fake_data,
         max_instances_per_image=config.max_instances_per_image)(
-            params)
+            config.as_dict())
 
   with ds_strategy.scope():
-    model = train_lib.EfficientDetNetTrain(params['model_name'], config)
-    model.compile(
-        optimizer=train_lib.get_optimizer(params),
-        loss={
-            'box_loss':
-                train_lib.BoxLoss(
-                    params['delta'], reduction=tf.keras.losses.Reduction.NONE),
-            'box_iou_loss':
-                train_lib.BoxIouLoss(
-                    params['iou_loss_type'],
-                    params['min_level'],
-                    params['max_level'],
-                    params['num_scales'],
-                    params['aspect_ratios'],
-                    params['anchor_scale'],
-                    params['image_size'],
-                    reduction=tf.keras.losses.Reduction.NONE),
-            'class_loss':
-                train_lib.FocalLoss(
-                    params['alpha'],
-                    params['gamma'],
-                    label_smoothing=params['label_smoothing'],
-                    reduction=tf.keras.losses.Reduction.NONE),
-            'seg_loss':
-                tf.keras.losses.SparseCategoricalCrossentropy(
-                    from_logits=True,
-                    reduction=tf.keras.losses.Reduction.NONE)
-        })
-
+    if config.model_optimizations:
+      model_optimization.set_config(config.model_optimizations.as_dict())
+    model = setup_model(config)
     if FLAGS.pretrained_ckpt:
       ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)
-      util_keras.restore_ckpt(model, ckpt_path, params['moving_average_decay'])
-    tf.io.gfile.makedirs(FLAGS.model_dir)
-    if params['model_optimizations']:
-      model_optimization.set_config(params['model_optimizations'])
-    model.build((None, *config.image_size, 3))
+      util_keras.restore_ckpt(model, ckpt_path, config.moving_average_decay)
+    init_experimental(config)
     model.fit(
-        get_dataset(True, params=params),
-        epochs=params['num_epochs'],
+        get_dataset(True, config),
+        epochs=config.num_epochs,
         steps_per_epoch=steps_per_epoch,
-        callbacks=train_lib.get_callbacks(params),
-        validation_data=get_dataset(False, params=params).repeat(),
+        callbacks=train_lib.get_callbacks(config.as_dict()),
+        validation_data=get_dataset(False, config).repeat(),
         validation_steps=(FLAGS.eval_samples // FLAGS.batch_size))
   model.save_weights(os.path.join(FLAGS.model_dir, 'ckpt-final'))
 
