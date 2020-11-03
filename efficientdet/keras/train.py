@@ -202,14 +202,13 @@ def main(_):
             config.as_dict())
 
   with ds_strategy.scope():
+    if config.model_optimizations:
+      model_optimization.set_config(config.model_optimizations.as_dict())
     model = setup_model(config)
     if FLAGS.pretrained_ckpt:
       ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)
       util_keras.restore_ckpt(model, ckpt_path, config.moving_average_decay)
     init_experimental(config)
-    if config.model_optimizations:
-      model_optimization.set_config(config.model_optimizations.as_dict())
-      model = setup_model(config)
     model.fit(
         get_dataset(True, config),
         epochs=config.num_epochs,
