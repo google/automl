@@ -91,6 +91,48 @@ flags.DEFINE_bool('profile', False, 'Enable profile mode')
 FLAGS = flags.FLAGS
 
 
+def setup_model(config):
+  """Build and compile model"""
+  model = train_lib.EfficientDetNetTrain(config=config)
+  model.build((None, *config.image_size, 3))
+  model.compile(
+    optimizer=train_lib.get_optimizer(config.as_dict()),
+    loss={
+      'box_loss':
+        train_lib.BoxLoss(
+          config.delta, reduction=tf.keras.losses.Reduction.NONE),
+      'box_iou_loss':
+        train_lib.BoxIouLoss(
+          config.iou_loss_type,
+          config.min_level,
+          config.max_level,
+          config.num_scales,
+          config.aspect_ratios,
+          config.anchor_scale,
+          config.image_size,
+          reduction=tf.keras.losses.Reduction.NONE),
+      'class_loss':
+        train_lib.FocalLoss(
+          config.alpha,
+          config.gamma,
+          label_smoothing=config.label_smoothing,
+          reduction=tf.keras.losses.Reduction.NONE),
+      'seg_loss':
+        tf.keras.losses.SparseCategoricalCrossentropy(
+          from_logits=True,
+          reduction=tf.keras.losses.Reduction.NONE)
+    })
+  return model
+
+
+def init_experimental(config):
+  """Serialize train config to model directory"""
+  tf.io.gfile.makedirs(config.model_dir)
+  config_file = os.path.join(config.model_dir, 'config.yaml')
+  if not tf.io.gfile.exists(config_file):
+    tf.io.gfile.GFile(config_file, 'w').write(str(config))
+
+
 def main(_):
   # Parse and override hparams
   config = hparams_config.get_detection_config(FLAGS.model_name)
@@ -139,7 +181,7 @@ def main(_):
       strategy=FLAGS.strategy,
       batch_size=FLAGS.batch_size,
       num_shards=ds_strategy.num_replicas_in_sync)
-  config.__dict__.update(params)
+  config.override(params, True)
   # set mixed precision policy by keras api.
   precision = utils.get_precision(config.strategy, config.mixed_precision)
   policy = tf.keras.mixed_precision.experimental.Policy(precision)
@@ -160,42 +202,14 @@ def main(_):
             config.as_dict())
 
   with ds_strategy.scope():
-    model = train_lib.EfficientDetNetTrain(config=config)
-    model.compile(
-        optimizer=train_lib.get_optimizer(config.as_dict()),
-        loss={
-            'box_loss':
-                train_lib.BoxLoss(
-                    config.delta, reduction=tf.keras.losses.Reduction.NONE),
-            'box_iou_loss':
-                train_lib.BoxIouLoss(
-                    config.iou_loss_type,
-                    config.min_level,
-                    config.max_level,
-                    config.num_scales,
-                    config.aspect_ratios,
-                    config.anchor_scale,
-                    config.image_size,
-                    reduction=tf.keras.losses.Reduction.NONE),
-            'class_loss':
-                train_lib.FocalLoss(
-                    config.alpha,
-                    config.gamma,
-                    label_smoothing=config.label_smoothing,
-                    reduction=tf.keras.losses.Reduction.NONE),
-            'seg_loss':
-                tf.keras.losses.SparseCategoricalCrossentropy(
-                    from_logits=True,
-                    reduction=tf.keras.losses.Reduction.NONE)
-        })
-
+    model = setup_model(config)
     if FLAGS.pretrained_ckpt:
       ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)
       util_keras.restore_ckpt(model, ckpt_path, config.moving_average_decay)
-    tf.io.gfile.makedirs(FLAGS.model_dir)
+    init_experimental(config)
     if config.model_optimizations:
       model_optimization.set_config(config.model_optimizations.as_dict())
-    model.build((None, *config.image_size, 3))
+      model = setup_model(config)
     model.fit(
         get_dataset(True, config),
         epochs=config.num_epochs,
