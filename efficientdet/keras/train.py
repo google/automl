@@ -98,10 +98,10 @@ def setup_model(config):
   model.compile(
     optimizer=train_lib.get_optimizer(config.as_dict()),
     loss={
-      'box_loss':
+      train_lib.BoxLoss.__name__:
         train_lib.BoxLoss(
           config.delta, reduction=tf.keras.losses.Reduction.NONE),
-      'box_iou_loss':
+      train_lib.BoxIouLoss.__name__:
         train_lib.BoxIouLoss(
           config.iou_loss_type,
           config.min_level,
@@ -111,13 +111,13 @@ def setup_model(config):
           config.anchor_scale,
           config.image_size,
           reduction=tf.keras.losses.Reduction.NONE),
-      'class_loss':
+      train_lib.FocalLoss.__name__:
         train_lib.FocalLoss(
           config.alpha,
           config.gamma,
           label_smoothing=config.label_smoothing,
           reduction=tf.keras.losses.Reduction.NONE),
-      'seg_loss':
+      tf.keras.losses.SparseCategoricalCrossentropy.__name__:
         tf.keras.losses.SparseCategoricalCrossentropy(
           from_logits=True,
           reduction=tf.keras.losses.Reduction.NONE)

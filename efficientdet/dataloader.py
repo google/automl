@@ -310,8 +310,7 @@ class InputReader:
                 image, boxes, num_layers=1, magnitude=15)
           else:
             image, boxes = autoaugment.distort_image_with_autoaugment(
-                image, boxes, params['autoaugment_policy'],
-                params['use_augmix'], *params['augmix_params'])
+                image, boxes, params['autoaugment_policy'])
 
       input_processor = DetectionInputProcessor(image, params['image_size'],
                                                 boxes, classes)

@@ -14,7 +14,6 @@
 # ==============================================================================
 r"""Tool to inspect a model."""
 import os
-import tempfile
 
 from absl import app
 from absl import flags
@@ -57,6 +56,7 @@ flags.DEFINE_string('output_video', None,
 flags.DEFINE_string('saved_model_dir', None, 'Folder path for saved model.')
 flags.DEFINE_string('tflite', None, 'tflite type: {FP32, FP16, INT8}.')
 flags.DEFINE_bool('debug', False, 'Debug mode.')
+flags.DEFINE_bool('only_network', False, 'Model only contains network')
 FLAGS = flags.FLAGS
 
 
@@ -78,7 +78,8 @@ def main(_):
   if tf.io.gfile.isdir(ckpt_path_or_file):
     ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
   driver = inference.ServingDriver(FLAGS.model_name, ckpt_path_or_file,
-                                   FLAGS.batch_size or None, model_params)
+                                   FLAGS.batch_size or None,
+                                   FLAGS.only_network, model_params)
   if FLAGS.mode == 'export':
     if not  FLAGS.saved_model_dir:
       raise ValueError('Please specify --saved_model_dir=')

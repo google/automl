@@ -75,6 +75,13 @@ class InferenceTest(tf.test.TestCase):
     self.assertEqual(classes.shape, (1, 100))
     self.assertEqual(valid_lens.shape, (1,))
 
+  def test_network_inference(self):
+    driver = inference.ServingDriver('efficientdet-d0', self.tmp_path, only_network=True)
+    images = tf.ones((1, 512, 512, 3))
+    class_outputs, box_outputs = driver.serve(images)
+    self.assertLen(class_outputs, 5)
+    self.assertLen(box_outputs, 5)
+
   def test_inference_mixed_precision(self):
     driver = inference.ServingDriver('efficientdet-d0', self.tmp_path)
     driver.build({'mixed_precision': True})

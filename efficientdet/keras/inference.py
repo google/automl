@@ -140,6 +140,7 @@ class ServingDriver(object):
                model_name: Text,
                ckpt_path: Text = None,
                batch_size: int = 1,
+               only_network: bool = False,
                model_params: Dict[Text, Any] = None):
     """Initialize the inference driver.
 
@@ -153,6 +154,7 @@ class ServingDriver(object):
     self.model_name = model_name
     self.ckpt_path = ckpt_path
     self.batch_size = batch_size
+    self.only_network = only_network
 
     self.params = hparams_config.get_detection_config(model_name).as_dict()
 
@@ -161,13 +163,23 @@ class ServingDriver(object):
     self.params.update(dict(is_training_bn=False))
     self.label_map = self.params.get('label_map', None)
 
-    self.model = None
+    self._model = None
 
     mixed_precision = self.params.get('mixed_precision', None)
     precision = utils.get_precision(
         self.params.get('strategy', None), mixed_precision)
     policy = tf.keras.mixed_precision.experimental.Policy(precision)
     tf.keras.mixed_precision.experimental.set_policy(policy)
+
+  @property
+  def model(self):
+    if not self._model:
+      self.build()
+    return self._model
+
+  @model.setter
+  def model(self, model):
+    self._model = model
 
   def build(self, params_override=None):
     """Build model and restore checkpoints."""
@@ -176,7 +188,10 @@ class ServingDriver(object):
       params.update(params_override)
     config = hparams_config.get_efficientdet_config(self.model_name)
     config.override(params)
-    self.model = efficientdet_keras.EfficientDetModel(config=config)
+    if self.only_network:
+      self.model = efficientdet_keras.EfficientDetNet(config=config)
+    else:
+      self.model = efficientdet_keras.EfficientDetModel(config=config)
     image_size = utils.parse_image_size(params['image_size'])
     self.model.build((self.batch_size, *image_size, 3))
     util_keras.restore_ckpt(self.model, self.ckpt_path,
@@ -195,9 +210,6 @@ class ServingDriver(object):
       bm_runs: Number of benchmark runs.
       trace_filename: If None, specify the filename for saving trace.
     """
-    if not self.model:
-      self.build()
-
     @tf.function
     def test_func(image_arrays):
       return self.model(image_arrays)
@@ -230,8 +242,6 @@ class ServingDriver(object):
     Returns:
       A list of detections.
     """
-    if not self.model:
-      self.build()
     return self.model(image_arrays)
 
   def load(self, saved_model_dir_or_frozen_graph: Text):
@@ -279,9 +289,6 @@ class ServingDriver(object):
       tensorrt: If not None, must be {'FP32', 'FP16', 'INT8'}.
       tflite: If not None, must be {'FP32', 'FP16', 'INT8'}.
     """
-    if not self.model:
-      self.build()
-
     export_model = ExportModel(self.model)
     if output_dir:
       tf.saved_model.save(
