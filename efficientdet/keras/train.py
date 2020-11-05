@@ -97,32 +97,32 @@ def setup_model(config):
   model = train_lib.EfficientDetNetTrain(config=config)
   model.build((None, *config.image_size, 3))
   model.compile(
-    optimizer=train_lib.get_optimizer(config.as_dict()),
-    loss={
-      train_lib.BoxLoss.__name__:
-        train_lib.BoxLoss(
-          config.delta, reduction=tf.keras.losses.Reduction.NONE),
-      train_lib.BoxIouLoss.__name__:
-        train_lib.BoxIouLoss(
-          config.iou_loss_type,
-          config.min_level,
-          config.max_level,
-          config.num_scales,
-          config.aspect_ratios,
-          config.anchor_scale,
-          config.image_size,
-          reduction=tf.keras.losses.Reduction.NONE),
-      train_lib.FocalLoss.__name__:
-        train_lib.FocalLoss(
-          config.alpha,
-          config.gamma,
-          label_smoothing=config.label_smoothing,
-          reduction=tf.keras.losses.Reduction.NONE),
-      tf.keras.losses.SparseCategoricalCrossentropy.__name__:
-        tf.keras.losses.SparseCategoricalCrossentropy(
-          from_logits=True,
-          reduction=tf.keras.losses.Reduction.NONE)
-    })
+      optimizer=train_lib.get_optimizer(config.as_dict()),
+      loss={
+          train_lib.BoxLoss.__name__:
+              train_lib.BoxLoss(
+                  config.delta, reduction=tf.keras.losses.Reduction.NONE),
+          train_lib.BoxIouLoss.__name__:
+              train_lib.BoxIouLoss(
+                  config.iou_loss_type,
+                  config.min_level,
+                  config.max_level,
+                  config.num_scales,
+                  config.aspect_ratios,
+                  config.anchor_scale,
+                  config.image_size,
+                  reduction=tf.keras.losses.Reduction.NONE),
+          train_lib.FocalLoss.__name__:
+              train_lib.FocalLoss(
+                  config.alpha,
+                  config.gamma,
+                  label_smoothing=config.label_smoothing,
+                  reduction=tf.keras.losses.Reduction.NONE),
+          tf.keras.losses.SparseCategoricalCrossentropy.__name__:
+              tf.keras.losses.SparseCategoricalCrossentropy(
+                  from_logits=True,
+                  reduction=tf.keras.losses.Reduction.NONE)}
+      )
   return model
 
 
