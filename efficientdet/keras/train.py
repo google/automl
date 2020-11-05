@@ -24,7 +24,8 @@ import hparams_config
 import utils
 from keras import train_lib
 from keras import util_keras
-from keras import model_optimization
+from keras import tfmot
+
 
 # Cloud TPU Cluster Resolvers
 flags.DEFINE_string(
@@ -151,6 +152,7 @@ def main(_):
   if FLAGS.debug:
     tf.config.experimental_run_functions_eagerly(True)
     tf.debugging.set_log_device_placement(True)
+    os.environ['TF_DETERMINISTIC_OPS'] = '1'
     tf.random.set_seed(111111)
     logging.set_verbosity(logging.DEBUG)
 
@@ -198,12 +200,13 @@ def main(_):
         file_pattern,
         is_training=is_training,
         use_fake_data=FLAGS.use_fake_data,
-        max_instances_per_image=config.max_instances_per_image)(
+        max_instances_per_image=config.max_instances_per_image,
+        debug=FLAGS.debug)(
             config.as_dict())
 
   with ds_strategy.scope():
     if config.model_optimizations:
-      model_optimization.set_config(config.model_optimizations.as_dict())
+      tfmot.set_config(config.model_optimizations.as_dict())
     model = setup_model(config)
     if FLAGS.pretrained_ckpt:
       ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)
