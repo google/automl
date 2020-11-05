@@ -87,6 +87,9 @@ flags.DEFINE_integer('num_examples_per_epoch', 120000,
 flags.DEFINE_integer('num_epochs', None, 'Number of epochs for training')
 flags.DEFINE_string('model_name', 'efficientdet-d1', 'Model name.')
 flags.DEFINE_bool('debug', False, 'Enable debug mode')
+flags.DEFINE_integer(
+    'tf_random_seed', 111111, 'Sets the TF graph seed for deterministic execution'
+    ' across runs (for debugging).')
 flags.DEFINE_bool('profile', False, 'Enable profile mode')
 
 FLAGS = flags.FLAGS
@@ -153,7 +156,7 @@ def main(_):
     tf.config.experimental_run_functions_eagerly(True)
     tf.debugging.set_log_device_placement(True)
     os.environ['TF_DETERMINISTIC_OPS'] = '1'
-    tf.random.set_seed(111111)
+    tf.random.set_seed(FLAGS.tf_random_seed)
     logging.set_verbosity(logging.DEBUG)
 
   if FLAGS.strategy == 'tpu':
@@ -182,6 +185,7 @@ def main(_):
       steps_per_epoch=steps_per_epoch,
       strategy=FLAGS.strategy,
       batch_size=FLAGS.batch_size,
+      tf_random_seed=FLAGS.tf_random_seed,
       num_shards=ds_strategy.num_replicas_in_sync)
   config.override(params, True)
   # set mixed precision policy by keras api.

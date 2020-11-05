@@ -395,7 +395,7 @@ class InputReader:
     )
 
     batch_size = batch_size or params['batch_size']
-    seed = 111111 if self._debug else None
+    seed = params['tf_random_seed'] if self._debug else None
     dataset = tf.data.Dataset.list_files(
         self._file_pattern, shuffle=self._is_training, seed=seed)
     if self._is_training:

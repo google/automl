@@ -127,6 +127,8 @@ def main(_):
     tpu_grpc_url = tpu_cluster_resolver.get_master()
     tf.Session.reset(tpu_grpc_url)
   else:
+    # Always enable auto mixed precision graph rewrite
+    os.environ['TF_AUTO_MIXED_PRECISION_GRAPH_REWRITE_IGNORE_PERFORMANCE'] = '1'
     tpu_cluster_resolver = None
 
   # Check data path

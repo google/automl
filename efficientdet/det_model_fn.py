@@ -179,14 +179,6 @@ def _box_loss(box_outputs, box_targets, num_positives, delta=0.1):
   return box_loss
 
 
-def _box_iou_loss(box_outputs, box_targets, num_positives, iou_loss_type):
-  """Computes box iou loss."""
-  normalizer = num_positives * 4.0
-  box_iou_loss = iou_utils.iou_loss(box_outputs, box_targets, iou_loss_type)
-  box_iou_loss = tf.reduce_sum(box_iou_loss) / normalizer
-  return box_iou_loss
-
-
 def detection_loss(cls_outputs, box_outputs, labels, params):
   """Computes total detection loss.
 
@@ -207,7 +199,6 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
       class and box losses from all levels.
     cls_loss: an integer tensor representing total class loss.
     box_loss: an integer tensor representing total box regression loss.
-    box_iou_loss: an integer tensor representing total box iou loss.
   """
   # Sum all positives in a batch for normalization and avoid zero
   # num_positives_sum, which would lead to inf loss during training
@@ -278,37 +269,14 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
               num_positives_sum,
               delta=params['delta']))
 
-  if params['iou_loss_type']:
-    input_anchors = anchors.Anchors(params['min_level'], params['max_level'],
-                                    params['num_scales'],
-                                    params['aspect_ratios'],
-                                    params['anchor_scale'],
-                                    params['image_size'])
-    box_output_list = [tf.reshape(box_outputs[i], [-1, 4]) for i in levels]
-    box_outputs = tf.concat(box_output_list, axis=0)
-    box_target_list = [
-        tf.reshape(labels['box_targets_%d' % level], [-1, 4])
-        for level in levels
-    ]
-    box_targets = tf.concat(box_target_list, axis=0)
-    anchor_boxes = tf.tile(input_anchors.boxes, [params['batch_size'], 1])
-    box_outputs = anchors.decode_box_outputs(box_outputs, anchor_boxes)
-    box_targets = anchors.decode_box_outputs(box_targets, anchor_boxes)
-    box_iou_loss = _box_iou_loss(box_outputs, box_targets, num_positives_sum,
-                                 params['iou_loss_type'])
-
-  else:
-    box_iou_loss = 0
-
   # Sum per level losses to total loss.
   cls_loss = tf.add_n(cls_losses)
   box_loss = tf.add_n(box_losses) if box_losses else 0
 
   total_loss = (
-      cls_loss + params['box_loss_weight'] * box_loss +
-      params['iou_loss_weight'] * box_iou_loss)
+      cls_loss + params['box_loss_weight'] * box_loss)
 
-  return total_loss, cls_loss, box_loss, box_iou_loss
+  return total_loss, cls_loss, box_loss
 
 
 def reg_l2_loss(weight_decay, regex=r'.*(kernel|weight):0$'):
@@ -379,7 +347,7 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
   learning_rate = learning_rate_schedule(params, global_step)
 
   # cls_loss and box_loss are for logging. only total_loss is optimized.
-  det_loss, cls_loss, box_loss, box_iou_loss = detection_loss(
+  det_loss, cls_loss, box_loss = detection_loss(
       cls_outputs, box_outputs, labels, params)
   reg_l2loss = reg_l2_loss(params['weight_decay'])
   total_loss = det_loss + reg_l2loss
@@ -391,8 +359,6 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     utils.scalar('trainloss/det_loss', det_loss, is_tpu)
     utils.scalar('trainloss/reg_l2_loss', reg_l2loss, is_tpu)
     utils.scalar('trainloss/loss', total_loss, is_tpu)
-    if params['iou_loss_type']:
-      utils.scalar('trainloss/box_iou_loss', box_iou_loss, is_tpu)
     train_epochs = tf.cast(global_step, tf.float32) / params['steps_per_epoch']
     utils.scalar('train_epochs', train_epochs, is_tpu)
 
@@ -413,23 +379,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
 
     if is_tpu:
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)
-    if params['device']['grad_ckpting']:
-      # pylint: disable=g-import-not-at-top,g-direct-tensorflow-import
-      from third_party.grad_checkpoint import grad
-      from tensorflow.python.ops import gradients
-      # pylint: enable=g-import-not-at-top,g-direct-tensorflow-import
-
-      # monkey patch tf.gradients to point to our custom version,
-      # with automatic checkpoint selection
-      def gradients_(ys, xs, grad_ys=None, **kwargs):
-        return grad.gradients(
-            ys,
-            xs,
-            grad_ys,
-            checkpoints=params['device']['grad_ckpting_list'],
-            **kwargs)
-
-      gradients.__dict__['gradients'] = gradients_
+    elif params['mixed_precision']:
+      optimizer = tf.train.experimental.enable_mixed_precision_graph_rewrite(optimizer)
 
     # Batch norm requires update_ops to be added as a train_op dependency.
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -637,20 +588,6 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
         every_n_iter=params.get('iterations_per_loop', 100),
     )
     training_hooks.append(logging_hook)
-
-    if params['device']['nvgpu_logging']:
-      try:
-        from third_party.tools import nvgpu  # pylint: disable=g-import-not-at-top
-        mem_message = tf.numpy_function(nvgpu.gpu_memory_util_message, [],
-                                        [tf.string])[0]
-        logging_hook_nvgpu = tf.estimator.LoggingTensorHook(
-            tensors={'mem_message': mem_message},
-            every_n_iter=params.get('iterations_per_loop', 100),
-            formatter=lambda x: x['mem_message'].decode('utf-8'),
-        )
-        training_hooks.append(logging_hook_nvgpu)
-      except:  # pylint: disable=bare-except
-        logging.error('nvgpu error: nvidia-smi format not recognized.')
 
     eval_metric_ops = (
         eval_metrics[0](**eval_metrics[1]) if eval_metrics else None)
