@@ -162,7 +162,7 @@ def iou_loss(pred_boxes: FloatType,
     raise ValueError(
         'Unknown loss_type {}, not iou/ciou/diou/giou'.format(iou_type))
 
-  pred_boxes = tf.convert_to_tensor(pred_boxes, tf.float32)
+  pred_boxes = tf.convert_to_tensor(pred_boxes)
   target_boxes = tf.cast(target_boxes, pred_boxes.dtype)
 
   # t_ denotes target boxes and p_ denotes predicted boxes: (y, x, y_max, x_max)
