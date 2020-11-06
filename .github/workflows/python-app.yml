@@ -27,6 +27,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install pylint Cython
         pip install -r efficientdet/requirements.txt
+        pip install pycocotools==2.0.0
     - name: Lint with pylint
       run: |
         pylint --rcfile=.pylintrc `find $PWD -name 'efficientdet/*_test.py'`
