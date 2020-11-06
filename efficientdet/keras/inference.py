@@ -82,10 +82,6 @@ class ExportModel(tf.Module):
   def __call__(self, imgs):
     return self.model(imgs, training=False, post_mode='global')
 
-  @tf.function
-  def tflite_call(self, imgs):
-    return self.model(imgs, training=False, pre_mode=None, post_mode=None)
-
 
 class ServingDriver(object):
   """A driver for serving single or batch images.
@@ -311,7 +307,7 @@ class ServingDriver(object):
     if tflite:
       image_size = utils.parse_image_size(self.params['image_size'])
       converter = tf.lite.TFLiteConverter.from_concrete_functions([
-          export_model.tflite_call.get_concrete_function(
+          export_model.__call__.get_concrete_function(
               tf.TensorSpec(shape=[1, *image_size, 3]))
       ])
 
