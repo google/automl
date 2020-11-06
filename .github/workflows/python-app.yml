@@ -27,9 +27,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install pylint
         bash efficientdet/install_deps.sh
-    - name: Lint with pylint
-      run: |
-        pylint --rcfile=.pylintrc `find $PWD -name '*_test.py'`
     - name: Test with pytest
       run: |
         bash test.sh
