@@ -14,12 +14,7 @@
 # limitations under the License.
 # ==============================================================================
 
-for file in `find $PWD/efficientdet -name '*.py'`
+for line in $(cat efficientdet/requirements.txt)
 do
-  pylint --rcfile=.pylintrc $file
-done
-
-for file in `find $PWD/efficientdet -name '*_test.py'`
-do
-  python $file
+  pip install $line
 done
