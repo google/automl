@@ -25,7 +25,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pylint
+        pip install pylint Cython
         pip install -r efficientdet/requirements.txt
     - name: Lint with pylint
       run: |
