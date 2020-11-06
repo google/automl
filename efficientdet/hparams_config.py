@@ -181,10 +181,7 @@ def default_detection_configs():
   h.jitter_min = 0.1
   h.jitter_max = 2.0
   h.autoaugment_policy = None
-  h.use_augmix = False
   h.grid_mask = False
-  # mixture_width, mixture_depth, alpha
-  h.augmix_params = [3, -1, 1]
   h.sample_image = None
 
   # dataset specific parameters
@@ -283,20 +280,6 @@ def default_detection_configs():
   h.dataset_type = None
   h.positives_momentum = None
   h.grad_checkpoint = False
-  # For device specific options.
-  h.device = {
-      # If true, apply gradient checkpointing to reduce memory usage.
-      'grad_ckpting': False,
-      # All ops in the list will be checkpointed, such as Add/Mul/Conv2d/Floor/
-      # Sigmoid and other ops, or more specific, e.g. blocks_10/se/conv2d_1.
-      # Adding more ops will save more memory at the cost of more computation.
-      # For EfficientDet, [Add_, AddN] reduces mbconv memory to one third
-      # with one third more compute, in particular enabling training d6 with
-      # batch size 2 on 11Gb (2080ti).
-      'grad_ckpting_list': ['Add_', 'AddN'],
-      # enable memory logging for NVIDIA cards.
-      'nvgpu_logging': False,
-  }
 
   return h
 

@@ -26,6 +26,7 @@ import iou_utils
 import utils
 from keras import anchors
 from keras import efficientdet_keras
+import neural_structured_learning as nsl
 
 from tensorflow_model_optimization.python.core.sparsity.keras import pruning_wrapper
 
@@ -386,6 +387,34 @@ def get_callbacks(params):
   return callbacks
 
 
+class AdversarialLoss(tf.keras.losses.Loss):
+  """Adversarial keras loss wrapper"""
+  #TODO(fsx950223): WIP
+  def __init__(self, adv_config, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.adv_config = adv_config
+    self.model = None
+    self.loss_fn = None
+    self.tape = None
+    self.built = False
+
+  def build(self, model, loss_fn, tape):
+    self.model = model
+    self.loss_fn = loss_fn
+    self.tape = tape
+    self.built = True
+
+  def call(self, features, y, y_pred, labeled_loss):
+    return self.adv_config.multiplier * nsl.keras.adversarial_loss(
+        features,
+        y,
+        self.model,
+        self.loss_fn,
+        predictions=y_pred,
+        labeled_loss=self.labeled_loss,
+        gradient_tape=self.tape)
+
+
 class FocalLoss(tf.keras.losses.Loss):
   """Compute the focal loss between `logits` and the golden `target` values.
 
@@ -463,8 +492,7 @@ class BoxLoss(tf.keras.losses.Loss):
     box_targets = tf.expand_dims(box_targets, axis=-1)
     box_outputs = tf.expand_dims(box_outputs, axis=-1)
     box_loss = self.huber(box_targets, box_outputs) * mask
-    box_loss = tf.reduce_sum(box_loss)
-    box_loss /= normalizer
+    box_loss = tf.reduce_sum(box_loss) / normalizer
     return box_loss
 
 
@@ -485,9 +513,10 @@ class BoxIouLoss(tf.keras.losses.Loss):
         self.input_anchors.boxes,
         [box_outputs.shape[0] // self.input_anchors.boxes.shape[0], 1])
     num_positives, box_targets = y_true
-    box_outputs = anchors.decode_box_outputs(box_outputs, anchor_boxes)
-    box_targets = anchors.decode_box_outputs(box_targets, anchor_boxes)
     normalizer = num_positives * 4.0
+    mask = tf.cast(box_targets != 0.0, tf.float32)
+    box_outputs = anchors.decode_box_outputs(box_outputs, anchor_boxes) * mask
+    box_targets = anchors.decode_box_outputs(box_targets, anchor_boxes) * mask
     box_iou_loss = iou_utils.iou_loss(box_outputs, box_targets,
                                       self.iou_loss_type)
     box_iou_loss = tf.reduce_sum(box_iou_loss) / normalizer
@@ -579,7 +608,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
         cls_targets_at_level = tf.reshape(cls_targets_at_level,
                                           [bs, width, height, -1])
 
-      class_loss_layer = self.loss.get('class_loss', None)
+      class_loss_layer = self.loss.get(FocalLoss.__name__, None)
       if class_loss_layer:
         cls_loss = class_loss_layer([num_positives_sum, cls_targets_at_level],
                                     cls_outputs[level])
@@ -598,10 +627,10 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
         cls_loss_sum = tf.clip_by_value(tf.reduce_sum(cls_loss), 0.0, 2.0)
         cls_losses.append(tf.cast(cls_loss_sum, tf.float32))
 
-      if self.config.box_loss_weight and self.loss.get('box_loss', None):
+      if self.config.box_loss_weight and self.loss.get(BoxLoss.__name__, None):
         box_targets_at_level = (
-          labels['box_targets_%d' % (level + self.config.min_level)])
-        box_loss_layer = self.loss['box_loss']
+            labels['box_targets_%d' % (level + self.config.min_level)])
+        box_loss_layer = self.loss[BoxLoss.__name__]
         box_losses.append(
             box_loss_layer([num_positives_sum, box_targets_at_level],
                            box_outputs[level]))
@@ -615,7 +644,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
               [-1, 4])
           for level in levels
       ], axis=0)
-      box_iou_loss_layer = self.loss['box_iou_loss']
+      box_iou_loss_layer = self.loss[BoxIouLoss.__name__]
       box_iou_loss = box_iou_loss_layer([num_positives_sum, box_targets],
                                         box_outputs)
       loss_vals['box_iou_loss'] = box_iou_loss
@@ -663,7 +692,8 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
                                         loss_vals)
         total_loss += det_loss
       if 'segmentation' in self.config.heads:
-        seg_loss_layer = self.loss['seg_loss']
+        seg_loss_layer = (
+            self.loss[tf.keras.losses.SparseCategoricalCrossentropy.__name__])
         seg_loss = seg_loss_layer(labels['image_masks'], seg_outputs)
         total_loss += seg_loss
         loss_vals['seg_loss'] = seg_loss
@@ -724,7 +754,8 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
                                       loss_vals)
       total_loss += det_loss
     if 'segmentation' in self.config.heads:
-      seg_loss_layer = self.loss['seg_loss']
+      seg_loss_layer = (
+          self.loss[tf.keras.losses.SparseCategoricalCrossentropy.__name__])
       seg_loss = seg_loss_layer(labels['image_masks'], seg_outputs)
       total_loss += seg_loss
       loss_vals['seg_loss'] = seg_loss

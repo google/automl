@@ -14,7 +14,6 @@
 # ==============================================================================
 r"""Tool to inspect a model."""
 import os
-import tempfile
 
 from absl import app
 from absl import flags
@@ -38,7 +37,7 @@ flags.DEFINE_string('tensorrt', None, 'TensorRT mode: {None, FP32, FP16, INT8}')
 flags.DEFINE_integer('batch_size', 1, 'Batch size for inference.')
 flags.DEFINE_integer('image_size', -1, 'Input image size for inference.')
 
-flags.DEFINE_string('ckpt_path', '_', 'checkpoint dir used for eval.')
+flags.DEFINE_string('model_dir', '_', 'checkpoint dir used for eval.')
 flags.DEFINE_string('export_ckpt', None, 'Output model ckpt path.')
 
 flags.DEFINE_string(
@@ -57,6 +56,7 @@ flags.DEFINE_string('output_video', None,
 flags.DEFINE_string('saved_model_dir', None, 'Folder path for saved model.')
 flags.DEFINE_string('tflite', None, 'tflite type: {FP32, FP16, INT8}.')
 flags.DEFINE_bool('debug', False, 'Debug mode.')
+flags.DEFINE_bool('only_network', False, 'Model only contains network')
 FLAGS = flags.FLAGS
 
 
@@ -74,11 +74,12 @@ def main(_):
   model_config.image_size = utils.parse_image_size(model_config.image_size)
 
   model_params = model_config.as_dict()
-  ckpt_path_or_file = FLAGS.ckpt_path
+  ckpt_path_or_file = FLAGS.model_dir
   if tf.io.gfile.isdir(ckpt_path_or_file):
     ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
   driver = inference.ServingDriver(FLAGS.model_name, ckpt_path_or_file,
-                                   FLAGS.batch_size or None, model_params)
+                                   FLAGS.batch_size or None,
+                                   FLAGS.only_network, model_params)
   if FLAGS.mode == 'export':
     if not  FLAGS.saved_model_dir:
       raise ValueError('Please specify --saved_model_dir=')

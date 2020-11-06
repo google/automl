@@ -24,7 +24,8 @@ import hparams_config
 import utils
 from keras import train_lib
 from keras import util_keras
-from keras import model_optimization
+from keras import tfmot
+
 
 # Cloud TPU Cluster Resolvers
 flags.DEFINE_string(
@@ -86,6 +87,9 @@ flags.DEFINE_integer('num_examples_per_epoch', 120000,
 flags.DEFINE_integer('num_epochs', None, 'Number of epochs for training')
 flags.DEFINE_string('model_name', 'efficientdet-d1', 'Model name.')
 flags.DEFINE_bool('debug', False, 'Enable debug mode')
+flags.DEFINE_integer(
+    'tf_random_seed', 111111, 'Sets the TF graph seed for deterministic execution'
+    ' across runs (for debugging).')
 flags.DEFINE_bool('profile', False, 'Enable profile mode')
 
 FLAGS = flags.FLAGS
@@ -96,32 +100,32 @@ def setup_model(config):
   model = train_lib.EfficientDetNetTrain(config=config)
   model.build((None, *config.image_size, 3))
   model.compile(
-    optimizer=train_lib.get_optimizer(config.as_dict()),
-    loss={
-      'box_loss':
-        train_lib.BoxLoss(
-          config.delta, reduction=tf.keras.losses.Reduction.NONE),
-      'box_iou_loss':
-        train_lib.BoxIouLoss(
-          config.iou_loss_type,
-          config.min_level,
-          config.max_level,
-          config.num_scales,
-          config.aspect_ratios,
-          config.anchor_scale,
-          config.image_size,
-          reduction=tf.keras.losses.Reduction.NONE),
-      'class_loss':
-        train_lib.FocalLoss(
-          config.alpha,
-          config.gamma,
-          label_smoothing=config.label_smoothing,
-          reduction=tf.keras.losses.Reduction.NONE),
-      'seg_loss':
-        tf.keras.losses.SparseCategoricalCrossentropy(
-          from_logits=True,
-          reduction=tf.keras.losses.Reduction.NONE)
-    })
+      optimizer=train_lib.get_optimizer(config.as_dict()),
+      loss={
+          train_lib.BoxLoss.__name__:
+              train_lib.BoxLoss(
+                  config.delta, reduction=tf.keras.losses.Reduction.NONE),
+          train_lib.BoxIouLoss.__name__:
+              train_lib.BoxIouLoss(
+                  config.iou_loss_type,
+                  config.min_level,
+                  config.max_level,
+                  config.num_scales,
+                  config.aspect_ratios,
+                  config.anchor_scale,
+                  config.image_size,
+                  reduction=tf.keras.losses.Reduction.NONE),
+          train_lib.FocalLoss.__name__:
+              train_lib.FocalLoss(
+                  config.alpha,
+                  config.gamma,
+                  label_smoothing=config.label_smoothing,
+                  reduction=tf.keras.losses.Reduction.NONE),
+          tf.keras.losses.SparseCategoricalCrossentropy.__name__:
+              tf.keras.losses.SparseCategoricalCrossentropy(
+                  from_logits=True,
+                  reduction=tf.keras.losses.Reduction.NONE)}
+      )
   return model
 
 
@@ -151,7 +155,8 @@ def main(_):
   if FLAGS.debug:
     tf.config.experimental_run_functions_eagerly(True)
     tf.debugging.set_log_device_placement(True)
-    tf.random.set_seed(111111)
+    os.environ['TF_DETERMINISTIC_OPS'] = '1'
+    tf.random.set_seed(FLAGS.tf_random_seed)
     logging.set_verbosity(logging.DEBUG)
 
   if FLAGS.strategy == 'tpu':
@@ -180,6 +185,7 @@ def main(_):
       steps_per_epoch=steps_per_epoch,
       strategy=FLAGS.strategy,
       batch_size=FLAGS.batch_size,
+      tf_random_seed=FLAGS.tf_random_seed,
       num_shards=ds_strategy.num_replicas_in_sync)
   config.override(params, True)
   # set mixed precision policy by keras api.
@@ -198,12 +204,13 @@ def main(_):
         file_pattern,
         is_training=is_training,
         use_fake_data=FLAGS.use_fake_data,
-        max_instances_per_image=config.max_instances_per_image)(
+        max_instances_per_image=config.max_instances_per_image,
+        debug=FLAGS.debug)(
             config.as_dict())
 
   with ds_strategy.scope():
     if config.model_optimizations:
-      model_optimization.set_config(config.model_optimizations.as_dict())
+      tfmot.set_config(config.model_optimizations.as_dict())
     model = setup_model(config)
     if FLAGS.pretrained_ckpt:
       ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)

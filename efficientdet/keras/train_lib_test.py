@@ -86,11 +86,11 @@ class TrainLibTest(tf.test.TestCase):
     self.assertAlmostEqual(iou_loss.numpy(), 4.924635, places=5)
 
   def test_predict(self):
-    x = np.random.random((1, 512, 512, 3)).astype(np.float32)
-    model = train_lib.EfficientDetNetTrain('efficientdet-d0')
-    cls_outputs, box_outputs = model(x)
+    _, x, labels, model =  self._build_model()
+    cls_outputs, box_outputs, seg_outputs = model(x)
     self.assertLen(cls_outputs, 5)
     self.assertLen(box_outputs, 5)
+    self.assertLen(seg_outputs, 1)
 
   def _build_model(self, grad_checkpoint=False):
     tf.random.set_seed(1111)
@@ -117,15 +117,19 @@ class TrainLibTest(tf.test.TestCase):
 
     params = config.as_dict()
     params['num_shards'] = 1
+    params['iterations_per_loop'] = 100
+    params['model_dir'] = tempfile.mkdtemp()
+    params['profile'] = False
+    config.override(params, allow_new_keys=True)
     model = train_lib.EfficientDetNetTrain(config=config)
     model.build((1, 512, 512, 3))
     model.compile(
         optimizer=train_lib.get_optimizer(params),
         loss={
-            'box_loss':
+            train_lib.BoxLoss.__name__:
                 train_lib.BoxLoss(
                     params['delta'], reduction=tf.keras.losses.Reduction.NONE),
-            'box_iou_loss':
+            train_lib.BoxIouLoss.__name__:
                 train_lib.BoxIouLoss(
                     params['iou_loss_type'],
                     params['min_level'],
@@ -135,13 +139,13 @@ class TrainLibTest(tf.test.TestCase):
                     params['anchor_scale'],
                     params['image_size'],
                     reduction=tf.keras.losses.Reduction.NONE),
-            'class_loss':
+            train_lib.FocalLoss.__name__:
                 train_lib.FocalLoss(
                     params['alpha'],
                     params['gamma'],
                     label_smoothing=params['label_smoothing'],
                     reduction=tf.keras.losses.Reduction.NONE),
-            'seg_loss':
+            tf.keras.losses.SparseCategoricalCrossentropy.__name__:
                 tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
         })
     return params, x, labels, model
@@ -150,12 +154,14 @@ class TrainLibTest(tf.test.TestCase):
     _, x, labels, model = self._build_model()
     outputs = model.train_on_batch(x, labels, return_dict=True)
     expect_results = {
-        'loss': 26279.4765625,
-        'det_loss': 26277.033203125,
-        'cls_loss': 5060.716796875,
-        'box_loss': 424.3263244628906,
-        'gnorm': 5873.78759765625,
-        'seg_loss': 1.2215478420257568,
+        'loss': 21184.48046875,
+        'det_loss': 21182.03125,
+        'cls_loss': 10.0,
+        'box_loss': 423.44061279296875,
+        'gradient_norm': 10.0,
+        'reg_l2_loss': 0.,
+        'learning_rate': 0.,
+        'seg_loss': 1.224212408065796,
     }
     self.assertAllClose(outputs, expect_results, rtol=.1, atol=100.)
 
@@ -163,11 +169,12 @@ class TrainLibTest(tf.test.TestCase):
     _, x, labels, model = self._build_model()
     outputs = model.test_on_batch(x, labels, return_dict=True)
     expect_results = {
-        'loss': 26064.126953125,
-        'det_loss': 26078.49609375,
-        'cls_loss': 5063.3759765625,
-        'box_loss': 420.30242919921875,
-        'seg_loss': 1.2299377918243408,
+        'loss': 21191.556640625,
+        'det_loss': 21189.234375,
+        'cls_loss': 10.0,
+        'reg_l2_loss': 0.,
+        'box_loss': 423.5846862792969,
+        'seg_loss': 1.0981438159942627,
     }
     self.assertAllClose(outputs, expect_results, rtol=.1, atol=100.)
 
@@ -179,12 +186,11 @@ class TrainLibTest(tf.test.TestCase):
         steps_per_epoch=1,
         epochs=1,
         callbacks=train_lib.get_callbacks(params))
-
-    self.assertAllClose(hist.history['loss'], [26061.], rtol=.1, atol=10.)
-    self.assertAllClose(hist.history['det_loss'], [26061.], rtol=.1, atol=10.)
-    self.assertAllClose(hist.history['cls_loss'], [5058.], rtol=.1, atol=10.)
-    self.assertAllClose(hist.history['box_loss'], [420.], rtol=.1, atol=100.)
-    self.assertAllClose(hist.history['seg_loss'], [1.2299], rtol=.1, atol=100.)
+    self.assertAllClose(hist.history['loss'], [21228.], rtol=.1, atol=10.)
+    self.assertAllClose(hist.history['det_loss'], [21226.], rtol=.1, atol=10.)
+    self.assertAllClose(hist.history['cls_loss'], [10.], rtol=.1, atol=10.)
+    self.assertAllClose(hist.history['box_loss'], [424.], rtol=.1, atol=100.)
+    self.assertAllClose(hist.history['seg_loss'], [1.221547], rtol=.1, atol=100.)
     # skip gnorm test because it is flaky.
 
   def test_recompute_grad(self):

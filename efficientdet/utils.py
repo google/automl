@@ -623,11 +623,14 @@ def build_model_with_precision(pp, mm, ii, tt, *args, **kwargs):
       outputs = mm(inputs, *args, **kwargs)
     set_precision_policy('float32')
   elif pp == 'mixed_float16':
-    set_precision_policy(pp, loss_scale=tt)
-    inputs = tf.cast(ii, tf.float16)
-    with float16_scope():
-      outputs = mm(inputs, *args, **kwargs)
-    set_precision_policy('float32')
+    if tt:
+      outputs = mm(ii, *args, **kwargs)
+    else:
+      set_precision_policy(pp, loss_scale=tt)
+      inputs = tf.cast(ii, tf.float16)
+      with float16_scope():
+        outputs = mm(inputs, *args, **kwargs)
+      set_precision_policy('float32')
   elif not pp or pp == 'float32':
     outputs = mm(ii, *args, **kwargs)
   else:
@@ -710,8 +713,8 @@ def _recompute_grad(f):
 
 
 def recompute_grad(recompute=False):
+  """ Decorator determine whether use gradient checkpoint. """
   def _wrapper(f):
-    """ Decorator determine whether use gradient checkpoint. """
     if recompute:
       return _recompute_grad(f)
     return f
