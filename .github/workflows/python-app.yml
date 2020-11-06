@@ -29,4 +29,4 @@ jobs:
         bash efficientdet/install_deps.sh
     - name: Test with pytest
       run: |
-        bash test.sh
+        bash efficientdet/test.sh
