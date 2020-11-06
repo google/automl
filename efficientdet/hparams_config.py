@@ -234,6 +234,7 @@ def default_detection_configs():
   h.weight_decay = 4e-5
   h.strategy = None  # 'tpu', 'gpus', None
   h.mixed_precision = False  # If False, use float32.
+  h.loss_scale = 2**10  # If False, use float32.
   h.model_optimizations = {}  # 'prune'
 
   # For detection.

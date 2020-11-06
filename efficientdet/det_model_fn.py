@@ -271,7 +271,7 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
 
   # Sum per level losses to total loss.
   cls_loss = tf.add_n(cls_losses)
-  box_loss = tf.add_n(box_losses) if box_losses else 0
+  box_loss = tf.add_n(box_losses) if box_losses else tf.constant(0.)
 
   total_loss = (
       cls_loss + params['box_loss_weight'] * box_loss)

@@ -306,7 +306,7 @@ def get_optimizer(params):
         optimizer, average_decay=moving_average_decay, dynamic_decay=True)
   if params['mixed_precision']:
     optimizer = tf.keras.mixed_precision.experimental.LossScaleOptimizer(
-        optimizer, loss_scale='dynamic')
+        optimizer, loss_scale=tf.mixed_precision.experimental.DynamicLossScale(params['loss_scale']))
   return optimizer
 
 
@@ -488,10 +488,12 @@ class BoxLoss(tf.keras.losses.Loss):
   def call(self, y_true, box_outputs):
     num_positives, box_targets = y_true
     normalizer = num_positives * 4.0
-    mask = tf.cast(box_targets != 0.0, tf.float32)
+    mask = tf.cast(box_targets != 0.0, num_positives.dtype)
     box_targets = tf.expand_dims(box_targets, axis=-1)
     box_outputs = tf.expand_dims(box_outputs, axis=-1)
-    box_loss = self.huber(box_targets, box_outputs) * mask
+    # TODO(fsx950223): remove cast when huber loss dtype is fixed.
+    box_loss = tf.cast(self.huber(box_targets, box_outputs),
+                       num_positives.dtype) * mask
     box_loss = tf.reduce_sum(box_loss) / normalizer
     return box_loss
 
@@ -514,7 +516,7 @@ class BoxIouLoss(tf.keras.losses.Loss):
         [box_outputs.shape[0] // self.input_anchors.boxes.shape[0], 1])
     num_positives, box_targets = y_true
     normalizer = num_positives * 4.0
-    mask = tf.cast(box_targets != 0.0, tf.float32)
+    mask = tf.cast(box_targets != 0.0, num_positives.dtype)
     box_outputs = anchors.decode_box_outputs(box_outputs, anchor_boxes) * mask
     box_targets = anchors.decode_box_outputs(box_targets, anchor_boxes) * mask
     box_iou_loss = iou_utils.iou_loss(box_outputs, box_targets,
@@ -573,6 +575,8 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     """
     # Sum all positives in a batch for normalization and avoid zero
     # num_positives_sum, which would lead to inf loss during training
+    precision = utils.get_precision(self.config.strategy, self.config.mixed_precision)
+    dtype = precision.split('_')[-1]
     num_positives_sum = tf.reduce_sum(labels['mean_num_positives']) + 1.0
     positives_momentum = self.config.positives_momentum or 0
     if positives_momentum > 0:
@@ -580,7 +584,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       moving_normalizer_var = tf.Variable(
           0.0,
           name='moving_normalizer',
-          dtype=tf.float32,
+          dtype=dtype,
           synchronization=tf.VariableSynchronization.ON_READ,
           trainable=False,
           aggregation=tf.VariableAggregation.MEAN)
@@ -590,6 +594,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
           momentum=self.config.positives_momentum)
     elif positives_momentum < 0:
       num_positives_sum = utils.cross_replica_mean(num_positives_sum)
+    num_positives_sum = tf.cast(num_positives_sum, dtype)
     levels = range(len(cls_outputs))
     cls_losses = []
     box_losses = []
@@ -597,7 +602,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       # Onehot encoding for classification labels.
       cls_targets_at_level = tf.one_hot(
           labels['cls_targets_%d' % (level + self.config.min_level)],
-          self.config.num_classes)
+          self.config.num_classes, dtype=dtype)
 
       if self.config.data_format == 'channels_first':
         bs, _, width, height, _ = cls_targets_at_level.get_shape().as_list()
@@ -623,9 +628,9 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
                 tf.not_equal(
                     labels['cls_targets_%d' % (level + self.config.min_level)],
                     -2), -1),
-            tf.float32)
+            dtype)
         cls_loss_sum = tf.clip_by_value(tf.reduce_sum(cls_loss), 0.0, 2.0)
-        cls_losses.append(tf.cast(cls_loss_sum, tf.float32))
+        cls_losses.append(tf.cast(cls_loss_sum, dtype))
 
       if self.config.box_loss_weight and self.loss.get(BoxLoss.__name__, None):
         box_targets_at_level = (
@@ -700,7 +705,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
 
       reg_l2_loss = self._reg_l2_loss(self.config.weight_decay)
       loss_vals['reg_l2_loss'] = reg_l2_loss
-      total_loss += reg_l2_loss
+      total_loss += tf.cast(reg_l2_loss, images.dtype)
       if isinstance(self.optimizer,
                     tf.keras.mixed_precision.experimental.LossScaleOptimizer):
         scaled_loss = self.optimizer.get_scaled_loss(total_loss)
@@ -761,5 +766,5 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       loss_vals['seg_loss'] = seg_loss
     reg_l2_loss = self._reg_l2_loss(self.config.weight_decay)
     loss_vals['reg_l2_loss'] = reg_l2_loss
-    loss_vals['loss'] = total_loss + reg_l2_loss
+    loss_vals['loss'] = total_loss + tf.cast(reg_l2_loss, images.dtype)
     return loss_vals
