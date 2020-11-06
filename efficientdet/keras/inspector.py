@@ -37,7 +37,7 @@ flags.DEFINE_string('tensorrt', None, 'TensorRT mode: {None, FP32, FP16, INT8}')
 flags.DEFINE_integer('batch_size', 1, 'Batch size for inference.')
 flags.DEFINE_integer('image_size', -1, 'Input image size for inference.')
 
-flags.DEFINE_string('ckpt_path', '_', 'checkpoint dir used for eval.')
+flags.DEFINE_string('model_dir', '_', 'checkpoint dir used for eval.')
 flags.DEFINE_string('export_ckpt', None, 'Output model ckpt path.')
 
 flags.DEFINE_string(
@@ -74,7 +74,7 @@ def main(_):
   model_config.image_size = utils.parse_image_size(model_config.image_size)
 
   model_params = model_config.as_dict()
-  ckpt_path_or_file = FLAGS.ckpt_path
+  ckpt_path_or_file = FLAGS.model_dir
   if tf.io.gfile.isdir(ckpt_path_or_file):
     ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
   driver = inference.ServingDriver(FLAGS.model_name, ckpt_path_or_file,
