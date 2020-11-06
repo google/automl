@@ -26,10 +26,10 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install pylint
-        pip install -r requirements.txt
+        pip install -r efficientdet/requirements.txt
     - name: Lint with pylint
       run: |
-        pylint --rcfile=.pylintrc `find $PWD -name '*_test.py'`
+        pylint --rcfile=.pylintrc `find $PWD -name 'efficientdet/*_test.py'`
     - name: Test with pytest
       run: |
-        bash test.sh
+        bash efficientdet/test.sh
