@@ -22,6 +22,6 @@ done
 cd efficientdet
 for file in `find $PWD -name '*_test.py'`
 do
-  python $file
+  PYTHONPATH=$PWD TF_CPP_MIN_LOG_LEVEL=1 python $file
 done
 
