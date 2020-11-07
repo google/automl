@@ -488,12 +488,12 @@ class BoxLoss(tf.keras.losses.Loss):
   def call(self, y_true, box_outputs):
     num_positives, box_targets = y_true
     normalizer = num_positives * 4.0
-    mask = tf.cast(box_targets != 0.0, box_targets.dtype)
+    mask = tf.cast(box_targets != 0.0, box_outputs.dtype)
     box_targets = tf.expand_dims(box_targets, axis=-1)
     box_outputs = tf.expand_dims(box_outputs, axis=-1)
     # TODO(fsx950223): remove cast when huber loss dtype is fixed.
-    box_loss = tf.cast(
-        self.huber(box_targets, box_outputs), box_targets.dtype) * mask
+    box_loss = tf.cast(self.huber(box_targets, box_outputs),
+                       box_outputs.dtype) * mask
     box_loss = tf.reduce_sum(box_loss) / normalizer
     return box_loss
 
@@ -516,7 +516,7 @@ class BoxIouLoss(tf.keras.losses.Loss):
         [box_outputs.shape[0] // self.input_anchors.boxes.shape[0], 1])
     num_positives, box_targets = y_true
     normalizer = num_positives * 4.0
-    mask = tf.cast(box_targets != 0.0, box_targets.dtype)
+    mask = tf.cast(box_targets != 0.0, box_outputs.dtype)
     box_outputs = anchors.decode_box_outputs(box_outputs, anchor_boxes) * mask
     box_targets = anchors.decode_box_outputs(box_targets, anchor_boxes) * mask
     box_iou_loss = iou_utils.iou_loss(box_outputs, box_targets,
