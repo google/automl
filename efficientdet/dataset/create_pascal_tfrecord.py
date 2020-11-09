@@ -258,7 +258,7 @@ def main(_):
 
   writers = [
       tf.io.TFRecordWriter(FLAGS.output_path + '-%05d-of-%05d.tfrecord' %
-                                  (i, FLAGS.num_shards))
+                           (i, FLAGS.num_shards))
       for i in range(FLAGS.num_shards)
   ]
 

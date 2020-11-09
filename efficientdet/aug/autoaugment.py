@@ -21,9 +21,9 @@ import inspect
 import math
 from absl import logging
 import tensorflow.compat.v1 as tf
+from tensorflow_addons import image as image_ops
 
 import hparams_config
-from tensorflow_addons import image as image_ops  # pylint: disable=g-import-not-at-top
 
 # This signifies the max integer that the controller RNN could predict for the
 # augmentation scheme.
@@ -1548,11 +1548,6 @@ def build_and_apply_nas_policy(policies, image, bboxes,
     bboxes: tf.Tensor of shape [N, 4] representing ground truth boxes that are
       normalized between [0, 1].
     augmentation_hparams: Hparams associated with the NAS learned policy.
-    use_augmix: whether use augmix[https://arxiv.org/pdf/1912.02781.pdf]
-    mixture_width: Width of augmentation chain
-    mixture_depth: Depth of augmentation chain. -1 enables stochastic depth
-      uniformly from [1, 3].
-    alpha: Probability coefficient for Beta and Dirichlet distributions.
 
   Returns:
     A version of image that now has data augmentation applied to it based on
@@ -1610,11 +1605,6 @@ def distort_image_with_autoaugment(image,
       found on the COCO dataset that have slight variation in what operations
       were used during the search procedure along with how many operations are
       applied in parallel to a single image (2 vs 3).
-    use_augmix: whether use augmix[https://arxiv.org/pdf/1912.02781.pdf]
-    mixture_width: Width of augmentation chain
-    mixture_depth: Depth of augmentation chain. -1 enables stochastic depth
-      uniformly from [1, 3].
-    alpha: Probability coefficient for Beta and Dirichlet distributions.
 
   Returns:
     A tuple containing the augmented versions of `image` and `bboxes`.
