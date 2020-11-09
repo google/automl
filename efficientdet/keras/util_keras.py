@@ -133,3 +133,5 @@ def restore_ckpt(model, ckpt_path_or_file, ema_decay=0.9998):
         var.assign(tf.train.load_variable(ckpt_path_or_file, key))
       except tf.errors.NotFoundError:
         logging.warning('Not found %s in %s', key, ckpt_path_or_file)
+      except ValueError as e:
+        logging.warning(f'%s: %s', key, e)
