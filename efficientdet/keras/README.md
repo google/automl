@@ -87,7 +87,7 @@ Run the following command line to export models:
 
     !rm  -rf savedmodeldir
     !python inspector.py --mode=saved_model --model_name=efficientdet-d0 \
-      --ckpt_path=efficientdet-d0 --saved_model_dir=savedmodeldir \
+      --model_dir=efficientdet-d0 --saved_model_dir=savedmodeldir \
       --tensorrt=FP32  --tflite=FP32 \
       --hparams=voc_config.yaml
 
@@ -100,7 +100,7 @@ Then you will get:
 
 Notably,
  --tflite_path only works after 2.3.0-dev20200521 ,
- --ckpt_path=xx/archive is the folder for exporting the best model.
+ --model_dir=xx/archive is the folder for exporting the best model.
 
 
 ## 4. Benchmark model latency.
@@ -123,7 +123,7 @@ new image, including: image preprocessing, network, postprocessing and NMS),
 use the following command:
 
     !python inspector.py --mode=benchmark --model_name=efficientdet-d0 \
-      --ckpt_path=efficientdet-d0 --hparams=mixed_precision=true
+      --model_dir=efficientdet-d0 --hparams=mixed_precision=true
 
 On single Tesla V100 without using TensorRT, our end-to-end
 latency and throughput are:
@@ -154,14 +154,14 @@ latency and throughput are:
 
     # Step2: inference image.
     !python inspector.py --mode=infer \
-      --model_name=efficientdet-d0 --ckpt_path=efficientdet-d0 \
+      --model_name=efficientdet-d0 --model_dir=efficientdet-d0 \
       --hparams="image_size=1920x1280" \
       --input_image=img.png --output_image_dir=/tmp/
 
 
 Alternatively, if you want to do inference using frozen graph instead of saved model, you can run
 
-    # Step 0 and 1 is the same as before.
+    # Step 1 is the same as before.
     # Step 2: do inference with frozen graph.
     !python inspector.py --mode=infer \
       --model_name=efficientdet-d0  \
@@ -173,7 +173,7 @@ Lastly, if you only have one image and just want to run a quick test, you can al
     # Run inference for a single image.
     !python inspector.py --mode=infer --model_name=$MODEL \
       --hparams="image_size=1920x1280" \
-      --ckpt_path=$CKPT_PATH --input_image=img.png --output_image_dir=/tmp
+      --model_dir=$CKPT_PATH --input_image=img.png --output_image_dir=/tmp
     # you can visualize the output /tmp/0.jpg
 
 Here is an example of EfficientDet-D0 visualization: more on [tutorial](tutorial.ipynb)
@@ -191,7 +191,7 @@ You can run inference for a video and show the results online:
 
     # step 2: export saved model.
     !python inspector.py --mode=video \
-      --model_name=efficientdet-d0 --ckpt_path=efficientdet-d0 \
+      --model_name=efficientdet-d0 --model_dir=efficientdet-d0 \
       --hparams=voc_config.yaml --input_video=input.mov
 
     # alternative step 2: inference video and save the result.
@@ -217,33 +217,10 @@ You can run inference for a video and show the results online:
         --num_shards=32
 
     // Run eval.
-    !python main.py --mode=eval  \
+    !python eval.py  \
         --model_name=${MODEL}  --model_dir=${CKPT_PATH}  \
-        --validation_file_pattern=tfrecord/val*  \
+        --val_file_pattern=tfrecord/val*  \
         --val_json_file=annotations/instances_val2017.json
-
-You can also run eval on test-dev set with the following command:
-
-    !wget http://images.cocodataset.org/zips/test2017.zip
-    !unzip -q test2017.zip
-    !wget http://images.cocodataset.org/annotations/image_info_test2017.zip
-    !unzip image_info_test2017.zip
-
-    !mkdir tfrecord
-    !PYTHONPATH=".:$PYTHONPATH"  python dataset/create_coco_tfrecord.py \
-          --image_dir=test2017 \
-          --image_info_file=annotations/image_info_test-dev2017.json \
-          --output_file_prefix=tfrecord/testdev \
-          --num_shards=32
-
-    # Eval on test-dev: testdev_dir must be set.
-    # Also, test-dev has 20288 images rather than val 5000 images.
-    !python main.py --mode=eval  \
-        --model_name=${MODEL}  --model_dir=${CKPT_PATH}  \
-        --validation_file_pattern=tfrecord/testdev*  \
-        --testdev_dir='testdev_output' --eval_samples=20288
-    # Now you can submit testdev_output/detections_test-dev2017_test_results.json to
-    # coco server: https://competitions.codalab.org/competitions/20794#participate
 
 ## 8. Finetune on PASCAL VOC 2012 with detector COCO ckpt.
 
@@ -285,7 +262,7 @@ If you want to do inference for custom data, you can run
 
     # Setting hparams-flag is needed sometimes.
     !python inspector.py --mode=infer \
-      --model_name=efficientdet-d0   --ckpt_path=efficientdet-d0 \
+      --model_name=efficientdet-d0   --model_dir=efficientdet-d0 \
       --hparams=voc_config.yaml  \
       --input_image=img.png --output_image_dir=/tmp/
 
@@ -312,17 +289,17 @@ Finetune needs to use --ckpt rather than --backbone_ckpt.
         --model_name=efficientdet-d0 \
         --model_dir=/tmp/efficientdet-d0-finetune  \
         --ckpt=efficientdet-d0  \
-        --batch_size=64 \
-        --eval_samples=1024 \
+        --batch_size=64  \
+        --eval_samples=1024  \
         --num_examples_per_epoch=5717 --num_epochs=50  \
-        --hparams=voc_config.yaml
+        --hparams=voc_config.yaml  \
         --strategy=gpus
 
 If you want to do inference for custom data, you can run
 
     # Setting hparams-flag is needed sometimes.
     !python inspector.py --mode=infer \
-      --model_name=efficientdet-d0   --ckpt_path=efficientdet-d0 \
+      --model_name=efficientdet-d0   --model_dir=efficientdet-d0 \
       --hparams=voc_config.yaml  \
       --input_image=img.png --output_image_dir=/tmp/
 
@@ -368,7 +345,6 @@ Check these links for a high-level idea of what gradient checkpointing is doing:
 If set to True, keras model uses ```tf.recompute_grad``` to achieve gradient checkpoints.
 
 Testing shows that:
-* It allows to train a d7x network with batch size of 2 by keras/train.py on a 11Gb (1080Ti) GPU
-* It also allows to train a d6 network with batch size of 2 by main.py on a 11Gb (1080Ti) GPU
+* It allows to train a d7x network with batch size of 2 on a 11Gb (1080Ti) GPU
 
 NOTE: this is not an official Google product.
