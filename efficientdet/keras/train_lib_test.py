@@ -14,7 +14,6 @@
 # ==============================================================================
 import tempfile
 from absl import logging
-import numpy as np
 import tensorflow as tf
 
 import det_model_fn as legacy_fn
@@ -86,7 +85,7 @@ class TrainLibTest(tf.test.TestCase):
     self.assertAlmostEqual(iou_loss.numpy(), 4.924635, places=5)
 
   def test_predict(self):
-    _, x, labels, model =  self._build_model()
+    _, x, _, model = self._build_model()
     cls_outputs, box_outputs, seg_outputs = model(x)
     self.assertLen(cls_outputs, 5)
     self.assertLen(box_outputs, 5)
@@ -110,9 +109,7 @@ class TrainLibTest(tf.test.TestCase):
         'cls_targets_%d' % i: tf.ones((1, 512 // 2**i, 512 // 2**i, 9),
                                       dtype=tf.int32) for i in range(3, 8)
     })
-    labels.update({
-        'image_masks': tf.ones((1, 128, 128, 1))
-    })
+    labels.update({'image_masks': tf.ones((1, 128, 128, 1))})
     labels.update({'mean_num_positives': tf.constant([10.0])})
 
     params = config.as_dict()
@@ -190,7 +187,8 @@ class TrainLibTest(tf.test.TestCase):
     self.assertAllClose(hist.history['det_loss'], [21226.], rtol=.1, atol=10.)
     self.assertAllClose(hist.history['cls_loss'], [10.], rtol=.1, atol=10.)
     self.assertAllClose(hist.history['box_loss'], [424.], rtol=.1, atol=100.)
-    self.assertAllClose(hist.history['seg_loss'], [1.221547], rtol=.1, atol=100.)
+    self.assertAllClose(
+        hist.history['seg_loss'], [1.221547], rtol=.1, atol=100.)
     # skip gnorm test because it is flaky.
 
   def test_recompute_grad(self):
@@ -200,7 +198,7 @@ class TrainLibTest(tf.test.TestCase):
       loss_vals = {}
       cls_outputs, box_outputs, _ = model(x, training=True)
       det_loss = model._detection_loss(cls_outputs, box_outputs, labels,
-                                      loss_vals)
+                                       loss_vals)
       grads1 = tape.gradient(det_loss, model.trainable_variables)
 
     _, x, labels, model = self._build_model(True)
@@ -208,7 +206,7 @@ class TrainLibTest(tf.test.TestCase):
       loss_vals = {}
       cls_outputs2, box_outputs2, _ = model(x, training=True)
       det_loss2 = model._detection_loss(cls_outputs2, box_outputs2, labels,
-                                      loss_vals)
+                                        loss_vals)
       grads2 = tape.gradient(det_loss2, model.trainable_variables)
     for grad1, grad2 in zip(grads1, grads2):
       if grad1 is None or grad2 is None:

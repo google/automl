@@ -22,9 +22,9 @@ import tensorflow as tf
 import dataloader
 import hparams_config
 import utils
+from keras import tfmot
 from keras import train_lib
 from keras import util_keras
-from keras import tfmot
 
 
 # Cloud TPU Cluster Resolvers
@@ -88,15 +88,15 @@ flags.DEFINE_integer('num_epochs', None, 'Number of epochs for training')
 flags.DEFINE_string('model_name', 'efficientdet-d1', 'Model name.')
 flags.DEFINE_bool('debug', False, 'Enable debug mode')
 flags.DEFINE_integer(
-    'tf_random_seed', 111111, 'Sets the TF graph seed for deterministic execution'
-    ' across runs (for debugging).')
+    'tf_random_seed', 111111,
+    'Fixed random seed for deterministic execution across runs for debugging.')
 flags.DEFINE_bool('profile', False, 'Enable profile mode')
 
 FLAGS = flags.FLAGS
 
 
 def setup_model(config):
-  """Build and compile model"""
+  """Build and compile model."""
   model = train_lib.EfficientDetNetTrain(config=config)
   model.build((None, *config.image_size, 3))
   model.compile(
@@ -130,7 +130,7 @@ def setup_model(config):
 
 
 def init_experimental(config):
-  """Serialize train config to model directory"""
+  """Serialize train config to model directory."""
   tf.io.gfile.makedirs(config.model_dir)
   config_file = os.path.join(config.model_dir, 'config.yaml')
   if not tf.io.gfile.exists(config_file):
@@ -174,7 +174,6 @@ def main(_):
       ds_strategy = tf.distribute.OneDeviceStrategy('device:GPU:0')
     else:
       ds_strategy = tf.distribute.OneDeviceStrategy('device:CPU:0')
-
 
   steps_per_epoch = FLAGS.num_examples_per_epoch // FLAGS.batch_size
   params = dict(

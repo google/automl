@@ -25,8 +25,8 @@ from backbone import backbone_factory
 from backbone import efficientnet_builder
 from keras import fpn_configs
 from keras import postprocess
-from keras import util_keras
 from keras import tfmot
+from keras import util_keras
 # pylint: disable=arguments-differ  # fo keras layers.
 
 
@@ -365,6 +365,7 @@ class ClassNet(tf.keras.layers.Layer):
       survival_prob: if a value is set then drop connect will be used.
       strategy: string to specify training strategy for TPU/GPU/CPU.
       data_format: string of 'channel_first' or 'channels_last'.
+      grad_checkpoint: bool, If true, apply grad checkpoint for saving memory.
       name: the name of this layerl.
       **kwargs: other parameters.
     """
@@ -491,6 +492,7 @@ class BoxNet(tf.keras.layers.Layer):
       survival_prob: if a value is set then drop connect will be used.
       strategy: string to specify training strategy for TPU/GPU/CPU.
       data_format: string of 'channel_first' or 'channels_last'.
+      grad_checkpoint: bool, If true, apply grad checkpoint for saving memory.
       name: Name of the layer.
       **kwargs: other parameters.
     """

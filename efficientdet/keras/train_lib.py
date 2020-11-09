@@ -18,23 +18,22 @@ import math
 import os
 import re
 from absl import logging
+import neural_structured_learning as nsl
 import numpy as np
-import tensorflow as tf
 
+import tensorflow as tf
 import inference
 import iou_utils
 import utils
 from keras import anchors
 from keras import efficientdet_keras
-import neural_structured_learning as nsl
-
 from tensorflow_model_optimization.python.core.sparsity.keras import pruning_wrapper
 
 
 def _collect_prunable_layers(model):
   """Recursively collect the prunable layers in the model."""
   prunable_layers = []
-  for layer in model._flatten_layers(recursive=False, include_self=False):
+  for layer in model._flatten_layers(recursive=False, include_self=False):  # pylint: disable=protected-access
     # A keras model may have other models as layers.
     if isinstance(layer, pruning_wrapper.PruneLowMagnitude):
       prunable_layers.append(layer)
@@ -46,6 +45,7 @@ def _collect_prunable_layers(model):
 
 class UpdatePruningStep(tf.keras.callbacks.Callback):
   """Keras callback which updates pruning wrappers with the optimizer step.
+
   This callback must be used when training a model which needs to be pruned. Not
   doing so will throw an error.
   Example:
@@ -101,8 +101,7 @@ class PruningSummaries(tf.keras.callbacks.TensorBoard):
           '`log_dir` must be a non-empty string. You passed `log_dir`='
           '{input}.'.format(input=log_dir))
 
-    super().__init__(
-        log_dir=log_dir, update_freq=update_freq, **kwargs)
+    super().__init__(log_dir=log_dir, update_freq=update_freq, **kwargs)
 
     log_dir = self.log_dir + '/metrics'
     self._file_writer = tf.summary.create_file_writer(log_dir)
@@ -136,14 +135,13 @@ class PruningSummaries(tf.keras.callbacks.TensorBoard):
     param_value_pairs = list(zip(params, values))
 
     for mask, mask_value in param_value_pairs[::2]:
-      pruning_logs.update({
-          mask.name + '/sparsity': 1 - np.mean(mask_value)
-      })
+      pruning_logs.update({mask.name + '/sparsity': 1 - np.mean(mask_value)})
 
     for threshold, threshold_value in param_value_pairs[1::2]:
       pruning_logs.update({threshold.name + '/threshold': threshold_value})
 
     self._log_pruning_metrics(pruning_logs, iteration)
+
 
 def update_learning_rate_schedule_parameters(params):
   """Updates params that are related to the learning rate schedule."""
@@ -290,8 +288,7 @@ def get_optimizer(params):
   momentum = params['momentum']
   if params['optimizer'].lower() == 'sgd':
     logging.info('Use SGD optimizer')
-    optimizer = tf.keras.optimizers.SGD(
-        learning_rate, momentum=momentum)
+    optimizer = tf.keras.optimizers.SGD(learning_rate, momentum=momentum)
   elif params['optimizer'].lower() == 'adam':
     logging.info('Use Adam optimizer')
     optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=momentum)
@@ -306,7 +303,9 @@ def get_optimizer(params):
         optimizer, average_decay=moving_average_decay, dynamic_decay=True)
   if params['mixed_precision']:
     optimizer = tf.keras.mixed_precision.experimental.LossScaleOptimizer(
-        optimizer, loss_scale=tf.mixed_precision.experimental.DynamicLossScale(params['loss_scale']))
+        optimizer,
+        loss_scale=tf.mixed_precision.experimental.DynamicLossScale(
+            params['loss_scale']))
   return optimizer
 
 
@@ -375,21 +374,22 @@ def get_callbacks(params):
     callbacks += [prune_callback, prune_summaries]
   else:
     tb_callback = tf.keras.callbacks.TensorBoard(
-        log_dir=params['model_dir'], update_freq=params['iterations_per_loop'],
+        log_dir=params['model_dir'],
+        update_freq=params['iterations_per_loop'],
         profile_batch=2 if params['profile'] else 0)
     callbacks.append(tb_callback)
   if params.get('sample_image', None):
     display_callback = DisplayCallback(
-        params.get('sample_image', None),
-        params['model_dir'],
+        params.get('sample_image', None), params['model_dir'],
         params['img_summary_steps'])
     callbacks.append(display_callback)
   return callbacks
 
 
 class AdversarialLoss(tf.keras.losses.Loss):
-  """Adversarial keras loss wrapper"""
-  #TODO(fsx950223): WIP
+  """Adversarial keras loss wrapper."""
+
+  # TODO(fsx950223): WIP
   def __init__(self, adv_config, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self.adv_config = adv_config
@@ -488,12 +488,12 @@ class BoxLoss(tf.keras.losses.Loss):
   def call(self, y_true, box_outputs):
     num_positives, box_targets = y_true
     normalizer = num_positives * 4.0
-    mask = tf.cast(box_targets != 0.0, num_positives.dtype)
+    mask = tf.cast(box_targets != 0.0, box_targets.dtype)
     box_targets = tf.expand_dims(box_targets, axis=-1)
     box_outputs = tf.expand_dims(box_outputs, axis=-1)
     # TODO(fsx950223): remove cast when huber loss dtype is fixed.
-    box_loss = tf.cast(self.huber(box_targets, box_outputs),
-                       num_positives.dtype) * mask
+    box_loss = tf.cast(
+        self.huber(box_targets, box_outputs), box_targets.dtype) * mask
     box_loss = tf.reduce_sum(box_loss) / normalizer
     return box_loss
 
@@ -516,7 +516,7 @@ class BoxIouLoss(tf.keras.losses.Loss):
         [box_outputs.shape[0] // self.input_anchors.boxes.shape[0], 1])
     num_positives, box_targets = y_true
     normalizer = num_positives * 4.0
-    mask = tf.cast(box_targets != 0.0, num_positives.dtype)
+    mask = tf.cast(box_targets != 0.0, box_targets.dtype)
     box_outputs = anchors.decode_box_outputs(box_outputs, anchor_boxes) * mask
     box_targets = anchors.decode_box_outputs(box_targets, anchor_boxes) * mask
     box_iou_loss = iou_utils.iou_loss(box_outputs, box_targets,
@@ -530,6 +530,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
 
   see https://www.tensorflow.org/guide/keras/customizing_what_happens_in_fit
   """
+
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     log_dir = os.path.join(self.config.model_dir, 'train_images')
@@ -547,9 +548,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     """Return regularization l2 loss loss."""
     var_match = re.compile(regex)
     return weight_decay * tf.add_n([
-        tf.nn.l2_loss(v)
-        for v in self._freeze_vars()
-        if var_match.match(v.name)
+        tf.nn.l2_loss(v) for v in self._freeze_vars() if var_match.match(v.name)
     ])
 
   def _detection_loss(self, cls_outputs, box_outputs, labels, loss_vals):
@@ -575,7 +574,8 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     """
     # Sum all positives in a batch for normalization and avoid zero
     # num_positives_sum, which would lead to inf loss during training
-    precision = utils.get_precision(self.config.strategy, self.config.mixed_precision)
+    precision = utils.get_precision(self.config.strategy,
+                                    self.config.mixed_precision)
     dtype = precision.split('_')[-1]
     num_positives_sum = tf.reduce_sum(labels['mean_num_positives']) + 1.0
     positives_momentum = self.config.positives_momentum or 0
@@ -602,7 +602,8 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       # Onehot encoding for classification labels.
       cls_targets_at_level = tf.one_hot(
           labels['cls_targets_%d' % (level + self.config.min_level)],
-          self.config.num_classes, dtype=dtype)
+          self.config.num_classes,
+          dtype=dtype)
 
       if self.config.data_format == 'channels_first':
         bs, _, width, height, _ = cls_targets_at_level.get_shape().as_list()
@@ -627,8 +628,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
             tf.expand_dims(
                 tf.not_equal(
                     labels['cls_targets_%d' % (level + self.config.min_level)],
-                    -2), -1),
-            dtype)
+                    -2), -1), dtype)
         cls_loss_sum = tf.clip_by_value(tf.reduce_sum(cls_loss), 0.0, 2.0)
         cls_losses.append(tf.cast(cls_loss_sum, dtype))
 
@@ -644,11 +644,11 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       box_outputs = tf.concat([tf.reshape(v, [-1, 4]) for v in box_outputs],
                               axis=0)
       box_targets = tf.concat([
-          tf.reshape(
-              labels['box_targets_%d' % (level + self.config.min_level)],
-              [-1, 4])
+          tf.reshape(labels['box_targets_%d' %
+                            (level + self.config.min_level)], [-1, 4])
           for level in levels
-      ], axis=0)
+      ],
+                              axis=0)
       box_iou_loss_layer = self.loss[BoxIouLoss.__name__]
       box_iou_loss = box_iou_loss_layer([num_positives_sum, box_targets],
                                         box_outputs)

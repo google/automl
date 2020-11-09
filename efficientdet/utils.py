@@ -20,8 +20,8 @@ from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
 import tensorflow.compat.v2 as tf2
-from tensorflow.python.tpu import tpu_function  # pylint:disable=g-direct-tensorflow-import
 from tensorflow.python.eager import tape as tape_lib  # pylint:disable=g-direct-tensorflow-import
+from tensorflow.python.tpu import tpu_function  # pylint:disable=g-direct-tensorflow-import
 # pylint: disable=logging-format-interpolation
 
 
@@ -63,9 +63,8 @@ def cross_replica_mean(t, num_shards_per_group=None):
   group_assignment = None
   if num_shards_per_group > 1:
     if num_shards % num_shards_per_group != 0:
-      raise ValueError(
-          'num_shards: %d mod shards_per_group: %d, should be 0' %
-          (num_shards, num_shards_per_group))
+      raise ValueError('num_shards: %d mod shards_per_group: %d, should be 0' %
+                       (num_shards, num_shards_per_group))
     num_groups = num_shards // num_shards_per_group
     group_assignment = [[
         x for x in range(num_shards) if x // num_shards_per_group == y
@@ -170,8 +169,8 @@ class TpuBatchNormalization(tf.keras.layers.BatchNormalization):
       shard_square_of_mean = tf.math.square(shard_mean)
       shard_mean_of_square = shard_variance + shard_square_of_mean
       group_mean = cross_replica_mean(shard_mean, num_shards_per_group)
-      group_mean_of_square = cross_replica_mean(
-          shard_mean_of_square, num_shards_per_group)
+      group_mean_of_square = cross_replica_mean(shard_mean_of_square,
+                                                num_shards_per_group)
       group_variance = group_mean_of_square - tf.math.square(group_mean)
       return (group_mean, group_variance)
     else:
@@ -451,8 +450,7 @@ def archive_ckpt(ckpt_eval, ckpt_objective, ckpt_path):
     dest = os.path.join(dst_dir, os.path.basename(f))
     tf.io.gfile.copy(f, dest, overwrite=True)
   ckpt_state = tf.train.generate_checkpoint_state_proto(
-      dst_dir,
-      model_checkpoint_path=os.path.join(dst_dir, ckpt_name))
+      dst_dir, model_checkpoint_path=os.path.join(dst_dir, ckpt_name))
   with tf.io.gfile.GFile(os.path.join(dst_dir, 'checkpoint'), 'w') as f:
     f.write(str(ckpt_state))
   with tf.io.gfile.GFile(os.path.join(dst_dir, 'best_eval.txt'), 'w') as f:
@@ -584,10 +582,7 @@ def set_precision_policy(policy_name: Text = None, loss_scale: bool = False):
 
   assert policy_name in ('mixed_float16', 'mixed_bfloat16', 'float32')
   logging.info('use mixed precision policy name %s', policy_name)
-  # TODO(tanmingxing): use tf.keras.layers.enable_v2_dtype_behavior() when it
-  # available in stable TF release.
-  from tensorflow.python.keras.engine import base_layer_utils  # pylint: disable=g-import-not-at-top,g-direct-tensorflow-import
-  base_layer_utils.enable_v2_dtype_behavior()
+  tf.compat.v1.keras.layers.enable_v2_dtype_behavior()
   # mixed_float16 training is not supported for now, so disable loss_scale.
   # float32 and mixed_bfloat16 do not need loss scale for training.
   if loss_scale:
@@ -661,8 +656,6 @@ def _recompute_grad(f):
    pass of a gradient call.
   """
 
-  # TODO(fsx950223): Wait for https://github.com/tensorflow/tensorflow/pull/44373 to be merged.
-
   @tf.custom_gradient
   def inner(*args, **kwargs):
     """Inner function closure for calculating gradients."""
@@ -677,7 +670,7 @@ def _recompute_grad(f):
       def inner_recompute_grad(*dresult):
         """Nested custom gradient function for computing grads in reverse and forward mode autodiff."""
         # Gradient calculation for reverse mode autodiff.
-        variables = grad_kwargs.get("variables")
+        variables = grad_kwargs.get('variables')
         with tf.GradientTape() as t:
           id_args = tf.nest.map_structure(tf.identity, args)
           t.watch(id_args)
@@ -690,18 +683,19 @@ def _recompute_grad(f):
         if variables is not None:
           kw_vars = list(variables)
         grads = t.gradient(
-          result,
-          list(id_args) + kw_vars,
-          output_gradients=dresult,
-          unconnected_gradients=tf.UnconnectedGradients.ZERO)
+            result,
+            list(id_args) + kw_vars,
+            output_gradients=dresult,
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
         def transpose(*t_args, **t_kwargs):
           """Gradient function calculation for forward mode autodiff."""
-          # Just throw an error since gradients / activations are not stored on tape for recompute.
+          # Just throw an error since gradients / activations are not stored on
+          # tape for recompute.
           raise NotImplementedError(
-            "recompute_grad tried to transpose grad of {}. "
-            "Consider not using recompute_grad in forward mode"
-            "autodiff".format(f.__name__))
+              'recompute_grad tried to transpose grad of {}. '
+              'Consider not using recompute_grad in forward mode'
+              'autodiff'.format(f.__name__))
 
         return (grads[:len(id_args)], grads[len(id_args):]), transpose
 
@@ -713,10 +707,11 @@ def _recompute_grad(f):
 
 
 def recompute_grad(recompute=False):
-  """ Decorator determine whether use gradient checkpoint. """
+  """Decorator determine whether use gradient checkpoint."""
+
   def _wrapper(f):
     if recompute:
       return _recompute_grad(f)
     return f
-  return _wrapper
 
+  return _wrapper

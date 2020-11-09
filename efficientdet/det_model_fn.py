@@ -21,7 +21,6 @@ import tensorflow.compat.v1 as tf
 import coco_metric
 import efficientdet_arch
 import hparams_config
-import iou_utils
 import nms_np
 import utils
 from keras import anchors
@@ -380,7 +379,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     if is_tpu:
       optimizer = tf.tpu.CrossShardOptimizer(optimizer)
     elif params['mixed_precision']:
-      optimizer = tf.train.experimental.enable_mixed_precision_graph_rewrite(optimizer)
+      optimizer = tf.train.experimental.enable_mixed_precision_graph_rewrite(
+          optimizer)
 
     # Batch norm requires update_ops to be added as a train_op dependency.
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
