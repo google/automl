@@ -68,7 +68,7 @@ class TrainLibTest(tf.test.TestCase):
         alpha, gamma, reduction=tf.keras.losses.Reduction.NONE)
     box_outputs = tf.random.normal([64, 4])
     box_targets = tf.random.normal([64, 4])
-    num_positives = 4.0
+    num_positives = tf.constant(4.0)
     self.assertEqual(
         legacy_fn._box_loss(box_outputs, box_targets, num_positives),
         box_loss([num_positives, box_targets], box_outputs))

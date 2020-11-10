@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-
 for file in `find $PWD/efficientdet -name '*.py'`
 do
   pylint --rcfile=.pylintrc $file
@@ -22,6 +21,5 @@ done
 cd efficientdet
 for file in `find $PWD -name '*_test.py'`
 do
-  python $file
+  PYTHONPATH=$PWD TF_CPP_MIN_LOG_LEVEL=1 python $file
 done
-
