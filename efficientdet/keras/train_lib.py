@@ -309,6 +309,52 @@ def get_optimizer(params):
   return optimizer
 
 
+class COCOCallback(tf.keras.callbacks.Callback):
+  def __init__(self, test_dataset):
+    self.test_dataset = test_dataset
+  
+  def set_model(self, model: tf.keras.Model):
+    import coco_metric
+    from keras import label_util
+    self.model = model
+    config = model.config
+    self.config = config
+    self.test_dataset = self.test_dataset.take(config.test_samples).repeat()
+    self.pbar = tf.keras.utils.Progbar(
+      (config.test_samples + config.batch_size - 1) // config.batch_size)
+    label_map = label_util.get_label_map(config.label_map)
+    log_dir = os.path.join(config.model_dir, 'coco')
+    self.file_writer = tf.summary.create_file_writer(log_dir)
+    self.evaluator = coco_metric.EvaluationMetric(
+        filename=config.val_json_file, label_map=label_map)
+
+  @tf.function
+  def _update_coco(self, images, labels):
+    from keras import postprocess
+    cls_outputs, box_outputs = self.model(images, training=False)
+    detections = postprocess.generate_detections(self.config,
+                                                 cls_outputs,
+                                                 box_outputs,
+                                                 labels['image_scales'],
+                                                 labels['source_ids'])
+    tf.numpy_function(self.evaluator.update_state,
+                      [labels['groundtruth_data'],
+                      postprocess.transform_detections(detections)],
+                      [])
+
+  def on_epoch_end(self, epoch, logs=None):
+    strategy = tf.distribute.get_strategy()
+    for i, (images, labels) in enumerate(self.test_dataset):
+      strategy.run(self._update_coco, (images, labels))
+      self.pbar.update(i)
+    metrics = self.evaluator.result()
+    metric_dict = {}
+    with self.file_writer.as_default():
+      for i, name in enumerate(self.evaluator.metric_names):
+        metric_dict[name] = metrics[i]
+        tf.summary.scalar(name, metrics[i], step=epoch)
+
+
 class DisplayCallback(tf.keras.callbacks.Callback):
   """Display inference result callback."""
 
@@ -317,33 +363,33 @@ class DisplayCallback(tf.keras.callbacks.Callback):
     image_file = tf.io.read_file(sample_image)
     self.sample_image = tf.expand_dims(
         tf.image.decode_jpeg(image_file, channels=3), axis=0)
-    self.executor = futures.ThreadPoolExecutor(max_workers=1)
+    # self.executor = futures.ThreadPoolExecutor(max_workers=1)
     self.update_freq = update_freq
     self.output_dir = output_dir
 
   def set_model(self, model: tf.keras.Model):
     self.train_model = model
+    config = model.config
     with tf.device('/cpu:0'):
-      self.model = efficientdet_keras.EfficientDetModel(config=model.config)
-    height, width = utils.parse_image_size(model.config.image_size)
+      self.model = efficientdet_keras.EfficientDetModel(config=config)
+    height, width = utils.parse_image_size(config.image_size)
     self.model.build((1, height, width, 3))
-    log_dir = os.path.join(self.output_dir, 'test_images')
+    log_dir = os.path.join(config.model_dir, 'test_images')
     self.file_writer = tf.summary.create_file_writer(log_dir)
-    self.min_score_thresh = self.model.config.nms_configs['score_thresh'] or 0.4
-    self.max_boxes_to_draw = (
-        self.model.config.nms_configs['max_output_size'] or 100)
+    self.min_score_thresh = config.nms_configs['score_thresh'] or 0.4
+    self.max_boxes_to_draw = config.nms_configs['max_output_size'] or 100
 
   def on_train_batch_end(self, batch, logs=None):
     if self.update_freq and batch % self.update_freq == 0:
-      self.executor.submit(self.draw_inference, batch)
+      self._draw_inference(batch)
 
   @tf.function
-  def inference(self):
+  def _inference(self):
     return self.model(self.sample_image, training=False)
 
-  def draw_inference(self, step):
-    self.model.set_weights(self.train_model.get_weights())
-    boxes, scores, classes, valid_len = self.inference()
+  def _draw_inference(self, step):
+    self.model.__class__ = efficientdet_keras.EfficientDetModel
+    boxes, scores, classes, valid_len = self._inference()
     length = valid_len[0]
     image = inference.visualize_image(
         self.sample_image[0],
@@ -356,7 +402,7 @@ class DisplayCallback(tf.keras.callbacks.Callback):
 
     with self.file_writer.as_default():
       tf.summary.image('Test image', tf.expand_dims(image, axis=0), step=step)
-
+    self.model.__class__ = efficientdet_keras.EfficientDetNet
 
 def get_callbacks(params):
   """Get callbacks for given params."""
