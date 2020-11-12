@@ -191,6 +191,7 @@ def main(_):
       tf_random_seed=FLAGS.tf_random_seed,
       debug=FLAGS.debug,
       val_json_file=FLAGS.val_json_file,
+      eval_samples=FLAGS.eval_samples,
       num_shards=ds_strategy.num_replicas_in_sync)
   config.override(params, True)
   # set mixed precision policy by keras api.

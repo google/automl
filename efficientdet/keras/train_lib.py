@@ -312,7 +312,7 @@ def get_optimizer(params):
 class COCOCallback(tf.keras.callbacks.Callback):
   def __init__(self, test_dataset, update_freq=None):
     super().__init__()
-    self.test_dataset = test_dataset
+    self.test_dataset = iter(test_dataset)
     self.update_freq = update_freq
 
   def set_model(self, model: tf.keras.Model):
@@ -320,10 +320,11 @@ class COCOCallback(tf.keras.callbacks.Callback):
     from keras import label_util
     self.model = model
     config = copy.deepcopy(model.config)
-    config.nms_configs['score_thresh'] = 1e-3
+    params = dict(nms_configs={'score_thresh': 1e-3})
+    config.override(params)
     self.config = config
     self.pbar = tf.keras.utils.Progbar(
-        (config.test_samples + config.batch_size - 1) // config.batch_size)
+        (config.eval_samples + config.batch_size - 1) // config.batch_size)
     label_map = label_util.get_label_map(config.label_map)
     log_dir = os.path.join(config.model_dir, 'coco')
     self.file_writer = tf.summary.create_file_writer(log_dir)
@@ -347,7 +348,7 @@ class COCOCallback(tf.keras.callbacks.Callback):
   def on_epoch_end(self, epoch, logs=None):
     if self.update_freq and epoch % self.update_freq == 0:
       strategy = tf.distribute.get_strategy()
-      for i in range(self.config.eval_samples// self.config.batch_size):
+      for i in range(self.config.eval_samples // self.config.batch_size):
         images, labels = next(self.test_dataset)
         strategy.run(self._update_map, (images, labels))
         self.pbar.update(i)
@@ -425,7 +426,7 @@ def get_callbacks(params, val_dataset):
         params.get('sample_image', None), params['model_dir'],
         params['img_summary_steps'])
     callbacks.append(display_callback)
-  if params.get('test_file_pattern', None):
+  if params.get('map_freq', None):
     coco_callback = COCOCallback(val_dataset, params['map_freq'])
     callbacks.append(coco_callback)
   return callbacks
