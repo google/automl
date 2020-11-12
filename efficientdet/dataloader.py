@@ -389,6 +389,15 @@ class InputReader:
     labels['image_masks'] = image_masks
     return images, labels
 
+  @property
+  def dataset_options(self):
+    options = tf.data.Options()
+    options.experimental_deterministic = self._debug or not self._is_training
+    options.experimental_optimization.map_vectorization.enabled = True
+    options.experimental_optimization.map_parallelization = True
+    options.experimental_optimization.parallel_batch = True
+    return options
+
   def __call__(self, params, input_context=None, batch_size=None):
     input_anchors = anchors.Anchors(params['min_level'], params['max_level'],
                                     params['num_scales'],
@@ -420,12 +429,7 @@ class InputReader:
 
     dataset = dataset.interleave(
         _prefetch_dataset, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    options = tf.data.Options()
-    options.experimental_deterministic = self._debug or not self._is_training
-    options.experimental_optimization.map_vectorization.enabled = True
-    options.experimental_optimization.map_parallelization = True
-    options.experimental_optimization.parallel_batch = True
-    dataset = dataset.with_options(options)
+    dataset = dataset.with_options(self.dataset_options)
     if self._is_training:
       dataset = dataset.shuffle(64, seed=seed)
 

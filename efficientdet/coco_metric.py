@@ -136,7 +136,7 @@ class EvaluationMetric():
 
   def result(self):
     """Return the metric values (and compute it if needed)."""
-    if not self.metric_values:
+    if self.metric_values is None:
       self.metric_values = self.evaluate()
     return self.metric_values
 

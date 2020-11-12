@@ -13,7 +13,6 @@
 # limitations under the License.
 # ==============================================================================
 """Training related libraries."""
-from concurrent import futures
 import math
 import os
 import re
@@ -27,6 +26,7 @@ import iou_utils
 import utils
 from keras import anchors
 from keras import efficientdet_keras
+from keras import postprocess
 from tensorflow_model_optimization.python.core.sparsity.keras import pruning_wrapper
 
 
@@ -309,6 +309,49 @@ def get_optimizer(params):
   return optimizer
 
 
+class COCOCallback(tf.keras.callbacks.Callback):
+  def __init__(self, test_dataset, update_freq=None):
+    super().__init__()
+    self.test_dataset = iter(test_dataset)
+    self.update_freq = update_freq
+
+  def set_model(self, model: tf.keras.Model):
+    import coco_metric
+    from keras import label_util
+    self.model = model
+    config = model.config
+    self.config = config
+    label_map = label_util.get_label_map(config.label_map)
+    log_dir = os.path.join(config.model_dir, 'coco')
+    self.file_writer = tf.summary.create_file_writer(log_dir)
+    self.evaluator = coco_metric.EvaluationMetric(
+        filename=config.val_json_file, label_map=label_map)
+
+  @tf.function
+  def _update_map(self, images, labels):
+    cls_outputs, box_outputs = self.model(images, training=False)
+    detections = postprocess.generate_detections(self.config,
+                                                 cls_outputs,
+                                                 box_outputs,
+                                                 labels['image_scales'],
+                                                 labels['source_ids'])
+    tf.numpy_function(self.evaluator.update_state,
+                      [labels['groundtruth_data'],
+                       postprocess.transform_detections(detections)],
+                      [])
+
+  def on_epoch_end(self, epoch, logs=None):
+    if self.update_freq and epoch % self.update_freq == 0:
+      strategy = tf.distribute.get_strategy()
+      for i in range(self.config.eval_samples // self.config.batch_size):
+        images, labels = next(self.test_dataset)
+        strategy.run(self._update_map, (images, labels))
+      metrics = self.evaluator.result()
+      with self.file_writer.as_default(), tf.summary.record_if(True):
+        for i, name in enumerate(self.evaluator.metric_names):
+          tf.summary.scalar(name, metrics[i])
+
+
 class DisplayCallback(tf.keras.callbacks.Callback):
   """Display inference result callback."""
 
@@ -317,48 +360,40 @@ class DisplayCallback(tf.keras.callbacks.Callback):
     image_file = tf.io.read_file(sample_image)
     self.sample_image = tf.expand_dims(
         tf.image.decode_jpeg(image_file, channels=3), axis=0)
-    self.executor = futures.ThreadPoolExecutor(max_workers=1)
     self.update_freq = update_freq
     self.output_dir = output_dir
 
   def set_model(self, model: tf.keras.Model):
-    self.train_model = model
-    with tf.device('/cpu:0'):
-      self.model = efficientdet_keras.EfficientDetModel(config=model.config)
-    height, width = utils.parse_image_size(model.config.image_size)
-    self.model.build((1, height, width, 3))
-    log_dir = os.path.join(self.output_dir, 'test_images')
+    self.model = model
+    config = model.config
+    log_dir = os.path.join(config.model_dir, 'test_images')
     self.file_writer = tf.summary.create_file_writer(log_dir)
-    self.min_score_thresh = self.model.config.nms_configs['score_thresh'] or 0.4
-    self.max_boxes_to_draw = (
-        self.model.config.nms_configs['max_output_size'] or 100)
+    self.min_score_thresh = config.nms_configs['score_thresh'] or 0.4
+    self.max_boxes_to_draw = config.nms_configs['max_output_size'] or 100
 
   def on_train_batch_end(self, batch, logs=None):
     if self.update_freq and batch % self.update_freq == 0:
-      self.executor.submit(self.draw_inference, batch)
+      self._draw_inference(batch)
 
-  @tf.function
-  def inference(self):
-    return self.model(self.sample_image, training=False)
-
-  def draw_inference(self, step):
-    self.model.set_weights(self.train_model.get_weights())
-    boxes, scores, classes, valid_len = self.inference()
+  def _draw_inference(self, step):
+    self.model.__class__ = efficientdet_keras.EfficientDetModel
+    results = self.model(self.sample_image, training=False)
+    boxes, scores, classes, valid_len = tf.nest.map_structure(np.array, results)
     length = valid_len[0]
     image = inference.visualize_image(
         self.sample_image[0],
-        boxes[0].numpy()[:length],
-        classes[0].numpy().astype(np.int)[:length],
-        scores[0].numpy()[:length],
+        boxes[0][:length],
+        classes[0].astype(np.int)[:length],
+        scores[0][:length],
         label_map=self.model.config.label_map,
         min_score_thresh=self.min_score_thresh,
         max_boxes_to_draw=self.max_boxes_to_draw)
 
     with self.file_writer.as_default():
       tf.summary.image('Test image', tf.expand_dims(image, axis=0), step=step)
+    self.model.__class__ = efficientdet_keras.EfficientDetNet
 
-
-def get_callbacks(params):
+def get_callbacks(params, val_dataset):
   """Get callbacks for given params."""
   ckpt_callback = tf.keras.callbacks.ModelCheckpoint(
       os.path.join(params['model_dir'], 'ckpt'),
@@ -383,6 +418,9 @@ def get_callbacks(params):
         params.get('sample_image', None), params['model_dir'],
         params['img_summary_steps'])
     callbacks.append(display_callback)
+  if params.get('map_freq', None):
+    coco_callback = COCOCallback(val_dataset, params['map_freq'])
+    callbacks.append(coco_callback)
   return callbacks
 
 

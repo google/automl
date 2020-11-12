@@ -426,8 +426,8 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
       """Returns a dictionary that has the evaluation metrics."""
       if params['nms_configs'].get('pyfunc', True):
         detections_bs = []
+        nms_configs = params['nms_configs']
         for index in range(kwargs['boxes'].shape[0]):
-          nms_configs = params['nms_configs']
           detections = tf.numpy_function(
               functools.partial(nms_np.per_class_nms, nms_configs=nms_configs),
               [
