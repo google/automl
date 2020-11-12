@@ -341,7 +341,7 @@ class COCOCallback(tf.keras.callbacks.Callback):
                       [])
 
   def on_epoch_end(self, epoch, logs=None):
-    if self.update_freq and epoch % self.update_freq == 0:
+    if epoch > 0 and self.update_freq and epoch % self.update_freq == 0:
       strategy = tf.distribute.get_strategy()
       for i in range(self.config.eval_samples // self.config.batch_size):
         images, labels = next(self.test_dataset)
