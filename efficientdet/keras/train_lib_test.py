@@ -38,7 +38,7 @@ class TrainLibTest(tf.test.TestCase):
     model = train_lib.EfficientDetNetTrain(config=config)
     model.build((1, 512, 512, 3))
     display_callback.set_model(model)
-    display_callback.on_train_batch_end(0, {})
+    display_callback.on_train_batch_end(0)
 
   def test_lr_schedule(self):
     stepwise = train_lib.StepwiseLrSchedule(1e-3, 1e-4, 1, 3, 5)
