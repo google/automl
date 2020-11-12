@@ -81,6 +81,10 @@ flags.DEFINE_string(
     'Glob for training data files (e.g., COCO train - minival set)')
 flags.DEFINE_string('validation_file_pattern', None,
                     'Glob for evaluation tfrecords (e.g., COCO val2017 set)')
+flags.DEFINE_string(
+    'val_json_file', None,
+    'COCO validation JSON containing golden bounding boxes. If None, use the '
+    'ground truth from the dataloader. Ignored if testdev_dir is not None.')
 
 flags.DEFINE_integer('num_examples_per_epoch', 120000,
                      'Number of examples in one epoch')
@@ -185,6 +189,8 @@ def main(_):
       strategy=FLAGS.strategy,
       batch_size=FLAGS.batch_size,
       tf_random_seed=FLAGS.tf_random_seed,
+      debug=FLAGS.debug,
+      val_json_file=FLAGS.val_json_file,
       num_shards=ds_strategy.num_replicas_in_sync)
   config.override(params, True)
   # set mixed precision policy by keras api.
@@ -215,12 +221,13 @@ def main(_):
       ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)
       util_keras.restore_ckpt(model, ckpt_path, config.moving_average_decay)
     init_experimental(config)
+    val_dataset = get_dataset(False, config).repeat()
     model.fit(
         get_dataset(True, config),
         epochs=config.num_epochs,
         steps_per_epoch=steps_per_epoch,
-        callbacks=train_lib.get_callbacks(config.as_dict()),
-        validation_data=get_dataset(False, config).repeat(),
+        callbacks=train_lib.get_callbacks(config.as_dict(), val_dataset),
+        validation_data=val_dataset,
         validation_steps=(FLAGS.eval_samples // FLAGS.batch_size))
   model.save_weights(os.path.join(FLAGS.model_dir, 'ckpt-final'))
 

@@ -183,6 +183,7 @@ def default_detection_configs():
   h.autoaugment_policy = None
   h.grid_mask = False
   h.sample_image = None
+  h.map_freq = 5
 
   # dataset specific parameters
   # TODO(tanmingxing): update this to be 91 for COCO, and 21 for pascal.

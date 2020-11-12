@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """Model function definition, including both architecture and loss."""
+import copy
 import functools
 import re
 from absl import logging
@@ -425,9 +426,10 @@ def _model_fn(features, labels, mode, params, model, variable_filter_fn=None):
     def metric_fn(**kwargs):
       """Returns a dictionary that has the evaluation metrics."""
       if params['nms_configs'].get('pyfunc', True):
+        nms_configs = copy.deepcopy(params['nms_configs'])
+        nms_configs['score_thresh'] = 1e-3
         detections_bs = []
         for index in range(kwargs['boxes'].shape[0]):
-          nms_configs = params['nms_configs']
           detections = tf.numpy_function(
               functools.partial(nms_np.per_class_nms, nms_configs=nms_configs),
               [
