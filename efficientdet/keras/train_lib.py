@@ -13,7 +13,6 @@
 # limitations under the License.
 # ==============================================================================
 """Training related libraries."""
-import copy
 import math
 import os
 import re
@@ -27,6 +26,7 @@ import iou_utils
 import utils
 from keras import anchors
 from keras import efficientdet_keras
+from keras import postprocess
 from tensorflow_model_optimization.python.core.sparsity.keras import pruning_wrapper
 
 
@@ -319,9 +319,7 @@ class COCOCallback(tf.keras.callbacks.Callback):
     import coco_metric
     from keras import label_util
     self.model = model
-    config = copy.deepcopy(model.config)
-    params = dict(nms_configs={'score_thresh': 1e-3})
-    config.override(params)
+    config = model.config
     self.config = config
     label_map = label_util.get_label_map(config.label_map)
     log_dir = os.path.join(config.model_dir, 'coco')
@@ -331,7 +329,6 @@ class COCOCallback(tf.keras.callbacks.Callback):
 
   @tf.function
   def _update_map(self, images, labels):
-    from keras import postprocess
     cls_outputs, box_outputs = self.model(images, training=False)
     detections = postprocess.generate_detections(self.config,
                                                  cls_outputs,

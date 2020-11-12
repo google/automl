@@ -186,7 +186,7 @@ def default_detection_configs():
   h.autoaugment_policy = None
   h.grid_mask = False
   h.sample_image = None
-  h.map_freq = 5
+  h.map_freq = 5  # AP eval frequency in epochs.
 
   # dataset specific parameters
   # TODO(tanmingxing): update this to be 91 for COCO, and 21 for pascal.
@@ -255,7 +255,7 @@ def default_detection_configs():
   h.nms_configs = {
       'method': 'gaussian',
       'iou_thresh': None,  # use the default value based on method.
-      'score_thresh': 0.4,
+      'score_thresh': 0.,
       'sigma': None,
       'max_nms_inputs': 0,
       'max_output_size': 100,
