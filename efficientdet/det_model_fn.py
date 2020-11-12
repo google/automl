@@ -257,7 +257,7 @@ def detection_loss(cls_outputs, box_outputs, labels, params):
     cls_loss *= tf.cast(
         tf.expand_dims(tf.not_equal(labels['cls_targets_%d' % level], -2), -1),
         cls_loss.dtype)
-    cls_loss_sum = tf.clip_by_value(tf.reduce_sum(cls_loss), 0.0, 2.0)
+    cls_loss_sum = tf.reduce_sum(cls_loss)
     cls_losses.append(tf.cast(cls_loss_sum, tf.float32))
 
     if params['box_loss_weight']:
