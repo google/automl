@@ -323,8 +323,6 @@ class COCOCallback(tf.keras.callbacks.Callback):
     params = dict(nms_configs={'score_thresh': 1e-3})
     config.override(params)
     self.config = config
-    self.pbar = tf.keras.utils.Progbar(
-        (config.eval_samples + config.batch_size - 1) // config.batch_size)
     label_map = label_util.get_label_map(config.label_map)
     log_dir = os.path.join(config.model_dir, 'coco')
     self.file_writer = tf.summary.create_file_writer(log_dir)
@@ -351,13 +349,10 @@ class COCOCallback(tf.keras.callbacks.Callback):
       for i in range(self.config.eval_samples // self.config.batch_size):
         images, labels = next(self.test_dataset)
         strategy.run(self._update_map, (images, labels))
-        self.pbar.update(i)
       metrics = self.evaluator.result()
-      metric_dict = {}
-      with self.file_writer.as_default():
+      with self.file_writer.as_default(), tf.summary.record_if(True):
         for i, name in enumerate(self.evaluator.metric_names):
-          metric_dict[name] = metrics[i]
-          tf.summary.scalar(name, metrics[i], step=epoch)
+          tf.summary.scalar(name, metrics[i])
 
 
 class DisplayCallback(tf.keras.callbacks.Callback):
