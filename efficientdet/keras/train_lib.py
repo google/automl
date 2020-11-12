@@ -314,7 +314,7 @@ class COCOCallback(tf.keras.callbacks.Callback):
     super().__init__()
     self.test_dataset = test_dataset
     self.update_freq = update_freq
-  
+
   def set_model(self, model: tf.keras.Model):
     import coco_metric
     from keras import label_util
@@ -323,7 +323,7 @@ class COCOCallback(tf.keras.callbacks.Callback):
     config.nms_configs['score_thresh'] = 1e-3
     self.config = config
     self.pbar = tf.keras.utils.Progbar(
-      (config.test_samples + config.batch_size - 1) // config.batch_size)
+        (config.test_samples + config.batch_size - 1) // config.batch_size)
     label_map = label_util.get_label_map(config.label_map)
     log_dir = os.path.join(config.model_dir, 'coco')
     self.file_writer = tf.summary.create_file_writer(log_dir)
@@ -341,7 +341,7 @@ class COCOCallback(tf.keras.callbacks.Callback):
                                                  labels['source_ids'])
     tf.numpy_function(self.evaluator.update_state,
                       [labels['groundtruth_data'],
-                      postprocess.transform_detections(detections)],
+                       postprocess.transform_detections(detections)],
                       [])
 
   def on_epoch_end(self, epoch, logs=None):

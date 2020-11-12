@@ -32,7 +32,9 @@ class TrainLibTest(tf.test.TestCase):
     fake_jpeg = tf.image.encode_jpeg(fake_image)
     sample_image = 'ram://fake_image.jpg'
     tf.io.write_file(sample_image, fake_jpeg)
-    display_callback = train_lib.DisplayCallback(sample_image, config.model_dir, 1)
+    display_callback = train_lib.DisplayCallback(sample_image,
+                                                 config.model_dir,
+                                                 1)
     model = train_lib.EfficientDetNetTrain(config=config)
     model.build((1, 512, 512, 3))
     display_callback.set_model(model)
