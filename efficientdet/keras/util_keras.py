@@ -61,8 +61,8 @@ def build_batch_norm(is_training_bn: bool,
 
 def get_ema_vars(model):
   """Get all exponential moving average (ema) variables."""
-  ema_vars = model.trainable_variables
-  for v in model.variables:
+  ema_vars = model.trainable_weights
+  for v in model.weights:
     # We maintain mva for batch norm moving mean and variance as well.
     if 'moving_mean' in v.name or 'moving_variance' in v.name:
       ema_vars.append(v)
@@ -93,7 +93,7 @@ def average_name(ema, var):
       var.name.split(':')[0] + '/' + ema.name, mark_as_used=False)
 
 
-def restore_ckpt(model, ckpt_path_or_file, ema_decay=0.9998):
+def restore_ckpt(model, ckpt_path_or_file, ema_decay=0.):
   """Restore variables from a given checkpoint.
 
   Args:
@@ -123,7 +123,7 @@ def restore_ckpt(model, ckpt_path_or_file, ema_decay=0.9998):
           var.name.split(':')[0]: var for (ref, var) in ema_vars.items()
       }
     # add variables that not in var_dict
-    for v in model.variables:
+    for v in model.weights:
       if v.ref() not in ema_vars:
         var_dict[v.name.split(':')[0]] = v
     # try to load graph-based checkpoint with ema support,

@@ -220,7 +220,7 @@ def main(_):
     model = setup_model(config)
     if FLAGS.pretrained_ckpt:
       ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)
-      util_keras.restore_ckpt(model, ckpt_path, config.moving_average_decay)
+      util_keras.restore_ckpt(model, ckpt_path)
     init_experimental(config)
     val_dataset = get_dataset(False, config).repeat()
     model.fit(
