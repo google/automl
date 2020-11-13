@@ -312,7 +312,7 @@ def get_optimizer(params):
 class COCOCallback(tf.keras.callbacks.Callback):
   def __init__(self, test_dataset, update_freq=None):
     super().__init__()
-    self.test_dataset = iter(test_dataset)
+    self.test_dataset = test_dataset
     self.update_freq = update_freq
 
   def set_model(self, model: tf.keras.Model):
@@ -343,8 +343,10 @@ class COCOCallback(tf.keras.callbacks.Callback):
   def on_epoch_end(self, epoch, logs=None):
     if epoch > 0 and self.update_freq and epoch % self.update_freq == 0:
       strategy = tf.distribute.get_strategy()
-      for i in range(self.config.eval_samples // self.config.batch_size):
-        images, labels = next(self.test_dataset)
+      count = self.config.eval_samples // self.config.batch_size
+      dataset = self.test_dataset.take(count)
+      dataset = strategy.experimental_distribute_dataset(dataset)
+      for (images, labels) in dataset:
         strategy.run(self._update_map, (images, labels))
       metrics = self.evaluator.result()
       with self.file_writer.as_default(), tf.summary.record_if(True):
@@ -395,11 +397,20 @@ class DisplayCallback(tf.keras.callbacks.Callback):
 
 def get_callbacks(params, val_dataset):
   """Get callbacks for given params."""
-  ckpt_callback = tf.keras.callbacks.ModelCheckpoint(
+  if params.get('moving_average_decay', None):
+    from tensorflow_addons.callbacks import AverageModelCheckpoint
+    avg_callback = AverageModelCheckpoint(
+        filepath=os.path.join(params['model_dir'], 'ckpt'),
+        verbose=1,
+        save_weights_only=True,
+        update_weights=True)
+    callbacks = [avg_callback]
+  else:
+    ckpt_callback = tf.keras.callbacks.ModelCheckpoint(
       os.path.join(params['model_dir'], 'ckpt'),
       verbose=1,
       save_weights_only=True)
-  callbacks = [ckpt_callback]
+    callbacks = [ckpt_callback]
   if params['model_optimizations'] and 'prune' in params['model_optimizations']:
     prune_callback = UpdatePruningStep()
     prune_summaries = PruningSummaries(
@@ -667,7 +678,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
                 tf.not_equal(
                     labels['cls_targets_%d' % (level + self.config.min_level)],
                     -2), -1), dtype)
-        cls_loss_sum = tf.clip_by_value(tf.reduce_sum(cls_loss), 0.0, 2.0)
+        cls_loss_sum = tf.reduce_sum(cls_loss)
         cls_losses.append(tf.cast(cls_loss_sum, dtype))
 
       if self.config.box_loss_weight and self.loss.get(BoxLoss.__name__, None):
