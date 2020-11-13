@@ -328,26 +328,27 @@ class COCOCallback(tf.keras.callbacks.Callback):
         filename=config.val_json_file, label_map=label_map)
 
   @tf.function
-  def _update_map(self, images, labels):
+  def _get_detections(self, images, labels):
     cls_outputs, box_outputs = self.model(images, training=False)
     detections = postprocess.generate_detections(self.config,
                                                  cls_outputs,
                                                  box_outputs,
                                                  labels['image_scales'],
                                                  labels['source_ids'])
-    tf.numpy_function(self.evaluator.update_state,
-                      [labels['groundtruth_data'],
-                       postprocess.transform_detections(detections)],
-                      [])
+    return postprocess.transform_detections(detections)
 
   def on_epoch_end(self, epoch, logs=None):
-    if epoch > 0 and self.update_freq and epoch % self.update_freq == 0:
+    epoch += 1
+    if self.update_freq and epoch % self.update_freq == 0:
       strategy = tf.distribute.get_strategy()
       count = self.config.eval_samples // self.config.batch_size
       dataset = self.test_dataset.take(count)
       dataset = strategy.experimental_distribute_dataset(dataset)
       for (images, labels) in dataset:
-        strategy.run(self._update_map, (images, labels))
+        detections = strategy.run(self._get_detections, (images, labels))
+        tf.numpy_function(self.evaluator.update_state,
+                          [labels['groundtruth_data'], detections],
+                          [])
       metrics = self.evaluator.result()
       with self.file_writer.as_default(), tf.summary.record_if(True):
         for i, name in enumerate(self.evaluator.metric_names):
