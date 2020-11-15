@@ -39,7 +39,7 @@ flags.DEFINE_integer('samples', 10,
                      'Number of random samples for visualization.')
 flags.DEFINE_string('file_pattern', None,
                     'Glob for data files (e.g., COCO train - minival set)')
-flags.DEFINE_bool('train', True, 'Data file pattern is train')
+flags.DEFINE_bool('eval', False, 'flag for file pattern mode i.e eval')
 FLAGS = flags.FLAGS
 
 
@@ -54,7 +54,7 @@ class RecordInspect:
         """
     self.input_fn = dataloader.InputReader(
         FLAGS.file_pattern,
-        is_training=FLAGS.train,
+        is_training=not FLAGS.eval,
         use_fake_data=False,
         max_instances_per_image=config.max_instances_per_image)
 
