@@ -16,13 +16,11 @@
 
 import os
 import sys
-from absl import app
-from absl import flags
-from absl import logging
 
-from PIL import Image
 import numpy as np
 import tensorflow as tf
+from absl import app, flags, logging
+from PIL import Image
 
 sys.path.append('./')
 import dataloader
@@ -46,84 +44,95 @@ FLAGS = flags.FLAGS
 
 
 class RecordInspect:
-    """Inspection Class"""
-    def __init__(self, config):
-        """ Initializes RecordInspect with passed config.
+  """Inspection Class"""
+
+  def __init__(self, config):
+    """ Initializes RecordInspect with passed config.
 
         Args:
             config: config file to initialize input_fn.
         """
-        self.input_fn = dataloader.InputReader(
-            FLAGS.file_pattern,
-            is_training=FLAGS.train,
-            use_fake_data=False,
-            max_instances_per_image=config.max_instances_per_image)
+    self.input_fn = dataloader.InputReader(
+        FLAGS.file_pattern,
+        is_training=FLAGS.train,
+        use_fake_data=False,
+        max_instances_per_image=config.max_instances_per_image)
 
-        self.params = dict(config.as_dict(),
-                           batch_size=FLAGS.samples,
-                           model_name=FLAGS.model_name)
-        logging.info(self.params)
-        os.makedirs(FLAGS.save_samples_dir, exist_ok=True)
+    self.params = dict(
+        config.as_dict(), batch_size=FLAGS.samples, model_name=FLAGS.model_name)
+    logging.info(self.params)
+    self.cls_to_label = config.label_map
+    os.makedirs(FLAGS.save_samples_dir, exist_ok=True)
 
-    def visualize(self):
-        """save tfrecords images with bounding boxes"""
+  def visualize(self):
+    """save tfrecords images with bounding boxes"""
 
-        # TODO (kartik4949): Make vis batch_size configurable
-        _vis_ds = self.input_fn(params=self.params)
+    _vis_ds = self.input_fn(params=self.params)
 
-        data = next(iter(_vis_ds))  # iterable.
-        images = data[0]
-        gt_data = data[1]['groundtruth_data']
+    data = next(iter(_vis_ds))  # iterable.
+    images = data[0]
+    gt_data = data[1]['groundtruth_data']
 
-        # scales
-        scale_to_org = data[1]['image_scales']
-        scales = 1.0 / scale_to_org
-        offset = tf.constant([0.485, 0.456, 0.406])
-        offset = tf.reshape(offset, (1, 1, -1))
-        scale_image = tf.constant([0.229, 0.224, 0.225])
-        scale_image = tf.reshape(scale_image, (1, 1, -1))
+    # scales
+    scale_to_org = data[1]['image_scales']
+    scales = 1.0 / scale_to_org
+    offset = tf.constant([0.485, 0.456, 0.406])
+    offset = tf.reshape(offset, (1, 1, -1))
+    scale_image = tf.constant([0.229, 0.224, 0.225])
+    scale_image = tf.reshape(scale_image, (1, 1, -1))
 
-        logging.info(f"Visualizing TfRecords {FLAGS.file_pattern} ....")
-        for i, zip_data in enumerate(zip(gt_data, images, scales)):
-            gt, image, scale = zip_data
-            boxes = gt[:, :4]
-            boxes = boxes[boxes[..., 0] > 0].numpy()
-            if boxes.shape[0] > 0:
-                classes = gt[:boxes.shape[0], -1].numpy()
+    logging.info(f"Visualizing TfRecords {FLAGS.file_pattern} ....")
+    for i, zip_data in enumerate(zip(gt_data, images, scales)):
+      gt, image, scale = zip_data
+      boxes = gt[:, :4]
+      boxes = boxes[boxes[..., 0] > 0].numpy()
+      if boxes.shape[0] > 0:
+        classes = gt[:boxes.shape[0], -1].numpy()
+        try:
+          display_str_list_list = map(lambda idx: self.cls_to_label[idx],
+                                      np.asarray(classes, dtype=np.int))
+          display_str_list_list = np.reshape(
+              np.asarray(list(display_str_list_list)), (-1, 1)).tolist()
+        except:
+          display_str_list_list = ()
 
-                # unnormalize image.
-                image *= scale_image
-                image += offset
+        # unnormalize image.
+        image *= scale_image
+        image += offset
 
-                # 0-255. range
-                image = np.asarray(image.numpy() * 255., dtype=np.uint8)
+        # 0-255. range
+        image = np.asarray(image.numpy() * 255., dtype=np.uint8)
 
-                # scale to image_size
-                boxes *= scale.numpy()
+        # scale to image_size
+        boxes *= scale.numpy()
 
-                # normalize boxes
-                boxes[:, (0, 2)] = boxes[:, (0, 2)] / image.shape[0]
-                boxes[:, (1, 3)] = boxes[:, (1, 3)] / image.shape[1]
+        # normalize boxes
+        boxes[:, (0, 2)] = boxes[:, (0, 2)] / image.shape[0]
+        boxes[:, (1, 3)] = boxes[:, (1, 3)] / image.shape[1]
 
-                image = Image.fromarray(image)
-                vis_utils.draw_bounding_boxes_on_image(image, boxes)
-                image.save(
-                    os.path.join(FLAGS.save_samples_dir, f'sample{i}.jpg'))
+        image = Image.fromarray(image)
+        vis_utils.draw_bounding_boxes_on_image(
+            image, boxes, display_str_list_list=display_str_list_list)
+        image.save(os.path.join(FLAGS.save_samples_dir, f'sample{i}.jpg'))
 
 
 def main(_):
-    # Parse and override hparams
-    config = hparams_config.get_detection_config(FLAGS.model_name)
-    config.override(FLAGS.hparams)
+  # Parse and override hparams
+  config = hparams_config.get_detection_config(FLAGS.model_name)
+  config.override(FLAGS.hparams)
 
-    # Parse image size in case it is in string format.
-    config.image_size = utils.parse_image_size(config.image_size)
-    try:
-        recordinspect = RecordInspect(config)
-        recordinspect.visualize()
-    except Exception as e:
-        logging.error(e)
+  # Parse image size in case it is in string format.
+  config.image_size = utils.parse_image_size(config.image_size)
+  try:
+    recordinspect = RecordInspect(config)
+    recordinspect.visualize()
+  except Exception as e:
+    logging.error(e)
+  else:
+    logging.info(
+        f"Done Visualization, please find samples at \'{FLAGS.save_samples_dir}\'"
+    )
 
 
 if __name__ == '__main__':
-    app.run(main)
+  app.run(main)
