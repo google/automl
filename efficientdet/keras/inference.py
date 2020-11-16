@@ -330,6 +330,8 @@ class ServingDriver(object):
       logging.info('Frozen graph saved at %s', proto_path)
 
     if tflite:
+      input_spec = tf.TensorSpec(
+          shape=[self.batch_size, *image_size, 3], dtype=input_spec.dtype, name=input_spec.name)
       converter = tf.lite.TFLiteConverter.from_concrete_functions(
           [export_model.__call__.get_concrete_function(input_spec)])
 
