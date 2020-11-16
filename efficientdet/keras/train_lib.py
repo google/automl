@@ -340,6 +340,7 @@ class COCOCallback(tf.keras.callbacks.Callback):
   def on_epoch_end(self, epoch, logs=None):
     epoch += 1
     if self.update_freq and epoch % self.update_freq == 0:
+      self.evaluator.reset_states()
       strategy = tf.distribute.get_strategy()
       count = self.config.eval_samples // self.config.batch_size
       dataset = self.test_dataset.take(count)
@@ -352,7 +353,7 @@ class COCOCallback(tf.keras.callbacks.Callback):
       metrics = self.evaluator.result()
       with self.file_writer.as_default(), tf.summary.record_if(True):
         for i, name in enumerate(self.evaluator.metric_names):
-          tf.summary.scalar(name, metrics[i])
+          tf.summary.scalar(name, metrics[i],step=epoch)
 
 
 class DisplayCallback(tf.keras.callbacks.Callback):
