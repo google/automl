@@ -250,6 +250,12 @@ class ServingDriver(object):
     Returns:
       A list of detections.
     """
+    if isinstance(self.model, tf.lite.Interpreter):
+      input_details = self.model.get_input_details()
+      output_details = self.model.get_output_details()
+      self.model.set_tensor(input_details[0]['index'], np.array(image_arrays))
+      self.model.invoke()
+      return [self.model.get_tensor(x['index']) for x in output_details]
     return self.model(image_arrays)  # pylint: disable=not-callable
 
   def load(self, saved_model_dir_or_frozen_graph: Text):
@@ -257,6 +263,11 @@ class ServingDriver(object):
     # Load saved model if it is a folder.
     if tf.saved_model.contains_saved_model(saved_model_dir_or_frozen_graph):
       self.model = tf.saved_model.load(saved_model_dir_or_frozen_graph)
+      return
+
+    if saved_model_dir_or_frozen_graph.endswith('tflite'):
+      self.model = tf.lite.Interpreter(saved_model_dir_or_frozen_graph)
+      self.model.allocate_tensors()
       return
 
     # Load a frozen graph.

@@ -95,15 +95,19 @@ def main(_):
     image_arrays = tf.io.decode_image(image_file)
     image_arrays.set_shape((None, None, 3))
     image_arrays = tf.expand_dims(image_arrays, axis=0)
+    if FLAGS.saved_model_dir.endswith('tflite'):
+      image_size = utils.parse_image_size(model_config.image_size)
+      image_arrays = tf.image.resize_with_pad(image_arrays, *image_size)
+      image_arrays = tf.cast(image_arrays, tf.uint8)
     detections_bs = driver.serve(image_arrays)
     boxes, scores, classes, _ = tf.nest.map_structure(np.array, detections_bs)
-    raw_image = Image.open(FLAGS.input_image)
+    raw_image = Image.fromarray(np.array(image_arrays)[0])
     img = driver.visualize(
         raw_image,
         boxes[0],
         classes[0],
         scores[0],
-        min_score_thresh=model_config.nms_configs.score_thresh,
+        min_score_thresh=model_config.nms_configs.score_thresh or 0.4,
         max_boxes_to_draw=model_config.nms_configs.max_output_size)
     output_image_path = os.path.join(FLAGS.output_image_dir, '0.jpg')
     Image.fromarray(img).save(output_image_path)
