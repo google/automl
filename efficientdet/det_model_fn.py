@@ -39,6 +39,11 @@ def update_learning_rate_schedule_parameters(params):
   # Learning rate is proportional to the batch size
   params['adjusted_learning_rate'] = (
       params['learning_rate'] * batch_size / _DEFAULT_BATCH_SIZE)
+
+  if 'lr_warmup_init' in params:
+    params['adjusted_lr_warmup_init'] = (
+        params['lr_warmup_init'] * batch_size / _DEFAULT_BATCH_SIZE)
+
   steps_per_epoch = params['num_examples_per_epoch'] / batch_size
   params['lr_warmup_step'] = int(params['lr_warmup_epoch'] * steps_per_epoch)
   params['first_lr_drop_step'] = int(params['first_lr_drop_epoch'] *
@@ -49,16 +54,16 @@ def update_learning_rate_schedule_parameters(params):
   params['steps_per_epoch'] = steps_per_epoch
 
 
-def stepwise_lr_schedule(adjusted_learning_rate, lr_warmup_init, lr_warmup_step,
+def stepwise_lr_schedule(adjusted_learning_rate, adjusted_lr_warmup_init, lr_warmup_step,
                          first_lr_drop_step, second_lr_drop_step, global_step):
   """Handles linear scaling rule, gradual warmup, and LR decay."""
-  # lr_warmup_init is the starting learning rate; the learning rate is linearly
+  # adjusted_lr_warmup_init is the starting learning rate; the learning rate is linearly
   # scaled up to the full learning rate after `lr_warmup_step` before decaying.
   logging.info('LR schedule method: stepwise')
   linear_warmup = (
-      lr_warmup_init +
+      adjusted_lr_warmup_init +
       (tf.cast(global_step, dtype=tf.float32) / lr_warmup_step *
-       (adjusted_learning_rate - lr_warmup_init)))
+       (adjusted_learning_rate - adjusted_lr_warmup_init)))
   learning_rate = tf.where(global_step < lr_warmup_step, linear_warmup,
                            adjusted_learning_rate)
   lr_schedule = [[1.0, lr_warmup_step], [0.1, first_lr_drop_step],
@@ -69,25 +74,25 @@ def stepwise_lr_schedule(adjusted_learning_rate, lr_warmup_init, lr_warmup_step,
   return learning_rate
 
 
-def cosine_lr_schedule(adjusted_lr, lr_warmup_init, lr_warmup_step, total_steps,
+def cosine_lr_schedule(adjusted_lr, adjusted_lr_warmup_init, lr_warmup_step, total_steps,
                        step):
   """Cosine learning rate scahedule."""
   logging.info('LR schedule method: cosine')
   linear_warmup = (
-      lr_warmup_init + (tf.cast(step, dtype=tf.float32) / lr_warmup_step *
-                        (adjusted_lr - lr_warmup_init)))
+      adjusted_lr_warmup_init + (tf.cast(step, dtype=tf.float32) / lr_warmup_step *
+                        (adjusted_lr - adjusted_lr_warmup_init)))
   decay_steps = tf.cast(total_steps - lr_warmup_step, tf.float32)
   cosine_lr = 0.5 * adjusted_lr * (
       1 + tf.cos(np.pi * tf.cast(step, tf.float32) / decay_steps))
   return tf.where(step < lr_warmup_step, linear_warmup, cosine_lr)
 
 
-def polynomial_lr_schedule(adjusted_lr, lr_warmup_init, lr_warmup_step, power,
+def polynomial_lr_schedule(adjusted_lr, adjusted_lr_warmup_init, lr_warmup_step, power,
                            total_steps, step):
   logging.info('LR schedule method: polynomial')
   linear_warmup = (
-      lr_warmup_init + (tf.cast(step, dtype=tf.float32) / lr_warmup_step *
-                        (adjusted_lr - lr_warmup_init)))
+      adjusted_lr_warmup_init + (tf.cast(step, dtype=tf.float32) / lr_warmup_step *
+                        (adjusted_lr - adjusted_lr_warmup_init)))
   polynomial_lr = adjusted_lr * tf.pow(
       1 - (tf.cast(step, tf.float32) / total_steps), power)
   return tf.where(step < lr_warmup_step, linear_warmup, polynomial_lr)
@@ -98,20 +103,20 @@ def learning_rate_schedule(params, global_step):
   lr_decay_method = params['lr_decay_method']
   if lr_decay_method == 'stepwise':
     return stepwise_lr_schedule(params['adjusted_learning_rate'],
-                                params['lr_warmup_init'],
+                                params['adjusted_lr_warmup_init'],
                                 params['lr_warmup_step'],
                                 params['first_lr_drop_step'],
                                 params['second_lr_drop_step'], global_step)
 
   if lr_decay_method == 'cosine':
     return cosine_lr_schedule(params['adjusted_learning_rate'],
-                              params['lr_warmup_init'],
+                              params['adjusted_lr_warmup_init'],
                               params['lr_warmup_step'], params['total_steps'],
                               global_step)
 
   if lr_decay_method == 'polynomial':
     return polynomial_lr_schedule(params['adjusted_learning_rate'],
-                                  params['lr_warmup_init'],
+                                  params['adjusted_lr_warmup_init'],
                                   params['lr_warmup_step'],
                                   params['poly_lr_power'],
                                   params['total_steps'], global_step)
