@@ -78,10 +78,10 @@ def main(_):
   if tf.io.gfile.isdir(ckpt_path_or_file):
     ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
   driver = inference.ServingDriver(FLAGS.model_name, ckpt_path_or_file,
-                                   FLAGS.batch_size or None,
-                                   FLAGS.only_network, model_params)
+                                   FLAGS.batch_size or None, FLAGS.only_network,
+                                   model_params)
   if FLAGS.mode == 'export':
-    if not  FLAGS.saved_model_dir:
+    if not FLAGS.saved_model_dir:
       raise ValueError('Please specify --saved_model_dir=')
     model_dir = FLAGS.saved_model_dir
     if tf.io.gfile.exists(model_dir):
@@ -93,6 +93,18 @@ def main(_):
     image_arrays = tf.io.decode_image(image_file)
     image_arrays.set_shape((None, None, 3))
     image_arrays = tf.expand_dims(image_arrays, axis=0)
+
+    # TODO (kartik4949) image dtype should be hardcoded float32?
+    # The image normalization is identical to Cloud TPU ResNet.
+    image_arrays = tf.image.convert_image_dtype(image_arrays, dtype=tf.float32)
+    offset = tf.constant([0.485, 0.456, 0.406])
+    offset = tf.reshape(image_arrays, (1, 1, 1, -1))
+    image_arrays -= offset
+
+    scale = tf.constant([0.229, 0.224, 0.225])
+    scale = tf.reshape(image_arrays, (1, 1, 1, -1))
+    image_arrays /= scale
+
     if FLAGS.saved_model_dir:
       driver.load(FLAGS.saved_model_dir)
       if FLAGS.saved_model_dir.endswith('.tflite'):
