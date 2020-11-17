@@ -265,7 +265,7 @@ class ServingDriver(object):
       self.model = tf.saved_model.load(saved_model_dir_or_frozen_graph)
       return
 
-    if saved_model_dir_or_frozen_graph.endswith('tflite'):
+    if saved_model_dir_or_frozen_graph.endswith('.tflite'):
       self.model = tf.lite.Interpreter(saved_model_dir_or_frozen_graph)
       self.model.allocate_tensors()
       return

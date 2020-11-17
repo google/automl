@@ -95,7 +95,7 @@ def main(_):
     image_arrays = tf.io.decode_image(image_file)
     image_arrays.set_shape((None, None, 3))
     image_arrays = tf.expand_dims(image_arrays, axis=0)
-    if FLAGS.saved_model_dir.endswith('tflite'):
+    if FLAGS.saved_model_dir.endswith('.tflite'):
       image_size = utils.parse_image_size(model_config.image_size)
       image_arrays = tf.image.resize_with_pad(image_arrays, *image_size)
       image_arrays = tf.cast(image_arrays, tf.uint8)
