@@ -89,16 +89,16 @@ def main(_):
     driver.export(model_dir, FLAGS.tensorrt, FLAGS.tflite)
     print('Model are exported to %s' % model_dir)
   elif FLAGS.mode == 'infer':
-    if FLAGS.saved_model_dir:
-      driver.load(FLAGS.saved_model_dir)
     image_file = tf.io.read_file(FLAGS.input_image)
     image_arrays = tf.io.decode_image(image_file)
     image_arrays.set_shape((None, None, 3))
     image_arrays = tf.expand_dims(image_arrays, axis=0)
-    if FLAGS.saved_model_dir.endswith('.tflite'):
-      image_size = utils.parse_image_size(model_config.image_size)
-      image_arrays = tf.image.resize_with_pad(image_arrays, *image_size)
-      image_arrays = tf.cast(image_arrays, tf.uint8)
+    if FLAGS.saved_model_dir:
+      driver.load(FLAGS.saved_model_dir)
+      if FLAGS.saved_model_dir.endswith('.tflite'):
+        image_size = utils.parse_image_size(model_config.image_size)
+        image_arrays = tf.image.resize_with_pad(image_arrays, *image_size)
+        image_arrays = tf.cast(image_arrays, tf.uint8)
     detections_bs = driver.serve(image_arrays)
     boxes, scores, classes, _ = tf.nest.map_structure(np.array, detections_bs)
     raw_image = Image.fromarray(np.array(image_arrays)[0])
