@@ -341,11 +341,11 @@ class ServingDriver(object):
       logging.info('Frozen graph saved at %s', proto_path)
 
     if tflite:
+      shape = (self.batch_size, *image_size, 3)
       input_spec = tf.TensorSpec(
-          shape=[self.batch_size, *image_size, 3], dtype=input_spec.dtype, name=input_spec.name)
+          shape=shape, dtype=input_spec.dtype, name=input_spec.name)
       converter = tf.lite.TFLiteConverter.from_concrete_functions(
           [export_model.__call__.get_concrete_function(input_spec)])
-
       if tflite == 'FP32':
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
         converter.target_spec.supported_types = [tf.float32]
@@ -357,10 +357,8 @@ class ServingDriver(object):
 
         def representative_dataset_gen():  # rewrite this for real data.
           for _ in range(num_calibration_steps):
-            yield [np.ones((self.batch_size, *image_size, 3), dtype=np.uint8)]
-
+            yield [tf.ones(shape, dtype=input_spec.dtype)]
         converter.representative_dataset = representative_dataset_gen
-
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
         converter.inference_input_type = tf.uint8
         converter.inference_output_type = tf.uint8
