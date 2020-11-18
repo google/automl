@@ -79,7 +79,7 @@ flags.DEFINE_integer('iterations_per_loop', 100,
 flags.DEFINE_string(
     'training_file_pattern', None,
     'Glob for training data files (e.g., COCO train - minival set)')
-flags.DEFINE_string('validation_file_pattern', None,
+flags.DEFINE_string('val_file_pattern', None,
                     'Glob for evaluation tfrecords (e.g., COCO val2017 set)')
 flags.DEFINE_string(
     'val_json_file', None,
@@ -220,7 +220,7 @@ def main(_):
     model = setup_model(config)
     if FLAGS.pretrained_ckpt:
       ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)
-      util_keras.restore_ckpt(model, ckpt_path)
+      util_keras.restore_ckpt(model, ckpt_path, config.moving_average_decay)
     init_experimental(config)
     val_dataset = get_dataset(False, config).repeat()
     model.fit(

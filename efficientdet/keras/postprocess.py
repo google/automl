@@ -176,7 +176,7 @@ def nms(params, boxes: T, scores: T, classes: T,
     score_thresh = nms_configs['score_thresh'] or float('-inf')
   elif method == 'gaussian':
     sigma = nms_configs['sigma'] or 0.5
-    iou_thresh = nms_configs['iou_thresh'] or 0.3
+    iou_thresh = 1.0
     score_thresh = nms_configs['score_thresh'] or 0.001
   else:
     raise ValueError('Inference has invalid nms method {}'.format(method))

@@ -71,16 +71,30 @@ def main(_):
 
   with ds_strategy.scope():
     # Network
-    model = efficientdet_keras.EfficientDetNet(config=config)
-    model.build((1, *config.image_size, 3))
+    model = efficientdet_keras.EfficientDetModel(config=config)
+    model.build((None, *config.image_size, 3))
     model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
 
     @tf.function
     def model_fn(images, labels):
-      cls_outputs, box_outputs = model(images, training=False)
-      return postprocess.generate_detections(config, cls_outputs, box_outputs,
-                                             labels['image_scales'],
-                                             labels['source_ids'])
+      nms_boxes_bs, nms_scores_bs, nms_classes_bs, _ = (
+          model(images,
+                training=False,
+                pre_mode=None,
+                post_mode='per_class'))
+      image_ids_bs = tf.cast(tf.expand_dims(labels['source_ids'], -1),
+                             nms_scores_bs.dtype)
+      detections_bs = [
+        image_ids_bs * tf.ones_like(nms_scores_bs),
+        nms_boxes_bs[:, :, 1],
+        nms_boxes_bs[:, :, 0],
+        nms_boxes_bs[:, :, 3] - nms_boxes_bs[:, :, 1],
+        nms_boxes_bs[:, :, 2] - nms_boxes_bs[:, :, 0],
+        nms_scores_bs,
+        nms_classes_bs,
+      ]
+      detections = tf.stack(detections_bs, axis=-1)
+      return detections
 
     # Evaluator for AP calculation.
     label_map = label_util.get_label_map(config.label_map)
