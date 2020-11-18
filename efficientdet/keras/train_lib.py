@@ -329,19 +329,26 @@ class COCOCallback(tf.keras.callbacks.Callback):
 
   @tf.function
   def _get_detections(self, images, labels):
-    nms_boxes_bs, nms_scores_bs, nms_classes_bs, _ = self.model(images, training=False, pre_mode=None, post_mode='per_class')
-    image_ids_bs = tf.cast(tf.expand_dims(labels['source_ids'], -1), nms_scores_bs.dtype)
+    nms_boxes_bs, nms_scores_bs, nms_classes_bs, _ = (
+      self.model(images,
+                 training=False,
+                 pre_mode=None,
+                 post_mode='per_class'))
+    image_ids_bs = tf.cast(tf.expand_dims(labels['source_ids'], -1),
+                           nms_scores_bs.dtype)
     detections_bs = [
       image_ids_bs * tf.ones_like(nms_scores_bs),
       nms_boxes_bs[:, :, 1],
       nms_boxes_bs[:, :, 0],
-      nms_boxes_bs[:, :, 3],
-      nms_boxes_bs[:, :, 2],
+      nms_boxes_bs[:, :, 3] - nms_boxes_bs[:, :, 1],
+      nms_boxes_bs[:, :, 2] - nms_boxes_bs[:, :, 0],
       nms_scores_bs,
       nms_classes_bs,
     ]
     detections = tf.stack(detections_bs, axis=-1)
-    return postprocess.transform_detections(detections)
+    tf.numpy_function(self.evaluator.update_state,
+                      [labels['groundtruth_data'], detections],
+                      [])
 
   def on_epoch_end(self, epoch, logs=None):
     epoch += 1
@@ -353,10 +360,7 @@ class COCOCallback(tf.keras.callbacks.Callback):
       dataset = self.test_dataset.take(count)
       dataset = strategy.experimental_distribute_dataset(dataset)
       for (images, labels) in dataset:
-        detections = strategy.run(self._get_detections, (images, labels))
-        tf.numpy_function(self.evaluator.update_state,
-                          [labels['groundtruth_data'], detections],
-                          [])
+        strategy.run(self._get_detections, (images, labels))
       metrics = self.evaluator.result()
       self.model.__class__ = EfficientDetNetTrain
       with self.file_writer.as_default(), tf.summary.record_if(True):
