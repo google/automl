@@ -141,5 +141,5 @@ def main(_):
 if __name__ == '__main__':
   flags.mark_flag_as_required('val_file_pattern')
   flags.mark_flag_as_required('model_dir')
-  logging.set_verbosity(logging.WARNING)
+  logging.set_verbosity(logging.ERROR)
   app.run(main)
