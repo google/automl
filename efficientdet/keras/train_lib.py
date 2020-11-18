@@ -329,32 +329,20 @@ class COCOCallback(tf.keras.callbacks.Callback):
 
   @tf.function
   def _get_detections(self, images, labels):
-    nms_boxes_bs, nms_scores_bs, nms_classes_bs, _ = (
-      self.model(images,
-                 training=False,
-                 pre_mode=None,
-                 post_mode='per_class'))
-    image_ids_bs = tf.cast(tf.expand_dims(labels['source_ids'], -1),
-                           nms_scores_bs.dtype)
-    detections_bs = [
-      image_ids_bs * tf.ones_like(nms_scores_bs),
-      nms_boxes_bs[:, :, 1],
-      nms_boxes_bs[:, :, 0],
-      nms_boxes_bs[:, :, 3] - nms_boxes_bs[:, :, 1],
-      nms_boxes_bs[:, :, 2] - nms_boxes_bs[:, :, 0],
-      nms_scores_bs,
-      nms_classes_bs,
-    ]
-    detections = tf.stack(detections_bs, axis=-1)
+    cls_outputs, box_outputs = self.model(images, training=False)
+    detections = postprocess.generate_detections(self.config,
+                                                 cls_outputs,
+                                                 box_outputs,
+                                                 labels['image_scales'],
+                                                 labels['source_ids'])
     tf.numpy_function(self.evaluator.update_state,
-                      [labels['groundtruth_data'], detections],
-                      [])
+                      [labels['groundtruth_data'],
+                       postprocess.transform_detections(detections)], [])
 
   def on_epoch_end(self, epoch, logs=None):
     epoch += 1
     if self.update_freq and epoch % self.update_freq == 0:
       self.evaluator.reset_states()
-      self.model.__class__ = efficientdet_keras.EfficientDetModel
       strategy = tf.distribute.get_strategy()
       count = self.config.eval_samples // self.config.batch_size
       dataset = self.test_dataset.take(count)
@@ -362,10 +350,9 @@ class COCOCallback(tf.keras.callbacks.Callback):
       for (images, labels) in dataset:
         strategy.run(self._get_detections, (images, labels))
       metrics = self.evaluator.result()
-      self.model.__class__ = EfficientDetNetTrain
       with self.file_writer.as_default(), tf.summary.record_if(True):
         for i, name in enumerate(self.evaluator.metric_names):
-          tf.summary.scalar(name, metrics[i],step=epoch)
+          tf.summary.scalar(name, metrics[i], step=epoch)
 
 
 class DisplayCallback(tf.keras.callbacks.Callback):
@@ -421,9 +408,9 @@ def get_callbacks(params, val_dataset):
     callbacks = [avg_callback]
   else:
     ckpt_callback = tf.keras.callbacks.ModelCheckpoint(
-      os.path.join(params['model_dir'], 'ckpt'),
-      verbose=1,
-      save_weights_only=True)
+        os.path.join(params['model_dir'], 'ckpt'),
+        verbose=1,
+        save_weights_only=True)
     callbacks = [ckpt_callback]
   if params['model_optimizations'] and 'prune' in params['model_optimizations']:
     prune_callback = UpdatePruningStep()

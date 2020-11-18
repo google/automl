@@ -22,6 +22,7 @@ import coco_metric
 import dataloader
 import hparams_config
 import utils
+from keras import util_keras
 
 from keras import anchors
 from keras import efficientdet_keras
@@ -71,40 +72,28 @@ def main(_):
 
   with ds_strategy.scope():
     # Network
-    model = efficientdet_keras.EfficientDetModel(config=config)
+    model = efficientdet_keras.EfficientDetNet(config=config)
     model.build((None, *config.image_size, 3))
-    model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
-
+    util_keras.restore_ckpt(model,
+                            tf.train.latest_checkpoint(FLAGS.model_dir),
+                            skip_mismatch=False)
     @tf.function
     def model_fn(images, labels):
-      nms_boxes_bs, nms_scores_bs, nms_classes_bs, _ = (
-          model(images,
-                training=False,
-                pre_mode=None,
-                post_mode='per_class'))
-      image_ids_bs = tf.cast(tf.expand_dims(labels['source_ids'], -1),
-                             nms_scores_bs.dtype)
-      detections_bs = [
-        image_ids_bs * tf.ones_like(nms_scores_bs),
-        nms_boxes_bs[:, :, 1],
-        nms_boxes_bs[:, :, 0],
-        nms_boxes_bs[:, :, 3] - nms_boxes_bs[:, :, 1],
-        nms_boxes_bs[:, :, 2] - nms_boxes_bs[:, :, 0],
-        nms_scores_bs,
-        nms_classes_bs,
-      ]
-      detections = tf.stack(detections_bs, axis=-1)
-      return detections
+      cls_outputs, box_outputs = model(images, training=False)
+      detections = postprocess.generate_detections(config,
+                                                   cls_outputs,
+                                                   box_outputs,
+                                                   labels['image_scales'],
+                                                   labels['source_ids'])
+      tf.numpy_function(evaluator.update_state,
+                        [labels['groundtruth_data'],
+                         postprocess.transform_detections(detections)], [])
 
     # Evaluator for AP calculation.
     label_map = label_util.get_label_map(config.label_map)
     evaluator = coco_metric.EvaluationMetric(
         filename=config.val_json_file, label_map=label_map)
 
-    @tf.function
-    def eval_update(gt, pred):
-      tf.numpy_function(evaluator.update_state,
-                        [gt, postprocess.transform_detections(pred)], [])
 
     # dataset
     batch_size = FLAGS.batch_size   # global batch size.
@@ -121,8 +110,7 @@ def main(_):
     eval_samples = FLAGS.eval_samples or 5000
     pbar = tf.keras.utils.Progbar((eval_samples + batch_size - 1) // batch_size)
     for i, (images, labels) in enumerate(ds):
-      detections = ds_strategy.run(model_fn, (images, labels))
-      ds_strategy.run(eval_update, (labels['groundtruth_data'], detections))
+      ds_strategy.run(model_fn, (images, labels))
       pbar.update(i)
 
   # compute the final eval results.
