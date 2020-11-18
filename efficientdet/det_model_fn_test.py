@@ -14,7 +14,7 @@
 # ==============================================================================
 """Tests for det_model_fn."""
 import tensorflow as tf
-import det_model_fn
+from . import det_model_fn
 
 
 def legacy_focal_loss(logits, targets, alpha, gamma, normalizer, _=0):

@@ -17,9 +17,9 @@ import os
 import tempfile
 from absl import logging
 import tensorflow.compat.v1 as tf
-import efficientdet_arch as legacy_arch
-import hparams_config
-from keras import efficientdet_keras
+from .. import efficientdet_arch as legacy_arch
+from .. import hparams_config
+from . import efficientdet_keras
 
 SEED = 111111
 

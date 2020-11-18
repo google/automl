@@ -22,7 +22,7 @@ import PIL.Image
 import six
 import tensorflow as tf
 
-from dataset import create_pascal_tfrecord
+from . import create_pascal_tfrecord
 
 
 class CreatePascalTFRecordTest(tf.test.TestCase):

@@ -25,11 +25,11 @@ from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
 
-import hparams_config
-import utils
-from backbone import backbone_factory
-from backbone import efficientnet_builder
-from keras import fpn_configs
+from . import hparams_config
+from . import utils
+from .backbone import backbone_factory
+from .backbone import efficientnet_builder
+from .keras import fpn_configs
 
 
 ################################################################################

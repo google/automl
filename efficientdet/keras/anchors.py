@@ -17,12 +17,12 @@ import collections
 import numpy as np
 import tensorflow as tf
 
-import utils
-from object_detection import argmax_matcher
-from object_detection import box_list
-from object_detection import faster_rcnn_box_coder
-from object_detection import region_similarity_calculator
-from object_detection import target_assigner
+from .. import utils
+from ..object_detection import argmax_matcher
+from ..object_detection import box_list
+from ..object_detection import faster_rcnn_box_coder
+from ..object_detection import region_similarity_calculator
+from ..object_detection import target_assigner
 
 MAX_DETECTION_POINTS = 5000
 

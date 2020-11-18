@@ -16,7 +16,7 @@
 from absl import logging
 import tensorflow.compat.v1 as tf
 
-from aug import mosaic
+from . import mosaic
 
 
 class MosaicTest(tf.test.TestCase):

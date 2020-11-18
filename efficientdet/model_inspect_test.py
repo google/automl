@@ -23,8 +23,8 @@ import numpy as np
 from PIL import Image
 import tensorflow.compat.v1 as tf
 
-import model_inspect
-import utils
+from . import model_inspect
+from . import utils
 FLAGS = flags.FLAGS
 
 

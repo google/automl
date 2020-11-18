@@ -16,7 +16,7 @@
 from absl import logging
 import tensorflow.compat.v1 as tf
 
-from aug import gridmask
+from . import gridmask
 
 
 class GridMaskTest(tf.test.TestCase):

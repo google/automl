@@ -23,10 +23,10 @@ from absl import app, flags, logging
 from PIL import Image
 
 sys.path.append('./')
-import dataloader
-import hparams_config
-import utils
-from visualize import vis_utils
+from .. import dataloader
+from .. import hparams_config
+from .. import utils
+from ..visualize import vis_utils
 
 flags.DEFINE_string('save_samples_dir', 'tfrecord_samples',
                     'Location of samples to save')
@@ -134,5 +134,8 @@ def main(_):
     )
 
 
-if __name__ == '__main__':
+def launcher():
   app.run(main)
+
+if __name__ == '__main__':
+  launcher()

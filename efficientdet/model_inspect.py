@@ -25,9 +25,9 @@ import numpy as np
 from PIL import Image
 import tensorflow.compat.v1 as tf
 
-import hparams_config
-import inference
-import utils
+from . import hparams_config
+from . import inference
+from . import utils
 from tensorflow.python.client import timeline  # pylint: disable=g-direct-tensorflow-import
 
 flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model.')
@@ -513,8 +513,12 @@ def main(_):
       trace_filename=FLAGS.trace_filename)
 
 
-if __name__ == '__main__':
+def launcher():
   logging.set_verbosity(logging.WARNING)
   tf.enable_v2_tensorshape()
   tf.disable_eager_execution()
   app.run(main)
+
+
+if __name__ == '__main__':
+  launcher()

@@ -31,7 +31,7 @@ from lxml import etree
 import PIL.Image
 import tensorflow as tf
 
-from dataset import tfrecord_util
+from . import tfrecord_util
 
 flags.DEFINE_string('data_dir', '', 'Root directory to raw PASCAL VOC dataset.')
 flags.DEFINE_string('set', 'train', 'Convert training set, validation set or '
@@ -315,5 +315,8 @@ def main(_):
     json.dump(ann_json_dict, f)
 
 
-if __name__ == '__main__':
+def launcher():
   app.run(main)
+
+if __name__ == '__main__':
+  launcher()

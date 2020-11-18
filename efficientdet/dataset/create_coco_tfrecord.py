@@ -39,8 +39,8 @@ import PIL.Image
 
 from pycocotools import mask
 import tensorflow as tf
-from dataset import label_map_util
-from dataset import tfrecord_util
+from . import label_map_util
+from . import tfrecord_util
 
 flags.DEFINE_boolean(
     'include_masks', False, 'Whether to include instance segmentations masks '
@@ -359,5 +359,8 @@ def main(_):
                                           FLAGS.include_masks)
 
 
-if __name__ == '__main__':
+def launcher():
   app.run(main)
+
+if __name__ == '__main__':
+  launcher()

@@ -23,7 +23,7 @@ import numpy as np
 from PIL import Image
 import tensorflow as tf
 
-from keras import inspector
+from . import inspector
 FLAGS = flags.FLAGS
 
 

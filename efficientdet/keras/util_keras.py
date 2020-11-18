@@ -16,7 +16,7 @@
 from typing import Text
 from absl import logging
 import tensorflow as tf
-import utils
+from .. import utils
 
 
 def build_batch_norm(is_training_bn: bool,

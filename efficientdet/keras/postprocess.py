@@ -19,9 +19,9 @@ from typing import List, Tuple
 from absl import logging
 import tensorflow as tf
 
-import nms_np
-import utils
-from keras import anchors
+from .. import nms_np
+from .. import utils
+from . import anchors
 T = tf.Tensor  # a shortcut for typing check.
 CLASS_OFFSET = 1
 

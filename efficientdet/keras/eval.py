@@ -18,15 +18,15 @@ from absl import flags
 from absl import logging
 import tensorflow as tf
 
-import coco_metric
-import dataloader
-import hparams_config
-import utils
+from .. import coco_metric
+from .. import dataloader
+from .. import hparams_config
+from .. import utils
 
-from keras import anchors
-from keras import efficientdet_keras
-from keras import label_util
-from keras import postprocess
+from . import anchors
+from . import efficientdet_keras
+from . import label_util
+from . import postprocess
 
 # Cloud TPU Cluster Resolvers
 flags.DEFINE_string('tpu', None, 'The Cloud TPU name.')
@@ -124,8 +124,11 @@ def main(_):
   print(FLAGS.model_name, metric_dict)
 
 
-if __name__ == '__main__':
+def launcher():
   flags.mark_flag_as_required('val_file_pattern')
   flags.mark_flag_as_required('model_dir')
   logging.set_verbosity(logging.WARNING)
   app.run(main)
+
+if __name__ == '__main__':
+  launcher()

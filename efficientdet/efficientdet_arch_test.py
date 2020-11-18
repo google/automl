@@ -16,9 +16,9 @@
 from absl import logging
 import tensorflow.compat.v1 as tf
 
-import efficientdet_arch
-import hparams_config
-import utils
+from . import efficientdet_arch
+from . import hparams_config
+from . import utils
 
 
 class EfficientDetArchTest(tf.test.TestCase):

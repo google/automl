@@ -21,12 +21,12 @@ import neural_structured_learning as nsl
 import numpy as np
 
 import tensorflow as tf
-import inference
-import iou_utils
-import utils
-from keras import anchors
-from keras import efficientdet_keras
-from keras import postprocess
+from .. import inference
+from .. import iou_utils
+from .. import utils
+from . import anchors
+from . import efficientdet_keras
+from . import postprocess
 from tensorflow_model_optimization.python.core.sparsity.keras import pruning_wrapper
 
 
@@ -316,8 +316,8 @@ class COCOCallback(tf.keras.callbacks.Callback):
     self.update_freq = update_freq
 
   def set_model(self, model: tf.keras.Model):
-    import coco_metric
-    from keras import label_util
+    from .. import coco_metric
+    from . import label_util
     self.model = model
     config = model.config
     self.config = config

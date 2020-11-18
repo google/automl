@@ -17,7 +17,7 @@ import os
 from absl import logging
 import tensorflow.compat.v1 as tf
 
-import utils
+from . import utils
 
 
 class UtilsTest(tf.test.TestCase):

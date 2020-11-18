@@ -18,7 +18,7 @@ BiFPN is presented in the EfficientDet paper.
 QuFPN is proposed in https://github.com/google/automl/pull/580
 """
 import itertools
-import hparams_config
+from .. import hparams_config
 
 
 def bifpn_config(min_level, max_level, weight_method):

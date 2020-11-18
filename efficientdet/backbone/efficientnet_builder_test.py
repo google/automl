@@ -17,7 +17,7 @@ from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
 
-from backbone import efficientnet_builder
+from . import efficientnet_builder
 
 
 class EfficientnetBuilderTest(tf.test.TestCase):

@@ -16,7 +16,7 @@
 from six.moves import zip
 import tensorflow.compat.v1 as tf
 
-from visualize import static_shape
+from . import static_shape
 
 
 def _is_tensor(t):

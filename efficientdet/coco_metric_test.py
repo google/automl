@@ -16,7 +16,7 @@
 
 from absl import logging
 import tensorflow.compat.v1 as tf
-import coco_metric
+from . import coco_metric
 
 
 class CocoMetricTest(tf.test.TestCase):

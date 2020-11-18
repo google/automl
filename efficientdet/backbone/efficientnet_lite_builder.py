@@ -21,9 +21,9 @@ import os
 from absl import logging
 import tensorflow.compat.v1 as tf
 
-import utils
-from backbone import efficientnet_builder
-from backbone import efficientnet_model
+from .. import utils
+from . import efficientnet_builder
+from . import efficientnet_model
 
 # Edge models use inception-style MEAN and STDDEV for better post-quantization.
 MEAN_RGB = [127.0, 127.0, 127.0]

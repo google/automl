@@ -15,7 +15,7 @@
 """Tests for iou_utils."""
 from absl import logging
 import tensorflow as tf
-import iou_utils
+from . import iou_utils
 
 
 class IouUtilsTest(tf.test.TestCase):

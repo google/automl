@@ -17,9 +17,9 @@ import os
 from absl import logging
 import tensorflow as tf
 
-from backbone import efficientnet_builder
-from backbone import efficientnet_lite_builder
-from backbone import efficientnet_model
+from . import efficientnet_builder
+from . import efficientnet_lite_builder
+from . import efficientnet_model
 
 
 def get_model_builder(model_name):

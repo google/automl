@@ -25,7 +25,7 @@ import PIL.Image
 import six
 import tensorflow as tf
 
-from dataset import create_coco_tfrecord
+from . import create_coco_tfrecord
 
 
 class CreateCocoTFRecordTest(tf.test.TestCase):

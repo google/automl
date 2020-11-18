@@ -16,9 +16,9 @@ import tempfile
 from absl import logging
 import tensorflow as tf
 
-import det_model_fn as legacy_fn
-import hparams_config
-from keras import train_lib
+from .. import det_model_fn as legacy_fn
+from .. import hparams_config
+from . import train_lib
 
 
 class TrainLibTest(tf.test.TestCase):
