@@ -81,7 +81,7 @@ def main(_):
                                    FLAGS.batch_size or None,
                                    FLAGS.only_network, model_params)
   if FLAGS.mode == 'export':
-    if not  FLAGS.saved_model_dir:
+    if not FLAGS.saved_model_dir:
       raise ValueError('Please specify --saved_model_dir=')
     model_dir = FLAGS.saved_model_dir
     if tf.io.gfile.exists(model_dir):
