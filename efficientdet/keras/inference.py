@@ -94,7 +94,7 @@ class ExportModel(tf.Module):
     return self.model(imgs, training=False, post_mode='global')
 
 
-class ServingDriver(object):
+class ServingDriver:
   """A driver for serving single or batch images.
 
   This driver supports serving with image files or arrays, with configurable
@@ -202,7 +202,7 @@ class ServingDriver(object):
       self.model = efficientdet_keras.EfficientDetModel(config=config)
     image_size = utils.parse_image_size(params['image_size'])
     self.model.build((self.batch_size, *image_size, 3))
-    util_keras.restore_ckpt(self.model, self.ckpt_path)
+    util_keras.restore_ckpt(self.model, self.ckpt_path, skip_mismatch=False)
 
   def visualize(self, image, boxes, classes, scores, **kwargs):
     """Visualize prediction on image."""

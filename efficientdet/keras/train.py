@@ -79,7 +79,7 @@ flags.DEFINE_integer('iterations_per_loop', 100,
 flags.DEFINE_string(
     'training_file_pattern', None,
     'Glob for training data files (e.g., COCO train - minival set)')
-flags.DEFINE_string('validation_file_pattern', None,
+flags.DEFINE_string('val_file_pattern', None,
                     'Glob for evaluation tfrecords (e.g., COCO val2017 set)')
 flags.DEFINE_string(
     'val_json_file', None,
@@ -202,7 +202,7 @@ def main(_):
   def get_dataset(is_training, config):
     file_pattern = (
         FLAGS.training_file_pattern
-        if is_training else FLAGS.validation_file_pattern)
+        if is_training else FLAGS.val_file_pattern)
     if not file_pattern:
       raise ValueError('No matching files.')
 

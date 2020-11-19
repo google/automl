@@ -335,7 +335,9 @@ class COCOCallback(tf.keras.callbacks.Callback):
                                                  box_outputs,
                                                  labels['image_scales'],
                                                  labels['source_ids'])
-    return postprocess.transform_detections(detections)
+    tf.numpy_function(self.evaluator.update_state,
+                      [labels['groundtruth_data'],
+                       postprocess.transform_detections(detections)], [])
 
   def on_epoch_end(self, epoch, logs=None):
     epoch += 1
@@ -346,14 +348,11 @@ class COCOCallback(tf.keras.callbacks.Callback):
       dataset = self.test_dataset.take(count)
       dataset = strategy.experimental_distribute_dataset(dataset)
       for (images, labels) in dataset:
-        detections = strategy.run(self._get_detections, (images, labels))
-        tf.numpy_function(self.evaluator.update_state,
-                          [labels['groundtruth_data'], detections],
-                          [])
+        strategy.run(self._get_detections, (images, labels))
       metrics = self.evaluator.result()
       with self.file_writer.as_default(), tf.summary.record_if(True):
         for i, name in enumerate(self.evaluator.metric_names):
-          tf.summary.scalar(name, metrics[i],step=epoch)
+          tf.summary.scalar(name, metrics[i], step=epoch)
 
 
 class DisplayCallback(tf.keras.callbacks.Callback):
@@ -395,7 +394,7 @@ class DisplayCallback(tf.keras.callbacks.Callback):
 
     with self.file_writer.as_default():
       tf.summary.image('Test image', tf.expand_dims(image, axis=0), step=step)
-    self.model.__class__ = efficientdet_keras.EfficientDetNet
+    self.model.__class__ = EfficientDetNetTrain
 
 def get_callbacks(params, val_dataset):
   """Get callbacks for given params."""
@@ -409,9 +408,9 @@ def get_callbacks(params, val_dataset):
     callbacks = [avg_callback]
   else:
     ckpt_callback = tf.keras.callbacks.ModelCheckpoint(
-      os.path.join(params['model_dir'], 'ckpt'),
-      verbose=1,
-      save_weights_only=True)
+        os.path.join(params['model_dir'], 'ckpt'),
+        verbose=1,
+        save_weights_only=True)
     callbacks = [ckpt_callback]
   if params['model_optimizations'] and 'prune' in params['model_optimizations']:
     prune_callback = UpdatePruningStep()

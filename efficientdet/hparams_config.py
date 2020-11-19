@@ -257,6 +257,7 @@ def default_detection_configs():
       'iou_thresh': None,  # use the default value based on method.
       'score_thresh': 0.,
       'sigma': None,
+      'pyfunc': False,
       'max_nms_inputs': 0,
       'max_output_size': 100,
   }
