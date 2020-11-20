@@ -161,8 +161,8 @@ def main(_):
       new_frame = driver.visualize(
           raw_frames[0],
           boxes[0],
-          scores[0],
           classes[0],
+          scores[0],
           min_score_thresh=model_config.nms_configs.score_thresh,
           max_boxes_to_draw=model_config.nms_configs.max_output_size)
 
