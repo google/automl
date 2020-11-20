@@ -624,9 +624,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     """
     # Sum all positives in a batch for normalization and avoid zero
     # num_positives_sum, which would lead to inf loss during training
-    precision = utils.get_precision(self.config.strategy,
-                                    self.config.mixed_precision)
-    dtype = precision.split('_')[-1]
+    dtype = tf.keras.mixed_precision.experimental.global_policy().compute_dtype
     num_positives_sum = tf.reduce_sum(labels['mean_num_positives']) + 1.0
     positives_momentum = self.config.positives_momentum or 0
     if positives_momentum > 0:

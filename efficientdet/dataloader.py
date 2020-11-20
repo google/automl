@@ -348,9 +348,8 @@ class InputReader:
       classes = pad_to_fixed_size(classes, -1,
                                   [self._max_instances_per_image, 1])
       if params['mixed_precision']:
-        precision = utils.get_precision(params['strategy'],
-                                        params['mixed_precision'])
-        dtype = precision.split('_')[-1]
+        dtype = (
+          tf.keras.mixed_precision.experimental.global_policy().compute_dtype)
         image = tf.cast(image, dtype=dtype)
         box_targets = tf.nest.map_structure(
             lambda box_target: tf.cast(box_target, dtype=dtype), box_targets)
