@@ -93,7 +93,7 @@ def average_name(ema, var):
       var.name.split(':')[0] + '/' + ema.name, mark_as_used=False)
 
 
-def restore_ckpt(model, ckpt_path_or_file, ema_decay=0.):
+def restore_ckpt(model, ckpt_path_or_file, ema_decay=0., skip_mismatch=True):
   """Restore variables from a given checkpoint.
 
   Args:
@@ -131,7 +131,13 @@ def restore_ckpt(model, ckpt_path_or_file, ema_decay=0.):
     for key, var in var_dict.items():
       try:
         var.assign(tf.train.load_variable(ckpt_path_or_file, key))
-      except tf.errors.NotFoundError:
-        logging.warning('Not found %s in %s', key, ckpt_path_or_file)
+      except tf.errors.NotFoundError as e:
+        if skip_mismatch:
+          logging.warning('Not found %s in %s', key, ckpt_path_or_file)
+        else:
+          raise e
       except ValueError as e:
-        logging.warning('%s: %s', key, e)
+        if skip_mismatch:
+          logging.warning('%s: %s', key, e)
+        else:
+          raise e

@@ -90,7 +90,7 @@ def main(_):
                                    FLAGS.batch_size or None,
                                    FLAGS.only_network, model_params)
   if FLAGS.mode == 'export':
-    if not  FLAGS.saved_model_dir:
+    if not FLAGS.saved_model_dir:
       raise ValueError('Please specify --saved_model_dir=')
     model_dir = FLAGS.saved_model_dir
     if tf.io.gfile.exists(model_dir):
@@ -170,8 +170,8 @@ def main(_):
       new_frame = driver.visualize(
           raw_frames[0],
           boxes[0],
-          scores[0],
           classes[0],
+          scores[0],
           min_score_thresh=model_config.nms_configs.score_thresh,
           max_boxes_to_draw=model_config.nms_configs.max_output_size)
 

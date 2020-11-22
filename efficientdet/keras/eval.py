@@ -32,6 +32,7 @@ from .. import dataloader
 from .. import hparams_config
 from .. import utils
 
+from . import util_keras
 from . import anchors
 from . import efficientdet_keras
 from . import label_util
@@ -81,25 +82,27 @@ def main(_):
   with ds_strategy.scope():
     # Network
     model = efficientdet_keras.EfficientDetNet(config=config)
-    model.build((1, *config.image_size, 3))
-    model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
-
+    model.build((None, *config.image_size, 3))
+    util_keras.restore_ckpt(model,
+                            tf.train.latest_checkpoint(FLAGS.model_dir),
+                            skip_mismatch=False)
     @tf.function
     def model_fn(images, labels):
       cls_outputs, box_outputs = model(images, training=False)
-      return postprocess.generate_detections(config, cls_outputs, box_outputs,
-                                             labels['image_scales'],
-                                             labels['source_ids'])
+      detections = postprocess.generate_detections(config,
+                                                   cls_outputs,
+                                                   box_outputs,
+                                                   labels['image_scales'],
+                                                   labels['source_ids'])
+      tf.numpy_function(evaluator.update_state,
+                        [labels['groundtruth_data'],
+                         postprocess.transform_detections(detections)], [])
 
     # Evaluator for AP calculation.
     label_map = label_util.get_label_map(config.label_map)
     evaluator = coco_metric.EvaluationMetric(
         filename=config.val_json_file, label_map=label_map)
 
-    @tf.function
-    def eval_update(gt, pred):
-      tf.numpy_function(evaluator.update_state,
-                        [gt, postprocess.transform_detections(pred)], [])
 
     # dataset
     batch_size = FLAGS.batch_size   # global batch size.
@@ -116,8 +119,7 @@ def main(_):
     eval_samples = FLAGS.eval_samples or 5000
     pbar = tf.keras.utils.Progbar((eval_samples + batch_size - 1) // batch_size)
     for i, (images, labels) in enumerate(ds):
-      detections = ds_strategy.run(model_fn, (images, labels))
-      ds_strategy.run(eval_update, (labels['groundtruth_data'], detections))
+      ds_strategy.run(model_fn, (images, labels))
       pbar.update(i)
 
   # compute the final eval results.
@@ -136,5 +138,5 @@ def main(_):
 if __name__ == '__main__':
   flags.mark_flag_as_required('val_file_pattern')
   flags.mark_flag_as_required('model_dir')
-  logging.set_verbosity(logging.WARNING)
+  logging.set_verbosity(logging.ERROR)
   app.run(main)
