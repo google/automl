@@ -15,8 +15,9 @@
 
 import os
 import sys
+# Allow relative imports when being executed as script.
 if __name__ == "__main__" and __package__ is None:
-  sys.path.insert(0, os.path.join(os.path.dirname(__file__), ))
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
   import efficientdet
   __package__ = "efficientdet"
 
@@ -85,10 +86,8 @@ def main(_):
     convert2trt(FLAGS.tf_savedmodel_dir, FLAGS.trt_savedmodel_dir)
   benchmark(FLAGS.trt_savedmodel_dir, FLAGS.warmup_runs, FLAGS.bm_runs)
 
-def launcher():
+
+if __name__ == '__main__':
   flags.mark_flag_as_required('trt_savedmodel_dir')
   tf.disable_v2_behavior()
   app.run(main)
-
-if __name__ == '__main__':
-  launcher()

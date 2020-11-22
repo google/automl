@@ -16,8 +16,9 @@
 
 import os
 import sys
+# Allow relative imports when being executed as script.
 if __name__ == "__main__" and __package__ is None:
-  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
   import efficientdet.keras
   __package__ = "efficientdet.keras"
 
@@ -131,11 +132,9 @@ def main(_):
       metric_dict[name] = metrics[i + len(evaluator.metric_names)]
   print(FLAGS.model_name, metric_dict)
 
-def launcher():
+
+if __name__ == '__main__':
   flags.mark_flag_as_required('val_file_pattern')
   flags.mark_flag_as_required('model_dir')
   logging.set_verbosity(logging.WARNING)
   app.run(main)
-
-if __name__ == '__main__':
-  launcher()

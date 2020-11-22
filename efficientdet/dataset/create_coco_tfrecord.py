@@ -15,8 +15,9 @@
 
 import os
 import sys
+# Allow relative imports when being executed as script.
 if __name__ == "__main__" and __package__ is None:
-  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
   import efficientdet.dataset
   __package__ = "efficientdet.dataset"
 
@@ -366,8 +367,6 @@ def main(_):
                                           FLAGS.caption_annotations_file,
                                           FLAGS.include_masks)
 
-def launcher():
-  app.run(main)
 
 if __name__ == '__main__':
-  launcher()
+  app.run(main)

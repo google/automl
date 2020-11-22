@@ -16,8 +16,9 @@
 
 import os
 import sys
+# Allow relative imports when being executed as script.
 if __name__ == "__main__" and __package__ is None:
-  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
   import efficientdet.keras
   __package__ = "efficientdet.keras"
 
@@ -109,12 +110,9 @@ def main(_):
     print('writing annotated image to %s' % output_image_path)
 
 
-def launcher():
+if __name__ == '__main__':
   flags.mark_flag_as_required('image_path')
   flags.mark_flag_as_required('output_dir')
   flags.mark_flag_as_required('model_dir')
   logging.set_verbosity(logging.ERROR)
   app.run(main)
-
-if __name__ == '__main__':
-  launcher()

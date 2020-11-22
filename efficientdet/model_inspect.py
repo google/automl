@@ -15,8 +15,9 @@
 
 import os
 import sys
+# Allow relative imports when being executed as script.
 if __name__ == "__main__" and __package__ is None:
-  sys.path.insert(0, os.path.join(os.path.dirname(__file__), ))
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
   import efficientdet
   __package__ = "efficientdet"
 
@@ -520,12 +521,9 @@ def main(_):
       threads=FLAGS.threads,
       trace_filename=FLAGS.trace_filename)
 
-def launcher():
+
+if __name__ == '__main__':
   logging.set_verbosity(logging.WARNING)
   tf.enable_v2_tensorshape()
   tf.disable_eager_execution()
   app.run(main)
-
-if __name__ == '__main__':
-  launcher()
-

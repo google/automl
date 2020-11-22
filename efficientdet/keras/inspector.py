@@ -15,8 +15,9 @@
 
 import os
 import sys
+# Allow relative imports when being executed as script.
 if __name__ == "__main__" and __package__ is None:
-  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
   import efficientdet.keras
   __package__ = "efficientdet.keras"
 
@@ -184,9 +185,7 @@ def main(_):
         if cv2.waitKey(1) & 0xFF == ord('q'):
           break
 
-def launcher():
-  logging.set_verbosity(logging.ERROR)
-  app.run(main)
 
 if __name__ == '__main__':
-  launcher()  
+  logging.set_verbosity(logging.ERROR)
+  app.run(main)
