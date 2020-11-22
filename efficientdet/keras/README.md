@@ -247,7 +247,7 @@ Finetune needs to use --ckpt rather than --backbone_ckpt.
 
     !python train.py
         --training_file_pattern=tfrecord/pascal*.tfrecord \
-        --validation_file_pattern=tfrecord/pascal*.tfrecord \
+        --val_file_pattern=tfrecord/pascal*.tfrecord \
         --model_name=efficientdet-d0 \
         --model_dir=/tmp/efficientdet-d0-finetune  \
         --ckpt=efficientdet-d0  \
@@ -285,7 +285,7 @@ Finetune needs to use --ckpt rather than --backbone_ckpt.
 
     python train.py \
         --training_file_pattern=tfrecord/pascal*.tfrecord \
-        --validation_file_pattern=tfrecord/pascal*.tfrecord \
+        --val_file_pattern=tfrecord/pascal*.tfrecord \
         --model_name=efficientdet-d0 \
         --model_dir=/tmp/efficientdet-d0-finetune  \
         --ckpt=efficientdet-d0  \
