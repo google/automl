@@ -13,6 +13,14 @@
 # limitations under the License.
 # ==============================================================================
 """A demo script to show to train a segmentation model."""
+
+import os
+import sys
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  import efficientdet.keras
+  __package__ = "efficientdet.keras"
+
 from absl import app
 from absl import logging
 import tensorflow as tf

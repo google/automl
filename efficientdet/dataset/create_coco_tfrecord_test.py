@@ -14,6 +14,14 @@
 # ==============================================================================
 """Test for create_coco_tfrecord.py."""
 
+import os
+import sys
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  import efficientdet.dataset
+  __package__ = "efficientdet.dataset"
+
+
 import io
 import json
 import os

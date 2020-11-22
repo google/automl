@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
+import os
+import sys
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  import efficientdet.dataset
+  __package__ = "efficientdet.dataset"
+
 r"""Convert PASCAL dataset to TFRecord.
 
 Example usage:
@@ -314,9 +322,9 @@ def main(_):
   with tf.io.gfile.GFile(json_file_path, 'w') as f:
     json.dump(ann_json_dict, f)
 
-
 def launcher():
   app.run(main)
 
 if __name__ == '__main__':
   launcher()
+  

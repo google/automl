@@ -13,6 +13,14 @@
 # limitations under the License.
 # ==============================================================================
 """Eval libraries."""
+
+import os
+import sys
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  import efficientdet.keras
+  __package__ = "efficientdet.keras"
+
 from absl import app
 from absl import flags
 from absl import logging
@@ -122,7 +130,6 @@ def main(_):
       name = 'AP_/%s' % label_map[cid]
       metric_dict[name] = metrics[i + len(evaluator.metric_names)]
   print(FLAGS.model_name, metric_dict)
-
 
 def launcher():
   flags.mark_flag_as_required('val_file_pattern')

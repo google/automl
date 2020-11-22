@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
+import os
+import sys
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  import efficientdet.keras
+  __package__ = "efficientdet.keras"
+
 from absl import logging
 from absl.testing import parameterized
 import tensorflow as tf

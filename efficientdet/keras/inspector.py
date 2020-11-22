@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
+import os
+import sys
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  import efficientdet.keras
+  __package__ = "efficientdet.keras"
+
 r"""Tool to inspect a model."""
 import os
 
@@ -176,10 +184,9 @@ def main(_):
         if cv2.waitKey(1) & 0xFF == ord('q'):
           break
 
-
 def launcher():
   logging.set_verbosity(logging.ERROR)
   app.run(main)
 
 if __name__ == '__main__':
-  launcher()
+  launcher()  

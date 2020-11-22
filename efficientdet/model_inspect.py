@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
+import os
+import sys
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), ))
+  import efficientdet
+  __package__ = "efficientdet"
+
 r"""Tool to inspect a model."""
 import os
 import time
@@ -512,13 +520,12 @@ def main(_):
       threads=FLAGS.threads,
       trace_filename=FLAGS.trace_filename)
 
-
 def launcher():
   logging.set_verbosity(logging.WARNING)
   tf.enable_v2_tensorshape()
   tf.disable_eager_execution()
   app.run(main)
 
-
 if __name__ == '__main__':
   launcher()
+

@@ -5,8 +5,8 @@ setuptools.setup(
     name             = 'efficientdet',
     version          = '0.0.0',
     description      = '',
-    url              = '',
-    author           = 'PyPackager',
+    url              = 'https://github.com/google/automl',
+    author           = 'Google',
     author_email     = '',
     maintainer       = '',
     maintainer_email = '',
@@ -24,11 +24,9 @@ setuptools.setup(
         'neural-structured-learning>=1.3.1',
         'tensorflow-model-optimization>=0.5',
         'Cython>=0.29.13',
+        'pycocotools'
     ],
-    dependency_links = [
-        'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'    
-    ],
-    entry_points = {
+    entry_points     = {
         'console_scripts': [
             'efficientdet-tf-model-inspect=efficientdet.model_inspect:launcher',
             'efficientdet-tf-main=efficientdet.main:launcher',
@@ -38,6 +36,6 @@ setuptools.setup(
             'efficientdet-create-coco-tfrecord=efficientdet.dataset.create_coco_tfrecord:launcher',
             'efficientdet-create-pascal-tfrecord=efficientdet.dataset.create_pascal_tfrecord:launcher',
             'efficientdet-inspect-tfrecord=efficientdet.dataset.inspect_tfrecords:launcher'
-        ]
+        ],
     }
 )

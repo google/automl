@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
+import os
+import sys
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), ))
+  import efficientdet
+  __package__ = "efficientdet"
+
 r"""Simple tools for TensorRT.
 
 Example usage:
@@ -77,8 +85,10 @@ def main(_):
     convert2trt(FLAGS.tf_savedmodel_dir, FLAGS.trt_savedmodel_dir)
   benchmark(FLAGS.trt_savedmodel_dir, FLAGS.warmup_runs, FLAGS.bm_runs)
 
-
-if __name__ == '__main__':
+def launcher():
   flags.mark_flag_as_required('trt_savedmodel_dir')
   tf.disable_v2_behavior()
   app.run(main)
+
+if __name__ == '__main__':
+  launcher()

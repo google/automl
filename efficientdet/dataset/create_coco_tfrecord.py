@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
+import os
+import sys
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  import efficientdet.dataset
+  __package__ = "efficientdet.dataset"
+
 r"""Convert raw COCO 2017 dataset to TFRecord.
 
 Example usage:
@@ -357,7 +365,6 @@ def main(_):
                                           FLAGS.object_annotations_file,
                                           FLAGS.caption_annotations_file,
                                           FLAGS.include_masks)
-
 
 def launcher():
   app.run(main)

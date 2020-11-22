@@ -13,6 +13,14 @@
 # limitations under the License.
 # ==============================================================================
 """The main training script."""
+
+import os
+import sys
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  import efficientdet.keras
+  __package__ = "efficientdet.keras"
+
 import os
 from absl import app
 from absl import flags
@@ -232,10 +240,9 @@ def main(_):
         validation_steps=(FLAGS.eval_samples // FLAGS.batch_size))
   model.save_weights(os.path.join(FLAGS.model_dir, 'ckpt-final'))
 
-
 def launcher():
   logging.set_verbosity(logging.INFO)
   app.run(main)
 
 if __name__ == '__main__':
-  launcher()
+  launcher()  

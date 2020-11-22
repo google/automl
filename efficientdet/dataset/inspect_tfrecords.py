@@ -16,6 +16,14 @@
 
 import os
 import sys
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  import efficientdet.dataset
+  __package__ = "efficientdet.dataset"
+
+
+import os
+import sys
 
 import numpy as np
 import tensorflow as tf
@@ -132,7 +140,6 @@ def main(_):
     logging.info(
         f"Done Visualization, please find samples at \'{FLAGS.save_samples_dir}\'"
     )
-
 
 def launcher():
   app.run(main)

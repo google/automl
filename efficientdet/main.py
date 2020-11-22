@@ -13,6 +13,14 @@
 # limitations under the License.
 # ==============================================================================
 """The main training script."""
+
+import os
+import sys
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), ))
+  import efficientdet
+  __package__ = "efficientdet"
+
 import multiprocessing
 import os
 from absl import app
@@ -361,7 +369,6 @@ def main(_):
 
   else:
     logging.info('Invalid mode: %s', FLAGS.mode)
-
 
 def launcher():
   app.run(main)

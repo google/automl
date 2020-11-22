@@ -13,6 +13,14 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for det_model_fn."""
+
+import os
+import sys
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), ))
+  import efficientdet
+  __package__ = "efficientdet"
+
 import tensorflow as tf
 from . import det_model_fn
 

@@ -13,6 +13,14 @@
 # limitations under the License.
 # ======================================
 """Tests for iou_utils."""
+
+import os
+import sys
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), ))
+  import efficientdet
+  __package__ = "efficientdet"
+
 from absl import logging
 import tensorflow as tf
 from . import iou_utils
