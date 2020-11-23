@@ -76,6 +76,7 @@ def main(_):
     model.build((None, *config.image_size, 3))
     util_keras.restore_ckpt(model,
                             tf.train.latest_checkpoint(FLAGS.model_dir),
+                            config.moving_average_decay,
                             skip_mismatch=False)
     @tf.function
     def model_fn(images, labels):

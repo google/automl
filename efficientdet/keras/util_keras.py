@@ -93,7 +93,7 @@ def average_name(ema, var):
       var.name.split(':')[0] + '/' + ema.name, mark_as_used=False)
 
 
-def restore_ckpt(model, ckpt_path_or_file, ema_decay=0., skip_mismatch=True):
+def restore_ckpt(model, ckpt_path_or_file, ema_decay=0.9998, skip_mismatch=True):
   """Restore variables from a given checkpoint.
 
   Args:
