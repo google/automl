@@ -74,8 +74,8 @@ flags.DEFINE_string(
 flags.DEFINE_integer('batch_size', 64, 'training batch size')
 flags.DEFINE_integer('eval_samples', 5000, 'The number of samples for '
                      'evaluation.')
-flags.DEFINE_integer('iterations_per_loop', 100,
-                     'Number of iterations per TPU training loop')
+flags.DEFINE_integer('steps_per_execution', 1000,
+                     'Number of steps per training execution.')
 flags.DEFINE_string(
     'training_file_pattern', None,
     'Glob for training data files (e.g., COCO train - minival set)')
@@ -86,10 +86,11 @@ flags.DEFINE_string(
     'COCO validation JSON containing golden bounding boxes. If None, use the '
     'ground truth from the dataloader. Ignored if testdev_dir is not None.')
 
+flags.DEFINE_string('mode', 'traineval', 'job mode: train, traineval.')
 flags.DEFINE_integer('num_examples_per_epoch', 120000,
                      'Number of examples in one epoch')
 flags.DEFINE_integer('num_epochs', None, 'Number of epochs for training')
-flags.DEFINE_string('model_name', 'efficientdet-d1', 'Model name.')
+flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model name.')
 flags.DEFINE_bool('debug', False, 'Enable debug mode')
 flags.DEFINE_integer(
     'tf_random_seed', 111111,
@@ -104,6 +105,7 @@ def setup_model(config):
   model = train_lib.EfficientDetNetTrain(config=config)
   model.build((None, *config.image_size, 3))
   model.compile(
+      steps_per_execution=FLAGS.steps_per_execution,
       optimizer=train_lib.get_optimizer(config.as_dict()),
       loss={
           train_lib.BoxLoss.__name__:
@@ -183,7 +185,7 @@ def main(_):
   params = dict(
       profile=FLAGS.profile,
       model_name=FLAGS.model_name,
-      iterations_per_loop=FLAGS.iterations_per_loop,
+      steps_per_execution=FLAGS.steps_per_execution,
       model_dir=FLAGS.model_dir,
       steps_per_epoch=steps_per_epoch,
       strategy=FLAGS.strategy,
@@ -222,7 +224,7 @@ def main(_):
       ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)
       util_keras.restore_ckpt(model, ckpt_path, config.moving_average_decay)
     init_experimental(config)
-    val_dataset = get_dataset(False, config).repeat()
+    val_dataset = get_dataset(False, config) if 'eval' in FLAGS.mode else None
     model.fit(
         get_dataset(True, config),
         epochs=config.num_epochs,

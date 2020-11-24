@@ -12,17 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Inspection of dataset"""
-
+"""Inspect tfrecord dataset."""
 import os
-import sys
-
+from absl import app
+from absl import flags
+from absl import logging
 import numpy as np
-import tensorflow as tf
-from absl import app, flags, logging
 from PIL import Image
+import tensorflow as tf
 
-sys.path.append('./')
 import dataloader
 import hparams_config
 import utils
@@ -44,14 +42,14 @@ FLAGS = flags.FLAGS
 
 
 class RecordInspect:
-  """Inspection Class"""
+  """Inspection Class."""
 
   def __init__(self, config):
-    """ Initializes RecordInspect with passed config.
+    """Initializes RecordInspect with passed config.
 
-        Args:
-            config: config file to initialize input_fn.
-        """
+    Args:
+        config: config file to initialize input_fn.
+    """
     self.input_fn = dataloader.InputReader(
         FLAGS.file_pattern,
         is_training=not FLAGS.eval,
@@ -65,11 +63,9 @@ class RecordInspect:
     os.makedirs(FLAGS.save_samples_dir, exist_ok=True)
 
   def visualize(self):
-    """save tfrecords images with bounding boxes"""
-
-    _vis_ds = self.input_fn(params=self.params)
-
-    data = next(iter(_vis_ds))  # iterable.
+    """save tfrecords images with bounding boxes."""
+    vis_ds = self.input_fn(params=self.params)
+    data = next(iter(vis_ds))  # iterable.
     images = data[0]
     gt_data = data[1]['groundtruth_data']
 
@@ -81,7 +77,7 @@ class RecordInspect:
     scale_image = tf.constant([0.229, 0.224, 0.225])
     scale_image = tf.reshape(scale_image, (1, 1, -1))
 
-    logging.info(f"Visualizing TfRecords {FLAGS.file_pattern} ....")
+    logging.info('Visualizing TfRecords %s', FLAGS.file_pattern)
     for i, zip_data in enumerate(zip(gt_data, images, scales)):
       gt, image, scale = zip_data
       boxes = gt[:, :4]
@@ -93,7 +89,7 @@ class RecordInspect:
                                       np.asarray(classes, dtype=np.int))
           display_str_list_list = np.reshape(
               np.asarray(list(display_str_list_list)), (-1, 1)).tolist()
-        except:
+        except Exception:  # pylint: disable=broad-except
           display_str_list_list = ()
 
         # unnormalize image.
@@ -126,12 +122,10 @@ def main(_):
   try:
     recordinspect = RecordInspect(config)
     recordinspect.visualize()
-  except Exception as e:
+  except Exception as e:  # pylint: disable=broad-except
     logging.error(e)
   else:
-    logging.info(
-        f"Done Visualization, please find samples at \'{FLAGS.save_samples_dir}\'"
-    )
+    logging.info('Done, please find samples at %s', FLAGS.save_samples_dir)
 
 
 if __name__ == '__main__':

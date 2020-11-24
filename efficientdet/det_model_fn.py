@@ -54,10 +54,11 @@ def update_learning_rate_schedule_parameters(params):
   params['steps_per_epoch'] = steps_per_epoch
 
 
-def stepwise_lr_schedule(adjusted_learning_rate, adjusted_lr_warmup_init, lr_warmup_step,
-                         first_lr_drop_step, second_lr_drop_step, global_step):
+def stepwise_lr_schedule(adjusted_learning_rate, adjusted_lr_warmup_init,
+                         lr_warmup_step, first_lr_drop_step,
+                         second_lr_drop_step, global_step):
   """Handles linear scaling rule, gradual warmup, and LR decay."""
-  # adjusted_lr_warmup_init is the starting learning rate; the learning rate is linearly
+  # adjusted_lr_warmup_init is the starting learning rate; LR is linearly
   # scaled up to the full learning rate after `lr_warmup_step` before decaying.
   logging.info('LR schedule method: stepwise')
   linear_warmup = (
@@ -74,25 +75,27 @@ def stepwise_lr_schedule(adjusted_learning_rate, adjusted_lr_warmup_init, lr_war
   return learning_rate
 
 
-def cosine_lr_schedule(adjusted_lr, adjusted_lr_warmup_init, lr_warmup_step, total_steps,
-                       step):
+def cosine_lr_schedule(adjusted_lr, adjusted_lr_warmup_init, lr_warmup_step,
+                       total_steps, step):
   """Cosine learning rate scahedule."""
   logging.info('LR schedule method: cosine')
   linear_warmup = (
-      adjusted_lr_warmup_init + (tf.cast(step, dtype=tf.float32) / lr_warmup_step *
-                        (adjusted_lr - adjusted_lr_warmup_init)))
+      adjusted_lr_warmup_init +
+      (tf.cast(step, dtype=tf.float32) / lr_warmup_step *
+       (adjusted_lr - adjusted_lr_warmup_init)))
   decay_steps = tf.cast(total_steps - lr_warmup_step, tf.float32)
   cosine_lr = 0.5 * adjusted_lr * (
       1 + tf.cos(np.pi * tf.cast(step, tf.float32) / decay_steps))
   return tf.where(step < lr_warmup_step, linear_warmup, cosine_lr)
 
 
-def polynomial_lr_schedule(adjusted_lr, adjusted_lr_warmup_init, lr_warmup_step, power,
-                           total_steps, step):
+def polynomial_lr_schedule(adjusted_lr, adjusted_lr_warmup_init, lr_warmup_step,
+                           power, total_steps, step):
   logging.info('LR schedule method: polynomial')
   linear_warmup = (
-      adjusted_lr_warmup_init + (tf.cast(step, dtype=tf.float32) / lr_warmup_step *
-                        (adjusted_lr - adjusted_lr_warmup_init)))
+      adjusted_lr_warmup_init +
+      (tf.cast(step, dtype=tf.float32) / lr_warmup_step *
+       (adjusted_lr - adjusted_lr_warmup_init)))
   polynomial_lr = adjusted_lr * tf.pow(
       1 - (tf.cast(step, tf.float32) / total_steps), power)
   return tf.where(step < lr_warmup_step, linear_warmup, polynomial_lr)

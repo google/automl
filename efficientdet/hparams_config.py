@@ -50,7 +50,7 @@ class Config(object):
   def __repr__(self):
     return repr(self.as_dict())
 
-  def __deepcopy__(self, memodict={}):
+  def __deepcopy__(self, memodict):
     return type(self)(self.as_dict())
 
   def __str__(self):
