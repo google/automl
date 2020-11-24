@@ -398,13 +398,13 @@ class DisplayCallback(tf.keras.callbacks.Callback):
 
 def get_callbacks(params, val_dataset):
   """Get callbacks for given params."""
-  if False:
+  if params['moving_average_decay']:
     from tensorflow_addons.callbacks import AverageModelCheckpoint
     avg_callback = AverageModelCheckpoint(
         filepath=os.path.join(params['model_dir'], 'ckpt'),
         verbose=1,
         save_weights_only=True,
-        update_weights=True)
+        update_weights=False)
     callbacks = [avg_callback]
   else:
     ckpt_callback = tf.keras.callbacks.ModelCheckpoint(
