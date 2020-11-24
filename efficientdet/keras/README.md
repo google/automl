@@ -304,4 +304,29 @@ If set to True, keras model uses ```tf.recompute_grad``` to achieve gradient che
 Testing shows that:
 * It allows to train a d7x network with batch size of 2 on a 11Gb (1080Ti) GPU
 
+## 12. Visualize TF-Records.
+
+You can visualize tf-records with following commands:
+
+To visualize training tfrecords with input dataloader use.
+```
+python dataset/inspect_tfrecords.py --file_pattern dataset/sample.record\ 
+--model_name "efficientdet-d0" --samples 10\ 
+--save_samples_dir train_samples/  -hparams="label_map={1:'label1'}, autoaugmentation_policy=v3"
+
+```
+
+To visualize evaluation tfrecords use.
+```
+python dataset/inspect_tfrecords.py --file_pattern dataset/sample.record\ 
+--model_name "efficientdet-d0" --samples 10\ 
+--save_samples_dir train_samples/  -eval\
+-hparams="label_map={1:'label1'}"
+
+```
+* samples: random samples to visualize.
+* model_name: model name will be used to get image_size.
+* save_samples_dir: save dir.
+* eval: flag for eval data.
+
 NOTE: this is not an official Google product.

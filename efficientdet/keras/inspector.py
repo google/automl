@@ -154,6 +154,7 @@ def main(_):
       ret, frame = cap.read()
       if not ret:
         break
+
       raw_frames = np.array([frame])
       detections_bs = driver.serve(raw_frames)
       boxes, scores, classes, _ = tf.nest.map_structure(np.array, detections_bs)
@@ -162,7 +163,7 @@ def main(_):
           boxes[0],
           classes[0],
           scores[0],
-          min_score_thresh=model_config.nms_configs.score_thresh or 0.4,
+          min_score_thresh=model_config.nms_configs.score_thresh,
           max_boxes_to_draw=model_config.nms_configs.max_output_size)
 
       if out_ptr:

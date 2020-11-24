@@ -22,12 +22,11 @@ import coco_metric
 import dataloader
 import hparams_config
 import utils
-from keras import util_keras
-
 from keras import anchors
 from keras import efficientdet_keras
 from keras import label_util
 from keras import postprocess
+from keras import util_keras
 
 # Cloud TPU Cluster Resolvers
 flags.DEFINE_string('tpu', None, 'The Cloud TPU name.')
@@ -94,7 +93,6 @@ def main(_):
     label_map = label_util.get_label_map(config.label_map)
     evaluator = coco_metric.EvaluationMetric(
         filename=config.val_json_file, label_map=label_map)
-
 
     # dataset
     batch_size = FLAGS.batch_size   # global batch size.

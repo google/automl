@@ -93,13 +93,17 @@ def average_name(ema, var):
       var.name.split(':')[0] + '/' + ema.name, mark_as_used=False)
 
 
-def restore_ckpt(model, ckpt_path_or_file, ema_decay=0.9998, skip_mismatch=True):
+def restore_ckpt(model,
+                 ckpt_path_or_file,
+                 ema_decay=0.9998,
+                 skip_mismatch=True):
   """Restore variables from a given checkpoint.
 
   Args:
     model: the keras model to be restored.
     ckpt_path_or_file: the path or file for checkpoint.
     ema_decay: ema decay rate. If None or zero or negative value, disable ema.
+    skip_mismatch: whether to skip variables if shape mismatch.
   """
   if ckpt_path_or_file == '_':
     logging.info('Running test: do not load any ckpt.')
@@ -141,3 +145,30 @@ def restore_ckpt(model, ckpt_path_or_file, ema_decay=0.9998, skip_mismatch=True)
           logging.warning('%s: %s', key, e)
         else:
           raise e
+
+
+def fp16_to_fp32_nested(input_nested):
+  """Convert fp16 tensors in a nested structure to fp32.
+
+  Args:
+    input_nested: A Python dict, values being Tensor or Python list/tuple of
+      Tensor or Non-Tensor.
+
+  Returns:
+    A Python dict with the same structure as `tensor_dict`,
+    with all bfloat16 tensors converted to float32.
+  """
+  if isinstance(input_nested, tf.Tensor):
+    if input_nested.dtype in (tf.bfloat16, tf.float16):
+      return tf.cast(input_nested, dtype=tf.float32)
+    else:
+      return input_nested
+  elif isinstance(input_nested, (list, tuple)):
+    out_tensor_dict = [fp16_to_fp32_nested(t) for t in input_nested]
+  elif isinstance(input_nested, dict):
+    out_tensor_dict = {
+        k: fp16_to_fp32_nested(v) for k, v in input_nested.items()
+    }
+  else:
+    return input_nested
+  return out_tensor_dict

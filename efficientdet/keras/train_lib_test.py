@@ -101,6 +101,7 @@ class TrainLibTest(tf.test.TestCase):
     config.num_examples_per_epoch = 1
     config.model_dir = tempfile.mkdtemp()
     config.steps_per_epoch = 1
+    config.mixed_precision = True
     config.grad_checkpoint = grad_checkpoint
     x = tf.ones((1, 512, 512, 3))
     labels = {
@@ -116,7 +117,7 @@ class TrainLibTest(tf.test.TestCase):
 
     params = config.as_dict()
     params['num_shards'] = 1
-    params['iterations_per_loop'] = 100
+    params['steps_per_execution'] = 100
     params['model_dir'] = tempfile.mkdtemp()
     params['profile'] = False
     config.override(params, allow_new_keys=True)
@@ -153,9 +154,9 @@ class TrainLibTest(tf.test.TestCase):
     _, x, labels, model = self._build_model()
     outputs = model.train_on_batch(x, labels, return_dict=True)
     expect_results = {
-        'loss': 21184.48046875,
-        'det_loss': 21182.03125,
-        'cls_loss': 10.0,
+        'loss': 26277.03125,
+        'det_loss': 26277.03125,
+        'cls_loss': 5065.4375,
         'box_loss': 423.44061279296875,
         'gradient_norm': 10.0,
         'reg_l2_loss': 0.,
@@ -168,9 +169,9 @@ class TrainLibTest(tf.test.TestCase):
     _, x, labels, model = self._build_model()
     outputs = model.test_on_batch(x, labels, return_dict=True)
     expect_results = {
-        'loss': 21191.556640625,
-        'det_loss': 21189.234375,
-        'cls_loss': 10.0,
+        'loss': 26277.03125,
+        'det_loss': 26277.03125,
+        'cls_loss': 5065.4375,
         'reg_l2_loss': 0.,
         'box_loss': 423.5846862792969,
         'seg_loss': 1.0981438159942627,
@@ -185,9 +186,9 @@ class TrainLibTest(tf.test.TestCase):
         steps_per_epoch=1,
         epochs=1,
         callbacks=train_lib.get_callbacks(params))
-    self.assertAllClose(hist.history['loss'], [21228.], rtol=.1, atol=10.)
-    self.assertAllClose(hist.history['det_loss'], [21226.], rtol=.1, atol=10.)
-    self.assertAllClose(hist.history['cls_loss'], [10.], rtol=.1, atol=10.)
+    self.assertAllClose(hist.history['loss'], [26279.47], rtol=.1, atol=10.)
+    self.assertAllClose(hist.history['det_loss'], [26279.47], rtol=.1, atol=10.)
+    self.assertAllClose(hist.history['cls_loss'], [5065.437], rtol=.1, atol=10.)
     self.assertAllClose(hist.history['box_loss'], [424.], rtol=.1, atol=100.)
     self.assertAllClose(
         hist.history['seg_loss'], [1.221547], rtol=.1, atol=100.)

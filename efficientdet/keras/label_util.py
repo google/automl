@@ -15,7 +15,7 @@
 """A few predefined label id mapping."""
 import tensorflow as tf
 import yaml
-from hparams_config import Config
+import hparams_config
 
 coco = {
     # 0: 'background',
@@ -139,7 +139,7 @@ def get_label_map(mapping):
   if not mapping or isinstance(mapping, dict):
     return mapping
 
-  if isinstance(mapping, Config):
+  if isinstance(mapping, hparams_config.Config):
     return mapping.as_dict()
 
   # case 2: if it is a yaml file, load it to a dict and return the dict.
