@@ -401,7 +401,7 @@ def get_callbacks(params, val_dataset):
   if params['moving_average_decay']:
     from tensorflow_addons.callbacks import AverageModelCheckpoint
     avg_callback = AverageModelCheckpoint(
-        filepath=os.path.join(params['model_dir'], 'ckpt'),
+        filepath=os.path.join(params['model_dir'], 'moving_average_ckpt'),
         verbose=1,
         save_weights_only=True,
         update_weights=False)
