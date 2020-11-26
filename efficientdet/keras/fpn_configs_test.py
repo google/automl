@@ -13,9 +13,18 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for fpn_configs."""
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+  import efficientdet.keras
+  __package__ = "efficientdet.keras"
+
 from absl import logging
 import tensorflow as tf
-from keras import fpn_configs
+from . import fpn_configs
 
 
 class FpnConfigTest(tf.test.TestCase):

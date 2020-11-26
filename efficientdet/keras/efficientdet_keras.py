@@ -18,15 +18,15 @@ from absl import logging
 import numpy as np
 import tensorflow as tf
 
-import dataloader
-import hparams_config
-import utils
-from backbone import backbone_factory
-from backbone import efficientnet_builder
-from keras import fpn_configs
-from keras import postprocess
-from keras import tfmot
-from keras import util_keras
+from .. import dataloader
+from .. import hparams_config
+from .. import utils
+from ..backbone import backbone_factory
+from ..backbone import efficientnet_builder
+from . import fpn_configs
+from . import postprocess
+from . import tfmot
+from . import util_keras
 # pylint: disable=arguments-differ  # fo keras layers.
 
 

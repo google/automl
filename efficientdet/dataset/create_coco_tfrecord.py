@@ -12,6 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+  import efficientdet.dataset
+  __package__ = "efficientdet.dataset"
+
 r"""Convert raw COCO 2017 dataset to TFRecord.
 
 Example usage:
@@ -39,8 +48,8 @@ import PIL.Image
 
 from pycocotools import mask
 import tensorflow as tf
-from dataset import label_map_util
-from dataset import tfrecord_util
+from . import label_map_util
+from . import tfrecord_util
 
 flags.DEFINE_boolean(
     'include_masks', False, 'Whether to include instance segmentations masks '

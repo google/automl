@@ -13,6 +13,15 @@
 # limitations under the License.
 # ==============================================================================
 """The main training script."""
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  import efficientdet
+  __package__ = "efficientdet"
+
 import multiprocessing
 import os
 from absl import app
@@ -21,10 +30,10 @@ from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
 
-import dataloader
-import det_model_fn
-import hparams_config
-import utils
+from . import dataloader
+from . import det_model_fn
+from . import hparams_config
+from . import utils
 
 flags.DEFINE_string(
     'tpu',

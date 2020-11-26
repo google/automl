@@ -12,6 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  import efficientdet
+  __package__ = "efficientdet"
+
 r"""Tool to inspect a model."""
 import os
 import time
@@ -25,9 +34,9 @@ import numpy as np
 from PIL import Image
 import tensorflow.compat.v1 as tf
 
-import hparams_config
-import inference
-import utils
+from . import hparams_config
+from . import inference
+from . import utils
 from tensorflow.python.client import timeline  # pylint: disable=g-direct-tensorflow-import
 
 flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model.')

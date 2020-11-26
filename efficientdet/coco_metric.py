@@ -25,7 +25,7 @@ from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 import tensorflow as tf
 
-from keras import label_util
+from .keras import label_util
 
 
 class EvaluationMetric():

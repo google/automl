@@ -13,6 +13,15 @@
 # limitations under the License.
 # ==============================================================================
 """A simple example on how to use keras model for inference."""
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+  import efficientdet.keras
+  __package__ = "efficientdet.keras"
+
 import os
 from absl import app
 from absl import flags
@@ -21,9 +30,9 @@ import numpy as np
 from PIL import Image
 import tensorflow as tf
 
-import hparams_config
-import inference
-from keras import efficientdet_keras
+from .. import hparams_config
+from .. import inference
+from . import efficientdet_keras
 
 flags.DEFINE_string('image_path', None, 'Location of test image.')
 flags.DEFINE_string('output_dir', None, 'Directory of annotated output images.')

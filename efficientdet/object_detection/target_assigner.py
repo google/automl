@@ -32,8 +32,8 @@ images must be handled externally.
 """
 import tensorflow.compat.v1 as tf
 
-from object_detection import box_list
-from object_detection import shape_utils
+from . import box_list
+from . import shape_utils
 
 
 KEYPOINTS_FIELD_NAME = 'keypoints'

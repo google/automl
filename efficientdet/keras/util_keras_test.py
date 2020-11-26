@@ -12,12 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+  import efficientdet.keras
+  __package__ = "efficientdet.keras"
+
 from absl import logging
 from absl.testing import parameterized
 import tensorflow as tf
 
-import utils
-from keras import util_keras
+from .. import utils
+from . import util_keras
 
 
 class KerasUtilTest(tf.test.TestCase, parameterized.TestCase):

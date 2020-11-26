@@ -13,9 +13,18 @@
 # limitations under the License.
 # ======================================
 """Tests for iou_utils."""
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  import efficientdet
+  __package__ = "efficientdet"
+
 from absl import logging
 import tensorflow as tf
-import iou_utils
+from . import iou_utils
 
 
 class IouUtilsTest(tf.test.TestCase):

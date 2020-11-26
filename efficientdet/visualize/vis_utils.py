@@ -32,8 +32,8 @@ from six.moves import range
 from six.moves import zip
 import tensorflow.compat.v1 as tf
 
-from visualize import shape_utils
-from visualize import standard_fields as fields
+from . import shape_utils
+from . import standard_fields as fields
 
 _TITLE_LEFT_MARGIN = 10
 _TITLE_TOP_MARGIN = 10

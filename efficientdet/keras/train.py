@@ -13,18 +13,27 @@
 # limitations under the License.
 # ==============================================================================
 """The main training script."""
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+  import efficientdet.keras
+  __package__ = "efficientdet.keras"
+
 import os
 from absl import app
 from absl import flags
 from absl import logging
 import tensorflow as tf
 
-import dataloader
-import hparams_config
-import utils
-from keras import tfmot
-from keras import train_lib
-from keras import util_keras
+from .. import dataloader
+from .. import hparams_config
+from .. import utils
+from . import tfmot
+from . import train_lib
+from . import util_keras
 
 
 # Cloud TPU Cluster Resolvers

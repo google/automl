@@ -12,6 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+  import efficientdet.dataset
+  __package__ = "efficientdet.dataset"
+
 r"""Convert PASCAL dataset to TFRecord.
 
 Example usage:
@@ -31,7 +40,7 @@ from lxml import etree
 import PIL.Image
 import tensorflow as tf
 
-from dataset import tfrecord_util
+from . import tfrecord_util
 
 flags.DEFINE_string('data_dir', '', 'Root directory to raw PASCAL VOC dataset.')
 flags.DEFINE_string('set', 'train', 'Convert training set, validation set or '

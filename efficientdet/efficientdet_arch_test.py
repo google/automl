@@ -13,12 +13,21 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for efficientdet_arch."""
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  import efficientdet
+  __package__ = "efficientdet"
+
 from absl import logging
 import tensorflow.compat.v1 as tf
 
-import efficientdet_arch
-import hparams_config
-import utils
+from . import efficientdet_arch
+from . import hparams_config
+from . import utils
 
 
 class EfficientDetArchTest(tf.test.TestCase):

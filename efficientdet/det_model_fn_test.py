@@ -13,8 +13,17 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for det_model_fn."""
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  import efficientdet
+  __package__ = "efficientdet"
+
 import tensorflow as tf
-import det_model_fn
+from . import det_model_fn
 
 
 def legacy_focal_loss(logits, targets, alpha, gamma, normalizer, _=0):

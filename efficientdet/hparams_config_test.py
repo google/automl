@@ -13,13 +13,22 @@
 # limitations under the License.
 # ======================================
 """Tests for hparams_config."""
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+  import efficientdet
+  __package__ = "efficientdet"
+
 import os
 import tempfile
 from absl import logging
 import tensorflow.compat.v1 as tf
 import yaml
 
-import hparams_config
+from . import hparams_config
 
 
 class HparamsConfigTest(tf.test.TestCase):

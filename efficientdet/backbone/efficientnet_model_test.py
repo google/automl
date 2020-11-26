@@ -13,11 +13,20 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for efficientnet_model."""
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+  import efficientdet.backbone
+  __package__ = "efficientdet.backbone"
+
 from absl import logging
 import tensorflow.compat.v1 as tf
 
-import utils
-from backbone import efficientnet_model
+from .. import utils
+from . import efficientnet_model
 
 
 class ModelTest(tf.test.TestCase):

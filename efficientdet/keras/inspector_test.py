@@ -12,6 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+  import efficientdet.keras
+  __package__ = "efficientdet.keras"
+
 r"""Tests for model inspect tool."""
 import os
 import shutil
@@ -23,7 +32,7 @@ import numpy as np
 from PIL import Image
 import tensorflow as tf
 
-from keras import inspector
+from . import inspector
 FLAGS = flags.FLAGS
 
 

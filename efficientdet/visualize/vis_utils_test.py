@@ -13,6 +13,15 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for visualize."""
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+  import efficientdet.visualize
+  __package__ = "efficientdet.visualize"
+
 import os
 from absl import logging
 import numpy as np
@@ -21,8 +30,8 @@ import six
 from six.moves import range
 import tensorflow.compat.v1 as tf
 
-from visualize import standard_fields as fields
-from visualize import vis_utils
+from . import standard_fields as fields
+from . import vis_utils
 
 _TESTDATA_PATH = 'testdata'
 

@@ -13,13 +13,22 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for efficientdet_keras."""
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+  import efficientdet.keras
+  __package__ = "efficientdet.keras"
+
 import os
 import tempfile
 from absl import logging
 import tensorflow.compat.v1 as tf
-import efficientdet_arch as legacy_arch
-import hparams_config
-from keras import efficientdet_keras
+from .. import efficientdet_arch as legacy_arch
+from .. import hparams_config
+from . import efficientdet_keras
 
 SEED = 111111
 

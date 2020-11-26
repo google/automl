@@ -14,6 +14,15 @@
 # ==============================================================================
 """Test for create_coco_tfrecord.py."""
 
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+  import efficientdet.dataset
+  __package__ = "efficientdet.dataset"
+
+
 import io
 import json
 import os
@@ -25,7 +34,7 @@ import PIL.Image
 import six
 import tensorflow as tf
 
-from dataset import create_coco_tfrecord
+from . import create_coco_tfrecord
 
 
 class CreateCocoTFRecordTest(tf.test.TestCase):

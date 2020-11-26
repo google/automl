@@ -13,13 +13,22 @@
 # limitations under the License.
 # ==============================================================================
 """A demo script to show to train a segmentation model."""
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+  import efficientdet.keras
+  __package__ = "efficientdet.keras"
+
 from absl import app
 from absl import logging
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-import hparams_config
-from keras import efficientdet_keras
+from .. import hparams_config
+from . import efficientdet_keras
 
 
 def create_mask(pred_mask):

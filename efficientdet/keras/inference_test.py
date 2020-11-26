@@ -12,13 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+  import efficientdet.keras
+  __package__ = "efficientdet.keras"
+
 r"""Inference test cases."""
 import os
 import tempfile
 from absl import logging
 import tensorflow as tf
-from keras import efficientdet_keras
-from keras import inference
+from . import efficientdet_keras
+from . import inference
 
 
 class InferenceTest(tf.test.TestCase):

@@ -12,13 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
+import os
+import sys
+# Allow relative imports when being executed as script.
+if __name__ == "__main__" and __package__ is None:
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+  import efficientdet.keras
+  __package__ = "efficientdet.keras"
+
 import tempfile
 from absl import logging
 import tensorflow as tf
 
-import det_model_fn as legacy_fn
-import hparams_config
-from keras import train_lib
+from .. import det_model_fn as legacy_fn
+from .. import hparams_config
+from . import train_lib
 
 
 class TrainLibTest(tf.test.TestCase):

@@ -27,8 +27,8 @@ factory function for popular implementations.
 """
 import tensorflow.compat.v1 as tf
 
-from object_detection import matcher
-from object_detection import shape_utils
+from . import matcher
+from . import shape_utils
 
 
 class ArgMaxMatcher(matcher.Matcher):

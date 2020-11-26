@@ -29,8 +29,8 @@ Faster RCNN box coder follows the coding schema described below:
 
 import tensorflow.compat.v1 as tf
 
-from object_detection import box_coder
-from object_detection import box_list
+from . import box_coder
+from . import box_list
 
 EPSILON = 1e-8
 

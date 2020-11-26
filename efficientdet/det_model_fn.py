@@ -18,14 +18,14 @@ import re
 from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
-import coco_metric
-import efficientdet_arch
-import hparams_config
-import nms_np
-import utils
-from keras import anchors
-from keras import efficientdet_keras
-from keras import postprocess
+from . import coco_metric
+from . import efficientdet_arch
+from . import hparams_config
+from . import nms_np
+from . import utils
+from .keras import anchors
+from .keras import efficientdet_keras
+from .keras import postprocess
 
 _DEFAULT_BATCH_SIZE = 64
 

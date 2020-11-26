@@ -24,8 +24,8 @@ from absl import logging
 import numpy as np
 import tensorflow as tf
 
-import utils
-from backbone import efficientnet_model
+from .. import utils
+from . import efficientnet_model
 
 
 def efficientnet_params(model_name):
