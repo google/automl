@@ -163,7 +163,7 @@ def main(_):
           boxes[0],
           classes[0],
           scores[0],
-          min_score_thresh=model_config.nms_configs.score_thresh,
+          min_score_thresh=model_config.nms_configs.score_thresh or 0.4,
           max_boxes_to_draw=model_config.nms_configs.max_output_size)
 
       if out_ptr:
