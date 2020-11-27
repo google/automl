@@ -407,7 +407,7 @@ def get_callbacks(params, val_dataset=None):
   """Get callbacks for given params."""
   if params['moving_average_decay']:
     avg_callback = AverageModelCheckpoint(
-        filepath=os.path.join(params['model_dir'], 'ckpt'),
+        filepath=os.path.join(params['model_dir'], 'ema_ckpt'),
         verbose=1,
         save_weights_only=True,
         update_weights=False)
