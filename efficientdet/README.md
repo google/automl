@@ -369,7 +369,7 @@ For more instructions about training on TPUs, please refer to the following tuto
 
   * EfficientNet tutorial: https://cloud.google.com/tpu/docs/tutorials/efficientnet
 
-## 11. Reducing Memory Usage when Training EfficientDets on GPU.
+## 11. Reducing Memory Usage when Training EfficientDets on GPU. (The current approach doesn't support mirrored multi GPU or mixed-precision training)
 
 EfficientDets use a lot of GPU memory for a few reasons:
 
@@ -377,7 +377,7 @@ EfficientDets use a lot of GPU memory for a few reasons:
 * Large internal activations for backbone: our backbone uses a relatively large expansion ratio (6), causing the large expanded activations.
 * Deep BiFPN: our BiFPN has multiple top-down and bottom-up paths, which leads to a lot of intermediate memory usage during training.
 
-To train this model on GPU with low memory there is an experimental option gradient_checkpointing.
+To train this model on GPU with low memory there is an experimental option grad_checkpoint.
 
 Check these links for a high-level idea of what gradient checkpointing is doing:
 1. https://medium.com/tensorflow/fitting-larger-networks-into-memory-583e3c758ff9
@@ -387,7 +387,6 @@ Check these links for a high-level idea of what gradient checkpointing is doing:
 If set to True, keras model uses ```tf.recompute_grad``` to achieve gradient checkpoints.
 
 Testing shows that:
-* It allows to train a d7x network with batch size of 2 by keras/train.py on a 11Gb (1080Ti) GPU
 * It also allows to train a d6 network with batch size of 2 by main.py on a 11Gb (1080Ti) GPU
 
 ## 12. Visualize TF-Records.
