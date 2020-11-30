@@ -618,15 +618,11 @@ def build_model_with_precision(pp, mm, ii, tt, *args, **kwargs):
       outputs = mm(inputs, *args, **kwargs)
     set_precision_policy('float32')
   elif pp == 'mixed_float16':
-    if tt:
-      outputs = mm(ii, *args, **kwargs)
-    else:
-      tf.train.experimental.disable_mixed_precision_graph_rewrite()
-      set_precision_policy(pp, loss_scale=tt)
-      inputs = tf.cast(ii, tf.float16)
-      with float16_scope():
-        outputs = mm(inputs, *args, **kwargs)
-      set_precision_policy('float32')
+    set_precision_policy(pp, loss_scale=tt)
+    inputs = tf.cast(ii, tf.float16)
+    with float16_scope():
+      outputs = mm(inputs, *args, **kwargs)
+    set_precision_policy('float32')
   elif not pp or pp == 'float32':
     outputs = mm(ii, *args, **kwargs)
   else:
