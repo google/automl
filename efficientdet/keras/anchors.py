@@ -116,8 +116,11 @@ class Anchors():
         stride, octave_scale, aspect, anchor_scale = config
         base_anchor_size_x = anchor_scale * stride[1] * 2**octave_scale
         base_anchor_size_y = anchor_scale * stride[0] * 2**octave_scale
-        aspect_x = np.sqrt(aspect)
-        aspect_y = 1.0 / aspect_x
+        if isinstance(aspect, list):
+          aspect_x, aspect_y = aspect
+        else:
+          aspect_x = np.sqrt(aspect)
+          aspect_y = 1.0 / aspect_x
         anchor_size_x_2 = base_anchor_size_x * aspect_x / 2.0
         anchor_size_y_2 = base_anchor_size_y * aspect_y / 2.0
 
