@@ -116,10 +116,13 @@ def get_ckpt_var_map(ckpt_path, ckpt_scope, var_scope, skip_mismatch=None):
       logging.info('skip {} -- does not match scope {}'.format(
           v.op.name, var_scope))
     ckpt_var = ckpt_scope + v.op.name[len(var_scope):]
-    replica_id = tf.keras.backend.get_value(
-        tf.distribute.get_replica_context()._replica_id_in_sync_group)
-    if tf.distribute.has_strategy() and replica_id >= 1:
-      ckpt_var = ''.join(ckpt_var.rsplit(f'/replica_{replica_id}', 1))
+
+    if tf.distribute.get_replica_context():
+      replica_id = tf.keras.backend.get_value(
+          tf.distribute.get_replica_context().replica_id_in_sync_group)
+      if replica_id >= 1:
+        ckpt_var = ''.join(ckpt_var.rsplit(f'/replica_{replica_id}', 1))
+
     if (ckpt_var not in ckpt_var_names and
         v.op.name.endswith('/ExponentialMovingAverage')):
       ckpt_var = ckpt_scope + v.op.name[:-len('/ExponentialMovingAverage')]
