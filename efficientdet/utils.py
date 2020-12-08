@@ -112,7 +112,7 @@ def get_ckpt_var_map(ckpt_path, ckpt_scope, var_scope, skip_mismatch=None):
   ckpt_var_names = set(reader.get_variable_to_shape_map().keys())
 
   if tf.distribute.get_replica_context():
-    replica_id = tf.keras.backend.get_value(
+    replica_id = tf.get_static_value(
       tf.distribute.get_replica_context().replica_id_in_sync_group)
   else:
     replica_id = 0

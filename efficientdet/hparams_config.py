@@ -204,7 +204,7 @@ def default_detection_configs():
   h.max_level = 7
   h.num_scales = 3
   # ratio w/h: 2.0 means w=1.4, h=0.7. Can be computed with k-mean per dataset.
-  h.aspect_ratios = [1.0, 2.0, 0.5]
+  h.aspect_ratios = [1.0, 2.0, 0.5]  #[[0.7, 1.4], [1.0, 1.0], [1.4, 0.7]]
   h.anchor_scale = 4.0
   # is batchnorm training mode
   h.is_training_bn = True
@@ -238,8 +238,8 @@ def default_detection_configs():
   h.weight_decay = 4e-5
   h.strategy = None  # 'tpu', 'gpus', None
   h.mixed_precision = False  # If False, use float32.
-  h.loss_scale = 2**10  # If False, use float32.
-  h.model_optimizations = {}  # 'prune'
+  h.loss_scale = None  # set to 2**16 enables dynamic loss scale
+  h.model_optimizations = {}  # 'prune':{}
 
   # For detection.
   h.box_class_repeats = 3
