@@ -493,6 +493,10 @@ class FocalLoss(tf.keras.losses.Loss):
     self.gamma = gamma
     self.label_smoothing = label_smoothing
 
+  def _smooth_labels(self, y_true, y_pred):
+    num_classes = tf.cast(tf.shape(y_true)[-1] // 9, y_pred.dtype)
+    return y_true * (1.0 - self.label_smoothing) + (self.label_smoothing / num_classes)
+
   @tf.autograph.experimental.do_not_convert
   def call(self, y, y_pred):
     """Compute focal loss for y and y_pred.
@@ -516,7 +520,7 @@ class FocalLoss(tf.keras.losses.Loss):
     modulating_factor = (1.0 - p_t)**gamma
 
     # apply label smoothing for cross_entropy for each entry.
-    y_true = y_true * (1.0 - self.label_smoothing) + 0.5 * self.label_smoothing
+    y_true = self._smooth_labels(y_true, y_pred)
     ce = tf.nn.sigmoid_cross_entropy_with_logits(labels=y_true, logits=y_pred)
 
     # compute the final loss and return

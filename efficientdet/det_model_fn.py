@@ -162,7 +162,8 @@ def focal_loss(y_pred, y_true, alpha, gamma, normalizer, label_smoothing=0.0):
 
     # apply label smoothing for cross_entropy for each entry.
     if label_smoothing:
-      y_true = y_true * (1.0 - label_smoothing) + 0.5 * label_smoothing
+      num_classes = tf.cast(tf.shape(y_true)[-1] // 9, y_pred.dtype)
+      y_true = y_true * (1.0 - label_smoothing) + label_smoothing / num_classes
     ce = tf.nn.sigmoid_cross_entropy_with_logits(labels=y_true, logits=y_pred)
 
     # compute the final loss and return
