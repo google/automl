@@ -108,7 +108,7 @@ Notably,
 
 There are two types of latency: network latency and end-to-end latency.
 
-(1) To measure the network latency (from the list conv to the last class/box
+(1) To measure the network latency (from the first conv to the last class/box
 prediction output), use the following command:
 
     !python model_inspect.py --runmode=bm --model_name=efficientdet-d0
