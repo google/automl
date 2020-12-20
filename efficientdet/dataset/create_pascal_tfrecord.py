@@ -33,19 +33,6 @@ import tensorflow as tf
 
 from dataset import tfrecord_util
 
-flags.DEFINE_string('data_dir', '', 'Root directory to raw PASCAL VOC dataset.')
-flags.DEFINE_string('set', 'train', 'Convert training set, validation set or '
-                    'merged set.')
-flags.DEFINE_string('annotations_dir', 'Annotations',
-                    '(Relative) path to annotations directory.')
-flags.DEFINE_string('year', 'VOC2007', 'Desired challenge year.')
-flags.DEFINE_string('output_path', '', 'Path to output TFRecord and json.')
-flags.DEFINE_string('label_map_json_path', None,
-                    'Path to label map json file with a dictionary.')
-flags.DEFINE_boolean('ignore_difficult_instances', False, 'Whether to ignore '
-                     'difficult instances')
-flags.DEFINE_integer('num_shards', 100, 'Number of shards for output file.')
-flags.DEFINE_integer('num_images', None, 'Max number of imags to process.')
 FLAGS = flags.FLAGS
 
 SETS = ['train', 'val', 'trainval', 'test']
@@ -79,6 +66,24 @@ GLOBAL_IMG_ID = 0  # global image id.
 GLOBAL_ANN_ID = 0  # global annotation id.
 
 
+def define_flags():
+  """Define the flags."""
+  flags.DEFINE_string('data_dir', '',
+                      'Root directory to raw PASCAL VOC dataset.')
+  flags.DEFINE_string('set', 'train', 'Convert training set, validation set or '
+                      'merged set.')
+  flags.DEFINE_string('annotations_dir', 'Annotations',
+                      '(Relative) path to annotations directory.')
+  flags.DEFINE_string('year', 'VOC2007', 'Desired challenge year.')
+  flags.DEFINE_string('output_path', '', 'Path to output TFRecord and json.')
+  flags.DEFINE_string('label_map_json_path', None,
+                      'Path to label map json file with a dictionary.')
+  flags.DEFINE_boolean('ignore_difficult_instances', False, 'Whether to ignore '
+                       'difficult instances')
+  flags.DEFINE_integer('num_shards', 100, 'Number of shards for output file.')
+  flags.DEFINE_integer('num_images', None, 'Max number of imags to process.')
+
+
 def get_image_id(filename):
   """Convert a string to a integer."""
   # Warning: this function is highly specific to pascal filename!!
@@ -101,10 +106,9 @@ def get_ann_id():
 
 
 def dict_to_tf_example(data,
-                       dataset_directory,
+                       images_dir,
                        label_map_dict,
                        ignore_difficult_instances=False,
-                       image_subdirectory='JPEGImages',
                        ann_json_dict=None):
   """Convert XML derived dict to tf.Example proto.
 
@@ -114,12 +118,10 @@ def dict_to_tf_example(data,
   Args:
     data: dict holding PASCAL XML fields for a single image (obtained by running
       tfrecord_util.recursive_parse_xml_to_dict)
-    dataset_directory: Path to root directory holding PASCAL dataset
+    images_dir: Path to the directory holding raw images.
     label_map_dict: A map from string label names to integers ids.
     ignore_difficult_instances: Whether to skip difficult instances in the
       dataset  (default: False).
-    image_subdirectory: String specifying subdirectory within the PASCAL dataset
-      directory holding the actual image data.
     ann_json_dict: annotation json dictionary.
 
   Returns:
@@ -128,8 +130,7 @@ def dict_to_tf_example(data,
   Raises:
     ValueError: if the image pointed to by data['filename'] is not a valid JPEG
   """
-  img_path = os.path.join(data['folder'], image_subdirectory, data['filename'])
-  full_path = os.path.join(dataset_directory, img_path)
+  full_path = os.path.join(images_dir, data['filename'])
   with tf.io.gfile.GFile(full_path, 'rb') as fid:
     encoded_jpg = fid.read()
   encoded_jpg_io = io.BytesIO(encoded_jpg)
@@ -297,9 +298,10 @@ def main(_):
       xml = etree.fromstring(xml_str)
       data = tfrecord_util.recursive_parse_xml_to_dict(xml)['annotation']
 
+      img_dir = os.path.join(FLAGS.data_dir, data['folder'], 'JPEGImages')
       tf_example = dict_to_tf_example(
           data,
-          FLAGS.data_dir,
+          img_dir,
           label_map_dict,
           FLAGS.ignore_difficult_instances,
           ann_json_dict=ann_json_dict)
@@ -316,4 +318,5 @@ def main(_):
 
 
 if __name__ == '__main__':
+  define_flags()
   app.run(main)

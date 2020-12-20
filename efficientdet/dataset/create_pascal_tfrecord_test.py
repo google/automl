@@ -73,8 +73,9 @@ class CreatePascalTFRecordTest(tf.test.TestCase):
         'notperson': 2,
     }
 
-    example = create_pascal_tfrecord.dict_to_tf_example(
-        data, self.get_temp_dir(), label_map_dict, image_subdirectory='')
+    example = create_pascal_tfrecord.dict_to_tf_example(data,
+                                                        self.get_temp_dir(),
+                                                        label_map_dict)
     self._assertProtoEqual(
         example.features.feature['image/height'].int64_list.value, [256])
     self._assertProtoEqual(

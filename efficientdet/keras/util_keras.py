@@ -132,9 +132,11 @@ def restore_ckpt(model,
         var_dict[v.name.split(':')[0]] = v
     # try to load graph-based checkpoint with ema support,
     # else load checkpoint via keras.load_weights which doesn't support ema.
-    for key, var in var_dict.items():
+    for i, (key, var) in enumerate(var_dict.items()):
       try:
         var.assign(tf.train.load_variable(ckpt_path_or_file, key))
+        if i < 10:
+          logging.info('Init %s from %s (%s)', var.name, key, ckpt_path_or_file)
       except tf.errors.NotFoundError as e:
         if skip_mismatch:
           logging.warning('Not found %s in %s', key, ckpt_path_or_file)
