@@ -245,7 +245,7 @@ Create a config file for the PASCAL VOC dataset called voc_config.yaml and put t
 Finetune needs to use --pretrained_ckpt.
 
     !python train.py
-        --training_file_pattern=tfrecord/pascal*.tfrecord \
+        --train_file_pattern=tfrecord/pascal*.tfrecord \
         --val_file_pattern=tfrecord/pascal*.tfrecord \
         --val_file_pattern=tfrecord/*.json \
         --model_name=efficientdet-d0 \
@@ -273,7 +273,7 @@ To train this model on Cloud TPU, you will need:
 Then train the model:
 
     !export PYTHONPATH="$PYTHONPATH:/path/to/models"
-    !python train.py --tpu=TPU_NAME --training_file_pattern=DATA_DIR/*.tfrecord --model_dir=MODEL_DIR --strategy=tpu
+    !python train.py --tpu=TPU_NAME --train_file_pattern=DATA_DIR/*.tfrecord --model_dir=MODEL_DIR --strategy=tpu
 
     # TPU_NAME is the name of the TPU node, the same name that appears when you run gcloud compute tpus list, or ctpu ls.
     # MODEL_DIR is a GCS location (a URL starting with gs:// where both the GCE VM and the associated Cloud TPU have write access.

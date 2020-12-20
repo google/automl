@@ -30,6 +30,17 @@ from keras import util_keras
 # pylint: disable=arguments-differ  # fo keras layers.
 
 
+def add_n(nodes):
+  """A customized add_n to add up a list of tensors."""
+  # tf.add_n is not supported by EdgeTPU, while tf.reduce_sum is not supported
+  # by GPU and runs slow on EdgeTPU because of the 5-dimension op.
+  with tf.name_scope('add_n'):
+    new_node = nodes[0]
+    for n in nodes[1:]:
+      new_node = new_node + n
+    return new_node
+
+
 class FNode(tf.keras.layers.Layer):
   """A Keras Layer implementing BiFPN Node."""
 
@@ -89,12 +100,12 @@ class FNode(tf.keras.layers.Layer):
       for var in self.vars:
         var = tf.cast(var, dtype=dtype)
         edge_weights.append(var)
-      weights_sum = tf.add_n(edge_weights)
+      weights_sum = add_n(edge_weights)
       nodes = [
           nodes[i] * edge_weights[i] / (weights_sum + 0.0001)
           for i in range(len(nodes))
       ]
-      new_node = tf.add_n(nodes)
+      new_node = add_n(nodes)
     elif self.weight_method == 'channel_attn':
       edge_weights = []
       for var in self.vars:
@@ -109,14 +120,14 @@ class FNode(tf.keras.layers.Layer):
         var = tf.cast(var, dtype=dtype)
         edge_weights.append(var)
 
-      weights_sum = tf.add_n(edge_weights)
+      weights_sum = add_n(edge_weights)
       nodes = [
           nodes[i] * edge_weights[i] / (weights_sum + 0.0001)
           for i in range(len(nodes))
       ]
-      new_node = tf.add_n(nodes)
+      new_node = add_n(nodes)
     elif self.weight_method == 'sum':
-      new_node = tf.reduce_sum(nodes, axis=0)
+      new_node = add_n(nodes)
     else:
       raise ValueError('unknown weight_method %s' % self.weight_method)
 
@@ -289,9 +300,9 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
 
   def _upsample2d(self, inputs, target_height, target_width):
     return tf.cast(
-        tf.image.resize(
-            tf.cast(inputs, tf.float32), [target_height, target_width],
-            method=self.upsampling_type), inputs.dtype)
+        tf.compat.v1.image.resize_nearest_neighbor(
+            tf.cast(inputs, tf.float32), [target_height, target_width]),
+        inputs.dtype)
 
   def _maybe_apply_1x1(self, feat, training, num_channels):
     """Apply 1x1 conv to change layer width if necessary."""
@@ -349,6 +360,7 @@ class ClassNet(tf.keras.layers.Layer):
                data_format='channels_last',
                grad_checkpoint=False,
                name='class_net',
+               feature_only=False,
                **kwargs):
     """Initialize the ClassNet.
 
@@ -367,6 +379,8 @@ class ClassNet(tf.keras.layers.Layer):
       data_format: string of 'channel_first' or 'channels_last'.
       grad_checkpoint: bool, If true, apply grad checkpoint for saving memory.
       name: the name of this layerl.
+      feature_only: build the base feature network only (excluding final class
+        head).
       **kwargs: other parameters.
     """
 
@@ -386,6 +400,7 @@ class ClassNet(tf.keras.layers.Layer):
     self.conv_ops = []
     self.bns = []
     self.grad_checkpoint = grad_checkpoint
+    self.feature_only = feature_only
     if separable_conv:
       conv2d_layer = functools.partial(
           tf.keras.layers.SeparableConv2D,
@@ -454,8 +469,10 @@ class ClassNet(tf.keras.layers.Layer):
       image = inputs[level_id]
       for i in range(self.repeats):
         image = self._conv_bn_act(image, i, level_id, training)
-
-      class_outputs.append(self.classes(image))
+      if self.feature_only:
+        class_outputs.append(image)
+      else:
+        class_outputs.append(self.classes(image))
 
     return class_outputs
 
@@ -477,6 +494,7 @@ class BoxNet(tf.keras.layers.Layer):
                data_format='channels_last',
                grad_checkpoint=False,
                name='box_net',
+               feature_only=False,
                **kwargs):
     """Initialize BoxNet.
 
@@ -494,6 +512,8 @@ class BoxNet(tf.keras.layers.Layer):
       data_format: string of 'channel_first' or 'channels_last'.
       grad_checkpoint: bool, If true, apply grad checkpoint for saving memory.
       name: Name of the layer.
+      feature_only: build the base feature network only (excluding box class
+        head).
       **kwargs: other parameters.
     """
 
@@ -511,6 +531,7 @@ class BoxNet(tf.keras.layers.Layer):
     self.strategy = strategy
     self.data_format = data_format
     self.grad_checkpoint = grad_checkpoint
+    self.feature_only = feature_only
 
     self.conv_ops = []
     self.bns = []
@@ -603,7 +624,11 @@ class BoxNet(tf.keras.layers.Layer):
       image = inputs[level_id]
       for i in range(self.repeats):
         image = self._conv_bn_act(image, i, level_id, training)
-      box_outputs.append(self.boxes(image))
+
+      if self.feature_only:
+        box_outputs.append(image)
+      else:
+        box_outputs.append(self.boxes(image))
 
     return box_outputs
 
@@ -752,7 +777,11 @@ class FPNCell(tf.keras.layers.Layer):
 class EfficientDetNet(tf.keras.Model):
   """EfficientDet keras network without pre/post-processing."""
 
-  def __init__(self, model_name=None, config=None, name=''):
+  def __init__(self,
+               model_name=None,
+               config=None,
+               name='',
+               feature_only=False):
     """Initialize model."""
     super().__init__(name=name)
 
@@ -816,7 +845,8 @@ class EfficientDetNet(tf.keras.Model):
             survival_prob=config.survival_prob,
             strategy=config.strategy,
             grad_checkpoint=config.grad_checkpoint,
-            data_format=config.data_format)
+            data_format=config.data_format,
+            feature_only=feature_only)
 
         self.box_net = BoxNet(
             num_anchors=num_anchors,
@@ -830,7 +860,8 @@ class EfficientDetNet(tf.keras.Model):
             survival_prob=config.survival_prob,
             strategy=config.strategy,
             grad_checkpoint=config.grad_checkpoint,
-            data_format=config.data_format)
+            data_format=config.data_format,
+            feature_only=feature_only)
 
       if head == 'segmentation':
         self.seg_head = SegmentationHead(

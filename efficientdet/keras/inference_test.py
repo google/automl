@@ -17,6 +17,7 @@ import os
 import tempfile
 from absl import logging
 import tensorflow as tf
+from brain_automl.efficientdet import test_util
 from keras import efficientdet_keras
 from keras import inference
 
@@ -39,10 +40,10 @@ class InferenceTest(tf.test.TestCase):
     driver.load(saved_model_path)
     driver.load(os.path.join(saved_model_path, 'efficientdet-d0_frozen.pb'))
 
-  def test_export_tflite(self):
+  def test_export_tflite_only_network(self):
     saved_model_path = os.path.join(self.tmp_path, 'saved_model')
     driver = inference.ServingDriver(
-        'efficientdet-d0', self.tmp_path, only_network=True)
+        'efficientdet-lite0', self.tmp_path, only_network=True)
     driver.export(saved_model_path, tflite='FP32')
     self.assertTrue(
         tf.io.gfile.exists(os.path.join(saved_model_path, 'fp32.tflite')))
@@ -50,6 +51,23 @@ class InferenceTest(tf.test.TestCase):
     driver.export(saved_model_path, tflite='FP16')
     self.assertTrue(
         tf.io.gfile.exists(os.path.join(saved_model_path, 'fp16.tflite')))
+    tf.io.gfile.rmtree(saved_model_path)
+    tfrecord_path = test_util.make_fake_tfrecord(self.get_temp_dir())
+    driver.export(
+        saved_model_path,
+        tflite='INT8',
+        file_pattern=[tfrecord_path],
+        num_calibration_steps=1)
+    self.assertTrue(
+        tf.io.gfile.exists(os.path.join(saved_model_path, 'int8.tflite')))
+
+  def test_export_tflite_with_post_processing(self):
+    saved_model_path = os.path.join(self.tmp_path, 'saved_model')
+    driver = inference.ServingDriver(
+        'efficientdet-lite0', self.tmp_path, only_network=False)
+    driver.export(saved_model_path, tflite='FP32')
+    self.assertTrue(
+        tf.io.gfile.exists(os.path.join(saved_model_path, 'fp32.tflite')))
 
   def test_inference(self):
     driver = inference.ServingDriver('efficientdet-d0', self.tmp_path)

@@ -79,9 +79,9 @@ flags.DEFINE_integer('iterations_per_loop', 100,
 flags.DEFINE_integer('save_checkpoints_steps', 100,
                      'Number of iterations per checkpoint save')
 flags.DEFINE_string(
-    'training_file_pattern', None,
+    'train_file_pattern', None,
     'Glob for training data files (e.g., COCO train - minival set)')
-flags.DEFINE_string('validation_file_pattern', None,
+flags.DEFINE_string('val_file_pattern', None,
                     'Glob for evaluation tfrecords (e.g., COCO val2017 set)')
 flags.DEFINE_string(
     'val_json_file', None,
@@ -95,7 +95,7 @@ flags.DEFINE_integer('num_epochs', None, 'Number of epochs for training')
 flags.DEFINE_string('mode', 'train',
                     'Mode to run: train or eval (default: train)')
 flags.DEFINE_string('model_name', 'efficientdet-d1', 'Model name.')
-flags.DEFINE_bool('eval_after_training', False, 'Run one eval after the '
+flags.DEFINE_bool('eval_after_train', False, 'Run one eval after the '
                   'training finishes.')
 flags.DEFINE_bool('profile', False, 'Profile training performance.')
 flags.DEFINE_integer(
@@ -131,11 +131,11 @@ def main(_):
 
   # Check data path
   if FLAGS.mode in ('train', 'train_and_eval'):
-    if FLAGS.training_file_pattern is None:
-      raise RuntimeError('Must specify --training_file_pattern for train.')
+    if FLAGS.train_file_pattern is None:
+      raise RuntimeError('Must specify --train_file_pattern for train.')
   if FLAGS.mode in ('eval', 'train_and_eval'):
-    if FLAGS.validation_file_pattern is None:
-      raise RuntimeError('Must specify --validation_file_pattern for eval.')
+    if FLAGS.val_file_pattern is None:
+      raise RuntimeError('Must specify --val_file_pattern for eval.')
 
   # Parse and override hparams
   config = hparams_config.get_detection_config(FLAGS.model_name)
@@ -235,12 +235,12 @@ def main(_):
     tf.io.gfile.GFile(config_file, 'w').write(str(config))
 
   train_input_fn = dataloader.InputReader(
-      FLAGS.training_file_pattern,
+      FLAGS.train_file_pattern,
       is_training=True,
       use_fake_data=FLAGS.use_fake_data,
       max_instances_per_image=max_instances_per_image)
   eval_input_fn = dataloader.InputReader(
-      FLAGS.validation_file_pattern,
+      FLAGS.val_file_pattern,
       is_training=False,
       use_fake_data=FLAGS.use_fake_data,
       max_instances_per_image=max_instances_per_image)
@@ -295,7 +295,7 @@ def main(_):
   # start train/eval flow.
   if FLAGS.mode == 'train':
     train_est.train(input_fn=train_input_fn, max_steps=train_steps)
-    if FLAGS.eval_after_training:
+    if FLAGS.eval_after_train:
       eval_est.evaluate(input_fn=eval_input_fn, steps=eval_steps)
 
   elif FLAGS.mode == 'eval':

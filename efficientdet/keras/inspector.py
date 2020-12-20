@@ -55,6 +55,11 @@ flags.DEFINE_string('output_video', None,
 # For saved model.
 flags.DEFINE_string('saved_model_dir', None, 'Folder path for saved model.')
 flags.DEFINE_string('tflite', None, 'tflite type: {FP32, FP16, INT8}.')
+flags.DEFINE_string('file_pattern', None,
+                    'Glob for tfrecords, e.g. coco/val-*.tfrecord.')
+flags.DEFINE_integer(
+    'num_calibration_steps', 2000,
+    'Number of post-training quantization calibration steps to run.')
 flags.DEFINE_bool('debug', False, 'Debug mode.')
 flags.DEFINE_bool('only_network', False, 'Model only contains network')
 FLAGS = flags.FLAGS
@@ -86,7 +91,8 @@ def main(_):
     model_dir = FLAGS.saved_model_dir
     if tf.io.gfile.exists(model_dir):
       tf.io.gfile.rmtree(model_dir)
-    driver.export(model_dir, FLAGS.tensorrt, FLAGS.tflite)
+    driver.export(model_dir, FLAGS.tensorrt, FLAGS.tflite, FLAGS.file_pattern,
+                  FLAGS.num_calibration_steps)
     print('Model are exported to %s' % model_dir)
   elif FLAGS.mode == 'infer':
     image_file = tf.io.read_file(FLAGS.input_image)
@@ -178,5 +184,5 @@ def main(_):
 
 
 if __name__ == '__main__':
-  logging.set_verbosity(logging.ERROR)
+  logging.set_verbosity(logging.INFO)
   app.run(main)

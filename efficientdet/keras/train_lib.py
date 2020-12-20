@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """Training related libraries."""
+import functools
 import math
 import os
 import re
@@ -22,6 +23,7 @@ import numpy as np
 
 import tensorflow as tf
 from tensorflow_addons.callbacks import AverageModelCheckpoint
+import tensorflow_hub as hub
 
 import coco_metric
 import inference
@@ -356,9 +358,12 @@ class COCOCallback(tf.keras.callbacks.Callback):
       for (images, labels) in dataset:
         strategy.run(self._get_detections, (images, labels))
       metrics = self.evaluator.result()
+      eval_results = {}
       with self.file_writer.as_default(), tf.summary.record_if(True):
         for i, name in enumerate(self.evaluator.metric_names):
           tf.summary.scalar(name, metrics[i], step=epoch)
+          eval_results[name] = metrics[i]
+      return eval_results
 
 
 class DisplayCallback(tf.keras.callbacks.Callback):
@@ -407,14 +412,14 @@ def get_callbacks(params, val_dataset=None):
   """Get callbacks for given params."""
   if params['moving_average_decay']:
     avg_callback = AverageModelCheckpoint(
-        filepath=os.path.join(params['model_dir'], 'ema_ckpt'),
+        filepath=os.path.join(params['model_dir'], 'emackpt-{epoch:d}'),
         verbose=1,
         save_weights_only=True,
         update_weights=False)
     callbacks = [avg_callback]
   else:
     ckpt_callback = tf.keras.callbacks.ModelCheckpoint(
-        os.path.join(params['model_dir'], 'ckpt'),
+        os.path.join(params['model_dir'], 'ckpt-{epoch:d}'),
         verbose=1,
         save_weights_only=True)
     callbacks = [ckpt_callback]
@@ -436,7 +441,8 @@ def get_callbacks(params, val_dataset=None):
         params.get('sample_image', None), params['model_dir'],
         params['img_summary_steps'])
     callbacks.append(display_callback)
-  if params.get('map_freq', None) and val_dataset:
+  if (params.get('map_freq', None) and val_dataset and
+      params['strategy'] != 'tpu'):
     coco_callback = COCOCallback(val_dataset, params['map_freq'])
     callbacks.append(coco_callback)
   return callbacks
@@ -843,3 +849,61 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     loss_vals['reg_l2_loss'] = reg_l2_loss
     loss_vals['loss'] = total_loss + tf.cast(reg_l2_loss, loss_dtype)
     return loss_vals
+
+
+class EfficientDetNetTrainHub(EfficientDetNetTrain):
+  """EfficientDetNetTrain for Hub module."""
+
+  def __init__(self, config, hub_module_url, name=''):
+    super(efficientdet_keras.EfficientDetNet, self).__init__(name=name)
+    self.config = config
+    self.hub_module_url = hub_module_url
+    self.base_model = hub.KerasLayer(hub_module_url, trainable=True)
+
+    # class/box output prediction network.
+    num_anchors = len(config.aspect_ratios) * config.num_scales
+
+    if config.separable_conv:
+      conv2d_layer = functools.partial(
+          tf.keras.layers.SeparableConv2D, depth_multiplier=1)
+    else:
+      conv2d_layer = tf.keras.layers.Conv2D
+    self.classes = conv2d_layer(
+        config.num_classes * num_anchors,
+        kernel_size=3,
+        bias_initializer=tf.constant_initializer(-np.log((1 - 0.01) / 0.01)),
+        padding='same',
+        name='class_net/class-predict')
+
+    if config.separable_conv:
+      self.boxes = tf.keras.layers.SeparableConv2D(
+          filters=4 * num_anchors,
+          depth_multiplier=1,
+          pointwise_initializer=tf.initializers.variance_scaling(),
+          depthwise_initializer=tf.initializers.variance_scaling(),
+          data_format=config.data_format,
+          kernel_size=3,
+          activation=None,
+          bias_initializer=tf.zeros_initializer(),
+          padding='same',
+          name='box_net/box-predict')
+    else:
+      self.boxes = tf.keras.layers.Conv2D(
+          filters=4 * num_anchors,
+          kernel_initializer=tf.random_normal_initializer(stddev=0.01),
+          data_format=config.data_format,
+          kernel_size=3,
+          activation=None,
+          bias_initializer=tf.zeros_initializer(),
+          padding='same',
+          name='box_net/box-predict')
+
+    log_dir = os.path.join(self.config.model_dir, 'train_images')
+    self.summary_writer = tf.summary.create_file_writer(log_dir)
+
+  def call(self, inputs, training):
+    cls_outputs, box_outputs = self.base_model(inputs, training=training)
+    for i in range(self.config.max_level - self.config.min_level + 1):
+      cls_outputs[i] = self.classes(cls_outputs[i])
+      box_outputs[i] = self.boxes(box_outputs[i])
+    return (cls_outputs, box_outputs)

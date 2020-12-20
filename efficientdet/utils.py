@@ -113,7 +113,7 @@ def get_ckpt_var_map(ckpt_path, ckpt_scope, var_scope, skip_mismatch=None):
 
   if tf.distribute.get_replica_context():
     replica_id = tf.get_static_value(
-      tf.distribute.get_replica_context().replica_id_in_sync_group)
+        tf.distribute.get_replica_context().replica_id_in_sync_group)
   else:
     replica_id = 0
 
@@ -125,11 +125,11 @@ def get_ckpt_var_map(ckpt_path, ckpt_scope, var_scope, skip_mismatch=None):
 
     if not var_op_name.startswith(var_scope):
       logging.info('skip {} -- does not match scope {}'.format(
-        var_op_name, var_scope))
+          var_op_name, var_scope))
     ckpt_var = ckpt_scope + var_op_name[len(var_scope):]
 
     if (ckpt_var not in ckpt_var_names and
-              var_op_name.endswith('/ExponentialMovingAverage')):
+        var_op_name.endswith('/ExponentialMovingAverage')):
       ckpt_var = ckpt_scope + var_op_name[:-len('/ExponentialMovingAverage')]
 
     if ckpt_var not in ckpt_var_names:
@@ -137,17 +137,18 @@ def get_ckpt_var_map(ckpt_path, ckpt_scope, var_scope, skip_mismatch=None):
         # Skip optimizer variables.
         continue
       if skip_mismatch:
-        logging.info('skip {} ({}) -- not in ckpt'.format(var_op_name, ckpt_var))
+        logging.info('skip {} ({}) -- not in ckpt'.format(
+            var_op_name, ckpt_var))
         continue
       raise ValueError('{} is not in ckpt {}'.format(v.op, ckpt_path))
 
     if v.shape != ckpt_var_name_to_shape[ckpt_var]:
       if skip_mismatch:
         logging.info('skip {} ({} vs {}) -- shape mismatch'.format(
-          var_op_name, v.shape, ckpt_var_name_to_shape[ckpt_var]))
+            var_op_name, v.shape, ckpt_var_name_to_shape[ckpt_var]))
         continue
       raise ValueError('shape mismatch {} ({} vs {})'.format(
-        var_op_name, v.shape, ckpt_var_name_to_shape[ckpt_var]))
+          var_op_name, v.shape, ckpt_var_name_to_shape[ckpt_var]))
 
     if i < 5:
       # Log the first few elements for sanity check.
