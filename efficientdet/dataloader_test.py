@@ -18,7 +18,7 @@ import tensorflow as tf
 
 import dataloader
 import hparams_config
-from brain_automl.efficientdet import test_util
+import test_util
 
 from keras import anchors
 from object_detection import tf_example_decoder
