@@ -17,7 +17,7 @@ import os
 import tempfile
 from absl import logging
 import tensorflow as tf
-from brain_automl.efficientdet import test_util
+import test_util
 from keras import efficientdet_keras
 from keras import inference
 
