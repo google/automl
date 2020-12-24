@@ -174,3 +174,10 @@ def fp16_to_fp32_nested(input_nested):
   else:
     return input_nested
   return out_tensor_dict
+
+def get_batch_norm(bn_class):
+  def _wrapper(*args, **kwargs):
+    if not kwargs.get('name', None):
+      kwargs['name'] = 'tpu_batch_normalization'
+    return bn_class(*args, **kwargs)
+  return _wrapper

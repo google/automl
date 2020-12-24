@@ -28,7 +28,9 @@ from keras import postprocess
 from keras import tfmot
 from keras import util_keras
 # pylint: disable=arguments-differ  # fo keras layers.
-
+utils.BatchNormalization = util_keras.get_batch_norm(tf.keras.layers.BatchNormalization)
+utils.SyncBatchNormalization = util_keras.get_batch_norm(tf.keras.layers.experimental.SyncBatchNormalization)
+utils.TpuBatchNormalization = util_keras.get_batch_norm(tf.keras.layers.experimental.SyncBatchNormalization)
 
 def add_n(nodes):
   """A customized add_n to add up a list of tensors."""
