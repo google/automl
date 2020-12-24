@@ -622,13 +622,11 @@ def build_model_with_precision(pp, mm, ii, *args, **kwargs):
     inputs = tf.cast(ii, tf.bfloat16)
     with tf.tpu.bfloat16_scope():
       outputs = mm(inputs, *args, **kwargs)
-    set_precision_policy('float32')
   elif pp == 'mixed_float16':
     set_precision_policy(pp)
     inputs = tf.cast(ii, tf.float16)
     with float16_scope():
       outputs = mm(inputs, *args, **kwargs)
-    set_precision_policy('float32')
   elif not pp or pp == 'float32':
     outputs = mm(ii, *args, **kwargs)
   else:
