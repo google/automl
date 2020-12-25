@@ -78,7 +78,7 @@ def define_flags():
   flags.DEFINE_integer('batch_size', 64, 'training batch size')
   flags.DEFINE_integer('eval_samples', 5000, 'The number of samples for '
                        'evaluation.')
-  flags.DEFINE_integer('steps_per_execution', 200,
+  flags.DEFINE_integer('steps_per_execution', 1,
                        'Number of steps per training execution.')
   flags.DEFINE_string(
       'train_file_pattern', None,
