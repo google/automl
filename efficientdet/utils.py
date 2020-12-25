@@ -219,9 +219,9 @@ class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
       # Compute variance using: Var[X]= E[X^2] - E[X]^2.
       shard_square_of_mean = tf.math.square(shard_mean)
       shard_mean_of_square = shard_variance + shard_square_of_mean
-      group_mean, group_mean_of_square = (
-          replica_context.all_reduce(tf.distribute.ReduceOp.MEAN,
-                                     [shard_mean, shard_mean_of_square]))
+      group_mean = replica_context.all_reduce(tf.distribute.ReduceOp.MEAN, shard_mean)
+      group_mean_of_square = replica_context.all_reduce(tf.distribute.ReduceOp.MEAN,
+                                                        shard_mean_of_square)
       group_variance = group_mean_of_square - tf.math.square(group_mean)
       return (group_mean, group_variance)
     else:
