@@ -369,7 +369,7 @@ For more instructions about training on TPUs, please refer to the following tuto
 
   * EfficientNet tutorial: https://cloud.google.com/tpu/docs/tutorials/efficientnet
 
-## 11. Reducing Memory Usage when Training EfficientDets on GPU. (The current approach doesn't support mirrored multi GPU or mixed-precision training)
+## 11. Reducing Memory Usage when Training EfficientDets on GPU.
 
 EfficientDets use a lot of GPU memory for a few reasons:
 

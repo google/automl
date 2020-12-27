@@ -19,6 +19,43 @@ from absl import app
 from absl import flags
 from absl import logging
 import numpy as np
+
+from tensorflow.python.ops import custom_gradient # pylint:disable=g-direct-tensorflow-import
+from tensorflow.python.framework import ops # pylint:disable=g-direct-tensorflow-import
+
+
+def get_variable_by_name(var_name):
+  """Given a variable name, retrieves a handle on the tensorflow Variable."""
+
+  global_vars = ops.get_collection(ops.GraphKeys.GLOBAL_VARIABLES)
+
+  def _filter_fn(item):
+    try:
+      return var_name == item.op.name
+    except AttributeError:
+      # Collection items without operation are ignored.
+      return False
+
+  candidate_vars = list(filter(_filter_fn, global_vars))
+
+  if len(candidate_vars) >= 1:
+    # Filter out non-trainable variables.
+    candidate_vars = [v for v in candidate_vars if v.trainable]
+  else:
+    raise ValueError("Unsuccessful at finding variable {}.".format(var_name))
+
+  if len(candidate_vars) == 1:
+    return candidate_vars[0]
+  elif len(candidate_vars) > 1:
+    raise ValueError(
+      "Unsuccessful at finding trainable variable {}. "
+      "Number of candidates: {}. "
+      "Candidates: {}".format(var_name, len(candidate_vars), candidate_vars))
+  else:
+    # The variable is not trainable.
+    return None
+
+custom_gradient.get_variable_by_name = get_variable_by_name
 import tensorflow.compat.v1 as tf
 
 import dataloader
@@ -355,7 +392,7 @@ def main(_):
         if p.exitcode != 0:
           return p.exitcode
       else:
-        tf.compat.v1.reset_default_graph()
+        tf.reset_default_graph()
         run_train_and_eval(e)
 
   else:
