@@ -271,10 +271,10 @@ class InputReader:
       from aug import autoaugment  # pylint: disable=g-import-not-at-top
       if params['autoaugment_policy'] == 'randaug':
         image, boxes = autoaugment.distort_image_with_randaugment(
-          image, boxes, num_layers=1, magnitude=15)
+            image, boxes, num_layers=1, magnitude=15)
       else:
         image, boxes = autoaugment.distort_image_with_autoaugment(
-          image, boxes, params['autoaugment_policy'])
+            image, boxes, params['autoaugment_policy'])
     return image, boxes, classes
 
   def _resize_image_first(self, image, classes, boxes, data, params):
@@ -285,8 +285,8 @@ class InputReader:
         input_processor.random_horizontal_flip()
 
       input_processor.set_training_random_scale_factors(
-        params['jitter_min'], params['jitter_max'],
-        params.get('target_size', None))
+          params['jitter_min'], params['jitter_max'],
+          params.get('target_size', None))
     else:
       input_processor.set_scale_factors_to_output_size()
 
@@ -294,7 +294,8 @@ class InputReader:
     boxes, classes = input_processor.resize_and_crop_boxes()
 
     if self._is_training:
-      image, boxes, classes = self._common_image_process(image, classes, boxes, data, params)
+      image, boxes, classes = self._common_image_process(image, classes,
+                                                         boxes, data, params)
 
     input_processor.image = image
     image = input_processor.normalize_image()
@@ -302,7 +303,8 @@ class InputReader:
 
   def _resize_image_last(self, image, classes, boxes, data, params):
     if self._is_training:
-      image, boxes, classes = self._common_image_process(image, classes, boxes, data, params)
+      image, boxes, classes = self._common_image_process(image, classes,
+                                                         boxes, data, params)
 
     input_processor = DetectionInputProcessor(image, params['image_size'],
                                               boxes, classes)
@@ -311,8 +313,8 @@ class InputReader:
         input_processor.random_horizontal_flip()
 
       input_processor.set_training_random_scale_factors(
-        params['jitter_min'], params['jitter_max'],
-        params.get('target_size', None))
+          params['jitter_min'], params['jitter_max'],
+          params.get('target_size', None))
     else:
       input_processor.set_scale_factors_to_output_size()
     input_processor.normalize_image()
@@ -367,15 +369,15 @@ class InputReader:
       areas = data['groundtruth_area']
       is_crowds = data['groundtruth_is_crowd']
       image_masks = data.get('groundtruth_instance_masks', [])
-      classes = tf.reshape(tf.cast(classes, dtype=tf.float32), [-1, 1])
       source_area = tf.shape(image)[0] * tf.shape(image)[1]
       target_size = utils.parse_image_size(params['image_size'])
       target_area = target_size[0] * target_size[1]
       # set condition in order to always process small
       # first which could speed up pipeline
-      image, boxes, classes, image_scale = tf.cond(source_area > target_area,
-                                                   lambda: self._resize_image_first(image, classes, boxes, data, params),
-                                                   lambda: self._resize_image_last(image, classes, boxes, data, params))
+      image, boxes, classes, image_scale = tf.cond(
+          source_area > target_area,
+          lambda: self._resize_image_first(image, classes, boxes, data, params),
+          lambda: self._resize_image_last(image, classes, boxes, data, params))
 
       # Assign anchors.
       (cls_targets, box_targets,
@@ -395,8 +397,7 @@ class InputReader:
       classes = pad_to_fixed_size(classes, -1,
                                   [self._max_instances_per_image, 1])
       if params['mixed_precision']:
-        dtype = (
-            tf.keras.mixed_precision.global_policy().compute_dtype)
+        dtype = tf.keras.mixed_precision.global_policy().compute_dtype
         image = tf.cast(image, dtype=dtype)
         box_targets = tf.nest.map_structure(
             lambda box_target: tf.cast(box_target, dtype=dtype), box_targets)
@@ -460,8 +461,6 @@ class InputReader:
     seed = params['tf_random_seed'] if self._debug else None
     dataset = tf.data.Dataset.list_files(
         self._file_pattern, shuffle=self._is_training, seed=seed)
-    if self._is_training:
-      dataset = dataset.repeat()
     if input_context:
       dataset = dataset.shard(input_context.num_input_pipelines,
                               input_context.input_pipeline_id)
@@ -495,6 +494,8 @@ class InputReader:
     dataset = dataset.map(
         lambda *args: self.process_example(params, batch_size, *args))
     dataset = dataset.prefetch(tf.data.AUTOTUNE)
+    if self._is_training:
+      dataset = dataset.repeat()
     if self._use_fake_data:
       # Turn this dataset into a semi-fake dataset which always loop at the
       # first batch. This reduces variance in performance and is useful in
