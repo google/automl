@@ -145,7 +145,7 @@ class Config(object):
           """Recursively merge two nested dictionary."""
           for k in src.keys():
             if ((k in target and isinstance(target[k], dict) and
-                 isinstance(src[k], collections.abc.Mapping))):
+                 isinstance(src[k], collections.Mapping))):
               merge_dict_recursive(target[k], src[k])
             else:
               target[k] = src[k]
