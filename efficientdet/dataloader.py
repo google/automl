@@ -256,72 +256,6 @@ class InputReader:
     self._max_instances_per_image = max_instances_per_image or 100
     self._debug = debug
 
-  def _common_image_process(self, image, classes, boxes, data, params):
-    # Training time preprocessing.
-    if params['skip_crowd_during_training']:
-      indices = tf.where(tf.logical_not(data['groundtruth_is_crowd']))
-      classes = tf.gather_nd(classes, indices)
-      boxes = tf.gather_nd(boxes, indices)
-
-    if params.get('grid_mask', None):
-      from aug import gridmask  # pylint: disable=g-import-not-at-top
-      image, boxes = gridmask.gridmask(image, boxes)
-
-    if params.get('autoaugment_policy', None):
-      from aug import autoaugment  # pylint: disable=g-import-not-at-top
-      if params['autoaugment_policy'] == 'randaug':
-        image, boxes = autoaugment.distort_image_with_randaugment(
-            image, boxes, num_layers=1, magnitude=15)
-      else:
-        image, boxes = autoaugment.distort_image_with_autoaugment(
-            image, boxes, params['autoaugment_policy'])
-    return image, boxes, classes
-
-  def _resize_image_first(self, image, classes, boxes, data, params):
-    input_processor = DetectionInputProcessor(image, params['image_size'],
-                                              boxes, classes)
-    if self._is_training:
-      if params['input_rand_hflip']:
-        input_processor.random_horizontal_flip()
-
-      input_processor.set_training_random_scale_factors(
-          params['jitter_min'], params['jitter_max'],
-          params.get('target_size', None))
-    else:
-      input_processor.set_scale_factors_to_output_size()
-
-    image = input_processor.resize_and_crop_image()
-    boxes, classes = input_processor.resize_and_crop_boxes()
-
-    if self._is_training:
-      image, boxes, classes = self._common_image_process(image, classes,
-                                                         boxes, data, params)
-
-    input_processor.image = image
-    image = input_processor.normalize_image()
-    return image, boxes, classes, input_processor.image_scale_to_original
-
-  def _resize_image_last(self, image, classes, boxes, data, params):
-    if self._is_training:
-      image, boxes, classes = self._common_image_process(image, classes,
-                                                         boxes, data, params)
-
-    input_processor = DetectionInputProcessor(image, params['image_size'],
-                                              boxes, classes)
-    if self._is_training:
-      if params['input_rand_hflip']:
-        input_processor.random_horizontal_flip()
-
-      input_processor.set_training_random_scale_factors(
-          params['jitter_min'], params['jitter_max'],
-          params.get('target_size', None))
-    else:
-      input_processor.set_scale_factors_to_output_size()
-    input_processor.normalize_image()
-    image = input_processor.resize_and_crop_image()
-    boxes, classes = input_processor.resize_and_crop_boxes()
-    return image, boxes, classes, input_processor.image_scale_to_original
-
   @tf.autograph.experimental.do_not_convert
   def dataset_parser(self, value, example_decoder, anchor_labeler, params):
     """Parse data to a fixed dimension input image and learning targets.
@@ -369,16 +303,41 @@ class InputReader:
       areas = data['groundtruth_area']
       is_crowds = data['groundtruth_is_crowd']
       image_masks = data.get('groundtruth_instance_masks', [])
-      source_area = tf.shape(image)[0] * tf.shape(image)[1]
-      target_size = utils.parse_image_size(params['image_size'])
-      target_area = target_size[0] * target_size[1]
-      # set condition in order to always process small
-      # first which could speed up pipeline
-      image, boxes, classes, image_scale = tf.cond(
-          source_area > target_area,
-          lambda: self._resize_image_first(image, classes, boxes, data, params),
-          lambda: self._resize_image_last(image, classes, boxes, data, params))
 
+      if self._is_training:
+        # Training time preprocessing.
+        if params['skip_crowd_during_training']:
+          indices = tf.where(tf.logical_not(data['groundtruth_is_crowd']))
+          classes = tf.gather_nd(classes, indices)
+          boxes = tf.gather_nd(boxes, indices)
+
+        if params.get('grid_mask', None):
+          from aug import gridmask  # pylint: disable=g-import-not-at-top
+          image, boxes = gridmask.gridmask(image, boxes)
+
+        if params.get('autoaugment_policy', None):
+          from aug import autoaugment  # pylint: disable=g-import-not-at-top
+          if params['autoaugment_policy'] == 'randaug':
+            image, boxes = autoaugment.distort_image_with_randaugment(
+                image, boxes, num_layers=1, magnitude=15)
+          else:
+            image, boxes = autoaugment.distort_image_with_autoaugment(
+                image, boxes, params['autoaugment_policy'])
+
+      input_processor = DetectionInputProcessor(image, params['image_size'],
+                                                boxes, classes)
+      input_processor.normalize_image()
+      if self._is_training:
+        if params['input_rand_hflip']:
+          input_processor.random_horizontal_flip()
+
+        input_processor.set_training_random_scale_factors(
+            params['jitter_min'], params['jitter_max'],
+            params.get('target_size', None))
+      else:
+        input_processor.set_scale_factors_to_output_size()
+      image = input_processor.resize_and_crop_image()
+      boxes, classes = input_processor.resize_and_crop_boxes()
       # Assign anchors.
       (cls_targets, box_targets,
        num_positives) = anchor_labeler.label_anchors(boxes, classes)
@@ -388,6 +347,7 @@ class InputReader:
       source_id = tf.strings.to_number(source_id)
 
       # Pad groundtruth data for evaluation.
+      image_scale = input_processor.image_scale_to_original
       boxes *= image_scale
       is_crowds = tf.cast(is_crowds, dtype=tf.float32)
       boxes = pad_to_fixed_size(boxes, -1, [self._max_instances_per_image, 4])
