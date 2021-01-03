@@ -57,7 +57,7 @@ def get_variable_by_name(var_name):
 
 custom_gradient.get_variable_by_name = get_variable_by_name
 import tensorflow.compat.v1 as tf
-
+tf.disable_eager_execution()
 import dataloader
 import det_model_fn
 import hparams_config
@@ -158,7 +158,6 @@ FLAGS = flags.FLAGS
 
 def main(_):
   if FLAGS.strategy == 'tpu':
-    tf.disable_eager_execution()
     tpu_cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
         FLAGS.tpu, zone=FLAGS.tpu_zone, project=FLAGS.gcp_project)
     tpu_grpc_url = tpu_cluster_resolver.get_master()

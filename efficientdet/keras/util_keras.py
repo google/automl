@@ -183,7 +183,7 @@ def get_batch_norm(bn_class):
     return bn_class(*args, **kwargs)
   return _wrapper
 
-
-utils.BatchNormalization = get_batch_norm(tf.keras.layers.BatchNormalization)
-utils.SyncBatchNormalization = get_batch_norm(tf.keras.layers.experimental.SyncBatchNormalization)
-utils.TpuBatchNormalization = get_batch_norm(tf.keras.layers.experimental.SyncBatchNormalization)
+if tf.compat.v1.executing_eagerly_outside_functions():
+  utils.BatchNormalization = get_batch_norm(tf.keras.layers.BatchNormalization)
+  utils.SyncBatchNormalization = get_batch_norm(tf.keras.layers.experimental.SyncBatchNormalization)
+  utils.TpuBatchNormalization = get_batch_norm(tf.keras.layers.experimental.SyncBatchNormalization)
