@@ -111,7 +111,8 @@ def restore_ckpt(model,
   if tf.io.gfile.isdir(ckpt_path_or_file):
     ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
 
-  var_shape_map = tf.train.load_checkpoint(ckpt_path_or_file).get_variable_to_shape_map()
+  reader = tf.train.load_checkpoint(ckpt_path_or_file)
+  var_shape_map = reader.get_variable_to_shape_map()
   if '_CHECKPOINTABLE_OBJECT_GRAPH' in var_shape_map:
     model.load_weights(ckpt_path_or_file)
   else:
@@ -141,7 +142,7 @@ def restore_ckpt(model,
           else:
             raise ValueError(msg)
         else:
-          var.assign(tf.train.load_variable(ckpt_path_or_file, key))
+          var.assign(reader.get_tensor(key), read_value=False)
           if i < 10:
             logging.info('Init %s from %s (%s)', var.name, key, ckpt_path_or_file)
       else:
