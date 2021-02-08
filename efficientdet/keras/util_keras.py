@@ -111,8 +111,8 @@ def restore_ckpt(model,
   if tf.io.gfile.isdir(ckpt_path_or_file):
     ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
 
-  if (tf.train.list_variables(ckpt_path_or_file)[0][0] ==
-      '_CHECKPOINTABLE_OBJECT_GRAPH'):
+  var_shape_map = tf.train.load_checkpoint(ckpt_path_or_file).get_variable_to_shape_map()
+  if '_CHECKPOINTABLE_OBJECT_GRAPH' in var_shape_map:
     model.load_weights(ckpt_path_or_file)
   else:
     if ema_decay > 0:
@@ -133,20 +133,23 @@ def restore_ckpt(model,
     # try to load graph-based checkpoint with ema support,
     # else load checkpoint via keras.load_weights which doesn't support ema.
     for i, (key, var) in enumerate(var_dict.items()):
-      try:
-        var.assign(tf.train.load_variable(ckpt_path_or_file, key))
-        if i < 10:
-          logging.info('Init %s from %s (%s)', var.name, key, ckpt_path_or_file)
-      except tf.errors.NotFoundError as e:
-        if skip_mismatch:
-          logging.warning('Not found %s in %s', key, ckpt_path_or_file)
+      if key in var_shape_map:
+        if var_shape_map[key] != var.shape:
+          msg = 'Shape mismatch: %s' % key
+          if skip_mismatch:
+            logging.warning(msg)
+          else:
+            raise ValueError(msg)
         else:
-          raise e
-      except ValueError as e:
+          var.assign(tf.train.load_variable(ckpt_path_or_file, key))
+          if i < 10:
+            logging.info('Init %s from %s (%s)', var.name, key, ckpt_path_or_file)
+      else:
+        msg = 'Not found %s in %s' % (key, ckpt_path_or_file)
         if skip_mismatch:
-          logging.warning('%s: %s', key, e)
+          logging.warning(msg)
         else:
-          raise e
+          raise KeyError(msg)
 
 
 def fp16_to_fp32_nested(input_nested):
