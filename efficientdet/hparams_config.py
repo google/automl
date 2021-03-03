@@ -45,7 +45,10 @@ class Config(object):
     return self.__dict__[k]
 
   def __getitem__(self, k):
-    return self.__dict__[k]
+    try:
+        return self.__dict__[k]
+    except:
+        raise AttributeError(k)
 
   def __repr__(self):
     return repr(self.as_dict())
@@ -191,11 +194,19 @@ def default_detection_configs():
   # dataset specific parameters
   # TODO(tanmingxing): update this to be 91 for COCO, and 21 for pascal.
   h.num_classes = 90  # 1+ actual classes, 0 is reserved for background.
+  h.num_classification_classes = 3  # number of classes for image classification head
+  h.num_pose_kps = 7    # number of upper body pose keyponits
+  h.pose_mask_shape = [ 48, 65 ]    # for input image shape 381x519. change if your input resolution is different
   h.seg_num_classes = 3  # segmentation classes
-  h.heads = ['object_detection']  # 'object_detection', 'segmentation'
+  # select one of these heads 'object_detection_image_classification_pose', 'object_detection_image_classification', 'object_detection', 'segmentation'
+  h.heads = ['object_detection_image_classification_pose']
+  h.crop_offset = [0, 0]    # image cropping offset
 
   h.skip_crowd_during_training = True
   h.label_map = None  # a dict or a string of 'coco', 'voc', 'waymo'.
+  h.label_name_map = None
+  h.label_map_inference = None
+  h.ground_truth_label_map_dict = None
   h.max_instances_per_image = 100  # Default to 100 for COCO.
   h.regenerate_source_id = False
 
