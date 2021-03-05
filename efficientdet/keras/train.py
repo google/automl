@@ -108,7 +108,8 @@ def define_flags():
 
 def setup_model(model, config):
   """Build and compile model."""
-  model.build((None, *config.image_size, 3))
+  if not FLAGS.debug:
+    model.build((None, *config.image_size, 3))
   model.compile(
       steps_per_execution=config.steps_per_execution,
       optimizer=train_lib.get_optimizer(config.as_dict()),
