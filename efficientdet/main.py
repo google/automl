@@ -129,8 +129,8 @@ flags.DEFINE_string('testdev_dir', None,
 flags.DEFINE_integer('num_examples_per_epoch', 120000,
                      'Number of examples in one epoch')
 flags.DEFINE_integer('num_epochs', None, 'Number of epochs for training')
-flags.DEFINE_string('mode', 'train',
-                    'Mode to run: train or eval (default: train)')
+flags.DEFINE_enum('mode', 'train', ['train', 'eval', 'train_and_eval'],
+                    'Mode to run: train, eval or train_and_eval')
 flags.DEFINE_string('model_name', 'efficientdet-d1', 'Model name.')
 flags.DEFINE_bool('eval_after_train', False, 'Run one eval after the '
                   'training finishes.')
