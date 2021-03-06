@@ -118,7 +118,7 @@ class InputProcessor:
 
   def resize_and_crop_image(self, method=tf.image.ResizeMethod.BILINEAR):
     """Resize input image and crop it to the self._output dimension."""
-    dtype = self._image.dtyp
+    dtype = self._image.dtype
     scaled_image = tf.image.resize(
         self._image, [self._scaled_height, self._scaled_width], method=method)
     scaled_image = scaled_image[self._crop_offset_y:self._crop_offset_y +
