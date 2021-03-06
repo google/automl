@@ -86,15 +86,16 @@ class ExportNetwork(tf.Module):
 class ExportModel(tf.Module):
   """Model to be exported as SavedModel/TFLite format."""
 
-  def __init__(self, model, pre_mode='infer'):
+  def __init__(self, model, pre_mode='infer', post_mode='global'):
     super().__init__()
     self.model = model
     self.pre_mode = pre_mode
+    self.post_mode = post_mode
 
   @tf.function
   def __call__(self, imgs):
     return self.model(
-        imgs, training=False, pre_mode=self.pre_mode, post_mode='global')
+        imgs, training=False, pre_mode=self.pre_mode, post_mode=self.post_mode)
 
 
 class ServingDriver:
@@ -317,7 +318,10 @@ class ServingDriver:
         # If export tflite, we should remove preprocessing since TFLite doesn't
         # support dynamic shape.
         logging.info('Export model without preprocessing.')
-        export_model = ExportModel(self.model, pre_mode=None)
+        # This section is only used for TFLite, so we use the applicable
+        # pre_ & post_ modes.
+        export_model = ExportModel(
+            self.model, pre_mode=None, post_mode='tflite')
       return export_model, spec
     else:
       spec = tf.TensorSpec(
@@ -361,8 +365,8 @@ class ServingDriver:
       shape = (self.batch_size, *image_size, 3)
       input_spec = tf.TensorSpec(
           shape=shape, dtype=input_spec.dtype, name=input_spec.name)
-      converter = tf.lite.TFLiteConverter.from_concrete_functions(
-          [export_model.__call__.get_concrete_function(input_spec)])
+      # from_saved_model supports advanced converter features like op fusing.
+      converter = tf.lite.TFLiteConverter.from_saved_model(output_dir)
       if tflite == 'FP32':
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
         converter.target_spec.supported_types = [tf.float32]
@@ -370,6 +374,8 @@ class ServingDriver:
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
         converter.target_spec.supported_types = [tf.float16]
       elif tflite == 'INT8':
+        # Enables MLIR-based post-training quantization.
+        converter.experimental_new_quantizer = True
         if file_pattern:
           config = hparams_config.get_efficientdet_config(self.model_name)
           config.override(self.params)
@@ -392,10 +398,11 @@ class ServingDriver:
         converter.representative_dataset = representative_dataset_gen
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
         converter.inference_input_type = tf.uint8
-        converter.inference_output_type = tf.uint8
-        supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
-        if not self.only_network:
-          supported_ops.append(tf.lite.OpsSet.TFLITE_BUILTINS)
+        # TFLite's custom NMS op isn't supported by post-training quant,
+        # so we add TFLITE_BUILTINS as well.
+        supported_ops = [
+            tf.lite.OpsSet.TFLITE_BUILTINS_INT8, tf.lite.OpsSet.TFLITE_BUILTINS
+        ]
         converter.target_spec.supported_ops = supported_ops
 
       else:

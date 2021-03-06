@@ -48,28 +48,11 @@ class InputProcessor:
     self._crop_offset_y = tf.constant(0)
     self._crop_offset_x = tf.constant(0)
 
-  @property
-  def image(self):
-    return self._image
-
-  @image.setter
-  def image(self, image):
-    self._image = image
-
-  def normalize_image(self):
+  def normalize_image(self, mean_rgb, stddev_rgb):
     """Normalize the image to zero mean and unit variance."""
-    # The image normalization is identical to Cloud TPU ResNet.
-    self._image = tf.image.convert_image_dtype(self._image, dtype=tf.float32)
-    offset = tf.constant([0.485, 0.456, 0.406])
-    offset = tf.expand_dims(offset, axis=0)
-    offset = tf.expand_dims(offset, axis=0)
-    self._image -= offset
-
-    scale = tf.constant([0.229, 0.224, 0.225])
-    scale = tf.expand_dims(scale, axis=0)
-    scale = tf.expand_dims(scale, axis=0)
-    self._image /= scale
-    return self._image
+    self._image = tf.cast(self._image, dtype=tf.float32)
+    self._image -= tf.constant(mean_rgb, shape=(1, 1, 3), dtype=tf.float32)
+    self._image /= tf.constant(stddev_rgb, shape=(1, 1, 3), dtype=tf.float32)
 
   def set_training_random_scale_factors(self,
                                         scale_min,
@@ -135,7 +118,7 @@ class InputProcessor:
 
   def resize_and_crop_image(self, method=tf.image.ResizeMethod.BILINEAR):
     """Resize input image and crop it to the self._output dimension."""
-    dtype = self._image.dtype
+    dtype = self._image.dtyp
     scaled_image = tf.image.resize(
         self._image, [self._scaled_height, self._scaled_width], method=method)
     scaled_image = scaled_image[self._crop_offset_y:self._crop_offset_y +
@@ -303,6 +286,7 @@ class InputReader:
       areas = data['groundtruth_area']
       is_crowds = data['groundtruth_is_crowd']
       image_masks = data.get('groundtruth_instance_masks', [])
+      classes = tf.reshape(tf.cast(classes, dtype=tf.float32), [-1, 1])
 
       if self._is_training:
         # Training time preprocessing.
@@ -326,7 +310,7 @@ class InputReader:
 
       input_processor = DetectionInputProcessor(image, params['image_size'],
                                                 boxes, classes)
-      input_processor.normalize_image()
+      input_processor.normalize_image(params['mean_rgb'], params['stddev_rgb'])
       if self._is_training:
         if params['input_rand_hflip']:
           input_processor.random_horizontal_flip()
@@ -338,6 +322,7 @@ class InputReader:
         input_processor.set_scale_factors_to_output_size()
       image = input_processor.resize_and_crop_image()
       boxes, classes = input_processor.resize_and_crop_boxes()
+
       # Assign anchors.
       (cls_targets, box_targets,
        num_positives) = anchor_labeler.label_anchors(boxes, classes)

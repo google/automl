@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+import os
 import tempfile
 from absl import logging
 import tensorflow as tf
@@ -30,7 +31,7 @@ class TrainLibTest(tf.test.TestCase):
     config.model_dir = tempfile.mkdtemp()
     fake_image = tf.ones([512, 512, 3], dtype=tf.uint8)
     fake_jpeg = tf.image.encode_jpeg(fake_image)
-    sample_image = 'ram://fake_image.jpg'
+    sample_image = os.path.join(config.model_dir + 'fake_image.jpg')
     tf.io.write_file(sample_image, fake_jpeg)
     display_callback = train_lib.DisplayCallback(sample_image,
                                                  config.model_dir,
@@ -71,10 +72,10 @@ class TrainLibTest(tf.test.TestCase):
     box_outputs = tf.random.normal([64, 4])
     box_targets = tf.random.normal([64, 4])
     num_positives = tf.constant(4.0)
-    self.assertEqual(
+    self.assertAllClose(
         legacy_fn._box_loss(box_outputs, box_targets, num_positives),
         box_loss([num_positives, box_targets], box_outputs))
-    self.assertAllEqual(
+    self.assertAllClose(
         legacy_fn.focal_loss(box_outputs, box_targets, alpha, gamma,
                              num_positives),
         focal_loss_v2([num_positives, box_targets], box_outputs))

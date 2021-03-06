@@ -13,10 +13,17 @@
 # limitations under the License.
 # ==============================================================================
 """Common keras utils."""
+import collections
+
 from typing import Text
 from absl import logging
 import tensorflow as tf
 import utils
+
+# Prefix variable name mapping from keras model to the hub module checkpoint.
+HUB_CPT_NAME = collections.OrderedDict([('class_net/class-predict/', 'classes'),
+                                        ('box_net/box-predict/', 'boxes'),
+                                        ('', 'base_model')])
 
 
 def build_batch_norm(is_training_bn: bool,
@@ -93,6 +100,31 @@ def average_name(ema, var):
       var.name.split(':')[0] + '/' + ema.name, mark_as_used=False)
 
 
+def load_from_hub_checkpoint(model, ckpt_path_or_file):
+  """Loads EfficientDetNet weights from EfficientDetNetTrainHub checkpoint."""
+
+  def _get_cpt_var_name(var_name):
+    for name_prefix, hub_name_prefix in HUB_CPT_NAME.items():
+      if var_name.startswith(name_prefix):
+        cpt_var_name = var_name[len(name_prefix):]  # remove the name_prefix
+        cpt_var_name = cpt_var_name.replace('/', '.S')
+        cpt_var_name = hub_name_prefix + '/' + cpt_var_name
+        if name_prefix:
+          cpt_var_name = cpt_var_name.replace(':0', '')
+        break
+
+    return cpt_var_name + '/.ATTRIBUTES/VARIABLE_VALUE'
+
+  for var in model.weights:
+    cpt_var_name = _get_cpt_var_name(var.name)
+    var.assign(tf.train.load_variable(ckpt_path_or_file, cpt_var_name))
+
+    logging.log_first_n(
+        logging.INFO,
+        'Init %s from %s (%s)' % (var.name, cpt_var_name, ckpt_path_or_file),
+        10)
+
+
 def restore_ckpt(model,
                  ckpt_path_or_file,
                  ema_decay=0.9998,
@@ -104,6 +136,9 @@ def restore_ckpt(model,
     ckpt_path_or_file: the path or file for checkpoint.
     ema_decay: ema decay rate. If None or zero or negative value, disable ema.
     skip_mismatch: whether to skip variables if shape mismatch.
+
+  Raises:
+    KeyError: if access unexpected variables.
   """
   if ckpt_path_or_file == '_':
     logging.info('Running test: do not load any ckpt.')
@@ -111,10 +146,16 @@ def restore_ckpt(model,
   if tf.io.gfile.isdir(ckpt_path_or_file):
     ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
 
-  reader = tf.train.load_checkpoint(ckpt_path_or_file)
-  var_shape_map = reader.get_variable_to_shape_map()
-  if '_CHECKPOINTABLE_OBJECT_GRAPH' in var_shape_map:
-    model.load_weights(ckpt_path_or_file)
+  if (tf.train.list_variables(ckpt_path_or_file)[0][0] ==
+      '_CHECKPOINTABLE_OBJECT_GRAPH'):
+    try:
+      model.load_weights(ckpt_path_or_file)
+    except AssertionError:
+      # The checkpoint for  EfficientDetNetTrainHub and EfficientDetNet are not
+      # the same. If we trained from EfficientDetNetTrainHub using hub module
+      # and then want to use the weight in EfficientDetNet, it needed to
+      # manually load the model checkpoint.
+      load_from_hub_checkpoint(model, ckpt_path_or_file)
   else:
     if ema_decay > 0:
       ema = tf.train.ExponentialMovingAverage(decay=0.0)
@@ -133,6 +174,8 @@ def restore_ckpt(model,
         var_dict[v.name.split(':')[0]] = v
     # try to load graph-based checkpoint with ema support,
     # else load checkpoint via keras.load_weights which doesn't support ema.
+    reader = tf.train.load_checkpoint(ckpt_path_or_file)
+    var_shape_map = reader.get_variable_to_shape_map()
     for i, (key, var) in enumerate(var_dict.items()):
       if key in var_shape_map:
         if var_shape_map[key] != var.shape:
@@ -144,7 +187,8 @@ def restore_ckpt(model,
         else:
           var.assign(reader.get_tensor(key), read_value=False)
           if i < 10:
-            logging.info('Init %s from %s (%s)', var.name, key, ckpt_path_or_file)
+            logging.info('Init %s from %s (%s)', var.name, key,
+                         ckpt_path_or_file)
       else:
         msg = 'Not found %s in %s' % (key, ckpt_path_or_file)
         if skip_mismatch:
@@ -180,14 +224,18 @@ def fp16_to_fp32_nested(input_nested):
   return out_tensor_dict
 
 
-def get_batch_norm(bn_class):
-  def _wrapper(*args, **kwargs):
-    if not kwargs.get('name', None):
-      kwargs['name'] = 'tpu_batch_normalization'
-    return bn_class(*args, **kwargs)
-  return _wrapper
+### The following code breaks COCO training.
+# def get_batch_norm(bn_class):
+#   def _wrapper(*args, **kwargs):
+#     if not kwargs.get('name', None):
+#       kwargs['name'] = 'tpu_batch_normalization'
+#     return bn_class(*args, **kwargs)
+#   return _wrapper
 
-if tf.compat.v1.executing_eagerly_outside_functions():
-  utils.BatchNormalization = get_batch_norm(tf.keras.layers.BatchNormalization)
-  utils.SyncBatchNormalization = get_batch_norm(tf.keras.layers.experimental.SyncBatchNormalization)
-  utils.TpuBatchNormalization = get_batch_norm(tf.keras.layers.experimental.SyncBatchNormalization)
+# if tf.compat.v1.executing_eagerly_outside_functions():
+#   utils.BatchNormalization = get_batch_norm(
+#       tf.keras.layers.BatchNormalization)
+#   utils.SyncBatchNormalization = get_batch_norm(
+#       tf.keras.layers.experimental.SyncBatchNormalization)
+#   utils.TpuBatchNormalization = get_batch_norm(
+#       tf.keras.layers.experimental.SyncBatchNormalization)

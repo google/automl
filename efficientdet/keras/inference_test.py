@@ -68,6 +68,15 @@ class InferenceTest(tf.test.TestCase):
     driver.export(saved_model_path, tflite='FP32')
     self.assertTrue(
         tf.io.gfile.exists(os.path.join(saved_model_path, 'fp32.tflite')))
+    tf.io.gfile.rmtree(saved_model_path)
+    tfrecord_path = test_util.make_fake_tfrecord(self.get_temp_dir())
+    driver.export(
+        saved_model_path,
+        tflite='INT8',
+        file_pattern=[tfrecord_path],
+        num_calibration_steps=1)
+    self.assertTrue(
+        tf.io.gfile.exists(os.path.join(saved_model_path, 'int8.tflite')))
 
   def test_inference(self):
     driver = inference.ServingDriver('efficientdet-d0', self.tmp_path)
