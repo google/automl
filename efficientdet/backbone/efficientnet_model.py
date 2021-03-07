@@ -92,7 +92,7 @@ def dense_kernel_initializer(shape, dtype=None, partition_info=None):
   """
   del partition_info
   init_range = 1.0 / np.sqrt(shape[1])
-  return tf.random.uniform(shape, -init_range, init_range, dtype)
+  return tf.random.uniform(shape, -init_range, init_range, dtype=dtype)
 
 
 def superpixel_kernel_initializer(shape, dtype='float32', partition_info=None):

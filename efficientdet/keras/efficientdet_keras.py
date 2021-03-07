@@ -123,10 +123,11 @@ class FNode(tf.keras.layers.Layer):
 
     return new_node
 
-  def _add_wsm(self, initializer):
+  def _add_wsm(self, initializer, shape=None):
     for i, _ in enumerate(self.inputs_offsets):
       name = 'WSM' + ('' if i == 0 else '_' + str(i))
-      self.vars.append(self.add_weight(initializer=initializer, name=name))
+      self.vars.append(
+          self.add_weight(initializer=initializer, name=name, shape=shape))
 
   def build(self, feats_shape):
     for i, input_offset in enumerate(self.inputs_offsets):
@@ -148,10 +149,10 @@ class FNode(tf.keras.layers.Layer):
       self._add_wsm('ones')
     elif self.weight_method == 'channel_attn':
       num_filters = int(self.fpn_num_filters)
-      self._add_wsm(lambda: tf.ones([num_filters]))
+      self._add_wsm(tf.ones, num_filters)
     elif self.weight_method == 'channel_fastattn':
       num_filters = int(self.fpn_num_filters)
-      self._add_wsm(lambda: tf.ones([num_filters]))
+      self._add_wsm(tf.ones, num_filters)
     self.op_after_combine = OpAfterCombine(
         self.is_training_bn,
         self.conv_bn_act_pattern,
