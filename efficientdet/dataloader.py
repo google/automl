@@ -48,11 +48,21 @@ class InputProcessor:
     self._crop_offset_y = tf.constant(0)
     self._crop_offset_x = tf.constant(0)
 
+  @property
+  def image(self):
+    return self._image
+
+  @image.setter
+  def image(self, image):
+    self._image = image
+
   def normalize_image(self, mean_rgb, stddev_rgb):
     """Normalize the image to zero mean and unit variance."""
+    # The image normalization is identical to Cloud TPU ResNet.
     self._image = tf.cast(self._image, dtype=tf.float32)
     self._image -= tf.constant(mean_rgb, shape=(1, 1, 3), dtype=tf.float32)
     self._image /= tf.constant(stddev_rgb, shape=(1, 1, 3), dtype=tf.float32)
+    return self._image
 
   def set_training_random_scale_factors(self,
                                         scale_min,

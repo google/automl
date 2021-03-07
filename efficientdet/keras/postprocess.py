@@ -34,10 +34,9 @@ TFLITE_USE_REGULAR_NMS = False
 
 def to_list(inputs):
   if isinstance(inputs, dict):
-    return [inputs[k] for k in sorted(inputs.keys())]
+    return [tf.cast(inputs[k], tf.float32) for k in sorted(inputs.keys())]
   if isinstance(inputs, list):
-    return inputs
-  raise ValueError('Unrecognized inputs : {}'.format(inputs))
+    return [tf.cast(i, tf.float32) for i in inputs]
 
 
 def batch_map_fn(map_fn, inputs, *args):
