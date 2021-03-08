@@ -28,12 +28,13 @@ import utils
 from keras import inference
 
 flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model.')
-flags.DEFINE_enum('mode', 'infer', ['infer', 'dry', 'export', 'benchmark', 'video'],
-                    'Run mode.')
+flags.DEFINE_enum('mode', 'infer',
+                  ['infer', 'dry', 'export', 'benchmark', 'video'], 'Run mode.')
 flags.DEFINE_string('trace_filename', None, 'Trace file name.')
 
 flags.DEFINE_integer('bm_runs', 10, 'Number of benchmark runs.')
-flags.DEFINE_enum('tensorrt', '', ['', 'FP32', 'FP16', 'INT8'], 'TensorRT mode.')
+flags.DEFINE_enum('tensorrt', '', ['', 'FP32', 'FP16', 'INT8'],
+                  'TensorRT mode.')
 flags.DEFINE_integer('batch_size', 1, 'Batch size for inference.')
 flags.DEFINE_integer('image_size', -1, 'Input image size for inference.')
 

@@ -41,7 +41,8 @@ class PostprocessTest(tf.test.TestCase):
             'sigma': None,
             'max_nms_inputs': 0,
             'max_output_size': 2,
-        }
+        },
+        'tflite_max_detections': 100
     }
 
   def test_postprocess_global(self):
@@ -180,6 +181,52 @@ class PostprocessTest(tf.test.TestCase):
     self.assertAllClose(classes.numpy(), [[2., 1.], [1., 2.]])
     self.assertAllClose(scores.numpy(),
                         [[0.90157586, 0.88812476], [0.88454413, 0.8158828]])
+
+  def test_experimental_implements_signature_tflite(self):
+    """Test generation of implements signature for TFLite conversion."""
+    generated = postprocess.tflite_nms_implements_signature(self.params)
+
+    expected = [
+        'name: "TFLite_Detection_PostProcess"',
+        'attr { key: "max_detections" value { i: 100 } }',
+        'attr { key: "max_classes_per_detection" value { i: 1 } }',
+        'attr { key: "use_regular_nms" value { b: false } }',
+        'attr { key: "nms_score_threshold" value { f: -inf } }',
+        'attr { key: "nms_iou_threshold" value { f: 0.500000 } }',
+        'attr { key: "y_scale" value { f: 1.000000 } }',
+        'attr { key: "x_scale" value { f: 1.000000 } }',
+        'attr { key: "h_scale" value { f: 1.000000 } }',
+        'attr { key: "w_scale" value { f: 1.000000 } }',
+        'attr { key: "num_classes" value { i: 2 } }'
+    ]
+    expected = ' '.join(expected)
+    self.assertEqual(generated, expected)
+
+  def test_pre_nms_tflite(self):
+    """Test pre-nms steps for TFLite's custom NMS op."""
+    tf.random.set_seed(1111)
+    cls_outputs = {
+        1: tf.random.normal([1, 4, 4, 2]),
+        2: tf.random.normal([1, 2, 2, 2])
+    }
+    box_outputs = {
+        1: tf.random.normal([1, 4, 4, 4]),
+        2: tf.random.normal([1, 2, 2, 4])
+    }
+
+    boxes, scores, anchors = postprocess.tflite_pre_nms(self.params,
+                                                        cls_outputs,
+                                                        box_outputs)
+    self.assertAllClose(boxes.shape, (1, 20, 4))
+    self.assertAllClose(scores.shape, (1, 20, 2))
+    self.assertAllClose(anchors.shape, (20, 4))
+    # Test a sample output as a sanity-check.
+    self.assertAllClose(boxes[0][0].numpy(),
+                        [-0.37178636, -0.36617598, -1.2374572, -1.132929])
+    # scores shouldn't be raw logits.
+    self.assertAllClose(scores[0][0].numpy(), [0.7584357, 0.52210987])
+    # anchor elements are normalized.
+    self.assertAllClose(anchors[0].numpy(), [0.125, 0.125, 0.25, 0.25])
 
 
 if __name__ == '__main__':

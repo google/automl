@@ -90,7 +90,8 @@ def define_flags():
       'COCO validation JSON containing golden bounding boxes. If None, use the '
       'ground truth from the dataloader. Ignored if testdev_dir is not None.')
 
-  flags.DEFINE_enum('mode', 'traineval', ['train', 'traineval'], 'job mode: train, traineval.')
+  flags.DEFINE_enum('mode', 'traineval', ['train', 'traineval'],
+                    'job mode: train, traineval.')
   flags.DEFINE_string(
       'hub_module_url', None, 'TF-Hub path/url to EfficientDet module.'
       'If specified, pretrained_ckpt flag should not be used.')

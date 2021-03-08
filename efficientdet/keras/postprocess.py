@@ -24,14 +24,19 @@ import utils
 from keras import anchors
 T = tf.Tensor  # a shortcut for typing check.
 CLASS_OFFSET = 1
+# TFLite-specific constants.
+TFLITE_MAX_CLASSES_PER_DETECTION = 1
+TFLITE_DETECTION_POSTPROCESS_FUNC = 'TFLite_Detection_PostProcess'
+# TFLite fast NMS == postprocess_global (less accurate)
+# TFLite regular NMS == postprocess_per_class
+TFLITE_USE_REGULAR_NMS = False
 
 
 def to_list(inputs):
   if isinstance(inputs, dict):
-    return [tf.cast(inputs[k], tf.float32) for k in sorted(inputs.keys())]
+    return [inputs[k] for k in sorted(inputs.keys())]
   if isinstance(inputs, list):
-    return [tf.cast(i, tf.float32) for i in inputs]
-  raise ValueError('Unrecognized inputs : {}'.format(inputs))
+    return inputs
 
 
 def batch_map_fn(map_fn, inputs, *args):
@@ -238,6 +243,133 @@ def postprocess_combined(params, cls_outputs, box_outputs, image_scales=None):
   return nms_boxes, nms_scores, nms_classes, nms_valid_len
 
 
+def tflite_nms_implements_signature(params):
+  """`experimental_implements` signature for TFLite's custom NMS op.
+
+  This signature encodes the arguments to correctly initialize TFLite's custom
+  post-processing op in the MLIR converter.
+  For details on `experimental_implements` see here:
+  https://www.tensorflow.org/api_docs/python/tf/function
+
+  Args:
+    params: a dict of parameters.
+
+  Returns:
+    String encoding of a map from attribute keys to values.
+  """
+  scale_value = 1.0
+  nms_configs = params['nms_configs']
+  iou_thresh = nms_configs['iou_thresh'] or 0.5
+  score_thresh = nms_configs['score_thresh'] or float('-inf')
+  max_detections = params['tflite_max_detections']
+
+  implements_signature = [
+      'name: "%s"' % TFLITE_DETECTION_POSTPROCESS_FUNC,
+      'attr { key: "max_detections" value { i: %d } }' % max_detections,
+      'attr { key: "max_classes_per_detection" value { i: %d } }' %
+      TFLITE_MAX_CLASSES_PER_DETECTION,
+      'attr { key: "use_regular_nms" value { b: %s } }' %
+      str(TFLITE_USE_REGULAR_NMS).lower(),
+      'attr { key: "nms_score_threshold" value { f: %f } }' % score_thresh,
+      'attr { key: "nms_iou_threshold" value { f: %f } }' % iou_thresh,
+      'attr { key: "y_scale" value { f: %f } }' % scale_value,
+      'attr { key: "x_scale" value { f: %f } }' % scale_value,
+      'attr { key: "h_scale" value { f: %f } }' % scale_value,
+      'attr { key: "w_scale" value { f: %f } }' % scale_value,
+      'attr { key: "num_classes" value { i: %d } }' % params['num_classes']
+  ]
+  implements_signature = ' '.join(implements_signature)
+
+  return implements_signature
+
+
+def tflite_pre_nms(params, cls_outputs, box_outputs):
+  """Pre-NMS that is compatible with TFLite's custom NMS op.
+
+  For details, see tensorflow/lite/kernels/detection_postprocess.cc
+
+  Args:
+    params: a dict of parameters.
+    cls_outputs: a list of tensors for classes, each tensor denotes a level of
+      logits with shape [1, H, W, num_class * num_anchors].
+    box_outputs: a list of tensors for boxes, each tensor ddenotes a level of
+      boxes with shape [1, H, W, 4 * num_anchors]. Each box format is [y_min,
+      x_min, y_max, x_man].
+
+  Returns:
+    boxes: boxes encoded as {y_center, x_center, height, width}
+    scores: scores converted from `cls_outputs` logits using sigmoid
+    anchors: normalized anchors encoded as {y_center, x_center, height, width}
+  """
+  cls_outputs = to_list(cls_outputs)
+  box_outputs = to_list(box_outputs)
+  cls_outputs, box_outputs = merge_class_box_level_outputs(
+      params, cls_outputs, box_outputs)
+  eval_anchors = anchors.Anchors(params['min_level'], params['max_level'],
+                                 params['num_scales'], params['aspect_ratios'],
+                                 params['anchor_scale'], params['image_size'])
+
+  # TODO(b/175166514): Consider computing Top-K boxes & anchors here. We don't
+  # do this currently since the resultant graph does not support TFLite
+  # delegates well. `topk_class_boxes` won't work as-is, since the outputs
+  # will need to be modified appropriately for TFLite op's consumption.
+
+  # TFLite's object detection APIs require normalized anchors.
+  height, width = utils.parse_image_size(params['image_size'])
+  normalize_factor = tf.constant([height, width, height, width],
+                                 dtype=tf.float32)
+  normalized_anchors = eval_anchors.boxes / normalize_factor
+  decoded_anchors = anchors.decode_anchors_to_centersize(
+      box_outputs, normalized_anchors)
+
+  # convert logits to scores.
+  scores = tf.math.sigmoid(cls_outputs)
+
+  return box_outputs, scores, decoded_anchors
+
+
+def postprocess_tflite(params, cls_outputs, box_outputs):
+  """Post processing for conversion to TFLite.
+
+  Mathematically same as postprocess_global, except that the last portion of the
+  TF graph constitutes a dummy `tf.function` that contains an annotation for
+  conversion to TFLite's custom NMS op. Using this custom op allows features
+  like post-training quantization & accelerator support.
+  NOTE: This function does NOT return a valid output, and is only meant to
+  generate a SavedModel for TFLite conversion via MLIR.
+  For TFLite op details, see tensorflow/lite/kernels/detection_postprocess.cc
+
+  Args:
+    params: a dict of parameters.
+    cls_outputs: a list of tensors for classes, each tensor denotes a level of
+      logits with shape [1, H, W, num_class * num_anchors].
+    box_outputs: a list of tensors for boxes, each tensor ddenotes a level of
+      boxes with shape [1, H, W, 4 * num_anchors]. Each box format is [y_min,
+      x_min, y_max, x_man].
+
+  Returns:
+    A (dummy) tuple of (boxes, scores, classess, valid_len).
+  """
+  box_outputs, scores, decoded_anchors = tflite_pre_nms(params, cls_outputs,
+                                                        box_outputs)
+
+  # There is no TF equivalent for TFLite's custom post-processing op.
+  # So we add an 'empty' composite function here, that is legalized to the
+  # custom op with MLIR.
+  # For details, see:
+  # tensorflow/compiler/mlir/lite/utils/nms_utils.cc
+  @tf.function(experimental_implements=tflite_nms_implements_signature(params))
+  # pylint: disable=g-unused-argument,unused-argument
+  def dummy_post_processing(box_encodings, class_predictions, anchor_boxes):
+    boxes = tf.constant(0.0, dtype=tf.float32, name='boxes')
+    scores = tf.constant(0.0, dtype=tf.float32, name='scores')
+    classes = tf.constant(0.0, dtype=tf.float32, name='classes')
+    num_detections = tf.constant(0.0, dtype=tf.float32, name='num_detections')
+    return boxes, classes, scores, num_detections
+
+  return dummy_post_processing(box_outputs, scores, decoded_anchors)[::-1]
+
+
 def postprocess_global(params, cls_outputs, box_outputs, image_scales=None):
   """Post processing with global NMS.
 
@@ -357,12 +489,49 @@ def postprocess_per_class(params, cls_outputs, box_outputs, image_scales=None):
   return per_class_nms(params, boxes, scores, classes, image_scales)
 
 
+def generate_detections_from_nms_output(nms_boxes_bs,
+                                        nms_classes_bs,
+                                        nms_scores_bs,
+                                        image_ids,
+                                        original_image_widths=None,
+                                        flip=False):
+  """Generating [id, x, y, w, h, score, class] from NMS outputs."""
+
+  image_ids_bs = tf.cast(tf.expand_dims(image_ids, -1), nms_scores_bs.dtype)
+  if flip:
+    detections_bs = [
+        image_ids_bs * tf.ones_like(nms_scores_bs),
+        # the mirrored location of the left edge is the image width
+        # minus the position of the right edge
+        original_image_widths - nms_boxes_bs[:, :, 3],
+        nms_boxes_bs[:, :, 0],
+        # the mirrored location of the right edge is the image width
+        # minus the position of the left edge
+        original_image_widths - nms_boxes_bs[:, :, 1],
+        nms_boxes_bs[:, :, 2],
+        nms_scores_bs,
+        nms_classes_bs,
+    ]
+  else:
+    detections_bs = [
+        image_ids_bs * tf.ones_like(nms_scores_bs),
+        nms_boxes_bs[:, :, 1],
+        nms_boxes_bs[:, :, 0],
+        nms_boxes_bs[:, :, 3],
+        nms_boxes_bs[:, :, 2],
+        nms_scores_bs,
+        nms_classes_bs,
+    ]
+  return tf.stack(detections_bs, axis=-1, name='detections')
+
+
 def generate_detections(params,
                         cls_outputs,
                         box_outputs,
                         image_scales,
                         image_ids,
-                        flip=False):
+                        flip=False,
+                        pre_class_nms=True):
   """A legacy interface for generating [id, x, y, w, h, score, class]."""
   _, width = utils.parse_image_size(params['image_size'])
 
@@ -401,48 +570,30 @@ def generate_detections(params,
             detections[:, 6],
         ], axis=-1)
       detections_bs.append(detections)
-    return tf.stack(detections_bs, axis=0, name='detnections')
+    return tf.stack(detections_bs, axis=0, name='detections')
 
-  nms_boxes_bs, nms_scores_bs, nms_classes_bs, _ = postprocess_per_class(
+  if pre_class_nms:
+    postprocess = postprocess_per_class
+  else:
+    postprocess = postprocess_global
+  nms_boxes_bs, nms_scores_bs, nms_classes_bs, _ = postprocess(
       params, cls_outputs, box_outputs, image_scales)
 
-  image_ids_bs = tf.cast(tf.expand_dims(image_ids, -1), nms_scores_bs.dtype)
-  if flip:
-    detections_bs = [
-        image_ids_bs * tf.ones_like(nms_scores_bs),
-        # the mirrored location of the left edge is the image width
-        # minus the position of the right edge
-        original_image_widths - nms_boxes_bs[:, :, 3],
-        nms_boxes_bs[:, :, 0],
-        # the mirrored location of the right edge is the image width
-        # minus the position of the left edge
-        original_image_widths - nms_boxes_bs[:, :, 1],
-        nms_boxes_bs[:, :, 2],
-        nms_scores_bs,
-        nms_classes_bs,
-    ]
-  else:
-    detections_bs = [
-        image_ids_bs * tf.ones_like(nms_scores_bs),
-        nms_boxes_bs[:, :, 1],
-        nms_boxes_bs[:, :, 0],
-        nms_boxes_bs[:, :, 3],
-        nms_boxes_bs[:, :, 2],
-        nms_scores_bs,
-        nms_classes_bs,
-    ]
-  return tf.stack(detections_bs, axis=-1, name='detnections')
+  return generate_detections_from_nms_output(nms_boxes_bs, nms_classes_bs,
+                                             nms_scores_bs, image_ids,
+                                             original_image_widths, flip)
 
 
 def transform_detections(detections):
   """A transforms detections in [id, x1, y1, x2, y2, score, class] form to [id, x, y, w, h, score, class]."""
-  return tf.stack([
-      detections[:, :, 0],
-      detections[:, :, 1],
-      detections[:, :, 2],
-      detections[:, :, 3] - detections[:, :, 1],
-      detections[:, :, 4] - detections[:, :, 2],
-      detections[:, :, 5],
-      detections[:, :, 6],
-  ],
-                  axis=-1)
+  return tf.stack(  #
+      [
+          detections[:, :, 0],
+          detections[:, :, 1],
+          detections[:, :, 2],
+          detections[:, :, 3] - detections[:, :, 1],
+          detections[:, :, 4] - detections[:, :, 2],
+          detections[:, :, 5],
+          detections[:, :, 6],
+      ],
+      axis=-1)
