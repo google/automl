@@ -81,7 +81,7 @@ In addition, the following table includes a list of models trained with fixed 64
 
 
 
-## 3. Export SavedModel, frozen graph, tensort models, or tflite.
+## 3. Export SavedModel, frozen graph, tensort models or tflite.
 
 Run the following command line to export models:
 
@@ -413,5 +413,15 @@ python dataset/inspect_tfrecords.py --file_pattern dataset/sample.record\
 * model_name: model name will be used to get image_size.
 * save_samples_dir: save dir.
 * eval: flag for eval data.
+
+## 13. Export to ONNX
+(1)  Install tf2onnx
+```
+pip install tf2onnx
+```
+(2) Export to onnx from saved_model
+```
+python -m tf2onnx.convert --saved-model=<saved model directory> --output=<onnx filename> --opset=11
+```
 
 NOTE: this is not an official Google product.
