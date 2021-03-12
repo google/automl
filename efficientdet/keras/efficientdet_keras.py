@@ -962,6 +962,9 @@ class EfficientDetModel(EfficientDetNet):
     if mode == 'per_class':
       return postprocess.postprocess_per_class(self.config.as_dict(),
                                                cls_outputs, box_outputs, scales)
+    if mode == 'combined':
+      return postprocess.postprocess_combined(self.config.as_dict(),
+                                              cls_outputs, box_outputs, scales)
     if mode == 'tflite':
       if scales is not None:
         # pre_mode should be None for TFLite.
