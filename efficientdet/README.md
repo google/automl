@@ -417,4 +417,25 @@ python dataset/inspect_tfrecords.py --file_pattern dataset/sample.record\
 * save_samples_dir: save dir.
 * eval: flag for eval data.
 
+## 13. Export to ONNX
+(1)  Install tf2onnx
+```
+pip install tf2onnx
+```
+(2) Set nms configs (onnx doesn't support soft nms, use normal nms instead):
+```
+nms_configs:
+  method: 'hard'
+  iou_thresh: 0.5  # use the default value based on method.
+  score_thresh: 0.
+  sigma: 0.0
+  pyfunc: False
+  max_nms_inputs: 0
+  max_output_size: 100
+```
+(3) Export to onnx from saved_model
+```
+python -m tf2onnx.convert --saved-model=<saved model directory> --output=<onnx filename> --opset=11
+```
+
 NOTE: this is not an official Google product.
