@@ -14,6 +14,7 @@
 # ==============================================================================
 """The main training script."""
 import os
+import platform
 from absl import app
 from absl import flags
 from absl import logging
@@ -178,8 +179,15 @@ def main(_):
     ds_strategy = tf.distribute.TPUStrategy(tpu_cluster_resolver)
     logging.info('All devices: %s', tf.config.list_logical_devices('TPU'))
   elif FLAGS.strategy == 'gpus':
-    ds_strategy = tf.distribute.MirroredStrategy()
-    logging.info('All devices: %s', tf.config.list_physical_devices('GPU'))
+    gpus = tf.config.list_physical_devices('GPU')
+    if FLAGS.batch_size % len(gpus):
+      raise ValueError('Batch size divide gpus number must be interger, but got %f', FLAGS.batch_size / len(gpus))
+    if platform.system() == 'Windows':
+      cross_device_ops = tf.distribute.HierarchicalCopyAllReduce()
+    else:
+      cross_device_ops = None
+    ds_strategy = tf.distribute.MirroredStrategy(cross_device_ops=cross_device_ops)
+    logging.info('All devices: %s', gpus)
   else:
     if tf.config.list_physical_devices('GPU'):
       ds_strategy = tf.distribute.OneDeviceStrategy('device:GPU:0')
