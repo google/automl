@@ -23,7 +23,7 @@ from absl import logging
 import numpy as np
 import PIL.Image
 import six
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 
 from dataset import create_coco_tfrecord
 

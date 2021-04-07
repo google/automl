@@ -121,8 +121,7 @@ class EfficientDetArchPrecisionTest(tf.test.TestCase):
           is_training_bn=is_training,
           image_size=512)
 
-    return utils.build_model_with_precision(precision, _model_fn, features,
-                                            False)
+    return utils.build_model_with_precision(precision, _model_fn, features)
 
   def test_float16(self):
     inputs = tf.ones(shape=[1, 512, 512, 3], name='input', dtype=tf.float32)

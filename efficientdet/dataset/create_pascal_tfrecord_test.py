@@ -20,7 +20,7 @@ from absl import logging
 import numpy as np
 import PIL.Image
 import six
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 
 from dataset import create_pascal_tfrecord
 
@@ -45,8 +45,10 @@ class CreatePascalTFRecordTest(tf.test.TestCase):
     image.save(save_path)
 
     data = {
-        'folder': '',
-        'filename': image_file_name,
+        'folder':
+            '',
+        'filename':
+            image_file_name,
         'size': {
             'height': 256,
             'width': 256,
@@ -64,6 +66,18 @@ class CreatePascalTFRecordTest(tf.test.TestCase):
                 'truncated': 0,
                 'pose': '',
             },
+            {
+                'difficult': 0,
+                'bndbox': {
+                    'xmin': 128,
+                    'ymin': 128,
+                    'xmax': 256,
+                    'ymax': 256,
+                },
+                'name': 'notperson',
+                'truncated': 0,
+                'pose': '',
+            },
         ],
     }
 
@@ -73,8 +87,17 @@ class CreatePascalTFRecordTest(tf.test.TestCase):
         'notperson': 2,
     }
 
+    ann_json_dict = {'images': [], 'annotations': [], 'categories': []}
+    unique_id = create_pascal_tfrecord.UniqueId()
     example = create_pascal_tfrecord.dict_to_tf_example(
-        data, self.get_temp_dir(), label_map_dict, image_subdirectory='')
+        data,
+        self.get_temp_dir(),
+        label_map_dict,
+        unique_id,
+        ann_json_dict=ann_json_dict)
+    self.assertEqual(unique_id.image_id, 1)
+    self.assertEqual(unique_id.ann_id, 2)
+
     self._assertProtoEqual(
         example.features.feature['image/height'].int64_list.value, [256])
     self._assertProtoEqual(
@@ -90,31 +113,61 @@ class CreatePascalTFRecordTest(tf.test.TestCase):
         [six.b('jpeg')])
     self._assertProtoEqual(
         example.features.feature['image/object/bbox/xmin'].float_list.value,
-        [0.25])
+        [0.25, 0.5])
     self._assertProtoEqual(
         example.features.feature['image/object/bbox/ymin'].float_list.value,
-        [0.25])
+        [0.25, 0.5])
     self._assertProtoEqual(
         example.features.feature['image/object/bbox/xmax'].float_list.value,
-        [0.75])
+        [0.75, 1.0])
     self._assertProtoEqual(
         example.features.feature['image/object/bbox/ymax'].float_list.value,
-        [0.75])
+        [0.75, 1.0])
     self._assertProtoEqual(
         example.features.feature['image/object/class/text'].bytes_list.value,
-        [six.b('person')])
+        [six.b('person'), six.b('notperson')])
     self._assertProtoEqual(
         example.features.feature['image/object/class/label'].int64_list.value,
-        [1])
+        [1, 2])
     self._assertProtoEqual(
         example.features.feature['image/object/difficult'].int64_list.value,
-        [1])
+        [1, 0])
     self._assertProtoEqual(
         example.features.feature['image/object/truncated'].int64_list.value,
-        [0])
+        [0, 0])
     self._assertProtoEqual(
         example.features.feature['image/object/view'].bytes_list.value,
-        [six.b('')])
+        [six.b(''), six.b('')])
+
+    expected_ann_json_dict = {
+        'annotations': [{
+            'area': 16384,
+            'iscrowd': 0,
+            'image_id': 1,
+            'bbox': [64, 64, 128, 128],
+            'category_id': 1,
+            'id': 1,
+            'ignore': 0,
+            'segmentation': []
+        }, {
+            'area': 16384,
+            'iscrowd': 0,
+            'image_id': 1,
+            'bbox': [128, 128, 128, 128],
+            'category_id': 2,
+            'id': 2,
+            'ignore': 0,
+            'segmentation': []
+        }],
+        'categories': [],
+        'images': [{
+            'file_name': '2012_12.jpg',
+            'height': 256,
+            'width': 256,
+            'id': 1
+        }]
+    }
+    self.assertEqual(ann_json_dict, expected_ann_json_dict)
 
 
 if __name__ == '__main__':

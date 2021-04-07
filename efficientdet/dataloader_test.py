@@ -13,62 +13,18 @@
 # limitations under the License.
 # ==============================================================================
 """Data loader and processing test cases."""
-import os
-import tempfile
+
 import tensorflow as tf
 
 import dataloader
 import hparams_config
-from dataset import tfrecord_util
+import test_util
+
 from keras import anchors
 from object_detection import tf_example_decoder
 
 
 class DataloaderTest(tf.test.TestCase):
-
-  def _make_fake_tfrecord(self):
-    tfrecord_path = os.path.join(tempfile.mkdtemp(), 'test.tfrecords')
-    writer = tf.io.TFRecordWriter(tfrecord_path)
-    encoded_jpg = tf.io.encode_jpeg(tf.ones([512, 512, 3], dtype=tf.uint8))
-    example = tf.train.Example(
-        features=tf.train.Features(
-            feature={
-                'image/height':
-                    tfrecord_util.int64_feature(512),
-                'image/width':
-                    tfrecord_util.int64_feature(512),
-                'image/filename':
-                    tfrecord_util.bytes_feature('test_file_name.jpg'.encode(
-                        'utf8')),
-                'image/source_id':
-                    tfrecord_util.bytes_feature('123456'.encode('utf8')),
-                'image/key/sha256':
-                    tfrecord_util.bytes_feature('qwdqwfw12345'.encode('utf8')),
-                'image/encoded':
-                    tfrecord_util.bytes_feature(encoded_jpg.numpy()),
-                'image/format':
-                    tfrecord_util.bytes_feature('jpeg'.encode('utf8')),
-                'image/object/bbox/xmin':
-                    tfrecord_util.float_list_feature([0.1]),
-                'image/object/bbox/xmax':
-                    tfrecord_util.float_list_feature([0.1]),
-                'image/object/bbox/ymin':
-                    tfrecord_util.float_list_feature([0.2]),
-                'image/object/bbox/ymax':
-                    tfrecord_util.float_list_feature([0.2]),
-                'image/object/class/text':
-                    tfrecord_util.bytes_list_feature(['test'.encode('utf8')]),
-                'image/object/class/label':
-                    tfrecord_util.int64_list_feature([1]),
-                'image/object/difficult':
-                    tfrecord_util.int64_list_feature([]),
-                'image/object/truncated':
-                    tfrecord_util.int64_list_feature([]),
-                'image/object/view':
-                    tfrecord_util.bytes_list_feature([]),
-            }))
-    writer.write(example.SerializeToString())
-    return tfrecord_path
 
   def test_parser(self):
     tf.random.set_seed(111111)
@@ -81,7 +37,7 @@ class DataloaderTest(tf.test.TestCase):
     anchor_labeler = anchors.AnchorLabeler(input_anchors, params['num_classes'])
     example_decoder = tf_example_decoder.TfExampleDecoder(
         regenerate_source_id=params['regenerate_source_id'])
-    tfrecord_path = self._make_fake_tfrecord()
+    tfrecord_path = test_util.make_fake_tfrecord(self.get_temp_dir())
     dataset = tf.data.TFRecordDataset([tfrecord_path])
     value = next(iter(dataset))
     reader = dataloader.InputReader(tfrecord_path, True)

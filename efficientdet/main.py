@@ -19,8 +19,45 @@ from absl import app
 from absl import flags
 from absl import logging
 import numpy as np
-import tensorflow.compat.v1 as tf
 
+from tensorflow.python.ops import custom_gradient # pylint:disable=g-direct-tensorflow-import
+from tensorflow.python.framework import ops # pylint:disable=g-direct-tensorflow-import
+
+
+def get_variable_by_name(var_name):
+  """Given a variable name, retrieves a handle on the tensorflow Variable."""
+
+  global_vars = ops.get_collection(ops.GraphKeys.GLOBAL_VARIABLES)
+
+  def _filter_fn(item):
+    try:
+      return var_name == item.op.name
+    except AttributeError:
+      # Collection items without operation are ignored.
+      return False
+
+  candidate_vars = list(filter(_filter_fn, global_vars))
+
+  if len(candidate_vars) >= 1:
+    # Filter out non-trainable variables.
+    candidate_vars = [v for v in candidate_vars if v.trainable]
+  else:
+    raise ValueError("Unsuccessful at finding variable {}.".format(var_name))
+
+  if len(candidate_vars) == 1:
+    return candidate_vars[0]
+  elif len(candidate_vars) > 1:
+    raise ValueError(
+      "Unsuccessful at finding trainable variable {}. "
+      "Number of candidates: {}. "
+      "Candidates: {}".format(var_name, len(candidate_vars), candidate_vars))
+  else:
+    # The variable is not trainable.
+    return None
+
+custom_gradient.get_variable_by_name = get_variable_by_name
+import tensorflow.compat.v1 as tf
+tf.disable_eager_execution()
 import dataloader
 import det_model_fn
 import hparams_config
@@ -79,9 +116,9 @@ flags.DEFINE_integer('iterations_per_loop', 100,
 flags.DEFINE_integer('save_checkpoints_steps', 100,
                      'Number of iterations per checkpoint save')
 flags.DEFINE_string(
-    'training_file_pattern', None,
+    'train_file_pattern', None,
     'Glob for training data files (e.g., COCO train - minival set)')
-flags.DEFINE_string('validation_file_pattern', None,
+flags.DEFINE_string('val_file_pattern', None,
                     'Glob for evaluation tfrecords (e.g., COCO val2017 set)')
 flags.DEFINE_string(
     'val_json_file', None,
@@ -92,10 +129,10 @@ flags.DEFINE_string('testdev_dir', None,
 flags.DEFINE_integer('num_examples_per_epoch', 120000,
                      'Number of examples in one epoch')
 flags.DEFINE_integer('num_epochs', None, 'Number of epochs for training')
-flags.DEFINE_string('mode', 'train',
-                    'Mode to run: train or eval (default: train)')
+flags.DEFINE_enum('mode', 'train', ['train', 'eval', 'train_and_eval'],
+                    'Mode to run: train, eval or train_and_eval')
 flags.DEFINE_string('model_name', 'efficientdet-d1', 'Model name.')
-flags.DEFINE_bool('eval_after_training', False, 'Run one eval after the '
+flags.DEFINE_bool('eval_after_train', False, 'Run one eval after the '
                   'training finishes.')
 flags.DEFINE_bool('profile', False, 'Profile training performance.')
 flags.DEFINE_integer(
@@ -111,7 +148,7 @@ flags.DEFINE_integer(
 
 # for train_and_eval mode
 flags.DEFINE_bool(
-    'run_epoch_in_child_process', True,
+    'run_epoch_in_child_process', False,
     'This option helps to rectify CPU memory leak. If True, every epoch is '
     'run in a separate process for train and eval and memory will be cleared.'
     'Drawback: need to kill 2 processes if trainining needs to be interrupted.')
@@ -121,7 +158,6 @@ FLAGS = flags.FLAGS
 
 def main(_):
   if FLAGS.strategy == 'tpu':
-    tf.disable_eager_execution()
     tpu_cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
         FLAGS.tpu, zone=FLAGS.tpu_zone, project=FLAGS.gcp_project)
     tpu_grpc_url = tpu_cluster_resolver.get_master()
@@ -131,11 +167,11 @@ def main(_):
 
   # Check data path
   if FLAGS.mode in ('train', 'train_and_eval'):
-    if FLAGS.training_file_pattern is None:
-      raise RuntimeError('Must specify --training_file_pattern for train.')
+    if FLAGS.train_file_pattern is None:
+      raise RuntimeError('Must specify --train_file_pattern for train.')
   if FLAGS.mode in ('eval', 'train_and_eval'):
-    if FLAGS.validation_file_pattern is None:
-      raise RuntimeError('Must specify --validation_file_pattern for eval.')
+    if FLAGS.val_file_pattern is None:
+      raise RuntimeError('Must specify --val_file_pattern for eval.')
 
   # Parse and override hparams
   config = hparams_config.get_detection_config(FLAGS.model_name)
@@ -235,12 +271,12 @@ def main(_):
     tf.io.gfile.GFile(config_file, 'w').write(str(config))
 
   train_input_fn = dataloader.InputReader(
-      FLAGS.training_file_pattern,
+      FLAGS.train_file_pattern,
       is_training=True,
       use_fake_data=FLAGS.use_fake_data,
       max_instances_per_image=max_instances_per_image)
   eval_input_fn = dataloader.InputReader(
-      FLAGS.validation_file_pattern,
+      FLAGS.val_file_pattern,
       is_training=False,
       use_fake_data=FLAGS.use_fake_data,
       max_instances_per_image=max_instances_per_image)
@@ -295,7 +331,7 @@ def main(_):
   # start train/eval flow.
   if FLAGS.mode == 'train':
     train_est.train(input_fn=train_input_fn, max_steps=train_steps)
-    if FLAGS.eval_after_training:
+    if FLAGS.eval_after_train:
       eval_est.evaluate(input_fn=eval_input_fn, steps=eval_steps)
 
   elif FLAGS.mode == 'eval':
@@ -355,6 +391,7 @@ def main(_):
         if p.exitcode != 0:
           return p.exitcode
       else:
+        tf.reset_default_graph()
         run_train_and_eval(e)
 
   else:

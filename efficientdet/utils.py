@@ -20,8 +20,8 @@ from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
 import tensorflow.compat.v2 as tf2
-from tensorflow.python.tpu import tpu_function  # pylint:disable=g-direct-tensorflow-import
 from tensorflow.python.eager import tape as tape_lib  # pylint:disable=g-direct-tensorflow-import
+from tensorflow.python.tpu import tpu_function  # pylint:disable=g-direct-tensorflow-import
 # pylint: disable=logging-format-interpolation
 
 
@@ -63,9 +63,8 @@ def cross_replica_mean(t, num_shards_per_group=None):
   group_assignment = None
   if num_shards_per_group > 1:
     if num_shards % num_shards_per_group != 0:
-      raise ValueError(
-          'num_shards: %d mod shards_per_group: %d, should be 0' %
-          (num_shards, num_shards_per_group))
+      raise ValueError('num_shards: %d mod shards_per_group: %d, should be 0' %
+                       (num_shards, num_shards_per_group))
     num_groups = num_shards // num_shards_per_group
     group_assignment = [[
         x for x in range(num_shards) if x // num_shards_per_group == y
@@ -112,35 +111,48 @@ def get_ckpt_var_map(ckpt_path, ckpt_scope, var_scope, skip_mismatch=None):
   ckpt_var_name_to_shape = reader.get_variable_to_shape_map()
   ckpt_var_names = set(reader.get_variable_to_shape_map().keys())
 
+  if tf.distribute.get_replica_context():
+    replica_id = tf.get_static_value(
+        tf.distribute.get_replica_context().replica_id_in_sync_group)
+  else:
+    replica_id = 0
+
   for i, v in enumerate(model_vars):
-    if not v.op.name.startswith(var_scope):
+    var_op_name = v.op.name
+
+    if replica_id >= 1:
+      var_op_name = ''.join(var_op_name.rsplit(f'/replica_{replica_id}', 1))
+
+    if not var_op_name.startswith(var_scope):
       logging.info('skip {} -- does not match scope {}'.format(
-          v.op.name, var_scope))
-    ckpt_var = ckpt_scope + v.op.name[len(var_scope):]
+          var_op_name, var_scope))
+    ckpt_var = ckpt_scope + var_op_name[len(var_scope):]
+
     if (ckpt_var not in ckpt_var_names and
-        v.op.name.endswith('/ExponentialMovingAverage')):
-      ckpt_var = ckpt_scope + v.op.name[:-len('/ExponentialMovingAverage')]
+        var_op_name.endswith('/ExponentialMovingAverage')):
+      ckpt_var = ckpt_scope + var_op_name[:-len('/ExponentialMovingAverage')]
 
     if ckpt_var not in ckpt_var_names:
       if 'Momentum' in ckpt_var or 'RMSProp' in ckpt_var:
         # Skip optimizer variables.
         continue
       if skip_mismatch:
-        logging.info('skip {} ({}) -- not in ckpt'.format(v.op.name, ckpt_var))
+        logging.info('skip {} ({}) -- not in ckpt'.format(
+            var_op_name, ckpt_var))
         continue
       raise ValueError('{} is not in ckpt {}'.format(v.op, ckpt_path))
 
     if v.shape != ckpt_var_name_to_shape[ckpt_var]:
       if skip_mismatch:
         logging.info('skip {} ({} vs {}) -- shape mismatch'.format(
-            v.op.name, v.shape, ckpt_var_name_to_shape[ckpt_var]))
+            var_op_name, v.shape, ckpt_var_name_to_shape[ckpt_var]))
         continue
       raise ValueError('shape mismatch {} ({} vs {})'.format(
-          v.op.name, v.shape, ckpt_var_name_to_shape[ckpt_var]))
+          var_op_name, v.shape, ckpt_var_name_to_shape[ckpt_var]))
 
     if i < 5:
       # Log the first few elements for sanity check.
-      logging.info('Init {} from ckpt var {}'.format(v.op.name, ckpt_var))
+      logging.info('Init {} from ckpt var {}'.format(var_op_name, ckpt_var))
     var_map[ckpt_var] = v
 
   return var_map
@@ -170,8 +182,8 @@ class TpuBatchNormalization(tf.keras.layers.BatchNormalization):
       shard_square_of_mean = tf.math.square(shard_mean)
       shard_mean_of_square = shard_variance + shard_square_of_mean
       group_mean = cross_replica_mean(shard_mean, num_shards_per_group)
-      group_mean_of_square = cross_replica_mean(
-          shard_mean_of_square, num_shards_per_group)
+      group_mean_of_square = cross_replica_mean(shard_mean_of_square,
+                                                num_shards_per_group)
       group_variance = group_mean_of_square - tf.math.square(group_mean)
       return (group_mean, group_variance)
     else:
@@ -207,9 +219,10 @@ class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
       # Compute variance using: Var[X]= E[X^2] - E[X]^2.
       shard_square_of_mean = tf.math.square(shard_mean)
       shard_mean_of_square = shard_variance + shard_square_of_mean
-      group_mean, group_mean_of_square = (
-          replica_context.all_reduce(tf.distribute.ReduceOp.MEAN,
-                                     [shard_mean, shard_mean_of_square]))
+      group_mean = replica_context.all_reduce(
+          tf.distribute.ReduceOp.MEAN, shard_mean)
+      group_mean_of_square = replica_context.all_reduce(
+          tf.distribute.ReduceOp.MEAN, shard_mean_of_square)
       group_variance = group_mean_of_square - tf.math.square(group_mean)
       return (group_mean, group_variance)
     else:
@@ -243,9 +256,7 @@ def batch_norm_class(is_training, strategy=None):
   if is_training and strategy == 'tpu':
     return TpuBatchNormalization
   elif is_training and strategy == 'gpus':
-    # TODO(fsx950223): use SyncBatchNorm after TF bug is fixed (incorrect nccl
-    # all_reduce). See https://github.com/tensorflow/tensorflow/issues/41980
-    return BatchNormalization
+    return SyncBatchNormalization
   else:
     return BatchNormalization
 
@@ -451,8 +462,7 @@ def archive_ckpt(ckpt_eval, ckpt_objective, ckpt_path):
     dest = os.path.join(dst_dir, os.path.basename(f))
     tf.io.gfile.copy(f, dest, overwrite=True)
   ckpt_state = tf.train.generate_checkpoint_state_proto(
-      dst_dir,
-      model_checkpoint_path=os.path.join(dst_dir, ckpt_name))
+      dst_dir, model_checkpoint_path=os.path.join(dst_dir, ckpt_name))
   with tf.io.gfile.GFile(os.path.join(dst_dir, 'checkpoint'), 'w') as f:
     f.write(str(ckpt_state))
   with tf.io.gfile.GFile(os.path.join(dst_dir, 'best_eval.txt'), 'w') as f:
@@ -540,7 +550,7 @@ def get_precision(strategy: str, mixed_precision: bool = False):
     if strategy == 'tpu':
       return 'mixed_bfloat16'
 
-    if tf.config.experimental.list_physical_devices('GPU'):
+    if tf.config.list_physical_devices('GPU'):
       return 'mixed_float16'
 
     # TODO(fsx950223): Fix CPU float16 inference
@@ -571,34 +581,26 @@ def float16_scope():
     yield varscope
 
 
-def set_precision_policy(policy_name: Text = None, loss_scale: bool = False):
+def set_precision_policy(policy_name: Text = None):
   """Set precision policy according to the name.
 
   Args:
     policy_name: precision policy name, one of 'float32', 'mixed_float16',
       'mixed_bfloat16', or None.
-    loss_scale: whether to use loss scale (only for training).
   """
   if not policy_name:
     return
 
   assert policy_name in ('mixed_float16', 'mixed_bfloat16', 'float32')
   logging.info('use mixed precision policy name %s', policy_name)
-  # TODO(tanmingxing): use tf.keras.layers.enable_v2_dtype_behavior() when it
-  # available in stable TF release.
-  from tensorflow.python.keras.engine import base_layer_utils  # pylint: disable=g-import-not-at-top,g-direct-tensorflow-import
-  base_layer_utils.enable_v2_dtype_behavior()
+  tf.compat.v1.keras.layers.enable_v2_dtype_behavior()
   # mixed_float16 training is not supported for now, so disable loss_scale.
   # float32 and mixed_bfloat16 do not need loss scale for training.
-  if loss_scale:
-    policy = tf2.keras.mixed_precision.experimental.Policy(policy_name)
-  else:
-    policy = tf2.keras.mixed_precision.experimental.Policy(
-        policy_name, loss_scale=None)
-  tf2.keras.mixed_precision.experimental.set_policy(policy)
+  policy = tf2.keras.mixed_precision.Policy(policy_name)
+  tf2.keras.mixed_precision.set_global_policy(policy)
 
 
-def build_model_with_precision(pp, mm, ii, tt, *args, **kwargs):
+def build_model_with_precision(pp, mm, ii, *args, **kwargs):
   """Build model with its inputs/params for a specified precision context.
 
   This is highly specific to this codebase, and not intended to be general API.
@@ -609,7 +611,6 @@ def build_model_with_precision(pp, mm, ii, tt, *args, **kwargs):
     pp: A string, precision policy name, such as "mixed_float16".
     mm: A function, for rmodel builder.
     ii: A tensor, for model inputs.
-    tt: A bool, If true, it is for training; otherwise, it is for eval.
     *args: A list of model arguments.
     **kwargs: A dict, extra model parameters.
 
@@ -621,13 +622,11 @@ def build_model_with_precision(pp, mm, ii, tt, *args, **kwargs):
     inputs = tf.cast(ii, tf.bfloat16)
     with tf.tpu.bfloat16_scope():
       outputs = mm(inputs, *args, **kwargs)
-    set_precision_policy('float32')
   elif pp == 'mixed_float16':
-    set_precision_policy(pp, loss_scale=tt)
+    set_precision_policy(pp)
     inputs = tf.cast(ii, tf.float16)
     with float16_scope():
       outputs = mm(inputs, *args, **kwargs)
-    set_precision_policy('float32')
   elif not pp or pp == 'float32':
     outputs = mm(ii, *args, **kwargs)
   else:
@@ -658,8 +657,6 @@ def _recompute_grad(f):
    pass of a gradient call.
   """
 
-  # TODO(fsx950223): Wait for https://github.com/tensorflow/tensorflow/pull/44373 to be merged.
-
   @tf.custom_gradient
   def inner(*args, **kwargs):
     """Inner function closure for calculating gradients."""
@@ -674,7 +671,7 @@ def _recompute_grad(f):
       def inner_recompute_grad(*dresult):
         """Nested custom gradient function for computing grads in reverse and forward mode autodiff."""
         # Gradient calculation for reverse mode autodiff.
-        variables = grad_kwargs.get("variables")
+        variables = grad_kwargs.get('variables')
         with tf.GradientTape() as t:
           id_args = tf.nest.map_structure(tf.identity, args)
           t.watch(id_args)
@@ -687,18 +684,19 @@ def _recompute_grad(f):
         if variables is not None:
           kw_vars = list(variables)
         grads = t.gradient(
-          result,
-          list(id_args) + kw_vars,
-          output_gradients=dresult,
-          unconnected_gradients=tf.UnconnectedGradients.ZERO)
+            result,
+            list(id_args) + kw_vars,
+            output_gradients=dresult,
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
         def transpose(*t_args, **t_kwargs):
           """Gradient function calculation for forward mode autodiff."""
-          # Just throw an error since gradients / activations are not stored on tape for recompute.
+          # Just throw an error since gradients / activations are not stored on
+          # tape for recompute.
           raise NotImplementedError(
-            "recompute_grad tried to transpose grad of {}. "
-            "Consider not using recompute_grad in forward mode"
-            "autodiff".format(f.__name__))
+              'recompute_grad tried to transpose grad of {}. '
+              'Consider not using recompute_grad in forward mode'
+              'autodiff'.format(f.__name__))
 
         return (grads[:len(id_args)], grads[len(id_args):]), transpose
 
@@ -710,10 +708,11 @@ def _recompute_grad(f):
 
 
 def recompute_grad(recompute=False):
+  """Decorator determine whether use gradient checkpoint."""
+
   def _wrapper(f):
-    """ Decorator determine whether use gradient checkpoint. """
     if recompute:
       return _recompute_grad(f)
     return f
-  return _wrapper
 
+  return _wrapper

@@ -58,6 +58,28 @@ def decode_box_outputs(pred_boxes, anchor_boxes):
   return tf.stack([ymin, xmin, ymax, xmax], axis=-1)
 
 
+def decode_anchors_to_centersize(pred_boxes, anchor_boxes):
+  """Transforms anchor boxes' encoding from box-corner to center-size.
+
+  Box-corner encoding is of form: {ymin, ymax, xmin, xmax}
+  Center-size encoding is of form: {y_center, x_center, height, width}
+  This is used for TFLite's custom NMS post-processing.
+
+  Args:
+    pred_boxes: predicted box regression targets.
+    anchor_boxes: anchors on all feature levels.
+
+  Returns:
+    outputs: anchor_boxes in center-size encoding.
+  """
+  anchor_boxes = tf.cast(anchor_boxes, pred_boxes.dtype)
+  ycenter_a = (anchor_boxes[..., 0] + anchor_boxes[..., 2]) / 2
+  xcenter_a = (anchor_boxes[..., 1] + anchor_boxes[..., 3]) / 2
+  ha = anchor_boxes[..., 2] - anchor_boxes[..., 0]
+  wa = anchor_boxes[..., 3] - anchor_boxes[..., 1]
+  return tf.stack([ycenter_a, xcenter_a, ha, wa], axis=-1)
+
+
 class Anchors():
   """Multi-scale anchors class."""
 
@@ -116,8 +138,11 @@ class Anchors():
         stride, octave_scale, aspect, anchor_scale = config
         base_anchor_size_x = anchor_scale * stride[1] * 2**octave_scale
         base_anchor_size_y = anchor_scale * stride[0] * 2**octave_scale
-        aspect_x = np.sqrt(aspect)
-        aspect_y = 1.0 / aspect_x
+        if isinstance(aspect, list):
+          aspect_x, aspect_y = aspect
+        else:
+          aspect_x = np.sqrt(aspect)
+          aspect_y = 1.0 / aspect_x
         anchor_size_x_2 = base_anchor_size_x * aspect_x / 2.0
         anchor_size_y_2 = base_anchor_size_y * aspect_y / 2.0
 

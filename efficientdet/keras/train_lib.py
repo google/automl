@@ -13,27 +13,33 @@
 # limitations under the License.
 # ==============================================================================
 """Training related libraries."""
-from concurrent import futures
 import math
 import os
 import re
 from absl import logging
+import neural_structured_learning as nsl
 import numpy as np
-import tensorflow as tf
 
+import tensorflow as tf
+from tensorflow_addons.callbacks import AverageModelCheckpoint
+import tensorflow_hub as hub
+
+import coco_metric
 import inference
 import iou_utils
 import utils
 from keras import anchors
 from keras import efficientdet_keras
-
+from keras import label_util
+from keras import postprocess
+from keras import util_keras
 from tensorflow_model_optimization.python.core.sparsity.keras import pruning_wrapper
 
 
 def _collect_prunable_layers(model):
   """Recursively collect the prunable layers in the model."""
   prunable_layers = []
-  for layer in model._flatten_layers(recursive=False, include_self=False):
+  for layer in model._flatten_layers(recursive=False, include_self=False):  # pylint: disable=protected-access
     # A keras model may have other models as layers.
     if isinstance(layer, pruning_wrapper.PruneLowMagnitude):
       prunable_layers.append(layer)
@@ -45,6 +51,7 @@ def _collect_prunable_layers(model):
 
 class UpdatePruningStep(tf.keras.callbacks.Callback):
   """Keras callback which updates pruning wrappers with the optimizer step.
+
   This callback must be used when training a model which needs to be pruned. Not
   doing so will throw an error.
   Example:
@@ -100,8 +107,7 @@ class PruningSummaries(tf.keras.callbacks.TensorBoard):
           '`log_dir` must be a non-empty string. You passed `log_dir`='
           '{input}.'.format(input=log_dir))
 
-    super().__init__(
-        log_dir=log_dir, update_freq=update_freq, **kwargs)
+    super().__init__(log_dir=log_dir, update_freq=update_freq, **kwargs)
 
     log_dir = self.log_dir + '/metrics'
     self._file_writer = tf.summary.create_file_writer(log_dir)
@@ -135,18 +141,17 @@ class PruningSummaries(tf.keras.callbacks.TensorBoard):
     param_value_pairs = list(zip(params, values))
 
     for mask, mask_value in param_value_pairs[::2]:
-      pruning_logs.update({
-          mask.name + '/sparsity': 1 - np.mean(mask_value)
-      })
+      pruning_logs.update({mask.name + '/sparsity': 1 - np.mean(mask_value)})
 
     for threshold, threshold_value in param_value_pairs[1::2]:
       pruning_logs.update({threshold.name + '/threshold': threshold_value})
 
     self._log_pruning_metrics(pruning_logs, iteration)
 
+
 def update_learning_rate_schedule_parameters(params):
   """Updates params that are related to the learning rate schedule."""
-  batch_size = params['batch_size'] * params['num_shards']
+  batch_size = params['batch_size']
   # Learning rate is proportional to the batch size
   params['adjusted_learning_rate'] = (params['learning_rate'] * batch_size / 64)
   steps_per_epoch = params['steps_per_epoch']
@@ -289,8 +294,7 @@ def get_optimizer(params):
   momentum = params['momentum']
   if params['optimizer'].lower() == 'sgd':
     logging.info('Use SGD optimizer')
-    optimizer = tf.keras.optimizers.SGD(
-        learning_rate, momentum=momentum)
+    optimizer = tf.keras.optimizers.SGD(learning_rate, momentum=momentum)
   elif params['optimizer'].lower() == 'adam':
     logging.info('Use Adam optimizer')
     optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=momentum)
@@ -303,10 +307,62 @@ def get_optimizer(params):
     from tensorflow_addons import optimizers as tfa_optimizers  # pylint: disable=g-import-not-at-top
     optimizer = tfa_optimizers.MovingAverage(
         optimizer, average_decay=moving_average_decay, dynamic_decay=True)
-  if params['mixed_precision']:
-    optimizer = tf.keras.mixed_precision.experimental.LossScaleOptimizer(
-        optimizer, loss_scale='dynamic')
+  precision = utils.get_precision(params['strategy'], params['mixed_precision'])
+  if precision == 'mixed_float16' and params['loss_scale']:
+    optimizer = tf.keras.mixed_precision.LossScaleOptimizer(
+        optimizer,
+        initial_scale=params['loss_scale'])
   return optimizer
+
+
+class COCOCallback(tf.keras.callbacks.Callback):
+  """A utility for COCO eval callback."""
+
+  def __init__(self, test_dataset, update_freq=None):
+    super().__init__()
+    self.test_dataset = test_dataset
+    self.update_freq = update_freq
+
+  def set_model(self, model: tf.keras.Model):
+    self.model = model
+    config = model.config
+    self.config = config
+    label_map = label_util.get_label_map(config.label_map)
+    log_dir = os.path.join(config.model_dir, 'coco')
+    self.file_writer = tf.summary.create_file_writer(log_dir)
+    self.evaluator = coco_metric.EvaluationMetric(
+        filename=config.val_json_file, label_map=label_map)
+
+  @tf.function
+  def _get_detections(self, images, labels):
+    cls_outputs, box_outputs = util_keras.fp16_to_fp32_nested(
+        self.model(images, training=False))
+    detections = postprocess.generate_detections(self.config,
+                                                 cls_outputs,
+                                                 box_outputs,
+                                                 labels['image_scales'],
+                                                 labels['source_ids'])
+    tf.numpy_function(self.evaluator.update_state,
+                      [labels['groundtruth_data'],
+                       postprocess.transform_detections(detections)], [])
+
+  def on_epoch_end(self, epoch, logs=None):
+    epoch += 1
+    if self.update_freq and epoch % self.update_freq == 0:
+      self.evaluator.reset_states()
+      strategy = tf.distribute.get_strategy()
+      count = self.config.eval_samples // self.config.batch_size
+      dataset = self.test_dataset.take(count)
+      dataset = strategy.experimental_distribute_dataset(dataset)
+      for (images, labels) in dataset:
+        strategy.run(self._get_detections, (images, labels))
+      metrics = self.evaluator.result()
+      eval_results = {}
+      with self.file_writer.as_default(), tf.summary.record_if(True):
+        for i, name in enumerate(self.evaluator.metric_names):
+          tf.summary.scalar(name, metrics[i], step=epoch)
+          eval_results[name] = metrics[i]
+      return eval_results
 
 
 class DisplayCallback(tf.keras.callbacks.Callback):
@@ -317,73 +373,107 @@ class DisplayCallback(tf.keras.callbacks.Callback):
     image_file = tf.io.read_file(sample_image)
     self.sample_image = tf.expand_dims(
         tf.image.decode_jpeg(image_file, channels=3), axis=0)
-    self.executor = futures.ThreadPoolExecutor(max_workers=1)
     self.update_freq = update_freq
     self.output_dir = output_dir
 
   def set_model(self, model: tf.keras.Model):
-    self.train_model = model
-    with tf.device('/cpu:0'):
-      self.model = efficientdet_keras.EfficientDetModel(config=model.config)
-    height, width = utils.parse_image_size(model.config.image_size)
-    self.model.build((1, height, width, 3))
-    log_dir = os.path.join(self.output_dir, 'test_images')
+    self.model = model
+    config = model.config
+    log_dir = os.path.join(config.model_dir, 'test_images')
     self.file_writer = tf.summary.create_file_writer(log_dir)
-    self.min_score_thresh = self.model.config.nms_configs['score_thresh'] or 0.4
-    self.max_boxes_to_draw = (
-        self.model.config.nms_configs['max_output_size'] or 100)
+    self.min_score_thresh = config.nms_configs['score_thresh'] or 0.4
+    self.max_boxes_to_draw = config.nms_configs['max_output_size'] or 100
 
   def on_train_batch_end(self, batch, logs=None):
     if self.update_freq and batch % self.update_freq == 0:
-      self.executor.submit(self.draw_inference, batch)
+      self._draw_inference(batch)
 
-  @tf.function
-  def inference(self):
-    return self.model(self.sample_image, training=False)
-
-  def draw_inference(self, step):
-    self.model.set_weights(self.train_model.get_weights())
-    boxes, scores, classes, valid_len = self.inference()
+  def _draw_inference(self, step):
+    self.model.__class__ = efficientdet_keras.EfficientDetModel
+    results = self.model(self.sample_image, training=False)
+    boxes, scores, classes, valid_len = tf.nest.map_structure(np.array, results)
     length = valid_len[0]
     image = inference.visualize_image(
         self.sample_image[0],
-        boxes[0].numpy()[:length],
-        classes[0].numpy().astype(np.int)[:length],
-        scores[0].numpy()[:length],
+        boxes[0][:length],
+        classes[0].astype(np.int)[:length],
+        scores[0][:length],
         label_map=self.model.config.label_map,
         min_score_thresh=self.min_score_thresh,
         max_boxes_to_draw=self.max_boxes_to_draw)
 
     with self.file_writer.as_default():
       tf.summary.image('Test image', tf.expand_dims(image, axis=0), step=step)
+    self.model.__class__ = EfficientDetNetTrain
 
 
-def get_callbacks(params):
+def get_callbacks(params, val_dataset=None):
   """Get callbacks for given params."""
-  ckpt_callback = tf.keras.callbacks.ModelCheckpoint(
-      os.path.join(params['model_dir'], 'ckpt'),
-      verbose=1,
-      save_weights_only=True)
-  callbacks = [ckpt_callback]
+  if params['moving_average_decay']:
+    avg_callback = AverageModelCheckpoint(
+        filepath=os.path.join(params['model_dir'], 'emackpt-{epoch:d}'),
+        verbose=1,
+        save_weights_only=True,
+        update_weights=False)
+    callbacks = [avg_callback]
+  else:
+    ckpt_callback = tf.keras.callbacks.ModelCheckpoint(
+        os.path.join(params['model_dir'], 'ckpt-{epoch:d}'),
+        verbose=1,
+        save_weights_only=True)
+    callbacks = [ckpt_callback]
   if params['model_optimizations'] and 'prune' in params['model_optimizations']:
     prune_callback = UpdatePruningStep()
     prune_summaries = PruningSummaries(
         log_dir=params['model_dir'],
-        update_freq=params['iterations_per_loop'],
+        update_freq=params['steps_per_execution'],
         profile_batch=2 if params['profile'] else 0)
     callbacks += [prune_callback, prune_summaries]
   else:
     tb_callback = tf.keras.callbacks.TensorBoard(
-        log_dir=params['model_dir'], update_freq=params['iterations_per_loop'],
+        log_dir=params['model_dir'],
+        update_freq=params['steps_per_execution'],
         profile_batch=2 if params['profile'] else 0)
     callbacks.append(tb_callback)
   if params.get('sample_image', None):
     display_callback = DisplayCallback(
-        params.get('sample_image', None),
-        params['model_dir'],
+        params.get('sample_image', None), params['model_dir'],
         params['img_summary_steps'])
     callbacks.append(display_callback)
+  if (params.get('map_freq', None) and val_dataset and
+      params['strategy'] != 'tpu'):
+    coco_callback = COCOCallback(val_dataset, params['map_freq'])
+    callbacks.append(coco_callback)
   return callbacks
+
+
+class AdversarialLoss(tf.keras.losses.Loss):
+  """Adversarial keras loss wrapper."""
+
+  # TODO(fsx950223): WIP
+  def __init__(self, adv_config, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.adv_config = adv_config
+    self.model = None
+    self.loss_fn = None
+    self.tape = None
+    self.built = False
+
+  def build(self, model, loss_fn, tape):
+    self.model = model
+    self.loss_fn = loss_fn
+    self.tape = tape
+    self.built = True
+
+  def call(self, features, y, y_pred, labeled_loss):
+    return self.adv_config.multiplier * nsl.keras.adversarial_loss(
+        features,
+        y,
+        self.model,
+        self.loss_fn,
+        predictions=y_pred,
+        labeled_loss=self.labeled_loss,
+        gradient_tape=self.tape)
 
 
 class FocalLoss(tf.keras.losses.Loss):
@@ -459,12 +549,13 @@ class BoxLoss(tf.keras.losses.Loss):
   def call(self, y_true, box_outputs):
     num_positives, box_targets = y_true
     normalizer = num_positives * 4.0
-    mask = tf.cast(box_targets != 0.0, tf.float32)
+    mask = tf.cast(box_targets != 0.0, box_outputs.dtype)
     box_targets = tf.expand_dims(box_targets, axis=-1)
     box_outputs = tf.expand_dims(box_outputs, axis=-1)
-    box_loss = self.huber(box_targets, box_outputs) * mask
-    box_loss = tf.reduce_sum(box_loss)
-    box_loss /= normalizer
+    # TODO(fsx950223): remove cast when huber loss dtype is fixed.
+    box_loss = tf.cast(self.huber(box_targets, box_outputs),
+                       box_outputs.dtype) * mask
+    box_loss = tf.reduce_sum(box_loss) / normalizer
     return box_loss
 
 
@@ -485,9 +576,10 @@ class BoxIouLoss(tf.keras.losses.Loss):
         self.input_anchors.boxes,
         [box_outputs.shape[0] // self.input_anchors.boxes.shape[0], 1])
     num_positives, box_targets = y_true
-    box_outputs = anchors.decode_box_outputs(box_outputs, anchor_boxes)
-    box_targets = anchors.decode_box_outputs(box_targets, anchor_boxes)
     normalizer = num_positives * 4.0
+    mask = tf.cast(box_targets != 0.0, box_outputs.dtype)
+    box_outputs = anchors.decode_box_outputs(box_outputs, anchor_boxes) * mask
+    box_targets = anchors.decode_box_outputs(box_targets, anchor_boxes) * mask
     box_iou_loss = iou_utils.iou_loss(box_outputs, box_targets,
                                       self.iou_loss_type)
     box_iou_loss = tf.reduce_sum(box_iou_loss) / normalizer
@@ -499,6 +591,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
 
   see https://www.tensorflow.org/guide/keras/customizing_what_happens_in_fit
   """
+
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     log_dir = os.path.join(self.config.model_dir, 'train_images')
@@ -516,9 +609,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     """Return regularization l2 loss loss."""
     var_match = re.compile(regex)
     return weight_decay * tf.add_n([
-        tf.nn.l2_loss(v)
-        for v in self._freeze_vars()
-        if var_match.match(v.name)
+        tf.nn.l2_loss(v) for v in self._freeze_vars() if var_match.match(v.name)
     ])
 
   def _detection_loss(self, cls_outputs, box_outputs, labels, loss_vals):
@@ -544,6 +635,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     """
     # Sum all positives in a batch for normalization and avoid zero
     # num_positives_sum, which would lead to inf loss during training
+    dtype = cls_outputs[0].dtype
     num_positives_sum = tf.reduce_sum(labels['mean_num_positives']) + 1.0
     positives_momentum = self.config.positives_momentum or 0
     if positives_momentum > 0:
@@ -551,7 +643,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       moving_normalizer_var = tf.Variable(
           0.0,
           name='moving_normalizer',
-          dtype=tf.float32,
+          dtype=dtype,
           synchronization=tf.VariableSynchronization.ON_READ,
           trainable=False,
           aggregation=tf.VariableAggregation.MEAN)
@@ -561,6 +653,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
           momentum=self.config.positives_momentum)
     elif positives_momentum < 0:
       num_positives_sum = utils.cross_replica_mean(num_positives_sum)
+    num_positives_sum = tf.cast(num_positives_sum, dtype)
     levels = range(len(cls_outputs))
     cls_losses = []
     box_losses = []
@@ -568,7 +661,8 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       # Onehot encoding for classification labels.
       cls_targets_at_level = tf.one_hot(
           labels['cls_targets_%d' % (level + self.config.min_level)],
-          self.config.num_classes)
+          self.config.num_classes,
+          dtype=dtype)
 
       if self.config.data_format == 'channels_first':
         bs, _, width, height, _ = cls_targets_at_level.get_shape().as_list()
@@ -579,7 +673,7 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
         cls_targets_at_level = tf.reshape(cls_targets_at_level,
                                           [bs, width, height, -1])
 
-      class_loss_layer = self.loss.get('class_loss', None)
+      class_loss_layer = self.loss.get(FocalLoss.__name__, None)
       if class_loss_layer:
         cls_loss = class_loss_layer([num_positives_sum, cls_targets_at_level],
                                     cls_outputs[level])
@@ -593,15 +687,14 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
             tf.expand_dims(
                 tf.not_equal(
                     labels['cls_targets_%d' % (level + self.config.min_level)],
-                    -2), -1),
-            tf.float32)
-        cls_loss_sum = tf.clip_by_value(tf.reduce_sum(cls_loss), 0.0, 2.0)
-        cls_losses.append(tf.cast(cls_loss_sum, tf.float32))
+                    -2), -1), dtype)
+        cls_loss_sum = tf.reduce_sum(cls_loss)
+        cls_losses.append(tf.cast(cls_loss_sum, dtype))
 
-      if self.config.box_loss_weight and self.loss.get('box_loss', None):
+      if self.config.box_loss_weight and self.loss.get(BoxLoss.__name__, None):
         box_targets_at_level = (
-          labels['box_targets_%d' % (level + self.config.min_level)])
-        box_loss_layer = self.loss['box_loss']
+            labels['box_targets_%d' % (level + self.config.min_level)])
+        box_loss_layer = self.loss[BoxLoss.__name__]
         box_losses.append(
             box_loss_layer([num_positives_sum, box_targets_at_level],
                            box_outputs[level]))
@@ -610,12 +703,12 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
       box_outputs = tf.concat([tf.reshape(v, [-1, 4]) for v in box_outputs],
                               axis=0)
       box_targets = tf.concat([
-          tf.reshape(
-              labels['box_targets_%d' % (level + self.config.min_level)],
-              [-1, 4])
+          tf.reshape(labels['box_targets_%d' %
+                            (level + self.config.min_level)], [-1, 4])
           for level in levels
-      ], axis=0)
-      box_iou_loss_layer = self.loss['box_iou_loss']
+      ],
+                              axis=0)
+      box_iou_loss_layer = self.loss[BoxIouLoss.__name__]
       box_iou_loss = box_iou_loss_layer([num_positives_sum, box_targets],
                                         box_outputs)
       loss_vals['box_iou_loss'] = box_iou_loss
@@ -651,11 +744,21 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
         tf.summary.image('input_image', images)
     with tf.GradientTape() as tape:
       if len(self.config.heads) == 2:
-        cls_outputs, box_outputs, seg_outputs = self(images, training=True)
+        cls_outputs, box_outputs, seg_outputs = util_keras.fp16_to_fp32_nested(
+            self(images, training=True))
+        loss_dtype = cls_outputs[0].dtype
       elif 'object_detection' in self.config.heads:
-        cls_outputs, box_outputs = self(images, training=True)
+        cls_outputs, box_outputs = util_keras.fp16_to_fp32_nested(
+            self(images, training=True))
+        loss_dtype = cls_outputs[0].dtype
       elif 'segmentation' in self.config.heads:
-        seg_outputs, = self(images, training=True)
+        seg_outputs, = util_keras.fp16_to_fp32_nested(
+            self(images, training=True))
+        loss_dtype = seg_outputs.dtype
+      else:
+        raise ValueError('No valid head found: {}'.format(self.config.heads))
+      labels = util_keras.fp16_to_fp32_nested(labels)
+
       total_loss = 0
       loss_vals = {}
       if 'object_detection' in self.config.heads:
@@ -663,26 +766,28 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
                                         loss_vals)
         total_loss += det_loss
       if 'segmentation' in self.config.heads:
-        seg_loss_layer = self.loss['seg_loss']
+        seg_loss_layer = (
+            self.loss[tf.keras.losses.SparseCategoricalCrossentropy.__name__])
         seg_loss = seg_loss_layer(labels['image_masks'], seg_outputs)
         total_loss += seg_loss
         loss_vals['seg_loss'] = seg_loss
 
       reg_l2_loss = self._reg_l2_loss(self.config.weight_decay)
       loss_vals['reg_l2_loss'] = reg_l2_loss
-      total_loss += reg_l2_loss
+      total_loss += tf.cast(reg_l2_loss, loss_dtype)
       if isinstance(self.optimizer,
-                    tf.keras.mixed_precision.experimental.LossScaleOptimizer):
+                    tf.keras.mixed_precision.LossScaleOptimizer):
         scaled_loss = self.optimizer.get_scaled_loss(total_loss)
+        optimizer = self.optimizer.inner_optimizer
       else:
         scaled_loss = total_loss
+        optimizer = self.optimizer
     loss_vals['loss'] = total_loss
-    loss_vals['learning_rate'] = self.optimizer.learning_rate(
-        self.optimizer.iterations)
+    loss_vals['learning_rate'] = optimizer.learning_rate(optimizer.iterations)
     trainable_vars = self._freeze_vars()
     scaled_gradients = tape.gradient(scaled_loss, trainable_vars)
     if isinstance(self.optimizer,
-                  tf.keras.mixed_precision.experimental.LossScaleOptimizer):
+                  tf.keras.mixed_precision.LossScaleOptimizer):
       gradients = self.optimizer.get_unscaled_gradients(scaled_gradients)
     else:
       gradients = scaled_gradients
@@ -712,11 +817,22 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
     """
     images, labels = data
     if len(self.config.heads) == 2:
-      cls_outputs, box_outputs, seg_outputs = self(images, training=False)
+      cls_outputs, box_outputs, seg_outputs = util_keras.fp16_to_fp32_nested(
+          self(images, training=False))
+      loss_dtype = cls_outputs[0].dtype
     elif 'object_detection' in self.config.heads:
-      cls_outputs, box_outputs = self(images, training=False)
+      cls_outputs, box_outputs = util_keras.fp16_to_fp32_nested(
+          self(images, training=False))
+      loss_dtype = cls_outputs[0].dtype
     elif 'segmentation' in self.config.heads:
-      seg_outputs, = self(images, training=False)
+      seg_outputs, = util_keras.fp16_to_fp32_nested(
+          self(images, training=False))
+      loss_dtype = seg_outputs.dtype
+    else:
+      raise ValueError('No valid head found: {}'.format(self.config.heads))
+
+    labels = util_keras.fp16_to_fp32_nested(labels)
+
     total_loss = 0
     loss_vals = {}
     if 'object_detection' in self.config.heads:
@@ -724,11 +840,49 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
                                       loss_vals)
       total_loss += det_loss
     if 'segmentation' in self.config.heads:
-      seg_loss_layer = self.loss['seg_loss']
+      seg_loss_layer = (
+          self.loss[tf.keras.losses.SparseCategoricalCrossentropy.__name__])
       seg_loss = seg_loss_layer(labels['image_masks'], seg_outputs)
       total_loss += seg_loss
       loss_vals['seg_loss'] = seg_loss
     reg_l2_loss = self._reg_l2_loss(self.config.weight_decay)
     loss_vals['reg_l2_loss'] = reg_l2_loss
-    loss_vals['loss'] = total_loss + reg_l2_loss
+    loss_vals['loss'] = total_loss + tf.cast(reg_l2_loss, loss_dtype)
     return loss_vals
+
+
+class EfficientDetNetTrainHub(EfficientDetNetTrain):
+  """EfficientDetNetTrain for Hub module."""
+
+  def __init__(self, config, hub_module_url, name=''):
+    super(efficientdet_keras.EfficientDetNet, self).__init__(name=name)
+    self.config = config
+    self.hub_module_url = hub_module_url
+    self.base_model = hub.KerasLayer(hub_module_url, trainable=True)
+
+    # class/box output prediction network.
+    num_anchors = len(config.aspect_ratios) * config.num_scales
+
+    conv2d_layer = efficientdet_keras.ClassNet.conv2d_layer(
+        config.separable_conv, config.data_format)
+    self.classes = efficientdet_keras.ClassNet.classes_layer(
+        conv2d_layer,
+        config.num_classes,
+        num_anchors,
+        name='class_net/class-predict')
+
+    self.boxes = efficientdet_keras.BoxNet.boxes_layer(
+        config.separable_conv,
+        num_anchors,
+        config.data_format,
+        name='box_net/box-predict')
+
+    log_dir = os.path.join(self.config.model_dir, 'train_images')
+    self.summary_writer = tf.summary.create_file_writer(log_dir)
+
+  def call(self, inputs, training):
+    cls_outputs, box_outputs = self.base_model(inputs, training=training)
+    for i in range(self.config.max_level - self.config.min_level + 1):
+      cls_outputs[i] = self.classes(cls_outputs[i])
+      box_outputs[i] = self.boxes(box_outputs[i])
+    return (cls_outputs, box_outputs)

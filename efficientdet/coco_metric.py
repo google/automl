@@ -21,11 +21,18 @@ import json
 import os
 from absl import logging
 import numpy as np
-from pycocotools.coco import COCO
-from pycocotools.cocoeval import COCOeval
 import tensorflow as tf
 
 from keras import label_util
+
+try:
+# pylint: disable=g-import-not-at-top
+  from pycocotools.coco import COCO
+  from pycocotools.cocoeval import COCOeval
+# pylint: enable=g-import-not-at-top
+except ImportError:
+  COCO = None
+  COCOeval = None
 
 
 class EvaluationMetric():
@@ -76,7 +83,15 @@ class EvaluationMetric():
     Returns:
       coco_metric: float numpy array with shape [12] representing the
         coco-style evaluation metrics.
+    Raises:
+      ImportError: if the pip package `pycocotools` is not installed.
     """
+    if COCO is None or COCOeval is None:
+      message = ('You must install pycocotools (`pip install pycocotools`) '
+                 '(see github repo at https://github.com/cocodataset/cocoapi) '
+                 'for efficientdet/coco_metric to work.')
+      raise ImportError(message)
+
     if self.filename:
       coco_gt = COCO(self.filename)
     else:
@@ -136,7 +151,7 @@ class EvaluationMetric():
 
   def result(self):
     """Return the metric values (and compute it if needed)."""
-    if not self.metric_values:
+    if self.metric_values is None:
       self.metric_values = self.evaluate()
     return self.metric_values
 

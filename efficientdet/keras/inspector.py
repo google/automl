@@ -14,7 +14,6 @@
 # ==============================================================================
 r"""Tool to inspect a model."""
 import os
-import tempfile
 
 from absl import app
 from absl import flags
@@ -29,16 +28,17 @@ import utils
 from keras import inference
 
 flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model.')
-flags.DEFINE_string('mode', 'infer',
-                    'Run mode: {dry, infer, export, benchmark}')
+flags.DEFINE_enum('mode', 'infer',
+                  ['infer', 'dry', 'export', 'benchmark', 'video'], 'Run mode.')
 flags.DEFINE_string('trace_filename', None, 'Trace file name.')
 
 flags.DEFINE_integer('bm_runs', 10, 'Number of benchmark runs.')
-flags.DEFINE_string('tensorrt', None, 'TensorRT mode: {None, FP32, FP16, INT8}')
+flags.DEFINE_enum('tensorrt', '', ['', 'FP32', 'FP16', 'INT8'],
+                  'TensorRT mode.')
 flags.DEFINE_integer('batch_size', 1, 'Batch size for inference.')
 flags.DEFINE_integer('image_size', -1, 'Input image size for inference.')
 
-flags.DEFINE_string('ckpt_path', '_', 'checkpoint dir used for eval.')
+flags.DEFINE_string('model_dir', '_', 'checkpoint dir used for eval.')
 flags.DEFINE_string('export_ckpt', None, 'Output model ckpt path.')
 
 flags.DEFINE_string(
@@ -55,8 +55,14 @@ flags.DEFINE_string('output_video', None,
 
 # For saved model.
 flags.DEFINE_string('saved_model_dir', None, 'Folder path for saved model.')
-flags.DEFINE_string('tflite', None, 'tflite type: {FP32, FP16, INT8}.')
+flags.DEFINE_enum('tflite', '', ['', 'FP32', 'FP16', 'INT8'], 'tflite type.')
+flags.DEFINE_string('file_pattern', None,
+                    'Glob for tfrecords, e.g. coco/val-*.tfrecord.')
+flags.DEFINE_integer(
+    'num_calibration_steps', 2000,
+    'Number of post-training quantization calibration steps to run.')
 flags.DEFINE_bool('debug', False, 'Debug mode.')
+flags.DEFINE_bool('only_network', False, 'Model only contains network')
 FLAGS = flags.FLAGS
 
 
@@ -74,35 +80,41 @@ def main(_):
   model_config.image_size = utils.parse_image_size(model_config.image_size)
 
   model_params = model_config.as_dict()
-  ckpt_path_or_file = FLAGS.ckpt_path
+  ckpt_path_or_file = FLAGS.model_dir
   if tf.io.gfile.isdir(ckpt_path_or_file):
     ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
   driver = inference.ServingDriver(FLAGS.model_name, ckpt_path_or_file,
-                                   FLAGS.batch_size or None, model_params)
+                                   FLAGS.batch_size or None,
+                                   FLAGS.only_network, model_params)
   if FLAGS.mode == 'export':
-    if not  FLAGS.saved_model_dir:
+    if not FLAGS.saved_model_dir:
       raise ValueError('Please specify --saved_model_dir=')
     model_dir = FLAGS.saved_model_dir
     if tf.io.gfile.exists(model_dir):
       tf.io.gfile.rmtree(model_dir)
-    driver.export(model_dir, FLAGS.tensorrt, FLAGS.tflite)
+    driver.export(model_dir, FLAGS.tensorrt, FLAGS.tflite, FLAGS.file_pattern,
+                  FLAGS.num_calibration_steps)
     print('Model are exported to %s' % model_dir)
   elif FLAGS.mode == 'infer':
-    if FLAGS.saved_model_dir:
-      driver.load(FLAGS.saved_model_dir)
     image_file = tf.io.read_file(FLAGS.input_image)
     image_arrays = tf.io.decode_image(image_file)
     image_arrays.set_shape((None, None, 3))
     image_arrays = tf.expand_dims(image_arrays, axis=0)
+    if FLAGS.saved_model_dir:
+      driver.load(FLAGS.saved_model_dir)
+      if FLAGS.saved_model_dir.endswith('.tflite'):
+        image_size = utils.parse_image_size(model_config.image_size)
+        image_arrays = tf.image.resize_with_pad(image_arrays, *image_size)
+        image_arrays = tf.cast(image_arrays, tf.uint8)
     detections_bs = driver.serve(image_arrays)
     boxes, scores, classes, _ = tf.nest.map_structure(np.array, detections_bs)
-    raw_image = Image.open(FLAGS.input_image)
+    raw_image = Image.fromarray(np.array(image_arrays)[0])
     img = driver.visualize(
         raw_image,
         boxes[0],
         classes[0],
         scores[0],
-        min_score_thresh=model_config.nms_configs.score_thresh,
+        min_score_thresh=model_config.nms_configs.score_thresh or 0.4,
         max_boxes_to_draw=model_config.nms_configs.max_output_size)
     output_image_path = os.path.join(FLAGS.output_image_dir, '0.jpg')
     Image.fromarray(img).save(output_image_path)
@@ -156,9 +168,9 @@ def main(_):
       new_frame = driver.visualize(
           raw_frames[0],
           boxes[0],
-          scores[0],
           classes[0],
-          min_score_thresh=model_config.nms_configs.score_thresh,
+          scores[0],
+          min_score_thresh=model_config.nms_configs.score_thresh or 0.4,
           max_boxes_to_draw=model_config.nms_configs.max_output_size)
 
       if out_ptr:
@@ -173,5 +185,5 @@ def main(_):
 
 
 if __name__ == '__main__':
-  logging.set_verbosity(logging.ERROR)
+  logging.set_verbosity(logging.INFO)
   app.run(main)

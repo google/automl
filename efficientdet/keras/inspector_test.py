@@ -33,7 +33,7 @@ class InspectorTest(tf.test.TestCase):
   def setUp(self):
     super().setUp()
     self.tempdir = tempfile.mkdtemp()
-    FLAGS.ckpt_path = '_'
+    FLAGS.model_dir = '_'
 
   def tearDown(self):
     super().tearDown()
@@ -59,13 +59,13 @@ class InspectorTest(tf.test.TestCase):
     inspector.main(None)
     self.assertFalse(tf.io.gfile.exists(os.path.join(self.tempdir, '0.jpg')))
 
-  @flagsaver.flagsaver(mode='export')
+  @flagsaver.flagsaver(mode='export', tflite='FP32')
   def test_export(self):
-    FLAGS.tflite_path = os.path.join(self.tempdir, 'test.tflite')
     FLAGS.saved_model_dir = os.path.join(self.tempdir, 'savedmodel')
+    tflite_path = os.path.join(FLAGS.saved_model_dir, 'fp32.tflite')
     inspector.main(None)
     self.assertTrue(tf.saved_model.contains_saved_model(FLAGS.saved_model_dir))
-    self.assertTrue(tf.io.gfile.exists(FLAGS.tflite_path))
+    self.assertTrue(tf.io.gfile.exists(tflite_path))
 
 
 if __name__ == '__main__':

@@ -22,7 +22,7 @@ from PIL import Image
 import tensorflow as tf
 
 import hparams_config
-import inference
+from keras import inference
 from keras import efficientdet_keras
 
 flags.DEFINE_string('image_path', None, 'Location of test image.')
@@ -43,9 +43,9 @@ def main(_):
   # !wget https://user-images.githubusercontent.com/11736571/77320690-099af300-6d37-11ea-9d86-24f14dc2d540.png -O tmp/img.png
   # !wget https://storage.googleapis.com/cloud-tpu-checkpoints/efficientdet/coco/efficientdet-d0.tar.gz -O tmp/efficientdet-d0.tar.gz
   # !tar zxf tmp/efficientdet-d0.tar.gz -C tmp
-  imgs = [np.array(Image.open(FLAGS.image_path))] * 2
+  imgs = [np.array(Image.open(FLAGS.image_path))]
   # Create model config.
-  config = hparams_config.get_efficientdet_config('efficientdet-d0')
+  config = hparams_config.get_efficientdet_config(FLAGS.model_name)
   config.is_training_bn = False
   config.image_size = '1920x1280'
   config.nms_configs.score_thresh = 0.4
@@ -53,9 +53,9 @@ def main(_):
   config.override(FLAGS.hparams)
 
   # Use 'mixed_float16' if running on GPUs.
-  policy = tf.keras.mixed_precision.experimental.Policy('float32')
-  tf.keras.mixed_precision.experimental.set_policy(policy)
-  tf.config.experimental_run_functions_eagerly(FLAGS.debug)
+  policy = tf.keras.mixed_precision.Policy('float32')
+  tf.keras.mixed_precision.set_global_policy(policy)
+  tf.config.run_functions_eagerly(FLAGS.debug)
 
   # Create and run the model.
   model = efficientdet_keras.EfficientDetModel(config=config)

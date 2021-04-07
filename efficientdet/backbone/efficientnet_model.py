@@ -416,21 +416,29 @@ class MBConvBlock(tf.keras.layers.Layer):
 
     return _call(inputs)
 
+
 class MBConvBlockWithoutDepthwise(MBConvBlock):
   """MBConv-like block without depthwise convolution and squeeze-and-excite."""
 
   def _build(self):
     """Builds block according to the arguments."""
     filters = self._block_args.input_filters * self._block_args.expand_ratio
+    # pylint: disable=g-long-lambda
+    cid = itertools.count(0)
+    get_conv_name = lambda: 'conv2d' + ('' if not next(cid) else '_' + str(
+        next(cid) // 2))
+    # pylint: enable=g-long-lambda
+    kernel_size = self._block_args.kernel_size
     if self._block_args.expand_ratio != 1:
       # Expansion phase:
       self._expand_conv = tf.keras.layers.Conv2D(
           filters,
-          kernel_size=[3, 3],
+          kernel_size=[kernel_size, kernel_size],
           strides=[1, 1],
           kernel_initializer=conv_kernel_initializer,
           padding='same',
-          use_bias=False)
+          use_bias=False,
+          name=get_conv_name())
       self._bn0 = self._batch_norm(
           axis=self._channel_axis,
           momentum=self._batch_norm_momentum,
@@ -444,7 +452,8 @@ class MBConvBlockWithoutDepthwise(MBConvBlock):
         strides=self._block_args.strides,
         kernel_initializer=conv_kernel_initializer,
         padding='same',
-        use_bias=False)
+        use_bias=False,
+        name=get_conv_name())
     self._bn1 = self._batch_norm(
         axis=self._channel_axis,
         momentum=self._batch_norm_momentum,
@@ -466,7 +475,8 @@ class MBConvBlockWithoutDepthwise(MBConvBlock):
     def _call(inputs):
       logging.info('Block %s  input shape: %s', self.name, inputs.shape)
       if self._block_args.expand_ratio != 1:
-        x = self._relu_fn(self._bn0(self._expand_conv(inputs), training=training))
+        x = self._relu_fn(
+            self._bn0(self._expand_conv(inputs), training=training))
       else:
         x = inputs
       logging.info('Expand shape: %s', x.shape)

@@ -101,7 +101,7 @@ class UtilsTest(tf.test.TestCase):
       return tf.cast(a, inputs.dtype) * conv(x) * inputs
 
     x = tf.constant(2.0, dtype=tf.float32)  # input can be any type.
-    out = utils.build_model_with_precision('mixed_float16', _model, x, False)
+    out = utils.build_model_with_precision('mixed_float16', _model, x)
     # Variables should be float32.
     for v in tf.global_variables():
       self.assertIn(v.dtype, (tf.float32, tf.dtypes.as_dtype('float32_ref')))
