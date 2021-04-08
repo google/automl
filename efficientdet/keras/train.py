@@ -183,6 +183,8 @@ def main(_):
     if FLAGS.batch_size % len(gpus):
       raise ValueError('Batch size divide gpus number must be interger, but got %f', FLAGS.batch_size / len(gpus))
     if platform.system() == 'Windows':
+      # Windows doesn't support nccl use HierarchicalCopyAllReduce instead
+      # TODO(fsx950223): investigate HierarchicalCopyAllReduce performance issue
       cross_device_ops = tf.distribute.HierarchicalCopyAllReduce()
     else:
       cross_device_ops = None

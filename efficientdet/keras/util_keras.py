@@ -146,10 +146,20 @@ def restore_ckpt(model,
   if tf.io.gfile.isdir(ckpt_path_or_file):
     ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
 
-  if (tf.train.list_variables(ckpt_path_or_file)[0][0] ==
+  var_list = tf.train.list_variables(ckpt_path_or_file)
+  if (var_list[0][0] ==
       '_CHECKPOINTABLE_OBJECT_GRAPH'):
     try:
-      model.load_weights(ckpt_path_or_file)
+      # Use custom checkpoint solves mismatch shape issue.
+      keys = {var[0].split('/')[0] for var in var_list}
+      keys.discard('_CHECKPOINTABLE_OBJECT_GRAPH')
+      if skip_mismatch:
+        keys.discard('class_net')
+      ckpt = tf.train.Checkpoint(**{key: getattr(model, key, None)
+                                    for key in keys
+                                    if getattr(model, key, None)})
+      status = ckpt.restore(ckpt_path_or_file)
+      status.assert_nontrivial_match()
     except AssertionError:
       # The checkpoint for  EfficientDetNetTrainHub and EfficientDetNet are not
       # the same. If we trained from EfficientDetNetTrainHub using hub module
@@ -176,7 +186,7 @@ def restore_ckpt(model,
     # else load checkpoint via keras.load_weights which doesn't support ema.
     reader = tf.train.load_checkpoint(ckpt_path_or_file)
     var_shape_map = reader.get_variable_to_shape_map()
-    for i, (key, var) in enumerate(var_dict.items()):
+    for key, var in var_dict.items():
       if key in var_shape_map:
         if var_shape_map[key] != var.shape:
           msg = 'Shape mismatch: %s' % key
@@ -186,9 +196,10 @@ def restore_ckpt(model,
             raise ValueError(msg)
         else:
           var.assign(reader.get_tensor(key), read_value=False)
-          if i < 10:
-            logging.info('Init %s from %s (%s)', var.name, key,
-                         ckpt_path_or_file)
+          logging.log_first_n(
+              logging.INFO,
+              'Init %s from %s (%s)' % (var.name, key, ckpt_path_or_file),
+              10)
       else:
         msg = 'Not found %s in %s' % (key, ckpt_path_or_file)
         if skip_mismatch:

@@ -221,6 +221,7 @@ def postprocess_combined(params, cls_outputs, box_outputs, image_scales=None):
   Returns:
     A tuple of batch level (boxes, scores, classess, valid_len) after nms.
   """
+  # Combined nms only has float32 kernel
   cls_outputs = util_keras.fp16_to_fp32_nested(to_list(cls_outputs))
   box_outputs = util_keras.fp16_to_fp32_nested(to_list(box_outputs))
   # Don't filter any outputs because combine_nms need the raw information.
