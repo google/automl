@@ -152,7 +152,8 @@ class ServingDriver:
                ckpt_path: Text = None,
                batch_size: int = 1,
                only_network: bool = False,
-               model_params: Dict[Text, Any] = None):
+               model_params: Dict[Text, Any] = None,
+               debug:bool = False):
     """Initialize the inference driver.
 
     Args:
@@ -167,6 +168,7 @@ class ServingDriver:
     self.ckpt_path = ckpt_path
     self.batch_size = batch_size
     self.only_network = only_network
+    self.debug = debug
 
     self.params = hparams_config.get_detection_config(model_name).as_dict()
 
@@ -209,6 +211,8 @@ class ServingDriver:
     util_keras.restore_ckpt(self.model, self.ckpt_path,
                             self.params['moving_average_decay'],
                             skip_mismatch=False)
+    if self.debug:
+      tf.config.run_functions_eagerly(self.debug)
 
   def visualize(self, image, boxes, classes, scores, **kwargs):
     """Visualize prediction on image."""

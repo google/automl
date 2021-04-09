@@ -350,4 +350,7 @@ nms_configs:
 python -m tf2onnx.convert --saved-model=<saved model directory> --output=<onnx filename> --opset=11
 ```
 
+## 14. Debug
+Just add ```--debug``` after command, then you could use pdb debug the model with eager execution and deterministic operations.
+
 NOTE: this is not an official Google product.

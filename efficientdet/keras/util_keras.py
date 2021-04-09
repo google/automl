@@ -128,14 +128,18 @@ def load_from_hub_checkpoint(model, ckpt_path_or_file):
 def restore_ckpt(model,
                  ckpt_path_or_file,
                  ema_decay=0.9998,
-                 skip_mismatch=True):
+                 skip_mismatch=True,
+                 exclude_layers=None):
   """Restore variables from a given checkpoint.
 
   Args:
     model: the keras model to be restored.
     ckpt_path_or_file: the path or file for checkpoint.
     ema_decay: ema decay rate. If None or zero or negative value, disable ema.
-    skip_mismatch: whether to skip variables if shape mismatch.
+    skip_mismatch: whether to skip variables if shape mismatch,
+      only works with tf1 checkpoint.
+    exclude_layers: string list exclude layer's variables,
+      only works with tf2 checkpoint.
 
   Raises:
     KeyError: if access unexpected variables.
@@ -153,8 +157,9 @@ def restore_ckpt(model,
       # Use custom checkpoint solves mismatch shape issue.
       keys = {var[0].split('/')[0] for var in var_list}
       keys.discard('_CHECKPOINTABLE_OBJECT_GRAPH')
-      if skip_mismatch:
-        keys.discard('class_net')
+      if exclude_layers:
+        exclude_layers = set(exclude_layers)
+        keys = keys.difference(exclude_layers)
       ckpt = tf.train.Checkpoint(**{key: getattr(model, key, None)
                                     for key in keys
                                     if getattr(model, key, None)})
