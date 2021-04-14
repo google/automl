@@ -135,6 +135,8 @@ def main(_):
       # use synthetic data if no image is provided.
       image_arrays = tf.ones((batch_size, *model_config.image_size, 3),
                              dtype=tf.uint8)
+      if FLAGS.only_network:
+        image_arrays = tf.cast(image_arrays, tf.float32)
     driver.benchmark(image_arrays, FLAGS.bm_runs, FLAGS.trace_filename)
   elif FLAGS.mode == 'dry':
     # transfer to tf2 format ckpt
@@ -153,7 +155,7 @@ def main(_):
     if FLAGS.output_video:
       frame_width, frame_height = int(cap.get(3)), int(cap.get(4))
       out_ptr = cv2.VideoWriter(FLAGS.output_video,
-                                cv2.VideoWriter_fourcc('m', 'p', '4', 'v'), 25,
+                                cv2.VideoWriter_fourcc('m', 'p', '4', 'v'), cap.get(5),
                                 (frame_width, frame_height))
 
     while cap.isOpened():
