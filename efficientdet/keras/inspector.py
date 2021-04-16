@@ -103,8 +103,7 @@ def main(_):
     if FLAGS.saved_model_dir:
       driver.load(FLAGS.saved_model_dir)
       if FLAGS.saved_model_dir.endswith('.tflite'):
-        image_size = utils.parse_image_size(model_config.image_size)
-        image_arrays = tf.image.resize_with_pad(image_arrays, *image_size)
+        image_arrays = tf.image.resize_with_pad(image_arrays, *model_config.image_size)
         image_arrays = tf.cast(image_arrays, tf.uint8)
     detections_bs = driver.serve(image_arrays)
     boxes, scores, classes, _ = tf.nest.map_structure(np.array, detections_bs)
@@ -135,8 +134,9 @@ def main(_):
       # use synthetic data if no image is provided.
       image_arrays = tf.ones((batch_size, *model_config.image_size, 3),
                              dtype=tf.uint8)
-      if FLAGS.only_network:
-        image_arrays = tf.cast(image_arrays, tf.float32)
+    if FLAGS.only_network:
+      image_arrays = tf.image.convert_image_dtype(image_arrays, tf.float32)
+      image_arrays = tf.image.resize(image_arrays, model_config.image_size)
     driver.benchmark(image_arrays, FLAGS.bm_runs, FLAGS.trace_filename)
   elif FLAGS.mode == 'dry':
     # transfer to tf2 format ckpt
