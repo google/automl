@@ -67,7 +67,6 @@ FLAGS = flags.FLAGS
 
 
 def main(_):
-  tf.config.run_functions_eagerly(FLAGS.debug)
   devices = tf.config.list_physical_devices('GPU')
   for device in devices:
     tf.config.experimental.set_memory_growth(device, True)
