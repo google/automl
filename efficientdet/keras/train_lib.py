@@ -335,8 +335,7 @@ class COCOCallback(tf.keras.callbacks.Callback):
 
   @tf.function
   def _get_detections(self, images, labels):
-    cls_outputs, box_outputs = util_keras.fp16_to_fp32_nested(
-        self.model(images, training=False))
+    cls_outputs, box_outputs = self.model(images, training=False)
     detections = postprocess.generate_detections(self.config,
                                                  cls_outputs,
                                                  box_outputs,
@@ -412,14 +411,16 @@ def get_callbacks(params, val_dataset=None):
   if params['moving_average_decay']:
     avg_callback = AverageModelCheckpoint(
         filepath=os.path.join(params['model_dir'], 'emackpt-{epoch:d}'),
-        verbose=1,
+        verbose=params['verbose'],
+        save_freq=params['save_freq'],
         save_weights_only=True,
         update_weights=False)
     callbacks = [avg_callback]
   else:
     ckpt_callback = tf.keras.callbacks.ModelCheckpoint(
         os.path.join(params['model_dir'], 'ckpt-{epoch:d}'),
-        verbose=1,
+        verbose=params['verbose'],
+        save_freq=params['save_freq'],
         save_weights_only=True)
     callbacks = [ckpt_callback]
   if params['model_optimizations'] and 'prune' in params['model_optimizations']:

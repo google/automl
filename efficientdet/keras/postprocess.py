@@ -22,7 +22,6 @@ import tensorflow as tf
 import nms_np
 import utils
 from keras import anchors
-from keras import util_keras
 T = tf.Tensor  # a shortcut for typing check.
 CLASS_OFFSET = 1
 # TFLite-specific constants.
@@ -200,7 +199,7 @@ def nms(params, boxes: T, scores: T, classes: T,
 
   nms_boxes = tf.gather(boxes, nms_top_idx)
   nms_classes = tf.cast(
-      tf.gather(classes, nms_top_idx) + CLASS_OFFSET, tf.float32)
+      tf.gather(classes, nms_top_idx) + CLASS_OFFSET, boxes.dtype)
   return nms_boxes, nms_scores, nms_classes, nms_valid_lens
 
 
@@ -221,9 +220,8 @@ def postprocess_combined(params, cls_outputs, box_outputs, image_scales=None):
   Returns:
     A tuple of batch level (boxes, scores, classess, valid_len) after nms.
   """
-  # Combined nms only has float32 kernel
-  cls_outputs = util_keras.fp16_to_fp32_nested(to_list(cls_outputs))
-  box_outputs = util_keras.fp16_to_fp32_nested(to_list(box_outputs))
+  cls_outputs = to_list(cls_outputs)
+  box_outputs = to_list(box_outputs)
   # Don't filter any outputs because combine_nms need the raw information.
   boxes, scores, _ = pre_nms(params, cls_outputs, box_outputs, topk=False)
 

@@ -180,14 +180,17 @@ def main(_):
   elif FLAGS.strategy == 'gpus':
     gpus = tf.config.list_physical_devices('GPU')
     if FLAGS.batch_size % len(gpus):
-      raise ValueError('Batch size divide gpus number must be interger, but got %f', FLAGS.batch_size / len(gpus))
+      raise ValueError(
+          'Batch size divide gpus number must be interger, but got %f' %
+          (FLAGS.batch_size / len(gpus)))
     if platform.system() == 'Windows':
       # Windows doesn't support nccl use HierarchicalCopyAllReduce instead
       # TODO(fsx950223): investigate HierarchicalCopyAllReduce performance issue
       cross_device_ops = tf.distribute.HierarchicalCopyAllReduce()
     else:
       cross_device_ops = None
-    ds_strategy = tf.distribute.MirroredStrategy(cross_device_ops=cross_device_ops)
+    ds_strategy = tf.distribute.MirroredStrategy(
+        cross_device_ops=cross_device_ops)
     logging.info('All devices: %s', gpus)
   else:
     if tf.config.list_physical_devices('GPU'):
@@ -243,7 +246,11 @@ def main(_):
       tf.config.run_functions_eagerly(True)
     if FLAGS.pretrained_ckpt and not FLAGS.hub_module_url:
       ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)
-      util_keras.restore_ckpt(model, ckpt_path, config.moving_average_decay, exclude_layers=['class_net'])
+      util_keras.restore_ckpt(
+          model,
+          ckpt_path,
+          config.moving_average_decay,
+          exclude_layers=['class_net'])
     init_experimental(config)
     if 'train' in FLAGS.mode:
       val_dataset = get_dataset(False, config) if 'eval' in FLAGS.mode else None

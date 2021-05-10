@@ -101,13 +101,13 @@ class RecordInspect:
         boxes *= scale.numpy()
 
         image = vis_utils.visualize_boxes_and_labels_on_image_array(
-          image,
-          boxes=boxes,
-          classes=classes.astype(int),
-          scores=np.ones(boxes.shape[0]),
-          category_index=category_index,
-          line_thickness=2,
-          skip_scores=True)
+            image,
+            boxes=boxes,
+            classes=classes.astype(int),
+            scores=np.ones(boxes.shape[0]),
+            category_index=category_index,
+            line_thickness=2,
+            skip_scores=True)
         image = Image.fromarray(image)
         image.save(os.path.join(FLAGS.save_samples_dir, f'sample{i}.jpg'))
 
