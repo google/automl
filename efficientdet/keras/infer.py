@@ -22,7 +22,7 @@ from PIL import Image
 import tensorflow as tf
 
 import hparams_config
-from keras import inference
+import inference
 from keras import efficientdet_keras
 
 flags.DEFINE_string('image_path', None, 'Location of test image.')

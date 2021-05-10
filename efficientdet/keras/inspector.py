@@ -25,7 +25,7 @@ import tensorflow as tf
 
 import hparams_config
 import utils
-from keras import inference
+from keras import infer_lib
 
 flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model.')
 flags.DEFINE_enum('mode', 'infer',
@@ -67,6 +67,7 @@ FLAGS = flags.FLAGS
 
 
 def main(_):
+  tf.config.run_functions_eagerly(FLAGS.debug)
   devices = tf.config.list_physical_devices('GPU')
   for device in devices:
     tf.config.experimental.set_memory_growth(device, True)
@@ -82,7 +83,7 @@ def main(_):
   ckpt_path_or_file = FLAGS.model_dir
   if tf.io.gfile.isdir(ckpt_path_or_file):
     ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
-  driver = inference.ServingDriver(FLAGS.model_name, ckpt_path_or_file,
+  driver = infer_lib.ServingDriver(FLAGS.model_name, ckpt_path_or_file,
                                    FLAGS.batch_size or None,
                                    FLAGS.only_network, model_params)
   if FLAGS.mode == 'export':
@@ -102,7 +103,8 @@ def main(_):
     if FLAGS.saved_model_dir:
       driver.load(FLAGS.saved_model_dir)
       if FLAGS.saved_model_dir.endswith('.tflite'):
-        image_arrays = tf.image.resize_with_pad(image_arrays, *model_config.image_size)
+        image_size = utils.parse_image_size(model_config.image_size)
+        image_arrays = tf.image.resize_with_pad(image_arrays, *image_size)
         image_arrays = tf.cast(image_arrays, tf.uint8)
     detections_bs = driver.serve(image_arrays)
     boxes, scores, classes, _ = tf.nest.map_structure(np.array, detections_bs)
@@ -154,8 +156,8 @@ def main(_):
     if FLAGS.output_video:
       frame_width, frame_height = int(cap.get(3)), int(cap.get(4))
       out_ptr = cv2.VideoWriter(FLAGS.output_video,
-                                cv2.VideoWriter_fourcc('m', 'p', '4', 'v'), cap.get(5),
-                                (frame_width, frame_height))
+                                cv2.VideoWriter_fourcc('m', 'p', '4', 'v'),
+                                cap.get(5), (frame_width, frame_height))
 
     while cap.isOpened():
       # Capture frame-by-frame

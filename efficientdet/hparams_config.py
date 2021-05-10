@@ -223,6 +223,7 @@ def default_detection_configs():
   # The default image normalization is identical to Cloud TPU ResNet.
   h.mean_rgb = [0.485 * 255, 0.456 * 255, 0.406 * 255]
   h.stddev_rgb = [0.229 * 255, 0.224 * 255, 0.225 * 255]
+  h.scale_range = False
 
   # classification loss
   h.label_smoothing = 0.0  # 0.1 is a good default
@@ -290,6 +291,10 @@ def default_detection_configs():
   h.dataset_type = None
   h.positives_momentum = None
   h.grad_checkpoint = False
+
+  # Parameters for the Checkpoint Callback.
+  h.verbose = 1
+  h.save_freq = 'epoch'
 
   return h
 
@@ -439,11 +444,22 @@ efficientdet_lite_param_dict = {
             box_class_repeats=4,
             **lite_common_param,
         ),
+    'efficientdet-lite3x':
+        dict(
+            name='efficientdet-lite3x',
+            backbone_name='efficientnet-lite3',
+            image_size=640,
+            fpn_num_filters=200,
+            fpn_cell_repeats=6,
+            box_class_repeats=4,
+            anchor_scale=3.0,
+            **lite_common_param,
+        ),
     'efficientdet-lite4':
         dict(
             name='efficientdet-lite4',
             backbone_name='efficientnet-lite4',
-            image_size=512,
+            image_size=640,
             fpn_num_filters=224,
             fpn_cell_repeats=7,
             box_class_repeats=4,

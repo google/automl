@@ -351,6 +351,8 @@ class InputReader:
       areas = pad_to_fixed_size(areas, -1, [self._max_instances_per_image, 1])
       classes = pad_to_fixed_size(classes, -1,
                                   [self._max_instances_per_image, 1])
+      if params['scale_range']:
+        image = image * 2.0 / 255 - 1.0
       if params['mixed_precision']:
         dtype = tf.keras.mixed_precision.global_policy().compute_dtype
         image = tf.cast(image, dtype=dtype)
@@ -395,7 +397,6 @@ class InputReader:
   def dataset_options(self):
     options = tf.data.Options()
     options.experimental_deterministic = self._debug or not self._is_training
-    options.experimental_optimization.map_vectorization.enabled = True
     options.experimental_optimization.map_parallelization = True
     options.experimental_optimization.parallel_batch = True
     return options

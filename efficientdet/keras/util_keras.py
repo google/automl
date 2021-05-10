@@ -202,8 +202,7 @@ def restore_ckpt(model,
         else:
           var.assign(reader.get_tensor(key), read_value=False)
           logging.log_first_n(
-              logging.INFO,
-              'Init %s from %s (%s)' % (var.name, key, ckpt_path_or_file),
+              logging.INFO, f'Init {var.name} from {key} ({ckpt_path_or_file})',
               10)
       else:
         msg = 'Not found %s in %s' % (key, ckpt_path_or_file)
