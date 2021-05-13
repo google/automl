@@ -1,7 +1,7 @@
 # EfficientNetV2
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.sandbox.google.com/github/google/automl/blob/master/efficientnetv2/tutorial.ipynb)
-[![Paper](http://img.shields.io/badge/Paper-arXiv.2104.00298-B3181B?logo=arXiv)(ICML'21)](https://arxiv.org/abs/2104.00298)
+[![Paper](http://img.shields.io/badge/Paper-arXiv.2104.00298-B3181B?logo=arXiv)](https://arxiv.org/abs/2104.00298)
 
 
    - May13/2021: Initial code release for [EfficientNetV2 models](https://arxiv.org/abs/2104.00298): accepted to ICML'21.
@@ -27,10 +27,8 @@ We have provided a list of results and checkpoints as follows:
 |    EffNetV2-M     |    85.2%   |    54.1M    | 24.7B    | [V100/A100](g3doc/effnetv2-m-gpu.png) |  [ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-m.tgz),  [tensorboard](https://tensorboard.dev/experiment/syoaqB2gTP6Vr0KRlrezmg)
 |    EffNetV2-L     |    85.7%   |   119.5M    | 56.3B    | [V100/A100](g3doc/effnetv2-l-gpu.png) |  [ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-l.tgz),  [tensorboard](https://tensorboard.dev/experiment/qgnTQ5JZQ92nSex6ZlWBbQ)
 
-** Thanks NVIDIA for providing the inference latency (scripts to benchmarking)
+** Thanks NVIDIA for providing the inference latency (benchmark scripts coming soon)
 
-
-Here are a list of ImageNet21K pretrained and finetuned models:
 
 Here are a list of ImageNet21K pretrained and finetuned models:
 
