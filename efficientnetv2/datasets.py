@@ -76,7 +76,7 @@ class ImageNetInput():
       https://github.com/tensorflow/tpu/blob/master/tools/datasets/imagenet_to_gcs.py
   """
   cfg = hparams.Config(
-      data_dir='/readahead/128M/placer/prod/home/distbelief/imagenet-tensorflow/imagenet-2012-tfrecord/',
+      data_dir=None,
       num_classes=1000,
       multiclass=False,
       tfds_split=None,
@@ -454,7 +454,7 @@ class ImageNet21kInput(ImageNetInput):
   cfg = copy.deepcopy(ImageNetInput.cfg)
   cfg.update(
       dict(
-          data_dir='/placer/prod/home/tensorflow-datasets-cns-storage-owner/datasets/imagenet21k/1.0.0/',
+          data_dir=None,
           num_classes=21843,
           multiclass=True,
           splits=dict(
@@ -601,7 +601,6 @@ def get_dataset_class(ds_name):
       'cifar100': CIFAR100Input,
       'flowers': FlowersInput,
       'cars': CarsInput,
-      'jft': JFTInput,
   }[ds_name]
 
 
@@ -657,42 +656,6 @@ class ImageNet21k():
           isize=224,
       ),
   )
-
-
-class JFTInput(ImageNet21kInput):
-  """Generates ImageNet input_fn from JFT-300M TFRecord files."""
-  cfg = copy.deepcopy(ImageNet21kInput.cfg)
-  cfg.update(
-      dict(
-          data_dir='/placer/prod/home/tensorflow-datasets-cns-storage-owner/datasets/jft/entity/1.0.0/',
-          num_classes=18291,
-          multiclass=True,
-          splits=dict(
-              train=dict(
-                  num_images=303021387,
-                  files='jft-train*',
-                  slice=slice(0, None)),
-              minival=dict(
-                  num_images=40105, files='jft-val*', slice=slice(0, 8)),
-              eval=dict(
-                  num_images=641676, files='jft-val*', slice=slice(0, None)),
-          ),
-      ))
-
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-    self.cache = False   # JFT is too big to cache.
-    self.shuffle_size_k = 1024
-    self.shuffle_files = True
-    self.shuffle_seed = None
-
-
-@ds_register
-class JFT(ImageNet21k):
-  """JFT train/eval configs."""
-  cfg = copy.deepcopy(ImageNet21k.cfg)
-  cfg.data.ds_name = 'jft'
-  cfg.train.update(dict(epochs=4, lr_sched='linear', lr_base=0.001))
 
 
 @ds_register
