@@ -92,7 +92,7 @@ def batch_image_preprocess(raw_images,
         image_size=image_size,
         mean_rgb=mean_rgb,
         stddev_rgb=stddev_rgb)
-    images, scales = tf.map_fn(
+    images, scales = tf.vertorized_map(
         map_fn, raw_images, dtype=(tf.float32, tf.float32), back_prop=False)
     return (images, scales)
 
