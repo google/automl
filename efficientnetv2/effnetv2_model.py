@@ -32,9 +32,9 @@ import six
 from six.moves import xrange
 import tensorflow as tf
 
-from brain_automl.efficientnetv2 import effnetv2_configs
-from brain_automl.efficientnetv2 import hparams
-from brain_automl.efficientnetv2 import utils
+import effnetv2_configs
+import hparams
+import utils
 
 
 def conv_kernel_initializer(shape, dtype=None, partition_info=None):
@@ -525,8 +525,7 @@ class EffNetV2Model(tf.keras.Model):
     Raises:
       ValueError: when blocks_args is not specified as a list.
     """
-    super().__init__(name=name)
-
+    super().__init__(name=name or model_name)
     cfg = copy.deepcopy(hparams.base_config)
     if model_name:
       cfg.override(effnetv2_configs.get_model_config(model_name))

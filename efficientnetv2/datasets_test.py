@@ -14,7 +14,7 @@
 # ==============================================================================
 """Tests datasets."""
 import tensorflow as tf
-from brain_automl.efficientnetv2 import datasets
+import datasets
 
 
 class ImagenetInputTest(tf.test.TestCase):

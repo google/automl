@@ -16,7 +16,7 @@
 from absl import logging
 from absl.testing import parameterized
 import tensorflow as tf
-from brain_automl.efficientnetv2 import preprocessing
+import preprocessing
 
 
 class PreprocessingTest(tf.test.TestCase, parameterized.TestCase):

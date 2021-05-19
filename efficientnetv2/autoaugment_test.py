@@ -13,14 +13,8 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for autoaugment."""
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import tensorflow.compat.v1 as tf
-
-from brain_automl.efficientnetv2 import autoaugment
+import autoaugment
 
 
 class AutoaugmentTest(tf.test.TestCase):

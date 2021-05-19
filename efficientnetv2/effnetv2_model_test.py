@@ -16,7 +16,7 @@
 from absl import logging
 from absl.testing import parameterized
 import tensorflow.compat.v1 as tf
-from brain_automl.efficientnetv2 import effnetv2_model
+import effnetv2_model
 
 
 class EffNetV2ModelTest(tf.test.TestCase, parameterized.TestCase):
