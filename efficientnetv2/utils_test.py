@@ -15,7 +15,7 @@
 """Tests for utils."""
 
 import tensorflow as tf
-from brain_automl.efficientnetv2 import utils
+import utils
 
 
 class UtilsTest(tf.test.TestCase):

@@ -19,8 +19,8 @@ import os
 from absl import logging
 import tensorflow.compat.v1 as tf
 import tensorflow_datasets as tfds
-from brain_automl.efficientnetv2 import hparams
-from brain_automl.efficientnetv2 import preprocessing
+import hparams
+import preprocessing
 ds_register = functools.partial(hparams.register, prefix='ds:')
 
 
@@ -336,7 +336,6 @@ class ImageNetInput():
 
     filenames = tf.io.gfile.glob(
         os.path.join(self.cfg.data_dir, self.split_info['files']))
-    print(filenames)
     filenames = sorted(filenames)[self.split_info['slice']]
     for f in filenames[:5]:
       logging.info('datafiles: %s', f)
@@ -528,9 +527,12 @@ class CIFAR10Input(ImageNetInput):
     new_label = {'label': tf.one_hot(features['label'], self.cfg.num_classes)}
     return new_features, new_label
 
-  def input_fn(self, params):
+  def _input_fn(self, batch_size, current_host, num_hosts):
+    logging.info('use tfds: %s[%s]', self.cfg.tfds_name,
+                 self.cfg.splits[self.split]['tfds_split'])
     ds = tfds.load(
         self.cfg.tfds_name, split=self.cfg.splits[self.split]['tfds_split'])
+    ds = ds.shard(num_hosts, current_host)
     if self.is_training:
       if self.cache:
         ds = ds.cache().shuffle(1024 * 16, seed=self.shuffle_seed).repeat()
@@ -542,7 +544,7 @@ class CIFAR10Input(ImageNetInput):
         self.preprocess, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     ds = ds.prefetch(1)
 
-    ds = ds.batch(params['batch_size'], drop_remainder=True)
+    ds = ds.batch(batch_size, drop_remainder=True)
     ds = ds.prefetch(1)
 
     options = tf.data.Options()
@@ -593,10 +595,28 @@ class CarsInput(CIFAR10Input):
           )))
 
 
+class ImageNetTfdsInput(CIFAR10Input):
+  """ImageNet TFDS input from tfds."""
+  cfg = copy.deepcopy(CIFAR10Input.cfg)
+  cfg.update(
+      dict(
+          data_dir=None,
+          num_classes=1000,
+          multiclass=False,
+          tfds_name='imagenet2012',
+          splits=dict(
+              train=dict(num_images=1_256_144, tfds_split='train[:98%]'),
+              minival=dict(num_images=25_021, tfds_split='train[2%:]'),
+              eval=dict(num_images=50_000, tfds_split='validation'),
+              trainval=dict(num_images=1_281_167, tfds_split='train'),
+          )))
+
+
 def get_dataset_class(ds_name):
   return {
       'imagenet': ImageNetInput,
       'imagenet21k': ImageNet21kInput,
+      'imagenettfds': ImageNetTfdsInput,
       'cifar10': CIFAR10Input,
       'cifar100': CIFAR100Input,
       'flowers': FlowersInput,
@@ -682,7 +702,7 @@ class ImagenetFt(ImageNet):
           isize=1.0,
       ),
       data=dict(
-          ds_name='imagenet',
+          ds_name='imagenettfds',
           augname='ft',
           mixup_alpha=0,
           cutmix_alpha=0,

@@ -15,7 +15,7 @@
 """EfficientNet V1 and V2 model configs."""
 import functools
 import re
-from brain_automl.efficientnetv2 import hparams
+import hparams
 cfg_register = functools.partial(hparams.register, prefix='cfg:')
 
 

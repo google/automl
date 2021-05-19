@@ -22,12 +22,12 @@ import tensorflow as tf
 import tensorflow.compat.v1 as tf1
 import tensorflow_datasets as tfds
 
-from brain_automl.efficientnetv2 import datasets
-from brain_automl.efficientnetv2 import effnetv2_configs
-from brain_automl.efficientnetv2 import effnetv2_model
-from brain_automl.efficientnetv2 import hparams
-from brain_automl.efficientnetv2 import preprocessing
-from brain_automl.efficientnetv2 import utils
+import datasets
+import effnetv2_configs
+import effnetv2_model
+import hparams
+import preprocessing
+import utils
 FLAGS = flags.FLAGS
 
 
@@ -46,24 +46,26 @@ def define_flags():
   flags.DEFINE_integer('batch_size', 16, 'Batch size.')
 
 
-def create_model(model_name, dataset_cfg, hparam_str=''):
+def get_config(model_name, dataset_cfg, hparam_str=''):
   """Create a keras model for EffNetV2."""
   config = copy.deepcopy(hparams.base_config)
   config.override(effnetv2_configs.get_model_config(model_name))
   config.override(datasets.get_dataset_config(dataset_cfg))
   config.override(hparam_str)
   config.model.num_classes = config.data.num_classes
-  return effnetv2_model.EffNetV2Model(model_name, config.model)
+  return config
 
 
 def build_tf2_model():
   """Build the tf2 model."""
-  # Use 'mixed_float16' if running on GPUs.
-  policy = tf.keras.mixed_precision.Policy('mixed_float16')
-  tf.keras.mixed_precision.set_global_policy(policy)
   tf.config.run_functions_eagerly(FLAGS.debug)
-  # Create and run the model.
-  model = create_model(FLAGS.model_name, FLAGS.dataset_cfg, FLAGS.hparam_str)
+  config = get_config(FLAGS.model_name, FLAGS.dataset_cfg, FLAGS.hparam_str)
+  if config.runtime.mixed_precision:
+    # Use 'mixed_float16' if running on GPUs.
+    policy = tf.keras.mixed_precision.Policy('mixed_float16')
+    tf.keras.mixed_precision.set_global_policy(policy)
+
+  model = effnetv2_model.EffNetV2Model(FLAGS.model_name, config.model)
   # Use call (not build) to match the namescope: tensorflow issues/29576
   model(tf.ones([1, 224, 224, 3]), False)
   if FLAGS.model_dir:
@@ -122,9 +124,12 @@ def tf2_benchmark():
 
   batch_size = FLAGS.batch_size
   imgs = tf.ones((batch_size, isize, isize, 3), dtype=tf.float16)
+
+  print('starting warmup.')
   for _ in range(10):  # warmup runs.
     export_model.f(imgs)
 
+  print('start benchmark.')
   start = time.perf_counter()
   for _ in range(10):
     export_model.f(imgs)
@@ -139,19 +144,23 @@ def tf1_benchmark():
   """Run TF1 inference and benchmark."""
   # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
   from tensorflow.python.client import timeline
+  config = get_config(FLAGS.model_name, FLAGS.dataset_cfg, FLAGS.hparam_str)
   with tf1.Session() as sess:
+    model = effnetv2_model.EffNetV2Model(FLAGS.model_name, config.model)
     batch_size = FLAGS.batch_size
     run_options = tf1.RunOptions(
         trace_level=tf1.RunOptions.FULL_TRACE)
     run_metadata = tf1.RunMetadata()
-    model = create_model(FLAGS.model_name, FLAGS.dataset_cfg, FLAGS.hparam_str)
-    isize = FLAGS.image_size or model.cfg.eval.isize
+    isize = FLAGS.image_size or config.eval.isize
     inputs = tf.ones((batch_size, isize, isize, 3), tf.float16)
     output = model(inputs, training=False)
     sess.run(tf1.global_variables_initializer())
-    for _ in range(5):
-      sess.run(output)  # warmup
 
+    print('starting warmup.')
+    for _ in range(5):
+      sess.run(output)
+
+    print('starting benchmark.')
     start = time.perf_counter()
     for _ in range(10):
       sess.run(output)
@@ -171,9 +180,10 @@ def tf1_benchmark():
 def tf1_export_ema_ckpt():
   """Restore variables from a given checkpoint."""
   with tf1.Session() as sess:
+    config = get_config(FLAGS.model_name, FLAGS.dataset_cfg, FLAGS.hparam_str)
+    model = effnetv2_model.EffNetV2Model(FLAGS.model_name, config.model)
     batch_size = FLAGS.batch_size
-    model = create_model(FLAGS.model_name, FLAGS.dataset_cfg, FLAGS.hparam_str)
-    isize = FLAGS.image_size or model.cfg.eval.isize
+    isize = FLAGS.image_size or config.eval.isize
     inputs = tf.ones((batch_size, isize, isize, 3), tf.float32)
     _ = model(inputs, training=False)
     sess.run(tf1.global_variables_initializer())

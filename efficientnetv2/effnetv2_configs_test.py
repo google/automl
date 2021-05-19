@@ -15,7 +15,7 @@
 """Tests fo effnetv2_configs."""
 from absl import logging
 import tensorflow as tf
-from brain_automl.efficientnetv2 import effnetv2_configs
+import effnetv2_configs
 
 
 class EffnetV2ConfigsTest(tf.test.TestCase):

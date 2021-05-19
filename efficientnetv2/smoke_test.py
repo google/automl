@@ -18,7 +18,7 @@ import tempfile
 from absl import flags
 from absl.testing import flagsaver
 import tensorflow as tf
-from brain_automl.efficientnetv2 import main as main_lib
+import main as main_lib
 
 FLAGS = flags.FLAGS
 GPU_TEST = 'gpu_test' in sys.argv[0]
@@ -35,7 +35,7 @@ class EfficientNetV2Test(tf.test.TestCase):
     FLAGS.data_dir = 'null'
     cls.hparam_str = (
         'train.batch_size=2,eval.batch_size=2,train.epochs=0,train.min_steps=1,'
-        'train.lr_base=0,data.splits.eval.num_images=6,')
+        'train.stages=0,train.lr_base=0,data.splits.eval.num_images=6,')
 
   def _run_single_step_train_and_eval(self, hparam_str=''):
     """Single step run with TPUEstimator."""

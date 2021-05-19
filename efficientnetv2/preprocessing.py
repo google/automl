@@ -15,8 +15,8 @@
 """ImageNet preprocessing."""
 from absl import logging
 import tensorflow as tf
-from brain_automl.efficientnetv2 import autoaugment
-from brain_automl.efficientnetv2 import preprocess_legacy
+import autoaugment
+import preprocess_legacy
 
 
 def preprocess_for_train(image,

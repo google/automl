@@ -23,14 +23,14 @@ from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
 
-from brain_automl.efficientnetv2 import datasets
-from brain_automl.efficientnetv2 import effnetv2_configs
-from brain_automl.efficientnetv2 import effnetv2_model
-from brain_automl.efficientnetv2 import hparams
-from brain_automl.efficientnetv2 import utils
+import datasets
+import effnetv2_configs
+import effnetv2_model
+import hparams
+import utils
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('model_name', 'efficientnetv2-s', 'model name.')
+flags.DEFINE_string('model_name', 'efficientnetv2-b0', 'model name.')
 flags.DEFINE_string('dataset_cfg', 'Imagenet', 'dataset config name.')
 flags.DEFINE_string('hparam_str', '', 'Comma separated k=v pairs of hparams.')
 flags.DEFINE_string('sweeps', '', 'Comma separated k=v pairs for sweeping.')

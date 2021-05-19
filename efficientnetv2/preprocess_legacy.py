@@ -15,7 +15,7 @@
 """Legacy ImageNet preprocessing for EfficientNetV1."""
 from absl import logging
 import tensorflow.compat.v1 as tf
-from brain_automl.efficientnetv2 import autoaugment
+import autoaugment
 
 
 def distorted_bounding_box_crop(image_bytes,
