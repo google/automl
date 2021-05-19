@@ -15,6 +15,7 @@
 """A simple example on how to use keras model for inference."""
 import copy
 import time
+import os
 from absl import app
 from absl import flags
 from absl import logging
@@ -33,7 +34,7 @@ FLAGS = flags.FLAGS
 
 def define_flags():
   """Define all flags for binary run."""
-  flags.DEFINE_string('mode', 'eval', 'Running mode.')
+  flags.DEFINE_string('mode', 'tf2eval', 'Running mode.')
   flags.DEFINE_string('image_path', None, 'Location of test image.')
   flags.DEFINE_integer('image_size', None, 'Image size.')
   flags.DEFINE_string('model_dir', None, 'Location of the checkpoint to run.')
@@ -72,7 +73,7 @@ def build_tf2_model():
     ckpt = FLAGS.model_dir
     if tf.io.gfile.isdir(ckpt):
       ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
-    model.load_weights(ckpt)
+    utils.restore_tf2_ckpt(model, ckpt, exclude_layers=('_head', 'optimizer'))
   model.summary()
 
   class ExportModel(tf.Module):
@@ -209,6 +210,47 @@ def tf1_export_ema_ckpt():
     saver.save(sess, FLAGS.export_dir)
 
 
+def tf2_export_mlir():
+  """Export model to MLIR."""
+  config = get_config(FLAGS.model_name, FLAGS.dataset_cfg, FLAGS.hparam_str)
+  model = effnetv2_model.EffNetV2Model(FLAGS.model_name, config.model)
+  # Use call (not build) to match the namescope: tensorflow issues/29576
+  model(tf.ones([1, 224, 224, 3]), False)
+  if FLAGS.model_dir:
+    ckpt = FLAGS.model_dir
+    if tf.io.gfile.isdir(ckpt):
+      ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
+    utils.restore_tf2_ckpt(model, ckpt, exclude_layers=('_head', 'optimizer'))
+  model.summary()
+
+  from tensorflow.lite.python.util import run_graph_optimizations, get_grappler_config
+  from tensorflow.python.framework.convert_to_constants import convert_variables_to_constants_v2_as_graph
+
+  fff = tf.function(model).get_concrete_function(tf.TensorSpec([1, 224, 224, 3], tf.float32))
+
+  frozen_func, graph_def = convert_variables_to_constants_v2_as_graph(fff)
+
+  input_tensors = [
+      tensor for tensor in frozen_func.inputs
+      if tensor.dtype != tf.resource
+  ]
+  output_tensors = frozen_func.outputs
+
+  graph_def = run_graph_optimizations(
+      graph_def,
+      input_tensors,
+      output_tensors,
+      config=get_grappler_config(['pruning', 'function', 'constfold', 'shape', 'remap', 'memory', 'common_subgraph_elimination', 'arithmetic', 'loop', 'dependency', 'debug_stripper']),
+      graph=frozen_func.graph)
+
+  tf_mlir_graph = tf.mlir.experimental.convert_graph_def(graph_def)
+
+  print('export model to {}'.format(FLAGS.export_dir))
+  os.makedirs(FLAGS.export_dir, exist_ok=True)
+  outfile = open('{}/{}.mlir'.format(FLAGS.export_dir, FLAGS.model_name), 'wb')
+  outfile.write(tf_mlir_graph.encode())
+  outfile.close()
+
 def main(_):
   if FLAGS.mode == 'tf1export':
     tf1_export_ema_ckpt()
@@ -218,6 +260,8 @@ def main(_):
     tf2_benchmark()
   elif FLAGS.mode == 'tf2eval':
     tf2_eval_dataset()
+  elif FLAGS.mode == 'tf2mlir':
+    tf2_export_mlir()
   else:
     raise ValueError(f'Invalid mode {FLAGS.mode}')
 
