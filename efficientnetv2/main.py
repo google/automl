@@ -433,11 +433,11 @@ def main(unused_argv):
         'Training for %d steps (%.2f epochs in total). Current'
         ' step %d.', train_steps, config.train.epochs, current_step)
 
-    start_timestamp = time.time()  # This time will include compilation time
-
     if FLAGS.mode == 'train':
+      total_stages = config.train.stages
+
       hooks = []  # add hooks if needed.
-      if not config.train.stages:
+      if not total_stages:
         dataset_train = datasets.build_dataset_input(True, input_image_size,
                                                      image_dtype,
                                                      FLAGS.data_dir,
@@ -452,7 +452,6 @@ def main(unused_argv):
         except (IndexError, TypeError):
           logging.info('%s has no ckpt with valid step.', FLAGS.model_dir)
 
-        total_stages = config.train.stages
         if config.train.sched:
           if config.model.dropout_rate:
             dp_list = np.linspace(0, config.model.dropout_rate, total_stages)
@@ -464,35 +463,24 @@ def main(unused_argv):
           mixup_list = np.linspace(0, config.data.mixup_alpha, total_stages)
           cutmix_list = np.linspace(0, config.data.cutmix_alpha, total_stages)
 
-        ibase = config.data.ibase or (input_image_size / 2)
-        # isize_list = np.linspace(ibase, input_image_size, total_stages)
-        for stage in range(curr_step // train_steps, total_stages):
-          tf.compat.v1.reset_default_graph()
-          ratio = float(stage + 1) / float(total_stages)
-          max_steps = int(ratio * train_steps)
-          image_size = int(ibase + (input_image_size - ibase) * ratio)
-          params['image_size'] = image_size
+        def _input_fn(params):
+          ibase = config.data.ibase or (input_image_size / 2)
+          isize_list = np.linspace(ibase, input_image_size, total_stages).astype(np.int32)
+          dts = [tf.data.experimental.Counter(dtype=tf.int32)]
+          for index, image_size in enumerate(isize_list):
+            if config.train.sched:
+              config.data.ram = ram_list[index]
+              config.data.mixup_alpha = mixup_list[index]
+              config.data.cutmix_alpha = cutmix_list[index]
+            ds_lab_cls = datasets.build_dataset_input(True, image_size,
+                                                      image_dtype, FLAGS.data_dir,
+                                                      train_split, copy.deepcopy(config.data))
 
-          if config.train.sched:
-            config.data.ram = ram_list[stage]
-            config.data.mixup_alpha = mixup_list[stage]
-            config.data.cutmix_alpha = cutmix_list[stage]
-            # config.model.dropout_rate = dp_list[stage]
-
-          ds_lab_cls = datasets.build_dataset_input(True, image_size,
-                                                    image_dtype, FLAGS.data_dir,
-                                                    train_split, config.data)
-
-          est = tf.estimator.tpu.TPUEstimator(
-              use_tpu=FLAGS.use_tpu,
-              model_fn=model_fn,
-              config=run_config,
-              train_batch_size=config.train.batch_size,
-              eval_batch_size=config.eval.batch_size,
-              export_to_tpu=FLAGS.export_to_tpu,
-              params=params)
-          est.train(
-              input_fn=ds_lab_cls.input_fn, max_steps=max_steps, hooks=hooks)
+            dts.append(ds_lab_cls.input_fn(params))
+          ds = tf.data.Dataset.zip(tuple(dts))
+          return ds.map(lambda c, *args: tf.switch_case(c // train_steps, {idx: (lambda: arg) for idx, arg in enumerate(args)}))
+        est.train(
+            input_fn=_input_fn, max_steps=train_steps * total_stages, hooks=hooks)
     else:
       raise ValueError('Unknown mode %s' % FLAGS.mode)
 
