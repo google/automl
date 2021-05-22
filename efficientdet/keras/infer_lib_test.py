@@ -32,6 +32,11 @@ class InferenceTest(tf.test.TestCase):
     model.build([1, 512, 512, 3])
     model.save_weights(os.path.join(self.tmp_path, 'model'))
 
+    lite_model = efficientdet_keras.EfficientDetModel('efficientdet-lite0')
+    self.lite_tmp_path = tempfile.mkdtemp()
+    lite_model.build([1, 512, 512, 3])
+    lite_model.save_weights(os.path.join(self.lite_tmp_path, 'model'))
+
   def test_export(self):
     saved_model_path = os.path.join(self.tmp_path, 'saved_model')
     driver = infer_lib.ServingDriver('efficientdet-d0', self.tmp_path)
@@ -42,9 +47,9 @@ class InferenceTest(tf.test.TestCase):
     driver.load(os.path.join(saved_model_path, 'efficientdet-d0_frozen.pb'))
 
   def test_export_tflite_only_network(self):
-    saved_model_path = os.path.join(self.tmp_path, 'saved_model')
+    saved_model_path = os.path.join(self.lite_tmp_path, 'saved_model')
     driver = infer_lib.ServingDriver(
-        'efficientdet-lite0', self.tmp_path, only_network=True)
+        'efficientdet-lite0', self.lite_tmp_path, only_network=True)
     driver.export(saved_model_path, tflite='FP32')
     self.assertTrue(
         tf.io.gfile.exists(os.path.join(saved_model_path, 'fp32.tflite')))
@@ -63,9 +68,9 @@ class InferenceTest(tf.test.TestCase):
         tf.io.gfile.exists(os.path.join(saved_model_path, 'int8.tflite')))
 
   def test_export_tflite_with_post_processing(self):
-    saved_model_path = os.path.join(self.tmp_path, 'saved_model')
+    saved_model_path = os.path.join(self.lite_tmp_path, 'saved_model')
     driver = infer_lib.ServingDriver(
-        'efficientdet-lite0', self.tmp_path, only_network=False)
+        'efficientdet-lite0', self.lite_tmp_path, only_network=False)
     driver.export(saved_model_path, tflite='FP32')
     self.assertTrue(
         tf.io.gfile.exists(os.path.join(saved_model_path, 'fp32.tflite')))
