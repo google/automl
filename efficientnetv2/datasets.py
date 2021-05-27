@@ -335,7 +335,7 @@ class ImageNetInput():
       return tf.data.Dataset.range(1).repeat().map(self._get_null_input)
 
     filenames = tf.io.gfile.glob(
-        os.path.join(self.cfg.data_dir, self.split_info['files']))
+        os.path.join(self.data_dir, self.split_info['files']))
     filenames = sorted(filenames)[self.split_info['slice']]
     for f in filenames[:5]:
       logging.info('datafiles: %s', f)
