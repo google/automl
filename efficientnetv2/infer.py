@@ -48,8 +48,7 @@ def define_flags():
 
 def get_config(model_name, dataset_cfg, hparam_str=''):
   """Create a keras model for EffNetV2."""
-  config = copy.deepcopy(hparams.base_config)
-  config.override(effnetv2_configs.get_model_config(model_name))
+  config = effnetv2_configs.get_model_config(model_name)
   config.override(datasets.get_dataset_config(dataset_cfg))
   config.override(hparam_str)
   config.model.num_classes = config.data.num_classes
