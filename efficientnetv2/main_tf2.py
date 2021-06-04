@@ -229,7 +229,8 @@ def main(_) -> None:
             train_steps = config.train.epochs * steps_per_epoch // total_stages
             ibase = config.data.ibase or (train_size / 2)
             isize_list = np.linspace(ibase, train_size, total_stages).astype(np.int32)
-            dts = [tf.data.experimental.Counter(dtype=tf.int32)]
+            ds = tf.data.experimental.Counter(dtype=tf.int32)
+            ds_iters = []
             for index, image_size in enumerate(isize_list):
               if config.train.sched:
                 config.data.ram = ram_list[index]
@@ -238,10 +239,8 @@ def main(_) -> None:
               ds_lab_cls = datasets.build_dataset_input(True, image_size,
                                                         image_dtype, FLAGS.data_dir,
                                                         train_split, copy.deepcopy(config.data))
-
-              dts.append(ds_lab_cls.distribute_dataset_fn(config.train.batch_size)(input_context))
-            ds = tf.data.Dataset.zip(tuple(dts))
-            return ds.map(lambda c, *args: tf.switch_case(c // train_steps, {idx: (lambda: arg) for idx, arg in enumerate(args)}))
+              ds_iters.append(iter(ds_lab_cls.distribute_dataset_fn(config.train.batch_size)(input_context)))
+            return ds.map(lambda c: tf.switch_case(c // (train_steps * config.train.batch_size), {idx: (lambda: next(ds_iter)) for idx, ds_iter in enumerate(ds_iters)}))
 
           return ds_strategy.distribute_datasets_from_function(_input_fn)
         else:

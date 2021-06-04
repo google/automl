@@ -466,7 +466,8 @@ def main(unused_argv):
         def _input_fn(params):
           ibase = config.data.ibase or (input_image_size / 2)
           isize_list = np.linspace(ibase, input_image_size, total_stages).astype(np.int32)
-          dts = [tf.data.experimental.Counter(dtype=tf.int32)]
+          ds = tf.data.experimental.Counter(dtype=tf.int32)
+          ds_iters = []
           for index, image_size in enumerate(isize_list):
             if config.train.sched:
               config.data.ram = ram_list[index]
@@ -475,10 +476,8 @@ def main(unused_argv):
             ds_lab_cls = datasets.build_dataset_input(True, image_size,
                                                       image_dtype, FLAGS.data_dir,
                                                       train_split, copy.deepcopy(config.data))
-
-            dts.append(ds_lab_cls.input_fn(params))
-          ds = tf.data.Dataset.zip(tuple(dts))
-          return ds.map(lambda c, *args: tf.switch_case(c // train_steps, {idx: (lambda: arg) for idx, arg in enumerate(args)}))
+            ds_iters.append(ds_lab_cls.input_fn(params).make_one_shot_iterator())
+          return ds.map(lambda c: tf.switch_case(c // (params['batch_size'] * train_steps), {idx: (lambda: ds_iter.get_next()) for idx, ds_iter in enumerate(ds_iters)}))
         est.train(
             input_fn=_input_fn, max_steps=train_steps * total_stages, hooks=hooks)
     else:
