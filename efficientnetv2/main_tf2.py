@@ -22,6 +22,7 @@ from absl import app
 from absl import flags
 from absl import logging
 import tensorflow as tf
+import numpy as np
 
 import cflags
 import datasets
@@ -217,10 +218,38 @@ def main(_) -> None:
     def get_dataset(training):
       """A shared utility to get input dataset."""
       if training:
-        return ds_strategy.distribute_datasets_from_function(
-            datasets.build_dataset_input(
-                True, train_size, image_dtype, FLAGS.data_dir, train_split,
-                config.data).distribute_dataset_fn(config.train.batch_size))
+        total_stages = config.train.stages
+        if total_stages:
+          if config.train.sched:
+            ram_list = np.linspace(5, config.data.ram, total_stages)
+            mixup_list = np.linspace(0, config.data.mixup_alpha, total_stages)
+            cutmix_list = np.linspace(0, config.data.cutmix_alpha, total_stages)
+
+          def _input_fn(input_context):
+            train_steps = config.train.epochs * steps_per_epoch // total_stages
+            ibase = config.data.ibase or (train_size / 2)
+            isize_list = np.linspace(ibase, train_size, total_stages).astype(np.int32)
+            dts = [tf.data.experimental.Counter(dtype=tf.int32)]
+            for index, image_size in enumerate(isize_list):
+              if config.train.sched:
+                config.data.ram = ram_list[index]
+                config.data.mixup_alpha = mixup_list[index]
+                config.data.cutmix_alpha = cutmix_list[index]
+              ds_lab_cls = datasets.build_dataset_input(True, image_size,
+                                                        image_dtype, FLAGS.data_dir,
+                                                        train_split, copy.deepcopy(config.data))
+
+              dts.append(ds_lab_cls.distribute_dataset_fn(config.train.batch_size)(input_context))
+            ds = tf.data.Dataset.zip(tuple(dts))
+            return ds.map(lambda c, *args: tf.switch_case(c // train_steps, {idx: (lambda: arg) for idx, arg in enumerate(args)}))
+
+          return ds_strategy.distribute_datasets_from_function(_input_fn)
+        else:
+          return ds_strategy.distribute_datasets_from_function(
+              datasets.build_dataset_input(
+                  True, train_size, image_dtype, FLAGS.data_dir, train_split,
+                  config.data).distribute_dataset_fn(config.train.batch_size))
+
       else:
         return ds_strategy.distribute_datasets_from_function(
             datasets.build_dataset_input(
