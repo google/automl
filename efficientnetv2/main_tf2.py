@@ -15,6 +15,7 @@
 """A simple script to train efficient net with tf2/keras."""
 
 import copy
+import functools
 import os
 import re
 
@@ -230,7 +231,7 @@ def main(_) -> None:
             ibase = config.data.ibase or (train_size / 2)
             isize_list = np.linspace(ibase, train_size, total_stages).astype(np.int32)
             ds = tf.data.experimental.Counter(dtype=tf.int32)
-            ds_iters = []
+            fns = {}
             for index, image_size in enumerate(isize_list):
               if config.train.sched:
                 config.data.ram = ram_list[index]
@@ -239,8 +240,9 @@ def main(_) -> None:
               ds_lab_cls = datasets.build_dataset_input(True, image_size,
                                                         image_dtype, FLAGS.data_dir,
                                                         train_split, copy.deepcopy(config.data))
-              ds_iters.append(iter(ds_lab_cls.distribute_dataset_fn(config.train.batch_size)(input_context)))
-            return ds.map(lambda c: tf.switch_case(c // (train_steps * config.train.batch_size), {idx: (lambda: next(ds_iter)) for idx, ds_iter in enumerate(ds_iters)}))
+              ds_iter = iter(ds_lab_cls.distribute_dataset_fn(config.train.batch_size)(input_context))
+              fns[index] = functools.partial(next, ds_iter)
+            return ds.map(lambda c: tf.switch_case(c // (train_steps * config.train.batch_size), fns))
 
           return ds_strategy.distribute_datasets_from_function(_input_fn)
         else:

@@ -17,6 +17,7 @@ import copy
 import os
 import re
 import time
+import functools
 from absl import app
 from absl import flags
 from absl import logging
@@ -467,7 +468,7 @@ def main(unused_argv):
           ibase = config.data.ibase or (input_image_size / 2)
           isize_list = np.linspace(ibase, input_image_size, total_stages).astype(np.int32)
           ds = tf.data.experimental.Counter(dtype=tf.int32)
-          ds_iters = []
+          fns = {}
           for index, image_size in enumerate(isize_list):
             if config.train.sched:
               config.data.ram = ram_list[index]
@@ -476,8 +477,8 @@ def main(unused_argv):
             ds_lab_cls = datasets.build_dataset_input(True, image_size,
                                                       image_dtype, FLAGS.data_dir,
                                                       train_split, copy.deepcopy(config.data))
-            ds_iters.append(ds_lab_cls.input_fn(params).make_one_shot_iterator())
-          return ds.map(lambda c: tf.switch_case(c // (params['batch_size'] * train_steps), {idx: (lambda: ds_iter.get_next()) for idx, ds_iter in enumerate(ds_iters)}))
+            fns[index] = functools.partial(lambda it: it.get_next(), ds_lab_cls.input_fn(params).make_one_shot_iterator())
+          return ds.map(lambda c: tf.switch_case(c // (params['batch_size'] * train_steps), fns))
         est.train(
             input_fn=_input_fn, max_steps=train_steps * total_stages, hooks=hooks)
     else:
