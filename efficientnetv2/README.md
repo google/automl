@@ -1,7 +1,8 @@
 # EfficientNetV2
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.sandbox.google.com/github/google/automl/blob/master/efficientnetv2/tutorial.ipynb)
-[![Paper](http://img.shields.io/badge/Paper-arXiv.2104.00298-B3181B?logo=arXiv)](https://arxiv.org/abs/2104.00298)
+[Paper![Paper](http://img.shields.io/badge/Paper-arXiv.2104.00298-B3181B?logo=arXiv)](https://arxiv.org/abs/2104.00298)
+[Tutorial![Tutorial In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.sandbox.google.com/github/google/automl/blob/master/efficientnetv2/tutorial.ipynb)
+[TF-hub![TF-Hub In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.sandbox.google.com/github/google/automl/blob/master/efficientnetv2/tfhub.ipynb)
 
 
    - May13/2021: Initial code release for [EfficientNetV2 models](https://arxiv.org/abs/2104.00298): accepted to ICML'21.

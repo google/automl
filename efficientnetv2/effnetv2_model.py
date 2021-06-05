@@ -579,13 +579,14 @@ class EffNetV2Model(tf.keras.Model):
     model = tf.keras.Model(inputs=[x], outputs=self.call(x, training=True))
     return model.summary()
 
-  def call(self, inputs, training, features_only=None):
+  def call(self, inputs, training, features_only=None, single_out=None):
     """Implementation of call().
 
     Args:
       inputs: input tensors.
       training: boolean, whether the model is constructed for training.
       features_only: build the base feature network only.
+      single_out: If true, only return the single output.
 
     Returns:
       output tensors.
@@ -627,6 +628,9 @@ class EffNetV2Model(tf.keras.Model):
       # Calls final layers and returns logits.
       outputs = self._head(outputs, training)
       self.endpoints.update(self._head.endpoints)
+
+    if single_out:  # Use for building sequential models.
+      return outputs
 
     return [outputs] + list(
         filter(lambda endpoint: endpoint is not None, [
