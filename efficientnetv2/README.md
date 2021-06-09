@@ -69,7 +69,29 @@ Finetune on CIFAR10:
     python main.py --mode=train  --model_name=efficientnetv2-s  --dataset_cfg=cifar10Ft --model_dir=$DIR --hparam_str="train.ft_init_ckpt=$PRETRAIN_CKPT_PATH"
 
 
-## 4. Inference
+## 4. Build a pretrained model and finetuning
+
+
+You can directly use this code to build a model like this:
+
+    mode = tf.keras.models.Sequential([
+        tf.keras.layers.InputLayer(input_shape=[224, 224, 3]),
+        effnetv2_model.get_model('efficientnetv2-b0', include_top=False, pretrained=True),
+        tf.keras.layers.Dropout(rate=0.2),
+        tf.keras.layers.Dense(4, activation='softmax'),
+    ])
+
+Or you can also load them from tfhub:
+
+    hub_url = 'gs://cloud-tpu-checkpoints/efficientnet/v2/hub/efficientnetv2-b0/feature-vector'
+    model = tf.keras.Sequential([
+        tf.keras.layers.InputLayer(input_shape=[224, 224, 3]),
+        hub.KerasLayer(hub_url, trainable=do_fine_tuning),
+        tf.keras.layers.Dropout(rate=0.2),
+        tf.keras.layers.Dense(4, activation='softmax'),
+    ])
+
+## 5. Inference
 
     python infer.py --model_name=efficientnetv2-m --model_dir=$MODEL_DIR
 
