@@ -459,13 +459,6 @@ class Head(tf.keras.layers.Layer):
 
     self._avg_pooling = tf.keras.layers.GlobalAveragePooling2D(
         data_format=mconfig.data_format)
-    if mconfig.num_classes:
-      self._fc = tf.keras.layers.Dense(
-          mconfig.num_classes,
-          kernel_initializer=dense_kernel_initializer,
-          bias_initializer=tf.constant_initializer(mconfig.headbias or 0))
-    else:
-      self._fc = None
 
     if mconfig.dropout_rate > 0:
       self._dropout = tf.keras.layers.Dropout(mconfig.dropout_rate)
@@ -498,9 +491,6 @@ class Head(tf.keras.layers.Layer):
       self.endpoints['pooled_features'] = outputs
       if self._dropout:
         outputs = self._dropout(outputs, training=training)
-      self.endpoints['global_pool'] = outputs
-      if self._fc:
-        outputs = self._fc(outputs)
       self.endpoints['head'] = outputs
     return outputs
 
@@ -514,12 +504,13 @@ class EffNetV2Model(tf.keras.Model):
   def __init__(self,
                model_name='efficientnetv2-s',
                model_config=None,
+               include_top=True,
                name=None):
     """Initializes an `Model` instance.
 
     Args:
       model_name: A string of model name.
-      model_config: A dict of model configureations or a string of hparams.
+      model_config: A dict of model configurations or a string of hparams.
       name: A string of layer name.
 
     Raises:
@@ -533,6 +524,7 @@ class EffNetV2Model(tf.keras.Model):
     self.cfg = cfg
     self._mconfig = cfg.model
     self.endpoints = None
+    self.include_top = include_top
     self._build()
 
   def _build(self):
@@ -574,12 +566,25 @@ class EffNetV2Model(tf.keras.Model):
     # Head part.
     self._head = Head(self._mconfig)
 
+    # top part for classification
+    if self.include_top and self._mconfig.num_classes:
+      self._fc = tf.keras.layers.Dense(
+          self._mconfig.num_classes,
+          kernel_initializer=dense_kernel_initializer,
+          bias_initializer=tf.constant_initializer(self._mconfig.headbias or 0))
+    else:
+      self._fc = None
+
   def summary(self, input_shape=(224, 224, 3), **kargs):
     x = tf.keras.Input(shape=input_shape)
     model = tf.keras.Model(inputs=[x], outputs=self.call(x, training=True))
     return model.summary()
 
-  def call(self, inputs, training, features_only=None, single_out=None):
+  def get_model_with_inputs(self, inputs, **kargs):
+    model = tf.keras.Model(inputs=[inputs], outputs=self.call(inputs, training=True))
+    return  model
+
+  def call(self, inputs, training, with_endpoints=False):
     """Implementation of call().
 
     Args:
@@ -624,19 +629,70 @@ class EffNetV2Model(tf.keras.Model):
             self.endpoints['reduction_%s/%s' % (reduction_idx, k)] = v
     self.endpoints['features'] = outputs
 
-    if not features_only:
-      # Calls final layers and returns logits.
-      outputs = self._head(outputs, training)
-      self.endpoints.update(self._head.endpoints)
+    # Head to obtain the final feature.
+    outputs = self._head(outputs, training)
+    self.endpoints.update(self._head.endpoints)
 
-    if single_out:  # Use for building sequential models.
-      return outputs
+    # Calls final dense layers and returns logits.
+    if self._fc:
+      with tf.name_scope('head'):  # legacy
+        outputs = self._fc(outputs)
 
-    return [outputs] + list(
-        filter(lambda endpoint: endpoint is not None, [
-            self.endpoints.get('reduction_1'),
-            self.endpoints.get('reduction_2'),
-            self.endpoints.get('reduction_3'),
-            self.endpoints.get('reduction_4'),
-            self.endpoints.get('reduction_5'),
-        ]))
+    if with_endpoints:  # Use for building sequential models.
+      return [outputs] + list(
+          filter(lambda endpoint: endpoint is not None, [
+              self.endpoints.get('reduction_1'),
+              self.endpoints.get('reduction_2'),
+              self.endpoints.get('reduction_3'),
+              self.endpoints.get('reduction_4'),
+              self.endpoints.get('reduction_5'),
+          ]))
+
+    return outputs
+
+
+def get_model(model_name,
+              model_config=None,
+              include_top=True,
+              pretrained=True,
+              training=True,
+              with_endpoints=False,
+              **kargs):
+  """Get a EfficientNet V1 or V2 model instance.
+
+  This is a simply utility for finetuning or inference.
+
+  Args:
+    model_name: a string such as 'efficientnetv2-s' or 'efficientnet-b0'.
+    model_config: A dict of model configurations or a string of hparams.
+    include_top: whether to include the final dense layer for classification.
+    pretrained: if true, download the checkpoint. If string, load the ckpt.
+    training: If true, all model variables are trainable.
+    with_endpoints: whether to return all intermedia endpoints.
+
+  Returns:
+    A single tensor if with_endpoints if False; otherwise, a list of tensor.
+  """
+  net = EffNetV2Model(model_name, model_config, include_top)
+  net(tf.keras.Input(shape=(None, None, 3)),
+      training=training,
+      with_endpoints=with_endpoints)
+  if pretrained is True:
+    # download checkpoint and set pretrained path. Supported models include:
+    #    efficientnetv2-s, efficientnetv2-m, efficientnetv2-l,
+    #    efficientnetv2-b0, efficientnetv2-b1, efficientnetv2-b2, efficientnetv2-b3, 
+    #    efficientnet-b0, efficientnet-b1, efficientnet-b2, efficientnet-b3,
+    #    efficientnet-b4, efficientnet-b5, efficientnet-b6, efficientnet-b7, efficientnet-l2
+    # More V2 ckpts: https://github.com/google/automl/tree/master/efficientnetv2
+    # More V1 ckpts: https://github.com/tensorflow/tpu/tree/master/models/official/efficientnet
+    url = f'https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/{model_name}.tgz'
+    pretrained_ckpt = tf.keras.utils.get_file(model_name, url, untar=True)
+  else:
+    pretrained_ckpt = pretrained
+
+  if pretrained_ckpt:
+    if tf.io.gfile.isdir(pretrained_ckpt):
+      pretrained_ckpt = tf.train.latest_checkpoint(pretrained_ckpt)
+    net.load_weights(pretrained_ckpt)
+
+  return net

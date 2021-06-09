@@ -44,13 +44,14 @@ def define_flags():
   flags.DEFINE_string('export_dir', None, 'Export or saved model directory')
   flags.DEFINE_string('trace_file', '/tmp/a.trace', 'If set, dump trace file.')
   flags.DEFINE_integer('batch_size', 16, 'Batch size.')
+  flags.DEFINE_bool('mixed_precision', False, 'If True, use mixed precision.')
 
 
 def get_config(model_name, dataset_cfg, hparam_str=''):
   """Create a keras model for EffNetV2."""
   config = copy.deepcopy(effnetv2_configs.get_model_config(model_name))
-  config.override(datasets.get_dataset_config(dataset_cfg))
-  config.override(hparam_str)
+  config.update(datasets.get_dataset_config(dataset_cfg))
+  config.override(hparam_str, allow_new_keys=True)
   config.model.num_classes = config.data.num_classes
   return config
 
@@ -58,52 +59,36 @@ def get_config(model_name, dataset_cfg, hparam_str=''):
 def build_tf2_model():
   """Build the tf2 model."""
   tf.config.run_functions_eagerly(FLAGS.debug)
-  config = get_config(FLAGS.model_name, FLAGS.dataset_cfg, FLAGS.hparam_str)
-  if config.runtime.mixed_precision:
+  if FLAGS.mixed_precision:
     # Use 'mixed_float16' if running on GPUs.
     policy = tf.keras.mixed_precision.Policy('mixed_float16')
     tf.keras.mixed_precision.set_global_policy(policy)
 
-  model = effnetv2_model.EffNetV2Model(FLAGS.model_name, config.model)
-  # Use call (not build) to match the namescope: tensorflow issues/29576
-  model(tf.ones([1, 224, 224, 3]), False)
-  if FLAGS.model_dir:
-    ckpt = FLAGS.model_dir
-    if tf.io.gfile.isdir(ckpt):
-      ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
-    model.load_weights(ckpt)
+  model = effnetv2_model.get_model(
+    FLAGS.model_name, FLAGS.hparam_str, include_top=True, pretrained=FLAGS.model_dir or True)
   model.summary()
-
-  class ExportModel(tf.Module):
-    """Export a saved model."""
-
-    def __init__(self, model):
-      super().__init__()
-      self.model = model
-
-    @tf.function
-    def f(self, images):
-      return self.model(images, training=False)[0]
-
-  return ExportModel(model)
-
+  return model
 
 def tf2_eval_dataset():
   """Run TF2 benchmark and inference."""
-  export_model = build_tf2_model()
-  isize = FLAGS.image_size or export_model.model.cfg.eval.isize
+  model = build_tf2_model()
+  isize = FLAGS.image_size or model.cfg.eval.isize
 
   def preprocess_fn(features):
     features['image'] = preprocessing.preprocess_image(
         features['image'], isize, is_training=False)
     return features
 
+  @tf.function
+  def f(x):
+    return model(x)
+
   top1_acc = tf.keras.metrics.Accuracy()
   pbar = tf.keras.utils.Progbar(None)
   data = tfds.load('imagenet2012', split='validation')
   ds = data.map(preprocess_fn).batch(FLAGS.batch_size)
   for i, batch in enumerate(ds.prefetch(tf.data.experimental.AUTOTUNE)):
-    logits = export_model.f(batch['image'])
+    logits = f(batch['image'])
     top1_acc.update_state(batch['label'], tf.argmax(logits, axis=-1))
     pbar.update(i, [('top1', top1_acc.result().numpy())])
   print('\n top1= {:.4f}'.format(top1_acc.result().numpy()))
@@ -111,27 +96,27 @@ def tf2_eval_dataset():
 
 def tf2_benchmark():
   """Run TF2 benchmark and inference."""
-  export_model = build_tf2_model()
-  isize = FLAGS.image_size or export_model.model.cfg.eval.isize
+  model = build_tf2_model()
+  isize = FLAGS.image_size or model.cfg.eval.isize
   if FLAGS.export_dir:
-    tf.saved_model.save(
-        export_model,
-        FLAGS.export_dir,
-        signatures=export_model.f.get_concrete_function(
-            tf.TensorSpec(shape=(None, isize, isize, 3), dtype=tf.float16)))
-    export_model = tf.saved_model.load(FLAGS.export_dir)
+    tf.saved_model.save(model, FLAGS.export_dir)
+    model = tf.saved_model.load(FLAGS.export_dir)
 
   batch_size = FLAGS.batch_size
   imgs = tf.ones((batch_size, isize, isize, 3), dtype=tf.float16)
 
+  @tf.function
+  def f(x):
+    return model(x)
+
   print('starting warmup.')
   for _ in range(10):  # warmup runs.
-    export_model.f(imgs)
+    f(imgs)
 
   print('start benchmark.')
   start = time.perf_counter()
   for _ in range(10):
-    export_model.f(imgs)
+    f(imgs)
   end = time.perf_counter()
   inference_time = (end - start) / 10
 
@@ -143,14 +128,13 @@ def tf1_benchmark():
   """Run TF1 inference and benchmark."""
   # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
   from tensorflow.python.client import timeline
-  config = get_config(FLAGS.model_name, FLAGS.dataset_cfg, FLAGS.hparam_str)
   with tf1.Session() as sess:
-    model = effnetv2_model.EffNetV2Model(FLAGS.model_name, config.model)
+    model = effnetv2_model.EffNetV2Model(FLAGS.model_name, FLAGS.hparam_str)
     batch_size = FLAGS.batch_size
     run_options = tf1.RunOptions(
         trace_level=tf1.RunOptions.FULL_TRACE)
     run_metadata = tf1.RunMetadata()
-    isize = FLAGS.image_size or config.eval.isize
+    isize = FLAGS.image_size or model.cfg.eval.isize
     inputs = tf.ones((batch_size, isize, isize, 3), tf.float16)
     output = model(inputs, training=False)
     sess.run(tf1.global_variables_initializer())
@@ -179,10 +163,9 @@ def tf1_benchmark():
 def tf1_export_ema_ckpt():
   """Restore variables from a given checkpoint."""
   with tf1.Session() as sess:
-    config = get_config(FLAGS.model_name, FLAGS.dataset_cfg, FLAGS.hparam_str)
-    model = effnetv2_model.EffNetV2Model(FLAGS.model_name, config.model)
+    model = effnetv2_model.EffNetV2Model(FLAGS.model_name, FLAGS.hparam_str)
     batch_size = FLAGS.batch_size
-    isize = FLAGS.image_size or config.eval.isize
+    isize = FLAGS.image_size or model.cfg.eval.isize
     inputs = tf.ones((batch_size, isize, isize, 3), tf.float32)
     _ = model(inputs, training=False)
     sess.run(tf1.global_variables_initializer())
