@@ -91,7 +91,7 @@ class TrainableModel(effnetv2_model.EffNetV2Model):
     images, labels = features['image'], labels['label']
 
     with tf.GradientTape() as tape:
-      pred = self(images, training=True)[0]
+      pred = self(images, training=True)
       pred = tf.cast(pred, tf.float32)
       loss = self.compiled_loss(
           labels,
@@ -105,7 +105,7 @@ class TrainableModel(effnetv2_model.EffNetV2Model):
   def test_step(self, data):
     features, labels = data
     images, labels = features['image'], labels['label']
-    pred = self(images, training=False)[0]
+    pred = self(images, training=False)
     pred = tf.cast(pred, tf.float32)
 
     self.compiled_loss(
@@ -174,9 +174,9 @@ def main(_) -> None:
         weight_decay=config.train.weight_decay)
 
     if config.train.ft_init_ckpt:  # load pretrained ckpt for finetuning.
-      model(tf.ones([1, 224, 224, 3]))
+      model(tf.keras.Input([None, None, 3]))
       ckpt = config.train.ft_init_ckpt
-      utils.restore_tf2_ckpt(model, ckpt, exclude_layers=('_head', 'optimizer'))
+      utils.restore_tf2_ckpt(model, ckpt, exclude_layers=('_fc', 'optimizer'))
 
     steps_per_epoch = num_train_images // config.train.batch_size
     total_steps = steps_per_epoch * config.train.epochs

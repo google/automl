@@ -84,7 +84,7 @@ def model_fn(features, labels, mode, params):
     """Build model using the model_name given through the command line."""
     config.model.num_classes = config.data.num_classes
     model = effnetv2_model.EffNetV2Model(config.model.model_name, config.model)
-    logits = model(in_images, training=is_training)[0]
+    logits = model(in_images, training=is_training)
     return logits
 
   pre_num_params, pre_num_flops = utils.num_params_flops(readable_format=True)
