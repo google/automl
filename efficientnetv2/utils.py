@@ -593,3 +593,11 @@ def restore_tf2_ckpt(model,
         logging.warning(msg)
       else:
         raise KeyError(msg)
+
+
+class ReuableBackupAndRestore(tf.keras.callbacks.experimental.BackupAndRestore):
+  """A BackupAndRestore callback that can be used across multiple model.fit()s."""
+
+  def on_train_end(self, logs=None):
+    # don't delete the backup, so it can be used for future model.fit()s
+    pass

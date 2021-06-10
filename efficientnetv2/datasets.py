@@ -328,6 +328,11 @@ class ImageNetInput():
       features['orig_image'] = tf.image.decode_image(image_bytes)
     return features, labels
 
+  def fetch_dataset(self, filename):
+    buffer_size = (self.file_buffer_size_m or 8) * 1024 * 1024  # 8 MiB
+    dataset = tf.data.TFRecordDataset(filename, buffer_size=buffer_size)
+    return dataset
+
   def make_source_dataset(self, index, num_hosts):
     """See base class."""
     if self.data_dir == 'null' or not self.data_dir:
@@ -354,14 +359,9 @@ class ImageNetInput():
     if self.is_training and not self.cache:
       dataset = dataset.repeat()
 
-    def fetch_dataset(filename):
-      buffer_size = (self.file_buffer_size_m or 8) * 1024 * 1024  # 8 MiB
-      dataset = tf.data.TFRecordDataset(filename, buffer_size=buffer_size)
-      return dataset
-
     # Read the data from disk in parallel
     dataset = dataset.interleave(
-        fetch_dataset,
+        self.fetch_dataset,
         num_parallel_calls=tf.data.experimental.AUTOTUNE,
         deterministic=self.debug)
 

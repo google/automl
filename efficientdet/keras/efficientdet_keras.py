@@ -668,6 +668,7 @@ class SegmentationHead(tf.keras.layers.Layer):
       is_training_bn: True if we train the BatchNorm.
       act_type: String of the activation used.
       strategy: string to specify training strategy for TPU/GPU/CPU.
+      name: string of name.
       **kwargs: other parameters.
     """
     super().__init__(name=name, **kwargs)

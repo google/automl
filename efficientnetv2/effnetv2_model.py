@@ -511,6 +511,7 @@ class EffNetV2Model(tf.keras.Model):
     Args:
       model_name: A string of model name.
       model_config: A dict of model configurations or a string of hparams.
+      include_top: If True, include the top layer for classification.
       name: A string of layer name.
 
     Raises:
@@ -581,8 +582,9 @@ class EffNetV2Model(tf.keras.Model):
     return model.summary()
 
   def get_model_with_inputs(self, inputs, **kargs):
-    model = tf.keras.Model(inputs=[inputs], outputs=self.call(inputs, training=True))
-    return  model
+    model = tf.keras.Model(
+        inputs=[inputs], outputs=self.call(inputs, training=True))
+    return model
 
   def call(self, inputs, training, with_endpoints=False):
     """Implementation of call().
@@ -590,8 +592,7 @@ class EffNetV2Model(tf.keras.Model):
     Args:
       inputs: input tensors.
       training: boolean, whether the model is constructed for training.
-      features_only: build the base feature network only.
-      single_out: If true, only return the single output.
+      with_endpoints: If true, return a list of endpoints.
 
     Returns:
       output tensors.
@@ -657,7 +658,7 @@ def get_model(model_name,
               pretrained=True,
               training=True,
               with_endpoints=False,
-              **kargs):
+              **kwargs):
   """Get a EfficientNet V1 or V2 model instance.
 
   This is a simply utility for finetuning or inference.
@@ -669,23 +670,29 @@ def get_model(model_name,
     pretrained: if true, download the checkpoint. If string, load the ckpt.
     training: If true, all model variables are trainable.
     with_endpoints: whether to return all intermedia endpoints.
+    **kwargs: additional parameters for keras model, such as name=xx.
 
   Returns:
     A single tensor if with_endpoints if False; otherwise, a list of tensor.
   """
-  net = EffNetV2Model(model_name, model_config, include_top)
+  net = EffNetV2Model(model_name, model_config, include_top, **kwargs)
   net(tf.keras.Input(shape=(None, None, 3)),
       training=training,
       with_endpoints=with_endpoints)
-  if pretrained is True:
+  if pretrained is True:  # pylint: disable=g-bool-id-comparison
+    # pylint: disable=line-too-long
     # download checkpoint and set pretrained path. Supported models include:
-    #    efficientnetv2-s, efficientnetv2-m, efficientnetv2-l,
-    #    efficientnetv2-b0, efficientnetv2-b1, efficientnetv2-b2, efficientnetv2-b3, 
-    #    efficientnet-b0, efficientnet-b1, efficientnet-b2, efficientnet-b3,
-    #    efficientnet-b4, efficientnet-b5, efficientnet-b6, efficientnet-b7, efficientnet-l2
-    # More V2 ckpts: https://github.com/google/automl/tree/master/efficientnetv2
-    # More V1 ckpts: https://github.com/tensorflow/tpu/tree/master/models/official/efficientnet
-    url = f'https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/{model_name}.tgz'
+    #   efficientnetv2-s, efficientnetv2-m, efficientnetv2-l,
+    #   efficientnetv2-b0, efficientnetv2-b1, efficientnetv2-b2, efficientnetv2-b3,
+    #   efficientnet-b0, efficientnet-b1, efficientnet-b2, efficientnet-b3,
+    #   efficientnet-b4, efficientnet-b5, efficientnet-b6, efficientnet-b7,
+    #   efficientnet-l2
+    # v2: https://github.com/google/automl/tree/master/efficientnetv2
+    # v1: https://github.com/tensorflow/tpu/tree/master/models/official/efficientnet
+    # pylint: enable=line-too-long
+
+    url = ('https://storage.googleapis.com/cloud-tpu-checkpoints/'
+           f'efficientnet/v2/{model_name}.tgz')
     pretrained_ckpt = tf.keras.utils.get_file(model_name, url, untar=True)
   else:
     pretrained_ckpt = pretrained

@@ -13,20 +13,19 @@
 # limitations under the License.
 # ==============================================================================
 """A simple example on how to export MLIR."""
-import copy
-import time
 import os
 from absl import app
 from absl import flags
 from absl import logging
 import tensorflow as tf
 
-import datasets
-import effnetv2_configs
 import effnetv2_model
-import hparams
-import preprocessing
 import utils
+# pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.framework.convert_to_constants import convert_variables_to_constants_v2_as_graph
+from tensorflow.lite.python.util import get_grappler_config
+from tensorflow.lite.python.util import run_graph_optimizations
+
 FLAGS = flags.FLAGS
 
 
@@ -39,20 +38,13 @@ def define_flags():
   flags.DEFINE_string('export_dir', None, 'Export or saved model directory')
 
 
-def get_config(model_name, dataset_cfg, hparam_str=''):
-  """Create a keras model for EffNetV2."""
-  config = copy.deepcopy(hparams.base_config)
-  config.override(effnetv2_configs.get_model_config(model_name))
-  config.override(datasets.get_dataset_config(dataset_cfg))
-  config.override(hparam_str)
-  config.model.num_classes = config.data.num_classes
-  return config
-
-
 def main(_):
   """Export model to MLIR."""
-  config = get_config(FLAGS.model_name, FLAGS.dataset_cfg, FLAGS.hparam_str)
-  model = effnetv2_model.EffNetV2Model(FLAGS.model_name, config.model)
+  model = effnetv2_model.get_model(
+      FLAGS.model_name,
+      FLAGS.hparam_str,
+      include_top=True,
+      pretrained=FLAGS.model_dir or True)
   # Use call (not build) to match the namescope: tensorflow issues/29576
   model(tf.ones([1, 224, 224, 3]), False)
   if FLAGS.model_dir:
@@ -62,16 +54,13 @@ def main(_):
     utils.restore_tf2_ckpt(model, ckpt, exclude_layers=('_head', 'optimizer'))
   model.summary()
 
-  from tensorflow.lite.python.util import run_graph_optimizations, get_grappler_config
-  from tensorflow.python.framework.convert_to_constants import convert_variables_to_constants_v2_as_graph
-
-  fff = tf.function(model).get_concrete_function(tf.TensorSpec([1, 224, 224, 3], tf.float32))
+  fff = tf.function(model).get_concrete_function(
+      tf.TensorSpec([1, 224, 224, 3], tf.float32))
 
   frozen_func, graph_def = convert_variables_to_constants_v2_as_graph(fff)
 
   input_tensors = [
-      tensor for tensor in frozen_func.inputs
-      if tensor.dtype != tf.resource
+      tensor for tensor in frozen_func.inputs if tensor.dtype != tf.resource
   ]
   output_tensors = frozen_func.outputs
 
@@ -79,7 +68,11 @@ def main(_):
       graph_def,
       input_tensors,
       output_tensors,
-      config=get_grappler_config(['pruning', 'function', 'constfold', 'shape', 'remap', 'memory', 'common_subgraph_elimination', 'arithmetic', 'loop', 'dependency', 'debug_stripper']),
+      config=get_grappler_config([
+          'pruning', 'function', 'constfold', 'shape', 'remap', 'memory',
+          'common_subgraph_elimination', 'arithmetic', 'loop', 'dependency',
+          'debug_stripper'
+      ]),
       graph=frozen_func.graph)
 
   tf_mlir_graph = tf.mlir.experimental.convert_graph_def(graph_def)

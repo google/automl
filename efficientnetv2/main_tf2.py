@@ -21,6 +21,7 @@ import re
 from absl import app
 from absl import flags
 from absl import logging
+import numpy as np
 import tensorflow as tf
 
 import cflags
@@ -211,47 +212,77 @@ def main(_) -> None:
         save_weights_only=True)
     tb_callback = tf.keras.callbacks.TensorBoard(
         log_dir=FLAGS.model_dir, update_freq=100)
-    rstr_callback = tf.keras.callbacks.experimental.BackupAndRestore(
-        backup_dir=FLAGS.model_dir)
+    rstr_callback = utils.ReuableBackupAndRestore(backup_dir=FLAGS.model_dir)
 
-    def get_dataset(training):
+    def get_dataset(training, image_size, config):
       """A shared utility to get input dataset."""
       if training:
         return ds_strategy.distribute_datasets_from_function(
             datasets.build_dataset_input(
-                True, train_size, image_dtype, FLAGS.data_dir, train_split,
+                True, image_size, image_dtype, FLAGS.data_dir, train_split,
                 config.data).distribute_dataset_fn(config.train.batch_size))
       else:
         return ds_strategy.distribute_datasets_from_function(
             datasets.build_dataset_input(
-                False, eval_size, image_dtype, FLAGS.data_dir, eval_split,
+                False, image_size, image_dtype, FLAGS.data_dir, eval_split,
                 config.data).distribute_dataset_fn(config.eval.batch_size))
 
     if FLAGS.mode == 'traineval':
       model.fit(
-          get_dataset(training=True),
+          get_dataset(training=True, image_size=train_size, config=config),
           epochs=config.train.epochs,
           steps_per_epoch=steps_per_epoch,
-          validation_data=get_dataset(training=False),
+          validation_data=get_dataset(
+              training=False, image_size=eval_size, config=config),
           validation_steps=num_eval_images // config.eval.batch_size,
           callbacks=[ckpt_callback, tb_callback, rstr_callback],
           # don't log spam if running on tpus
           verbose=2 if strategy == 'tpu' else 1,
       )
     elif FLAGS.mode == 'train':
-      model.fit(
-          get_dataset(training=True),
-          epochs=config.train.epochs,
-          steps_per_epoch=steps_per_epoch,
-          callbacks=[ckpt_callback, tb_callback, rstr_callback],
-          verbose=2 if strategy == 'tpu' else 1,
-      )
+      if not config.train.stages:
+        model.fit(
+            get_dataset(training=True, image_size=train_size, config=config),
+            epochs=config.train.epochs,
+            steps_per_epoch=steps_per_epoch,
+            callbacks=[ckpt_callback, tb_callback, rstr_callback],
+            verbose=2 if strategy == 'tpu' else 1,
+        )
+      else:
+        total_stages = config.train.stages
+        ibase = config.data.ibase or (train_size / 2)
+
+        if config.train.sched:
+          ram_list = np.linspace(5, config.data.ram, total_stages)
+          mixup_list = np.linspace(0, config.data.mixup_alpha, total_stages)
+          cutmix_list = np.linspace(0, config.data.cutmix_alpha, total_stages)
+
+        for stage in range(total_stages):
+          ratio = float(stage + 1) / float(total_stages)
+          start_epoch = int(
+              float(stage) / float(total_stages) * config.train.epochs)
+          end_epoch = int(ratio * config.train.epochs)
+          image_size = int(ibase + (train_size - ibase) * ratio)
+
+          if config.train.sched:
+            config.data.ram = ram_list[stage]
+            config.data.mixup_alpha = mixup_list[stage]
+            config.data.cutmix_alpha = cutmix_list[stage]
+
+          model.fit(
+              get_dataset(training=True, image_size=image_size, config=config),
+              initial_epoch=start_epoch,
+              epochs=end_epoch,
+              steps_per_epoch=steps_per_epoch,
+              callbacks=[ckpt_callback, tb_callback, rstr_callback],
+              verbose=2 if strategy == 'tpu' else 1,
+          )
     elif FLAGS.mode == 'eval':
       for ckpt in tf.train.checkpoints_iterator(
           FLAGS.model_dir, timeout=60 * 60 * 24):
         model.load_weights(ckpt)
         eval_results = model.evaluate(
-            get_dataset(training=False),
+            get_dataset(training=False, image_size=eval_size, config=config),
             batch_size=config.eval.batch_size,
             steps=num_eval_images // config.eval.batch_size,
             callbacks=[tb_callback, rstr_callback],

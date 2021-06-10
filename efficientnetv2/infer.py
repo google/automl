@@ -13,7 +13,6 @@
 # limitations under the License.
 # ==============================================================================
 """A simple example on how to use keras model for inference."""
-import copy
 import time
 from absl import app
 from absl import flags
@@ -22,12 +21,10 @@ import tensorflow as tf
 import tensorflow.compat.v1 as tf1
 import tensorflow_datasets as tfds
 
-import datasets
-import effnetv2_configs
 import effnetv2_model
-import hparams
 import preprocessing
 import utils
+
 FLAGS = flags.FLAGS
 
 
@@ -47,15 +44,6 @@ def define_flags():
   flags.DEFINE_bool('mixed_precision', False, 'If True, use mixed precision.')
 
 
-def get_config(model_name, dataset_cfg, hparam_str=''):
-  """Create a keras model for EffNetV2."""
-  config = copy.deepcopy(effnetv2_configs.get_model_config(model_name))
-  config.update(datasets.get_dataset_config(dataset_cfg))
-  config.override(hparam_str, allow_new_keys=True)
-  config.model.num_classes = config.data.num_classes
-  return config
-
-
 def build_tf2_model():
   """Build the tf2 model."""
   tf.config.run_functions_eagerly(FLAGS.debug)
@@ -65,9 +53,13 @@ def build_tf2_model():
     tf.keras.mixed_precision.set_global_policy(policy)
 
   model = effnetv2_model.get_model(
-    FLAGS.model_name, FLAGS.hparam_str, include_top=True, pretrained=FLAGS.model_dir or True)
+      FLAGS.model_name,
+      FLAGS.hparam_str,
+      include_top=True,
+      pretrained=FLAGS.model_dir or True)
   model.summary()
   return model
+
 
 def tf2_eval_dataset():
   """Run TF2 benchmark and inference."""
@@ -131,8 +123,7 @@ def tf1_benchmark():
   with tf1.Session() as sess:
     model = effnetv2_model.EffNetV2Model(FLAGS.model_name, FLAGS.hparam_str)
     batch_size = FLAGS.batch_size
-    run_options = tf1.RunOptions(
-        trace_level=tf1.RunOptions.FULL_TRACE)
+    run_options = tf1.RunOptions(trace_level=tf1.RunOptions.FULL_TRACE)
     run_metadata = tf1.RunMetadata()
     isize = FLAGS.image_size or model.cfg.eval.isize
     inputs = tf.ones((batch_size, isize, isize, 3), tf.float16)
