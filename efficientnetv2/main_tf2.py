@@ -151,7 +151,19 @@ class Trainer:
       epsilon: float=0.001,
       momentum : float=0.9) -> Any:
 
-    """ Function to build tf2 optimizer for training. """
+    """A helper function to build tf2 optimizer for training.
+
+    Args:
+      optimizer_name: string, optimizer for training example (Adam).
+      decay: float. decay rate.
+      epsilon: float. epsilon for the optimizer.
+      momentum. float. momentum used in the optimizer.
+
+    Raises:
+      When passed unknown optimizer raises unknown optimizer.
+
+    """
+
     if optimizer_name == 'sgd':
       logging.info('Using SGD optimizer')
       optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate)
@@ -172,7 +184,12 @@ class Trainer:
     return optimizer
 
   def num_samples(self) -> Tuple[int, int]:
-    """Helper function to get num_samples"""
+    """ A Helper function to get num_samples.
+
+    Returns: 
+      tuple. number of train and evalution images.
+
+    """
     train_split = self.config.train.split or 'train'
     eval_split = self.config.eval.split or 'eval'
     num_train_images = self.config.data.splits[train_split].num_images
@@ -180,7 +197,11 @@ class Trainer:
     return num_train_images, num_eval_images
 
   def setup(self) -> None:
-    """ Function for setting up model and training setup. """
+    """A helper function for setting up model and training setup.
+    setup number of train and eval images, total steps, steps_per_epoch,
+    set the precision of the training, get the efficientnetv2 model
+    instance.
+    """
     logging.info('Setting up training regime for efficientnetv2')
 
     self.num_train_images, self.num_eval_images = self.num_samples()
@@ -200,7 +221,14 @@ class Trainer:
     
 
   def get_callbacks(self, istrain : bool = True) -> Tuple[Any, Any, Any]:
-    """ Get tensorflow callbacks. """
+    """ A helper function to get tensorflow callbacks for training.
+    Args:
+      istrain: bool. a flag to check if callbacks are needed for training.
+
+    Returns:
+      Callbacks corresponding to the mode of training i.e train or eval. 
+    
+    """
     tb_callback = tf.keras.callbacks.TensorBoard(
         log_dir=FLAGS.model_dir, update_freq=100)
 
@@ -234,7 +262,7 @@ class Trainer:
     scaled_lr_min = self.config.train.lr_min * (self.config.train.batch_size / 256.0)
     learning_rate = utils.WarmupLearningRateSchedule(
         scaled_lr,
-        steps_per_epoch=self._steps_per_epoch,
+        steps_per_epoch=self.steps_per_epoch,
         decay_epochs=self.config.train.lr_decay_epoch,
         warmup_epochs=self.config.train.lr_warmup_epoch,
         decay_factor=self.config.train.lr_decay_factor,
@@ -256,7 +284,7 @@ class Trainer:
     )
     return model
 
-  def train_multi_stage(self, fit_config: dict) -> None:
+  def train_multi_stage(self, fit_config: Dict[str, Any]) -> None:
     """ Function to train efficientnetv2 in multi stages. """
 
     total_stages = self.config.train.stages
