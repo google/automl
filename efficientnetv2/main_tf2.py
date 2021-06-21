@@ -91,16 +91,6 @@ class TrainableModel(effnetv2_model.EffNetV2Model):
     return {m.name: m.result() for m in self.metrics}
 
 
-def main(_) -> None:
-  trainer = Trainer(hparams.base_config)
-
-  # strategy context manager. 
-  with trainer.ds_strategy.scope():
-    # setup training regime.
-    trainer.setup()
-    # run trainer.
-    trainer.run()
-
 class Trainer:
   """A simple class for training Efficientnetv2 in tf2. 
 
@@ -427,14 +417,15 @@ class Trainer:
         ds_strategy = tf.distribute.MirroredStrategy(['CPU:0'])
     return ds_strategy
 
+def main(_) -> None:
+  trainer = Trainer(hparams.base_config)
 
-
-
-
-
-
-
-
+  # strategy context manager. 
+  with trainer.ds_strategy.scope():
+    # setup training regime.
+    trainer.setup()
+    # run trainer.
+    trainer.run()
 
 if __name__ == '__main__':
   cflags.define_flags()
