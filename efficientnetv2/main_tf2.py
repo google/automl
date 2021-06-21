@@ -294,7 +294,7 @@ class Trainer:
         self.config.data.mixup_alpha = mixup_list[stage]
         self.config.data.cutmix_alpha = cutmix_list[stage]
 
-      model.fit(
+      self.model.fit(
           self.get_dataset(training=True, image_size=_image_size, config=self.config),
           initial_epoch=start_epoch,
           epochs=end_epoch,
@@ -302,12 +302,18 @@ class Trainer:
       )
 
   def evaluate(self) -> None:
-    """ Evaluation helper function. """
+    """ A helper function to evaluate efficientnetv2
+      model checkpoints on given validation dataset.
+
+      Raise:
+        Index Error when epoch ckpt has no information.
+
+      """
     for ckpt in tf.train.checkpoints_iterator(
         FLAGS.model_dir, timeout=60 * 60 * 24):
-      model.load_weights(ckpt)
-      eval_results = model.evaluate(
-          self.get_dataset(training=False, image_size=eval_size, config=self.config),
+      self.model.load_weights(ckpt)
+      eval_results = self.model.evaluate(
+          self.get_dataset(training=False, image_size=self.eval_size, config=self.config),
           batch_size=self.config.eval.batch_size,
           steps=self.num_eval_images // self.config.eval.batch_size,
           callbacks=self.get_callbacks(istrain=False),
@@ -323,11 +329,19 @@ class Trainer:
       logging.info('Epoch: %d, total %d', current_epoch, self.config.train.epochs)
       if current_epoch >= self.config.train.epochs:
         break
-    else:
-      raise ValueError(f'Invalid mode {FLAGS.mode}')
+      print(f'Evalutaion Result for {current_epoch}')
+      print(eval_results)
 
   def run(self):
-    """ Run function executes the training with give mode. """
+    """ A function to execute the training/eval regime corresponding
+      to the given config.
+      Run acts as a driver function which executes the
+      eval/train/traineval/multi_stage_train regimes.
+
+      Raise:
+        Raises unknown/invalid mode error on encountering
+        invalid mode.
+    """
     if self.mode != 'eval':
       # don't log spam if running on tpus
       verbose = 2 if self.strategy == 'tpu' else 1
@@ -357,10 +371,12 @@ class Trainer:
 
       # training the model with corresponding to mode.
       if not self.config.train.stages:
-        model.fit(_fit_config)
+        self.model.fit(_fit_config)
 
     elif self.mode == 'eval':
       self.evaluate()
+    else:
+      raise ValueError(f'Invalid mode {FLAGS.mode}')
 
   def get_dataset(self, training: bool, image_size: Tuple[int, int, int], config: Config) -> Any:
     """A shared utility to get input dataset."""
