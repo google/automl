@@ -92,7 +92,7 @@ class TrainableModel(effnetv2_model.EffNetV2Model):
 
 
 class Trainer:
-  """A simple class for training Efficientnetv2 in tf2. 
+  """A simple class for training Efficientnetv2 in tf2.
 
   Attributes:
     config: Config. a configuration class.
@@ -176,7 +176,7 @@ class Trainer:
   def num_samples(self) -> Tuple[int, int]:
     """ A Helper function to get num_samples.
 
-    Returns: 
+    Returns:
       tuple. number of train and evalution images.
 
     """
@@ -208,7 +208,6 @@ class Trainer:
 
     # get efficientnetv2 model
     self.model = self.get_model()
-    
 
   def get_callbacks(self, istrain : bool = True) -> Tuple[Any, Any, Any]:
     """ A helper function to get tensorflow callbacks for training.
@@ -216,8 +215,7 @@ class Trainer:
       istrain: bool. a flag to check if callbacks are needed for training.
 
     Returns:
-      Callbacks corresponding to the mode of training i.e train or eval. 
-    
+      Callbacks corresponding to the mode of training i.e train or eval.
     """
     tb_callback = tf.keras.callbacks.TensorBoard(
         log_dir=FLAGS.model_dir, update_freq=100)
@@ -233,7 +231,6 @@ class Trainer:
         save_weights_only=True)
 
     return ckpt_callback, tb_callback, rstr_callback
-    
 
   def get_model(self) -> TrainableModel:
     """ A helper function to get efficientnetv2 model. """
@@ -365,7 +362,6 @@ class Trainer:
     elif self.mode == 'eval':
       self.evaluate()
 
-
   def get_dataset(self, training: bool, image_size: Tuple[int, int, int], config: Config) -> Any:
     """A shared utility to get input dataset."""
     if training:
@@ -400,14 +396,14 @@ class Trainer:
   def get_strategy(self) -> None:
     """ Get ds_strategy for the training session. """
 
-    if strategy == 'tpu':
+    if self.strategy == 'tpu':
       tpu_cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
           FLAGS.tpu, zone=FLAGS.tpu_zone, project=FLAGS.gcp_project)
       tf.config.experimental_connect_to_cluster(tpu_cluster_resolver)
       tf.tpu.experimental.initialize_tpu_system(tpu_cluster_resolver)
       ds_strategy = tf.distribute.TPUStrategy(tpu_cluster_resolver)
       logging.info('All devices: %s', tf.config.list_logical_devices('TPU'))
-    elif strategy == 'gpus':
+    elif self.strategy == 'gpus':
       ds_strategy = tf.distribute.MirroredStrategy()
       logging.info('All devices: %s', tf.config.list_physical_devices('GPU'))
     else:
@@ -420,7 +416,7 @@ class Trainer:
 def main(_) -> None:
   trainer = Trainer(hparams.base_config)
 
-  # strategy context manager. 
+  # strategy context manager.
   with trainer.ds_strategy.scope():
     # setup training regime.
     trainer.setup()
