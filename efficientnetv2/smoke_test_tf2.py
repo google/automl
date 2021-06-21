@@ -42,7 +42,7 @@ class EfficientNetV2TF2Test(tf.test.TestCase):
         'train.stages=0,train.lr_base=0,data.splits.train.num_images=2,data.splits.eval.num_images=6,')
 
   def _run_single_step_train_and_eval(self, hparam_str=''):
-    """Run single step train and eval."""
+    """Run single step train and eval after training."""
     FLAGS.hparam_str = self.hparam_str + hparam_str
     FLAGS.mode = 'train'
     main_lib.main(None)
@@ -50,7 +50,7 @@ class EfficientNetV2TF2Test(tf.test.TestCase):
     tf.compat.v1.reset_default_graph()
     FLAGS.mode = 'eval'
     main_lib.main(None)
-  
+ 
   # TODO(someone): remove `runtime.strategy` and use `use_tpu`
   @flagsaver.flagsaver(
       model_name='efficientnetv2-s', dataset_cfg='ImageNet')
@@ -60,7 +60,7 @@ class EfficientNetV2TF2Test(tf.test.TestCase):
   @flagsaver.flagsaver(use_tpu=True)
   def test_tpu_b0_model_bfloat_single_step(self):
     if TPU_TEST:
-      self._run_single_step_train_and_eval('')
+      self._run_single_step_train_and_eval('runtime.strategy=tpu')
     else:
       self.skipTest('Skip because no TPU is available.')
 
@@ -68,7 +68,7 @@ class EfficientNetV2TF2Test(tf.test.TestCase):
   def test_tpu_b0_model_single_step_gpu(self):
     if GPU_TEST:
       # Disables export as tflite does not support NCHW layout.
-      self._run_single_step_train_and_eval('model.data_format=channels_first')
+      self._run_single_step_train_and_eval('runtime.strategy=gpu,model.data_format=channels_first')
     else:
       self.skipTest('Skip because no GPU is available.')
 
