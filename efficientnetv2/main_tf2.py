@@ -253,7 +253,7 @@ class Trainer:
     model.compile(
         optimizer=optimizer,
         loss=tf.keras.losses.CategoricalCrossentropy(
-            label_smoothing=self.config.train.label_smoothing, from_logits=True),
+        label_smoothing=self.config.train.label_smoothing, from_logits=True),
         metrics=[
             tf.keras.metrics.TopKCategoricalAccuracy(k=1, name='acc_top1'),
             tf.keras.metrics.TopKCategoricalAccuracy(k=5, name='acc_top5')
