@@ -17,7 +17,7 @@
 import copy
 import os
 import re
-from typing import Tuple, Any
+from typing import Tuple, Any, Dict
 
 from absl import app
 from absl import flags
@@ -95,14 +95,14 @@ class Trainer:
   """A simple class for training Efficientnetv2 in tf2.
 
   Attributes:
-    config: Config. a configuration class.
+    config: hparams.Config. a configuration class.
     mode: Flags.mode.
     strategy: str. Training strategy. default('gpu').
     ds_strategy: tf.distributed. distributed strategy object.
 
   """
-  def __init__(self, config):
-    """__init__.
+  def __init__(self, config: hparams.Config):
+    """ Initializes a new `Trainer`.
 
     Args:
         config: hparams base_config.
@@ -173,19 +173,6 @@ class Trainer:
 
     return optimizer
 
-  def num_samples(self) -> Tuple[int, int]:
-    """ A Helper function to get num_samples.
-
-    Returns:
-      tuple. number of train and evalution images.
-
-    """
-    train_split = self.config.train.split or 'train'
-    eval_split = self.config.eval.split or 'eval'
-    num_train_images = self.config.data.splits[train_split].num_images
-    num_eval_images = self.config.data.splits[eval_split].num_images
-    return num_train_images, num_eval_images
-
   def setup(self) -> None:
     """A helper function for setting up model and training setup.
     setup number of train and eval images, total steps, steps_per_epoch,
@@ -194,7 +181,10 @@ class Trainer:
     """
     logging.info('Setting up training regime for efficientnetv2')
 
-    self.num_train_images, self.num_eval_images = self.num_samples()
+    self.train_split = self.config.train.split or 'train'
+    self.eval_split = self.config.eval.split or 'eval'
+    self.num_train_images = self.config.data.splits[self.train_split].num_images
+    self.num_eval_images = self.config.data.splits[self.eval_split].num_images
     self._steps_per_epoch = self.num_train_images // self.config.train.batch_size
     self._total_steps = self._steps_per_epoch * self.config.train.epochs
     self.train_size = self.config.train.isize
@@ -356,38 +346,36 @@ class Trainer:
       if self.mode == 'traineval':
         _val_dataset = self.get_dataset(training=False, image_size=self.eval_size, config=self.config)
         _train_dataset = self.get_dataset(training=True, image_size=self.train_size, config=self.config)
-        _fit_config.update({'train_data': _train_dataset, 
+        _fit_config.update({
             'validation_data': _val_dataset, 
             'validation_steps' : self.num_eval_images // self.config.eval.batch_size,})
 
       elif self.mode == 'train':
         if not self.config.train.stages:
           _train_dataset = self.get_dataset(training=True, image_size=self.train_size, config=self.config)
-          _fit_config.update({'train_data': _train_dataset})
-
         else:
           # train model on multi stages.
           self.train_multi_stage(_fit_config)
 
       # training the model with corresponding to mode.
       if not self.config.train.stages:
-        self.model.fit(_fit_config)
+        self.model.fit(_train_dataset, **_fit_config)
 
     elif self.mode == 'eval':
       self.evaluate()
     else:
       raise ValueError(f'Invalid mode {FLAGS.mode}')
 
-  def get_dataset(self, training: bool, image_size: Tuple[int, int, int], config: Config) -> Any:
+  def get_dataset(self, training: bool, image_size: Tuple[int, int, int], config: hparams.Config) -> Any:
     """A shared utility to get input dataset."""
     if training:
-      return self.strategy.distribute_datasets_from_function(
+      return self.ds_strategy.distribute_datasets_from_function(
           datasets.build_dataset_input(
-              True, image_size, self.image_dtype, FLAGS.data_dir, train_split,
+              True, image_size, self.image_dtype, FLAGS.data_dir, self.train_split,
               config.data).distribute_dataset_fn(config.train.batch_size))
-    return self.strategy.distribute_datasets_from_function(
+    return self.ds_strategy.distribute_datasets_from_function(
         datasets.build_dataset_input(
-            False, image_size, self.image_dtype, FLAGS.data_dir, eval_split,
+            False, image_size, self.image_dtype, FLAGS.data_dir, self.eval_split,
             config.data).distribute_dataset_fn(config.eval.batch_size))
 
 
@@ -400,7 +388,7 @@ class Trainer:
     tf.keras.mixed_precision.set_global_policy(policy)
 
 
-  def get_config(self, base_config: Config) -> Config:
+  def get_config(self, base_config: hparams.Config) -> hparams.Config:
     """ Get training config. """
     config = copy.deepcopy(base_config)
     config.override(effnetv2_configs.get_model_config(FLAGS.model_name))
