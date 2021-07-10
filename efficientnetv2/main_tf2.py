@@ -214,6 +214,11 @@ def main(_) -> None:
         log_dir=FLAGS.model_dir, update_freq=100)
     rstr_callback = utils.ReuableBackupAndRestore(backup_dir=FLAGS.model_dir)
 
+    def filter_callbacks(callbacks):
+      if strategy == 'tpu' and not FLAGS.model_dir.startswith('gs://'):
+        return list(filter(lambda callback: isinstance(callback, tf.keras.callbacks.ModelCheckpoint), callbacks))
+      return callbacks
+
     def get_dataset(training, image_size, config):
       """A shared utility to get input dataset."""
       if training:
@@ -235,7 +240,7 @@ def main(_) -> None:
           validation_data=get_dataset(
               training=False, image_size=eval_size, config=config),
           validation_steps=num_eval_images // config.eval.batch_size,
-          callbacks=[ckpt_callback, tb_callback, rstr_callback],
+          callbacks=filter_callbacks([ckpt_callback, tb_callback, rstr_callback]),
           # don't log spam if running on tpus
           verbose=2 if strategy == 'tpu' else 1,
       )
@@ -245,7 +250,7 @@ def main(_) -> None:
             get_dataset(training=True, image_size=train_size, config=config),
             epochs=config.train.epochs,
             steps_per_epoch=steps_per_epoch,
-            callbacks=[ckpt_callback, tb_callback, rstr_callback],
+            callbacks=filter_callbacks([ckpt_callback, tb_callback, rstr_callback]),
             verbose=2 if strategy == 'tpu' else 1,
         )
       else:
@@ -274,7 +279,7 @@ def main(_) -> None:
               initial_epoch=start_epoch,
               epochs=end_epoch,
               steps_per_epoch=steps_per_epoch,
-              callbacks=[ckpt_callback, tb_callback, rstr_callback],
+              callbacks=filter_callbacks([ckpt_callback, tb_callback, rstr_callback]),
               verbose=2 if strategy == 'tpu' else 1,
           )
     elif FLAGS.mode == 'eval':
@@ -285,7 +290,7 @@ def main(_) -> None:
             get_dataset(training=False, image_size=eval_size, config=config),
             batch_size=config.eval.batch_size,
             steps=num_eval_images // config.eval.batch_size,
-            callbacks=[tb_callback, rstr_callback],
+            callbacks=filter_callbacks([tb_callback, rstr_callback]),
             verbose=2 if strategy == 'tpu' else 1,
         )
 

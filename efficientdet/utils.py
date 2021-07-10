@@ -376,7 +376,7 @@ class Pair(tuple):
 
 def scalar(name, tensor, is_tpu=True):
   """Stores a (name, Tensor) tuple in a custom collection."""
-  logging.info('Adding scale summary {}'.format(Pair(name, tensor)))
+  logging.info('Adding scalar summary {}'.format(Pair(name, tensor)))
   if is_tpu:
     tf.add_to_collection('scalar_summaries', Pair(name, tf.reduce_mean(tensor)))
   else:
