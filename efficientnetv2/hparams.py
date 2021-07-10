@@ -288,6 +288,7 @@ base_config = Config(
         multiclass=None,
         num_classes=1000,
         tfds_name=None,
+        try_gcs=False,
         tfds_split=None,
         splits=dict(
             train=dict(
