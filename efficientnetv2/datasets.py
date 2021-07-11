@@ -531,7 +531,7 @@ class CIFAR10Input(ImageNetInput):
     logging.info('use tfds: %s[%s]', self.cfg.tfds_name,
                  self.cfg.splits[self.split]['tfds_split'])
     ds = tfds.load(
-        self.cfg.tfds_name, split=self.cfg.splits[self.split]['tfds_split'])
+        self.cfg.tfds_name, split=self.cfg.splits[self.split]['tfds_split'], try_gcs=self.cfg.try_gcs)
     ds = ds.shard(num_hosts, current_host)
     if self.is_training:
       if self.cache:
@@ -581,6 +581,21 @@ class FlowersInput(CIFAR10Input):
           )))
 
 
+class TFFlowersInput(CIFAR10Input):
+  """TFFlowers input from tfds gcs."""
+  cfg = copy.deepcopy(CIFAR10Input.cfg)
+  cfg.update(
+      dict(
+          num_classes=5,
+          tfds_name='tf_flowers',
+          try_gcs=True,
+          splits=dict(
+              train=dict(num_images=2569, tfds_split='train[:70%]'),
+              minival=dict(num_images=1101, tfds_split='train[30%:]'),
+              eval=dict(num_images=1101, tfds_split='train[30%:]'),
+          )))
+
+
 class CarsInput(CIFAR10Input):
   """Car input from tfds."""
   cfg = copy.deepcopy(CIFAR10Input.cfg)
@@ -620,6 +635,7 @@ def get_dataset_class(ds_name):
       'cifar10': CIFAR10Input,
       'cifar100': CIFAR100Input,
       'flowers': FlowersInput,
+      'tfflowers': TFFlowersInput,
       'cars': CarsInput,
   }[ds_name]
 
@@ -730,6 +746,11 @@ class FlowersFt(Cifar10Ft):
   cfg = copy.deepcopy(Cifar10Ft.cfg)
   cfg.data.override(dict(ds_name='flowers'))
 
+@ds_register
+class TFFlowersFt(Cifar10Ft):
+  """Finetune tfflower configs."""
+  cfg = copy.deepcopy(Cifar10Ft.cfg)
+  cfg.data.override(dict(ds_name='tfflowers'))
 
 @ds_register
 class CarsFt(Cifar10Ft):
