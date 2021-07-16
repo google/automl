@@ -508,6 +508,7 @@ class CIFAR10Input(ImageNetInput):
   cfg = copy.deepcopy(ImageNetInput.cfg)
   cfg.update(
       dict(
+          try_gcs=True,
           data_dir=None,
           num_classes=10,
           multiclass=False,
