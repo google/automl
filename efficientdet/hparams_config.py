@@ -243,7 +243,6 @@ def default_detection_configs():
   h.strategy = None  # 'tpu', 'gpus', None
   h.mixed_precision = False  # If False, use float32.
   h.loss_scale = None  # set to 2**16 enables dynamic loss scale
-  h.model_optimizations = {}  # 'prune':{}
 
   # For detection.
   h.box_class_repeats = 3

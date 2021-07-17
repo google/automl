@@ -23,7 +23,6 @@ import tensorflow as tf
 import dataloader
 import hparams_config
 import utils
-from keras import tfmot
 from keras import train_lib
 from keras import util_keras
 
@@ -234,8 +233,6 @@ def main(_):
             config.as_dict())
 
   with ds_strategy.scope():
-    if config.model_optimizations:
-      tfmot.set_config(config.model_optimizations.as_dict())
     if FLAGS.hub_module_url:
       model = train_lib.EfficientDetNetTrainHub(
           config=config, hub_module_url=FLAGS.hub_module_url)

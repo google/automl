@@ -194,7 +194,8 @@ def restore_ckpt(model,
     for key, var in var_dict.items():
       if key in var_shape_map:
         if var_shape_map[key] != var.shape:
-          msg = 'Shape mismatch: %s' % key
+          msg = 'Shape mismatch: %s, expected %s, but got %s' % (
+              key, str(var.shape), str(var_shape_map[key]))
           if skip_mismatch:
             logging.warning(msg)
           else:
