@@ -777,7 +777,7 @@ def get_model(model_name,
 
   if model_name in pretrained_ckpts and weights in pretrained_ckpts[model_name]:
     url = pretrained_ckpts[model_name][weights]
-    fname = os.path.splitext(os.path.basename(url))[0]
+    fname = os.path.basename(url).split('.')[0]
     pretrained_ckpt= tf.keras.utils.get_file(fname, url , untar=True)
   else:
     pretrained_ckpt = weights
