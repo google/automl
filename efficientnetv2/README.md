@@ -5,6 +5,11 @@
 [TF-hub![TF-Hub In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.sandbox.google.com/github/google/automl/blob/master/efficientnetv2/tfhub.ipynb)
 
 
+   - Jul19/2021: A list of updates
+     * Added TF2 script [here](https://github.com/google/automl/blob/master/efficientnetv2/main_tf2.py).
+     * Updated ImageNet21k sigmoid-loss checkpoints, for multi-class pseudo labeling.
+     * Add EfficientNetV2-XL 21k and 1k checkpoint and hub modules.
+     * Added Nvidia TensorRT script [here](https://github.com/NVIDIA/TensorRT/tree/master/samples/python/efficientnet).
    - May13/2021: Initial code release for [EfficientNetV2 models](https://arxiv.org/abs/2104.00298): accepted to ICML'21.
 
 ## 1. About EfficientNetV2 Models
@@ -28,7 +33,7 @@ We have provided a list of results and checkpoints as follows:
 |    EffNetV2-M     |    85.2%   |    54.1M    | 24.7B    | [V100/A100](g3doc/effnetv2-m-gpu.png) |  [ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-m.tgz),  [tensorboard](https://tensorboard.dev/experiment/syoaqB2gTP6Vr0KRlrezmg)
 |    EffNetV2-L     |    85.7%   |   119.5M    | 56.3B    | [V100/A100](g3doc/effnetv2-l-gpu.png) |  [ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-l.tgz),  [tensorboard](https://tensorboard.dev/experiment/qgnTQ5JZQ92nSex6ZlWBbQ)
 
-** Thanks NVIDIA for providing the inference latency (benchmark scripts coming soon)
+** Thanks NVIDIA for providing the inference latency: full TensorRT scripts and instructions are available here: [link](https://github.com/NVIDIA/TensorRT/tree/master/samples/python/efficientnet)
 
 
 Here are a list of ImageNet21K pretrained and finetuned models:
@@ -39,6 +44,7 @@ Here are a list of ImageNet21K pretrained and finetuned models:
 |  EffNetV2-S   |  [pretrain ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-s-21k.tgz)  |  top1=84.9%,  [ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-s-21k-ft1k.tgz),  [tensorboard](https://tensorboard.dev/experiment/7sga2olqTBeH4ioydel0hg/) |
 |  EffNetV2-M   |  [pretrain ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-m-21k.tgz)  |  top1=86.2%,  [ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-m-21k-ft1k.tgz),  [tensorboard](https://tensorboard.dev/experiment/HkV6ANZSQ6WI5GhlZa48xQ/) |
 |  EffNetV2-L   |  [pretrain ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-l-21k.tgz)  |  top1=86.9%,  [ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-l-21k-ft1k.tgz),  [tensorboard](https://tensorboard.dev/experiment/m9ZHx1L6SQu5iBYhXO5jOw/) |
+|  EffNetV2-XL   |  [pretrain ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-xl-21k.tgz)  |  top1=87.2%,  [ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-xl-21k-ft1k.tgz),  [tensorboard]()|
 
 For comparison with EfficientNetV1, we have also provided a few smaller V2 models using the same scaling and preprocessing as V1:
 

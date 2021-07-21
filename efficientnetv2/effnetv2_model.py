@@ -25,11 +25,10 @@
 import copy
 import itertools
 import math
+import os
 
 from absl import logging
 import numpy as np
-import six
-from six.moves import xrange
 import tensorflow as tf
 
 import effnetv2_configs
@@ -560,7 +559,7 @@ class EffNetV2Model(tf.keras.Model):
         block_args.input_filters = block_args.output_filters
         block_args.strides = 1
         # pylint: enable=protected-access
-      for _ in xrange(block_args.num_repeat - 1):
+      for _ in range(block_args.num_repeat - 1):
         self._blocks.append(
             conv_block(block_args, self._mconfig, name=block_name()))
 
@@ -624,7 +623,7 @@ class EffNetV2Model(tf.keras.Model):
       if is_reduction:
         self.endpoints['reduction_%s' % reduction_idx] = outputs
       if block.endpoints:
-        for k, v in six.iteritems(block.endpoints):
+        for k, v in block.endpoints.items():
           self.endpoints['block_%s/%s' % (idx, k)] = v
           if is_reduction:
             self.endpoints['reduction_%s/%s' % (reduction_idx, k)] = v
@@ -655,7 +654,7 @@ class EffNetV2Model(tf.keras.Model):
 def get_model(model_name,
               model_config=None,
               include_top=True,
-              pretrained=True,
+              weights='imagenet',
               training=True,
               with_endpoints=False,
               **kwargs):
@@ -667,7 +666,12 @@ def get_model(model_name,
     model_name: a string such as 'efficientnetv2-s' or 'efficientnet-b0'.
     model_config: A dict of model configurations or a string of hparams.
     include_top: whether to include the final dense layer for classification.
-    pretrained: if true, download the checkpoint. If string, load the ckpt.
+    weights: One of None (random initialization),
+      'imagenet' (pretrained on ImageNet),
+      'imagenet21k' (pretrained on Imagenet21k),
+      'imagenet21k-ft1k' (pretrained on 21k and finetuned on 1k), 
+      'jft' (trained with non-labelled JFT-300),
+      or the path to the weights file to be loaded. Defaults to 'imagenet'.
     training: If true, all model variables are trainable.
     with_endpoints: whether to return all intermedia endpoints.
     **kwargs: additional parameters for keras model, such as name=xx.
@@ -679,27 +683,106 @@ def get_model(model_name,
   net(tf.keras.Input(shape=(None, None, 3)),
       training=training,
       with_endpoints=with_endpoints)
-  if pretrained is True:  # pylint: disable=g-bool-id-comparison
-    # pylint: disable=line-too-long
-    # download checkpoint and set pretrained path. Supported models include:
-    #   efficientnetv2-s, efficientnetv2-m, efficientnetv2-l,
-    #   efficientnetv2-b0, efficientnetv2-b1, efficientnetv2-b2, efficientnetv2-b3,
-    #   efficientnet-b0, efficientnet-b1, efficientnet-b2, efficientnet-b3,
-    #   efficientnet-b4, efficientnet-b5, efficientnet-b6, efficientnet-b7,
-    #   efficientnet-l2
-    # v2: https://github.com/google/automl/tree/master/efficientnetv2
-    # v1: https://github.com/tensorflow/tpu/tree/master/models/official/efficientnet
-    # pylint: enable=line-too-long
 
-    url = ('https://storage.googleapis.com/cloud-tpu-checkpoints/'
-           f'efficientnet/v2/{model_name}.tgz')
-    pretrained_ckpt = tf.keras.utils.get_file(model_name, url, untar=True)
+  if not weights:  # pylint: disable=g-bool-id-comparison
+    return net
+
+  v2url = 'https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/'
+  v1url = 'https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/advprop/'
+  v1jfturl = 'https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/noisystudent/'
+  pretrained_ckpts = {
+      # EfficientNet V2.
+      'efficientnetv2-s': {
+          'imagenet': v2url + 'efficientnetv2-s.tgz',
+          'imagenet21k': v2url + 'efficientnetv2-s-21k.tgz',
+          'imagenet21k-ft1k': v2url + 'efficientnetv2-s-21k-ft1k.tgz',
+      },
+      'efficientnetv2-m': {
+          'imagenet': v2url + 'efficientnetv2-m.tgz',
+          'imagenet21k': v2url + 'efficientnetv2-m-21k.tgz',
+          'imagenet21k-ft1k': v2url + 'efficientnetv2-m-21k-ft1k.tgz',
+      },
+      'efficientnetv2-l': {
+          'imagenet': v2url + 'efficientnetv2-l.tgz',
+          'imagenet21k': v2url + 'efficientnetv2-l-21k.tgz',
+          'imagenet21k-ft1k': v2url + 'efficientnetv2-l-21k-ft1k.tgz',
+      },
+      'efficientnetv2-xl': {
+          # no imagenet ckpt.
+          'imagenet21k': v2url + 'efficientnetv2-xl-21k.tgz',
+          'imagenet21k-ft1k': v2url + 'efficientnetv2-xl-21k-ft1k.tgz',
+      },
+
+      'efficientnetv2-b0': {
+          'imagenet': v2url + 'efficientnetv2-b0.tgz',
+          'imagenet21k': v2url + 'efficientnetv2-b0-21k.tgz',
+          'imagenet21k-ft1k': v2url + 'efficientnetv2-b0-21k-ft1k.tgz',
+      },
+      'efficientnetv2-b1': {
+          'imagenet': v2url + 'efficientnetv2-b1.tgz',
+          'imagenet21k': v2url + 'efficientnetv2-b1-21k.tgz',
+          'imagenet21k-ft1k': v2url + 'efficientnetv2-b1-21k-ft1k.tgz',
+      },
+      'efficientnetv2-b2': {
+          'imagenet': v2url + 'efficientnetv2-b2.tgz',
+          'imagenet21k': v2url + 'efficientnetv2-b2-21k.tgz',
+          'imagenet21k-ft1k': v2url + 'efficientnetv2-b2-21k-ft1k.tgz',
+      },
+      'efficientnetv2-b3': {
+          'imagenet': v2url + 'efficientnetv2-b3.tgz',
+          'imagenet21k': v2url + 'efficientnetv2-b3-21k.tgz',
+          'imagenet21k-ft1k': v2url + 'efficientnetv2-b3-21k-ft1k.tgz',
+      },
+
+      # EfficientNet V1.
+      'efficientnet-b0': {
+          'imagenet': v1url + 'efficientnet-b0.tar.gz',
+          'jft': v1jfturl + 'noisy_student_efficientnet-b0.tar.gz',
+      },
+      'efficientnet-b1': {
+          'imagenet': v1url + 'efficientnet-b1.tar.gz',
+          'jft': v1jfturl + 'noisy_student_efficientnet-b1.tar.gz',
+      },
+      'efficientnet-b2': {
+          'imagenet': v1url + 'efficientnet-b2.tar.gz',
+          'jft': v1jfturl + 'noisy_student_efficientnet-b2.tar.gz',
+      },
+      'efficientnet-b3': {
+          'imagenet': v1url + 'efficientnet-b3.tar.gz',
+          'jft': v1jfturl + 'noisy_student_efficientnet-b3.tar.gz',
+      },
+      'efficientnet-b4': {
+          'imagenet': v1url + 'efficientnet-b4.tar.gz',
+          'jft': v1jfturl + 'noisy_student_efficientnet-b4.tar.gz',
+      },
+      'efficientnet-b5': {
+          'imagenet': v1url + 'efficientnet-b5.tar.gz',
+          'jft': v1jfturl + 'noisy_student_efficientnet-b5.tar.gz',
+      },
+      'efficientnet-b6': {
+          'imagenet': v1url + 'efficientnet-b6.tar.gz',
+          'jft': v1jfturl + 'noisy_student_efficientnet-b6.tar.gz',
+      },
+      'efficientnet-b7': {
+          'imagenet': v1url + 'efficientnet-b7.tar.gz',
+          'jft': v1jfturl + 'noisy_student_efficientnet-b7.tar.gz',
+      },
+      'efficientnet-b8': {
+          'imagenet': v1url + 'efficientnet-b8.tar.gz',
+      },
+      'efficientnet-l2': {
+          'jft': v1jfturl + 'noisy_student_efficientnet-l2_475.tar.gz',
+      },
+  }
+
+  if model_name in pretrained_ckpts and weights in pretrained_ckpts[model_name]:
+    url = pretrained_ckpts[model_name][weights]
+    fname = os.path.splitext(os.path.basename(url))[0]
+    pretrained_ckpt= tf.keras.utils.get_file(fname, url , untar=True)
   else:
-    pretrained_ckpt = pretrained
+    pretrained_ckpt = weights
 
-  if pretrained_ckpt:
-    if tf.io.gfile.isdir(pretrained_ckpt):
-      pretrained_ckpt = tf.train.latest_checkpoint(pretrained_ckpt)
-    net.load_weights(pretrained_ckpt)
-
+  if tf.io.gfile.isdir(pretrained_ckpt):
+    pretrained_ckpt = tf.train.latest_checkpoint(pretrained_ckpt)
+  net.load_weights(pretrained_ckpt)
   return net

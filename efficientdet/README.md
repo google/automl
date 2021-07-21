@@ -10,6 +10,7 @@ Arxiv link: https://arxiv.org/abs/1911.09070
 
 Updates:
 
+  - Jul19/2021: Added Nvidia TensorRT script/instruction [link](https://github.com/NVIDIA/TensorRT/tree/master/samples/python/efficientdet)
   - May10/2021: Added EfficientDet-lite checkpoints (by Yuqi and TFLite team)
   - Mar25/2021: Added [Det-AdvProp](https://arxiv.org/abs/2103.13886) model checkpoints ([see this page](./Det-AdvProp.md)).
   - Jul20/2020: Added keras/TF2 and new SOTA D7x: 55.1mAP with 153ms.
@@ -76,6 +77,26 @@ We have provided a list of EfficientDet checkpoints and results as follows:
 <sup><em>val</em> denotes validation results, <em>test-dev</em> denotes test-dev2017 results. AP<sup>val</sup> is for validation accuracy, all other AP results in the table are for COCO test-dev2017. All accuracy numbers are for single-model single-scale without ensemble or test-time augmentation.  EfficientDet-D0 to D6 are trained for 300 epochs and D7/D7x are trained for 600 epochs.</sup>
 
 For more accurate and robust EfficientDet, please see [this page](./Det-AdvProp.md), which contains a list of models trained with Det-AdvProp + AutoAugment (AA) described in [this paper](https://arxiv.org/abs/2103.13886). The obatined model is not only more accurate on clean images, but also much more robust against various corruptions and domain shift.
+
+On single Tesla V100 without using TensorRT, our end-to-end
+latency and throughput are:
+
+
+|       Model    |   mAP | batch1 latency |  batch1 throughput |  batch8 throughput |
+| ------ | ------ | ------  | ------ | ------ |
+| EfficientDet-D0 |  34.6 | 10.2ms | 97 fps | 209 fps |
+| EfficientDet-D1 |  40.5 | 13.5ms | 74 fps | 140 fps |
+| EfficientDet-D2 |  43.0 | 17.7ms | 57 fps | 97 fps  |
+| EfficientDet-D3 |  47.5 | 28.0ms | 36 fps | 58 fps  |
+| EfficientDet-D4 |  49.7 | 42.8ms | 23 fps | 35 fps  |
+| EfficientDet-D5 |  51.5 | 72.5ms | 14 fps | 18 fps  |
+| EfficientDet-D6 |  52.6 | 92.8ms | 11 fps | - fps  |
+| EfficientDet-D7 |  53.7 | 122ms  | 8.2 fps | - fps  |
+| EfficientDet-D7x |  55.1 | 153ms  | 6.5 fps | - fps  |
+
+** FPS means frames per second (or images/second).
+
+** EfficientDet can be significantly sped up with TensorRT: [link](https://github.com/NVIDIA/TensorRT/tree/master/samples/python/efficientdet)
 
 In addition, the following table includes a list of models trained with fixed 640x640 image sizes (see appendix of [this paper](https://arxiv.org/abs/1911.09070)):
 
@@ -151,24 +172,6 @@ use the following command:
       --saved_model_dir=/tmp/benchmark/efficientdet-d0_frozen.pb \
       --model_name=efficientdet-d0  --input_image=testdata/img1.jpg  \
       --output_image_dir=/tmp/
-
-On single Tesla V100 without using TensorRT, our end-to-end
-latency and throughput are:
-
-
-|       Model    |   mAP | batch1 latency |  batch1 throughput |  batch8 throughput |
-| ------ | ------ | ------  | ------ | ------ |
-| EfficientDet-D0 |  34.6 | 10.2ms | 97 fps | 209 fps |
-| EfficientDet-D1 |  40.5 | 13.5ms | 74 fps | 140 fps |
-| EfficientDet-D2 |  43.0 | 17.7ms | 57 fps | 97 fps  |
-| EfficientDet-D3 |  47.5 | 28.0ms | 36 fps | 58 fps  |
-| EfficientDet-D4 |  49.7 | 42.8ms | 23 fps | 35 fps  |
-| EfficientDet-D5 |  51.5 | 72.5ms | 14 fps | 18 fps  |
-| EfficientDet-D6 |  52.6 | 92.8ms | 11 fps | - fps  |
-| EfficientDet-D7 |  53.7 | 122ms  | 8.2 fps | - fps  |
-| EfficientDet-D7x |  55.1 | 153ms  | 6.5 fps | - fps  |
-
-** FPS means frames per second (or images/second).
 
 ## 5. Inference for images.
 
