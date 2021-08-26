@@ -1,0 +1,97 @@
+act_type: swish
+alpha: 0.25
+anchor_scale: 4.0
+apply_bn_for_resampling: true
+aspect_ratios:
+- 1.0
+- 2.0
+- 0.5
+autoaugment_policy: null
+backbone_config: null
+backbone_name: efficientnet-b1
+box_class_repeats: 3
+box_loss_weight: 50.0
+ckpt_var_scope: null
+clip_gradients_norm: 10.0
+conv_after_downsample: false
+conv_bn_act_pattern: false
+data_format: channels_first
+dataset_type: null
+delta: 0.1
+drop_remainder: true
+first_lr_drop_epoch: 200.0
+fpn_cell_repeats: 4
+fpn_config: null
+fpn_name: null
+fpn_num_filters: 88
+fpn_weight_method: null
+gamma: 1.5
+grad_checkpoint: false
+grid_mask: false
+heads:
+- object_detection
+image_size: !!python/tuple
+- 640
+- 640
+img_summary_steps: null
+input_rand_hflip: true
+iou_loss_type: null
+iou_loss_weight: 1.0
+is_training_bn: true
+jitter_max: 2.0
+jitter_min: 0.1
+label_map: null
+label_smoothing: 0.0
+learning_rate: 0.08
+loss_scale: null
+lr_decay_method: cosine
+lr_warmup_epoch: 1.0
+lr_warmup_init: 0.008
+map_freq: 5
+max_instances_per_image: 100
+max_level: 7
+mean_rgb:
+- 123.675
+- 116.28
+- 103.53
+min_level: 3
+mixed_precision: false
+model_optimizations: {}
+momentum: 0.9
+moving_average_decay: 0.9998
+name: efficientdet-d1
+nms_configs:
+    iou_thresh: null
+    max_nms_inputs: 0
+    max_output_size: 100
+    method: gaussian
+    pyfunc: false
+    score_thresh: 0.0
+    sigma: null
+num_classes: 90
+num_epochs: 300
+num_scales: 3
+optimizer: sgd
+poly_lr_power: 0.9
+positives_momentum: null
+regenerate_source_id: false
+sample_image: null
+save_freq: epoch
+scale_range: false
+second_lr_drop_epoch: 250.0
+seg_num_classes: 3
+separable_conv: true
+skip_crowd_during_training: true
+skip_mismatch: true
+stddev_rgb:
+- 58.395
+- 57.120000000000005
+- 57.375
+strategy: null
+survival_prob: null
+target_size: null
+tflite_max_detections: 100
+use_keras_model: true
+var_freeze_expr: null
+verbose: 1
+weight_decay: 4.0e-05

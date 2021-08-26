@@ -23,9 +23,9 @@ import efficientdet_arch
 import hparams_config
 import nms_np
 import utils
-from keras import anchors
-from keras import efficientdet_keras
-from keras import postprocess
+from tf2 import anchors
+from tf2 import efficientdet_keras
+from tf2 import postprocess
 
 _DEFAULT_BATCH_SIZE = 64
 
