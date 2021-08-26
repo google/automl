@@ -585,7 +585,7 @@ class EffNetV2Model(tf.keras.Model):
         inputs=[inputs], outputs=self.call(inputs, training=True))
     return model
 
-  def call(self, inputs, training, with_endpoints=False):
+  def call(self, inputs, training=False, with_endpoints=False):
     """Implementation of call().
 
     Args:

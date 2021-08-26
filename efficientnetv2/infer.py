@@ -56,7 +56,7 @@ def build_tf2_model():
       FLAGS.model_name,
       FLAGS.hparam_str,
       include_top=True,
-      pretrained=FLAGS.model_dir or True)
+      weights=FLAGS.model_dir or 'imagenet')
   model.summary()
   return model
 
@@ -95,11 +95,12 @@ def tf2_benchmark():
     model = tf.saved_model.load(FLAGS.export_dir)
 
   batch_size = FLAGS.batch_size
-  imgs = tf.ones((batch_size, isize, isize, 3), dtype=tf.float16)
+  data_dtype = tf.float16 if FLAGS.mixed_precision else tf.float32
+  imgs = tf.ones((batch_size, isize, isize, 3), dtype=data_dtype)
 
   @tf.function
   def f(x):
-    return model(x)
+    return model(x, training=False)
 
   print('starting warmup.')
   for _ in range(10):  # warmup runs.
@@ -126,7 +127,8 @@ def tf1_benchmark():
     run_options = tf1.RunOptions(trace_level=tf1.RunOptions.FULL_TRACE)
     run_metadata = tf1.RunMetadata()
     isize = FLAGS.image_size or model.cfg.eval.isize
-    inputs = tf.ones((batch_size, isize, isize, 3), tf.float16)
+    data_dtype = tf.float16 if FLAGS.mixed_precision else tf.float32
+    inputs = tf.ones((batch_size, isize, isize, 3), data_dtype)
     output = model(inputs, training=False)
     sess.run(tf1.global_variables_initializer())
 
