@@ -290,10 +290,15 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     raise ValueError('Unsupported pooling type {}.'.format(self.pooling_type))
 
   def _upsample2d(self, inputs, target_height, target_width):
-    return tf.cast(
+    if self.data_format == 'channels_first':
+      inputs = tf.compat.v1.transpose(inputs, perm=[0, 2, 3, 1])
+    outputs = tf.cast(
         tf.compat.v1.image.resize_nearest_neighbor(
             tf.cast(inputs, tf.float32), [target_height, target_width]),
         inputs.dtype)
+    if self.data_format == 'channels_first':
+      outputs = tf.compat.v1.transpose(outputs, perm=[0, 3, 1, 2])
+    return outputs
 
   def _maybe_apply_1x1(self, feat, training, num_channels):
     """Apply 1x1 conv to change layer width if necessary."""
