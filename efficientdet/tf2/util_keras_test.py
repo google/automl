@@ -17,7 +17,7 @@ from absl.testing import parameterized
 import tensorflow as tf
 
 import utils
-from keras import util_keras
+from tf2 import util_keras
 
 
 class KerasUtilTest(tf.test.TestCase, parameterized.TestCase):

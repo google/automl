@@ -18,8 +18,8 @@ import tempfile
 from absl import logging
 import tensorflow as tf
 import test_util
-from keras import efficientdet_keras
-from keras import infer_lib
+from tf2 import efficientdet_keras
+from tf2 import infer_lib
 
 
 class InferenceTest(tf.test.TestCase):

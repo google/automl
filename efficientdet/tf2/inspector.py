@@ -25,7 +25,7 @@ import tensorflow as tf
 
 import hparams_config
 import utils
-from keras import infer_lib
+from tf2 import infer_lib
 
 flags.DEFINE_string('model_name', 'efficientdet-d0', 'Model.')
 flags.DEFINE_enum('mode', 'infer',

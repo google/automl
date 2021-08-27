@@ -23,10 +23,10 @@ import hparams_config
 import utils
 from backbone import backbone_factory
 from backbone import efficientnet_builder
-from keras import fpn_configs
-from keras import postprocess
-from keras import tfmot
-from keras import util_keras
+from tf2 import fpn_configs
+from tf2 import postprocess
+from tf2 import tfmot
+from tf2 import util_keras
 
 
 def add_n(nodes):

@@ -653,7 +653,7 @@ def _recompute_grad(f):
   Warning: If `f` was originally a tf.keras Model or Layer object, `g` will not
   be able to access the member variables of that object, because `g` returns
   through the wrapper function `inner`.  When recomputing gradients through
-  objects that inherit from keras, we suggest keeping a reference to the
+  objects that inherit from tf2, we suggest keeping a reference to the
   underlying object around for the purpose of accessing these variables.
 
   Args:

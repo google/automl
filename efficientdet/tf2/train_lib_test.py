@@ -19,7 +19,7 @@ import tensorflow as tf
 
 import det_model_fn as legacy_fn
 import hparams_config
-from keras import train_lib
+from tf2 import train_lib
 
 
 class TrainLibTest(tf.test.TestCase):

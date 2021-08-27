@@ -20,7 +20,7 @@ import dataloader
 import hparams_config
 import test_util
 
-from keras import anchors
+from tf2 import anchors
 from object_detection import tf_example_decoder
 
 

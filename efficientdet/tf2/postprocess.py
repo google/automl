@@ -21,7 +21,7 @@ import tensorflow as tf
 
 import nms_np
 import utils
-from keras import anchors
+from tf2 import anchors
 T = tf.Tensor  # a shortcut for typing check.
 CLASS_OFFSET = 1
 # TFLite-specific constants.
