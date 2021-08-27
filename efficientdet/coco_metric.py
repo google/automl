@@ -24,7 +24,7 @@ from absl import logging
 import numpy as np
 import tensorflow as tf
 
-from keras import label_util
+from tf2 import label_util
 
 try:
 # pylint: disable=g-import-not-at-top

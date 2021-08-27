@@ -20,7 +20,7 @@ from absl import logging
 import tensorflow as tf
 import utils
 
-# Prefix variable name mapping from keras model to the hub module checkpoint.
+# Prefix variable name mapping from tf2 model to the hub module checkpoint.
 HUB_CPT_NAME = collections.OrderedDict([('class_net/class-predict/', 'classes'),
                                         ('box_net/box-predict/', 'boxes'),
                                         ('', 'base_model')])

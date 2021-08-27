@@ -19,7 +19,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 
 import hparams_config
-from keras import efficientdet_keras
+from tf2 import efficientdet_keras
 
 
 def create_mask(pred_mask):

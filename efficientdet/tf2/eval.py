@@ -22,11 +22,11 @@ import coco_metric
 import dataloader
 import hparams_config
 import utils
-from keras import anchors
-from keras import efficientdet_keras
-from keras import label_util
-from keras import postprocess
-from keras import util_keras
+from tf2 import anchors
+from tf2 import efficientdet_keras
+from tf2 import label_util
+from tf2 import postprocess
+from tf2 import util_keras
 
 # Cloud TPU Cluster Resolvers
 flags.DEFINE_string('tpu', None, 'The Cloud TPU name.')

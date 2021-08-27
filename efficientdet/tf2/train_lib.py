@@ -28,11 +28,11 @@ import coco_metric
 import inference
 import iou_utils
 import utils
-from keras import anchors
-from keras import efficientdet_keras
-from keras import label_util
-from keras import postprocess
-from keras import util_keras
+from tf2 import anchors
+from tf2 import efficientdet_keras
+from tf2 import label_util
+from tf2 import postprocess
+from tf2 import util_keras
 from tensorflow_model_optimization.python.core.sparsity.keras import pruning_wrapper
 
 

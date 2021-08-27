@@ -24,9 +24,9 @@ import dataloader
 import hparams_config
 import utils
 
-from keras import anchors
-from keras import label_util
-from keras import postprocess
+from tf2 import anchors
+from tf2 import label_util
+from tf2 import postprocess
 
 FLAGS = flags.FLAGS
 

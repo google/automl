@@ -29,7 +29,7 @@ import hparams_config
 import utils
 from backbone import backbone_factory
 from backbone import efficientnet_builder
-from keras import fpn_configs
+from tf2 import fpn_configs
 
 
 ################################################################################

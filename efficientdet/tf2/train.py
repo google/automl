@@ -23,9 +23,9 @@ import tensorflow as tf
 import dataloader
 import hparams_config
 import utils
-from keras import tfmot
-from keras import train_lib
-from keras import util_keras
+from tf2 import tfmot
+from tf2 import train_lib
+from tf2 import util_keras
 
 FLAGS = flags.FLAGS
 

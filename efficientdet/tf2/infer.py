@@ -23,7 +23,7 @@ import tensorflow as tf
 
 import hparams_config
 import inference
-from keras import efficientdet_keras
+from tf2 import efficientdet_keras
 
 flags.DEFINE_string('image_path', None, 'Location of test image.')
 flags.DEFINE_string('output_dir', None, 'Directory of annotated output images.')
