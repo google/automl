@@ -82,7 +82,7 @@ You can directly use this code to build a model like this:
 
     mode = tf.keras.models.Sequential([
         tf.keras.layers.InputLayer(input_shape=[224, 224, 3]),
-        effnetv2_model.get_model('efficientnetv2-b0', include_top=False, pretrained=True),
+        effnetv2_model.get_model('efficientnetv2-b0', include_top=False),
         tf.keras.layers.Dropout(rate=0.2),
         tf.keras.layers.Dense(4, activation='softmax'),
     ])
