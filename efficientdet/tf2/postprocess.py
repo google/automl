@@ -531,7 +531,7 @@ def generate_detections(params,
                         image_scales,
                         image_ids,
                         flip=False,
-                        pre_class_nms=True):
+                        per_class_nms=True):
   """A legacy interface for generating [id, x, y, w, h, score, class]."""
   _, width = utils.parse_image_size(params['image_size'])
 
@@ -572,7 +572,7 @@ def generate_detections(params,
       detections_bs.append(detections)
     return tf.stack(detections_bs, axis=0, name='detections')
 
-  if pre_class_nms:
+  if per_class_nms:
     postprocess = postprocess_per_class
   else:
     postprocess = postprocess_global
