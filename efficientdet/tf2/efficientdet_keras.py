@@ -25,10 +25,6 @@ from backbone import backbone_factory
 from backbone import efficientnet_builder
 from tf2 import fpn_configs
 from tf2 import postprocess
-<<<<<<< HEAD:efficientdet/tf2/efficientdet_keras.py
-from tf2 import tfmot
-=======
->>>>>>> fix tflite inference and add keras turtorial:efficientdet/tf2/efficientdet_keras.py
 from tf2 import util_keras
 
 
