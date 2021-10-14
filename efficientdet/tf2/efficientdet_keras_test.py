@@ -20,6 +20,7 @@ import tensorflow.compat.v1 as tf
 import efficientdet_arch as legacy_arch
 import hparams_config
 from tf2 import efficientdet_keras
+from tf2 import train_lib
 
 SEED = 111111
 
@@ -37,7 +38,6 @@ class EfficientDetKerasTest(tf.test.TestCase):
     inputs_shape = [1, 512, 512, 3]
     config = hparams_config.get_efficientdet_config('efficientdet-d0')
     config.heads = ['object_detection', 'segmentation']
-    tmp_ckpt = os.path.join(tempfile.mkdtemp(), 'ckpt')
     with tf.Session(graph=tf.Graph()) as sess:
       feats = tf.ones(inputs_shape)
       tf.random.set_random_seed(SEED)
@@ -48,7 +48,6 @@ class EfficientDetKerasTest(tf.test.TestCase):
       grads = tf.nest.map_structure(lambda output: tf.gradients(output, feats),
                                     outputs)
       keras_class_grads, keras_box_grads, _ = sess.run(grads)
-      model.save_weights(tmp_ckpt)
     with tf.Session(graph=tf.Graph()) as sess:
       feats = tf.ones(inputs_shape)
       tf.random.set_random_seed(SEED)
@@ -60,19 +59,19 @@ class EfficientDetKerasTest(tf.test.TestCase):
       legacy_class_grads, legacy_box_grads = sess.run(grads)
 
     for i in range(3, 8):
-      self.assertAllClose(
-          keras_class_out[i - 3], legacy_class_out[i], rtol=1e-4, atol=1e-4)
-      self.assertAllClose(
-          keras_box_out[i - 3], legacy_box_out[i], rtol=1e-4, atol=1e-4)
-      self.assertAllClose(
-          keras_class_grads[i - 3], legacy_class_grads[i], rtol=1e-4, atol=1e-4)
-      self.assertAllClose(
-          keras_box_grads[i - 3], legacy_box_grads[i], rtol=1e-4, atol=1e-4)
+      self.assertAllEqual(
+          keras_class_out[i - 3], legacy_class_out[i])
+      self.assertAllEqual(
+          keras_box_out[i - 3], legacy_box_out[i])
+      self.assertAllEqual(
+          keras_class_grads[i - 3], legacy_class_grads[i])
+      self.assertAllEqual(
+          keras_box_grads[i - 3], legacy_box_grads[i])
 
   def test_eager_output(self):
     inputs_shape = [1, 512, 512, 3]
     config = hparams_config.get_efficientdet_config('efficientdet-d0')
-    config.heads = ['object_detection', 'segmentation']
+    config.heads = ['object_detection']
     tmp_ckpt = os.path.join(tempfile.mkdtemp(), 'ckpt2')
 
     with tf.Session(graph=tf.Graph()) as sess:
@@ -80,21 +79,37 @@ class EfficientDetKerasTest(tf.test.TestCase):
       tf.random.set_random_seed(SEED)
       model = efficientdet_keras.EfficientDetNet(config=config)
       outputs = model(feats, True)
+      grads = tf.nest.map_structure(lambda output: tf.gradients(output, feats),
+                                    outputs)
       sess.run(tf.global_variables_initializer())
-      keras_class_out, keras_box_out, keras_seg_out = sess.run(outputs)
+      keras_class_out, keras_box_out = sess.run(outputs)
+      legacy_class_grads, legacy_box_grads = sess.run(grads)
       model.save_weights(tmp_ckpt)
 
     feats = tf.ones(inputs_shape)
     model = efficientdet_keras.EfficientDetNet(config=config)
+    model.build(inputs_shape)
     model.load_weights(tmp_ckpt)
-    eager_class_out, eager_box_out, eager_seg_out = model(feats, True)
+
+    @tf.function
+    def _run(feats):
+      with tf.GradientTape(persistent=True) as tape:
+        tape.watch(feats)
+        eager_class_out, eager_box_out = model(feats, True)
+        class_grads, box_grads = tf.nest.map_structure(
+                                      lambda output: tape.gradient(output, feats),
+                                      [eager_class_out, eager_box_out])
+      return eager_class_out, eager_box_out, class_grads, box_grads
+    eager_class_out, eager_box_out, class_grads, box_grads = _run(feats)
     for i in range(5):
-      self.assertAllClose(
-          eager_class_out[i], keras_class_out[i], rtol=1e-4, atol=1e-4)
-      self.assertAllClose(
-          eager_box_out[i], keras_box_out[i], rtol=1e-4, atol=1e-4)
-    self.assertAllClose(
-        eager_seg_out, keras_seg_out, rtol=1e-4, atol=1e-4)
+      self.assertAllEqual(
+          eager_class_out[i], keras_class_out[i])
+      self.assertAllEqual(
+          eager_box_out[i], keras_box_out[i])
+      self.assertAllEqual(
+          class_grads[i], legacy_class_grads[i][0])
+      self.assertAllEqual(
+          box_grads[i], legacy_box_grads[i][0])
 
   def test_build_feature_network(self):
     config = hparams_config.get_efficientdet_config('efficientdet-d0')
@@ -130,8 +145,8 @@ class EfficientDetKerasTest(tf.test.TestCase):
       legacy_grads = sess.run(grads[3:6])
 
     for i in range(config.min_level, config.max_level + 1):
-      self.assertAllClose(keras_feats[i - config.min_level], legacy_feats[i])
-      self.assertAllClose(keras_grads[i - config.min_level],
+      self.assertAllEqual(keras_feats[i - config.min_level], legacy_feats[i])
+      self.assertAllEqual(keras_grads[i - config.min_level],
                           legacy_grads[i - config.min_level])
 
   def test_model_variables(self):
@@ -191,6 +206,23 @@ class EfficientDetKerasTest(tf.test.TestCase):
             all_feats = [tf.ones([1, 8, 8, 64])]
             actual_result = resample_layer(feat, training, all_feats)
             self.assertAllCloseAccordingToType(expect_result, actual_result)
+
+  def test_hub_model(self):
+    image = tf.random.uniform((1, 320, 320, 3))
+    keras_model = efficientdet_keras.EfficientDetNet('efficientdet-lite0')
+    tmp_ckpt = os.path.join(tempfile.mkdtemp(), 'ckpt')
+    keras_model.config.model_dir = tmp_ckpt
+    base_model = train_lib.EfficientDetNetTrainHub(keras_model.config,
+                                                   "https://tfhub.dev/tensorflow/efficientdet/lite0/feature-vector/1")
+    cls_outputs, box_outputs = tf.function(base_model)(image, training=False)
+    keras_model.build(image.shape)
+    d1 = {var.name: var for var in base_model.variables}
+    for var in keras_model.variables:
+      var.assign(d1[var.name].numpy())
+    cls_outputs2, box_outputs2 = tf.function(keras_model)(image, False)
+    for c1, b1, c2, b2 in zip(cls_outputs, box_outputs, cls_outputs2, box_outputs2):
+      self.assertAllEqual(c1, c2)
+      self.assertAllEqual(b1, b2)
 
   def test_resample_var_names(self):
     with tf.Graph().as_default():
