@@ -45,72 +45,72 @@ class EfficientDetArchTest(tf.test.TestCase):
     return utils.num_params_flops(False)
 
   def test_efficientdet_d0(self):
-    self.assertSequenceEqual((3880067.0, 2535456183),
+    self.assertSequenceEqual((3880067.0, 2532997127),
                              self.build_model('efficientdet-d0', 512))
 
   def test_efficientdet_d0_channel_first(self):
     self.assertSequenceEqual(
-        (3880067.0, 2534258103),
+        (3880067.0, 2531799047),
         self.build_model('efficientdet-d0', 512, data_format='channels_first'))
 
   def test_efficientdet_d0_511_513(self):
-    self.assertSequenceEqual((3880067.0, 2613160475),
+    self.assertSequenceEqual((3880067.0, 2610687851),
                              self.build_model('efficientdet-d0', (511, 513)))
 
   def test_efficientdet_d1(self):
-    self.assertSequenceEqual((6625898.0, 6101276568),
+    self.assertSequenceEqual((6625898.0, 6095640824),
                              self.build_model('efficientdet-d1', 640))
 
   def test_efficientdet_d1_640_1280(self):
-    self.assertSequenceEqual((6625898.0, 12194901743),
+    self.assertSequenceEqual((6625898.0, 12186897999),
                              self.build_model('efficientdet-d1', (640, 1280)))
 
   def test_efficientdet_d2(self):
-    self.assertSequenceEqual((8097039.0, 10993616292),
+    self.assertSequenceEqual((8097039.0, 10986053156),
                              self.build_model('efficientdet-d2', 768))
 
   def test_efficientdet_d3(self):
-    self.assertSequenceEqual((12032296.0, 24882174639),
+    self.assertSequenceEqual((12032296.0, 24869554579),
                              self.build_model('efficientdet-d3', 896))
 
   def test_efficientdet_d4(self):
-    self.assertSequenceEqual((20723675.0, 55167980877),
+    self.assertSequenceEqual((20723675.0, 55146068329),
                              self.build_model('efficientdet-d4', 1024))
 
   def test_efficientdet_d5(self):
-    self.assertSequenceEqual((33653315.0, 135353202989),
+    self.assertSequenceEqual((33653315.0, 135306619957),
                              self.build_model('efficientdet-d5', 1280))
 
   def test_efficientdet_d6(self):
-    self.assertSequenceEqual((51871782.0, 225532115747),
+    self.assertSequenceEqual((51871782.0, 225467043531),
                              self.build_model('efficientdet-d6', 1280))
 
   def test_efficientdet_d7(self):
-    self.assertSequenceEqual((51871782.0, 324740293607),
+    self.assertSequenceEqual((51871782.0, 324657914255),
                              self.build_model('efficientdet-d7', 1536))
 
   def test_efficientdet_lite0(self):
-    self.assertSequenceEqual((3243470.0, 979428213),
+    self.assertSequenceEqual((3243470.0, 977617221),
                              self.build_model('efficientdet-lite0'))
 
   def test_efficientdet_lite1(self):
-    self.assertSequenceEqual((4248318.0, 1976353506),
+    self.assertSequenceEqual((4248318.0, 1973728714),
                              self.build_model('efficientdet-lite1'))
 
   def test_efficientdet_lite2(self):
-    self.assertSequenceEqual((5252334.0, 3386596870),
+    self.assertSequenceEqual((5252334.0, 3383232590),
                              self.build_model('efficientdet-lite2'))
 
   def test_efficientdet_lite3(self):
-    self.assertSequenceEqual((8350862.0, 7509226979),
+    self.assertSequenceEqual((8350862.0, 7503764515),
                              self.build_model('efficientdet-lite3'))
 
   def test_efficientdet_lite3x(self):
-    self.assertSequenceEqual((9280862.0, 14026487930),
+    self.assertSequenceEqual((9280862.0, 14019809178),
                              self.build_model('efficientdet-lite3x'))
 
   def test_efficientdet_lite4(self):
-    self.assertSequenceEqual((15130894.0, 20232158598),
+    self.assertSequenceEqual((15130894.0, 20221443966),
                              self.build_model('efficientdet-lite4'))
 
 
