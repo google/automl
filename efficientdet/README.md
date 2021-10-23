@@ -305,6 +305,8 @@ Download data and checkpoints.
 Create a config file for the PASCAL VOC dataset called voc_config.yaml and put this in it.
 
       num_classes: 21
+      lr_warmup_init: 0.08
+      learning_rate: 0.8
       var_freeze_expr: '(efficientnet|fpn_cells|resample_p6)'
       label_map: {1: aeroplane, 2: bicycle, 3: bird, 4: boat, 5: bottle, 6: bus, 7: car, 8: cat, 9: chair, 10: cow, 11: diningtable, 12: dog, 13: horse, 14: motorbike, 15: person, 16: pottedplant, 17: sheep, 18: sofa, 19: train, 20: tvmonitor}
 
@@ -317,7 +319,7 @@ Finetune needs to use --ckpt rather than --backbone_ckpt.
         --model_dir=/tmp/efficientdet-d0-finetune  \
         --ckpt=efficientdet-d0  \
         --train_batch_size=64 \
-        --eval_batch_size=64 --eval_samples=1024 \
+        --eval_batch_size=64 \
         --num_examples_per_epoch=5717 --num_epochs=50  \
         --hparams=voc_config.yaml --val_json_file=tfrecord/json_pascal.json
 
@@ -355,7 +357,7 @@ Finetune needs to use --ckpt rather than --backbone_ckpt.
         --model_dir=/tmp/efficientdet-d0-finetune  \
         --ckpt=efficientdet-d0  \
         --train_batch_size=64 \
-        --eval_batch_size=64 --eval_samples=1024 \
+        --eval_batch_size=64 \
         --num_examples_per_epoch=5717 --num_epochs=50  \
         --hparams=voc_config.yaml
         --strategy=gpus

@@ -356,7 +356,7 @@ def main(_):
         if p.exitcode != 0:
           return p.exitcode
       else:
-        tf.compat.v1.reset_default_graph()
+        tf.reset_default_graph()
         run_train_and_eval(e)
 
   else:

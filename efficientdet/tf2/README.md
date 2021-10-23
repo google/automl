@@ -218,7 +218,7 @@ You can run inference for a video and show the results online:
     // Run eval.
     !python eval.py  \
         --model_name=${MODEL}  --model_dir=${CKPT_PATH}  \
-        --val_file_pattern=tfrecord/val/pascal*.tfrecord  \
+        --val_file_pattern=tfrecord/val*  \
         --val_json_file=annotations/instances_val2017.json
 
 ## 8. Finetune on PASCAL VOC 2012 with detector COCO ckpt.
@@ -239,6 +239,8 @@ Download data and checkpoints.
 Create a config file for the PASCAL VOC dataset called voc_config.yaml and put this in it.
 
       num_classes: 21
+      lr_warmup_init: 0.08
+      learning_rate: 0.8
       var_freeze_expr: '(efficientnet|fpn_cells|resample_p6)'
       label_map: {1: aeroplane, 2: bicycle, 3: bird, 4: boat, 5: bottle, 6: bus, 7: car, 8: cat, 9: chair, 10: cow, 11: diningtable, 12: dog, 13: horse, 14: motorbike, 15: person, 16: pottedplant, 17: sheep, 18: sofa, 19: train, 20: tvmonitor}
 
