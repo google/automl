@@ -218,7 +218,7 @@ You can run inference for a video and show the results online:
     // Run eval.
     !python eval.py  \
         --model_name=${MODEL}  --model_dir=${CKPT_PATH}  \
-        --val_file_pattern=tfrecord/val/pascal*.tfrecord  \
+        --val_file_pattern=tfrecord/val*  \
         --val_json_file=annotations/instances_val2017.json
 
 ## 8. Finetune on PASCAL VOC 2012 with detector COCO ckpt.

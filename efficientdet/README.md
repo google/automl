@@ -317,7 +317,7 @@ Finetune needs to use --ckpt rather than --backbone_ckpt.
         --model_dir=/tmp/efficientdet-d0-finetune  \
         --ckpt=efficientdet-d0  \
         --train_batch_size=64 \
-        --eval_batch_size=64 --eval_samples=1024 \
+        --eval_batch_size=64 \
         --num_examples_per_epoch=5717 --num_epochs=50  \
         --hparams=voc_config.yaml --val_json_file=tfrecord/json_pascal.json
 
@@ -355,7 +355,7 @@ Finetune needs to use --ckpt rather than --backbone_ckpt.
         --model_dir=/tmp/efficientdet-d0-finetune  \
         --ckpt=efficientdet-d0  \
         --train_batch_size=64 \
-        --eval_batch_size=64 --eval_samples=1024 \
+        --eval_batch_size=64 \
         --num_examples_per_epoch=5717 --num_epochs=50  \
         --hparams=voc_config.yaml
         --strategy=gpus
