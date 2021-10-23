@@ -254,7 +254,7 @@ Finetune needs to use --pretrained_ckpt.
         --batch_size=64 \
         --eval_samples=1024 \
         --num_examples_per_epoch=5717 --num_epochs=50  \
-        --hparams=voc_config.yaml
+        --hparams=voc_config.yaml --val_json_file=tfrecord/json_pascal.json
 
 If you want to continue to train the model, simply re-run the above command because the `num_epochs` is a maximum number of epochs. For example, to reproduce the result of efficientdet-d0, set `--num_epochs=300` then run the command multiple times until the training is finished.
 
