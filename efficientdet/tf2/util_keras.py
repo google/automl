@@ -80,26 +80,6 @@ def get_ema_vars(model):
   return ema_vars_dict
 
 
-def average_name(ema, var):
-  """Returns the name of the `Variable` holding the average for `var`.
-
-  A hacker for tf2.
-
-  Args:
-    ema: A `ExponentialMovingAverage` object.
-    var: A `Variable` object.
-
-  Returns:
-    A string: The name of the variable that will be used or was used
-    by the `ExponentialMovingAverage class` to hold the moving average of `var`.
-  """
-
-  if var.ref() in ema._averages:  # pylint: disable=protected-access
-    return ema._averages[var.ref()].name.split(':')[0]  # pylint: disable=protected-access
-  return tf.compat.v1.get_default_graph().unique_name(
-      var.name.split(':')[0] + '/' + ema.name, mark_as_used=False)
-
-
 def load_from_hub_checkpoint(model, ckpt_path_or_file):
   """Loads EfficientDetNet weights from EfficientDetNetTrainHub checkpoint."""
 
@@ -176,12 +156,12 @@ def restore_ckpt(model,
       ema = tf.train.ExponentialMovingAverage(decay=0.0)
       ema_vars = get_ema_vars(model)
       var_dict = {
-          average_name(ema, var): var for (ref, var) in ema_vars.items()
+          ema.average_name(var): var for var in ema_vars.values()
       }
     else:
       ema_vars = get_ema_vars(model)
       var_dict = {
-          var.name.split(':')[0]: var for (ref, var) in ema_vars.items()
+          var.name[:-len(":0")]: var for var in ema_vars.values()
       }
     # add variables that not in var_dict
     for v in model.weights:
