@@ -166,7 +166,7 @@ def restore_ckpt(model,
     # add variables that not in var_dict
     for v in model.weights:
       if v.ref() not in ema_vars:
-        var_dict[v.name.split(':')[0]] = v
+        var_dict[v.name[:-len(":0")]] = v
     # try to load graph-based checkpoint with ema support,
     # else load checkpoint via keras.load_weights which doesn't support ema.
     reader = tf.train.load_checkpoint(ckpt_path_or_file)
