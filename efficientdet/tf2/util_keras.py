@@ -152,17 +152,22 @@ def restore_ckpt(model,
       # manually load the model checkpoint.
       load_from_hub_checkpoint(model, ckpt_path_or_file)
   else:
+    ema_vars = get_ema_vars(model)
+    var_dict = {
+        var.name[:-len(":0")]: var for var in ema_vars.values()
+    }
+    
     if ema_decay > 0:
       ema = tf.train.ExponentialMovingAverage(decay=0.0)
-      ema_vars = get_ema_vars(model)
-      var_dict = {
-          ema.average_name(var): var for var in ema_vars.values()
+      optimizer = model.optimizer
+      if isinstance(optimizer, tf.keras.mixed_precision.LossScaleOptimizer):
+        optimizer = optimizer.inner_optimizer
+      optimizer.shadow_copy(ema_vars.values())
+      ema_var_dict = {
+          ema.average_name(var): optimizer.get_slot(var, 'average') for var in ema_vars.values()
       }
-    else:
-      ema_vars = get_ema_vars(model)
-      var_dict = {
-          var.name[:-len(":0")]: var for var in ema_vars.values()
-      }
+      var_dict.update(ema_var_dict)
+    
     # add variables that not in var_dict
     for v in model.weights:
       if v.ref() not in ema_vars:
