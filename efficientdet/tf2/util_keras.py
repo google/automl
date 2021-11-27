@@ -136,6 +136,7 @@ def restore_ckpt(model,
     try:
       # Use custom checkpoint solves mismatch shape issue.
       keys = {var[0].split('/')[0] for var in var_list}
+      keys.add('optimizer')
       keys.discard('_CHECKPOINTABLE_OBJECT_GRAPH')
       if exclude_layers:
         exclude_layers = set(exclude_layers)

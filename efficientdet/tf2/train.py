@@ -241,13 +241,19 @@ def main(_):
     model = setup_model(model, config)
     if FLAGS.debug:
       tf.config.run_functions_eagerly(True)
-    if FLAGS.pretrained_ckpt and not FLAGS.hub_module_url:
+    if tf.train.latest_checkpoint(FLAGS.model_dir):
+      ckpt_path = tf.train.latest_checkpoint(FLAGS.model_dir)
+      util_keras.restore_ckpt(
+          model,
+          ckpt_path,
+          config.moving_average_decay)
+    elif FLAGS.pretrained_ckpt and not FLAGS.hub_module_url:
       ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)
       util_keras.restore_ckpt(
           model,
           ckpt_path,
           config.moving_average_decay,
-          exclude_layers=['class_net'])
+          exclude_layers=['class_net', 'optimizer'])
     init_experimental(config)
     if 'train' in FLAGS.mode:
       val_dataset = get_dataset(False, config) if 'eval' in FLAGS.mode else None
