@@ -253,7 +253,7 @@ def main(_):
           model,
           ckpt_path,
           config.moving_average_decay,
-          exclude_layers=['class_net', 'optimizer'])
+          exclude_layers=['class_net', 'optimizer', 'box_net'])
     init_experimental(config)
     if 'train' in FLAGS.mode:
       val_dataset = get_dataset(False, config) if 'eval' in FLAGS.mode else None
