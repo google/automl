@@ -422,7 +422,7 @@ To visualize training tfrecords with input dataloader use.
 ```
 python dataset/inspect_tfrecords.py --file_pattern dataset/sample.record\ 
 --model_name "efficientdet-d0" --samples 10\ 
---save_samples_dir train_samples/  -hparams="label_map={1:'label1'}, autoaugmentation_policy=v3"
+--save_samples_dir train_samples/ --hparams="label_map={1:'label1'}, autoaugmentation_policy=v3"
 
 ```
 

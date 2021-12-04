@@ -261,6 +261,7 @@ def main(_):
           get_dataset(True, config),
           epochs=config.num_epochs,
           steps_per_epoch=steps_per_epoch,
+          initial_epoch=model.optimizer.iterations.numpy() // steps_per_epoch,
           callbacks=train_lib.get_callbacks(config.as_dict(), val_dataset),
           validation_data=val_dataset,
           validation_steps=(FLAGS.eval_samples // FLAGS.batch_size))
@@ -277,7 +278,7 @@ def main(_):
 
         val_dataset = get_dataset(False, config)
         logging.info('start loading model.')
-        model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
+        model.load_weights(ckpt)
         logging.info('finish loading model.')
         coco_eval = train_lib.COCOCallback(val_dataset, 1)
         coco_eval.set_model(model)
