@@ -18,7 +18,7 @@ A decoder to decode string tensors containing serialized tensorflow.Example
 protos for object detection.
 """
 
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 
 
 def _get_source_id_from_encoded_image(parsed_tensors):
@@ -34,29 +34,27 @@ class TfExampleDecoder(object):
     self._include_mask = include_mask
     self._regenerate_source_id = regenerate_source_id
     self._keys_to_features = {
-        'image/encoded': tf.FixedLenFeature((), tf.string),
-        'image/source_id': tf.FixedLenFeature((), tf.string, ''),
-        'image/height': tf.FixedLenFeature((), tf.int64, -1),
-        'image/width': tf.FixedLenFeature((), tf.int64, -1),
-        'image/object/bbox/xmin': tf.VarLenFeature(tf.float32),
-        'image/object/bbox/xmax': tf.VarLenFeature(tf.float32),
-        'image/object/bbox/ymin': tf.VarLenFeature(tf.float32),
-        'image/object/bbox/ymax': tf.VarLenFeature(tf.float32),
-        'image/object/class/label': tf.VarLenFeature(tf.int64),
-        'image/object/area': tf.VarLenFeature(tf.float32),
-        'image/object/is_crowd': tf.VarLenFeature(tf.int64),
+        'image/encoded': tf.io.FixedLenFeature((), tf.string),
+        'image/source_id': tf.io.FixedLenFeature((), tf.string, ''),
+        'image/height': tf.io.FixedLenFeature((), tf.int64, -1),
+        'image/width': tf.io.FixedLenFeature((), tf.int64, -1),
+        'image/object/bbox/xmin': tf.io.VarLenFeature(tf.float32),
+        'image/object/bbox/xmax': tf.io.VarLenFeature(tf.float32),
+        'image/object/bbox/ymin': tf.io.VarLenFeature(tf.float32),
+        'image/object/bbox/ymax': tf.io.VarLenFeature(tf.float32),
+        'image/object/class/label': tf.io.VarLenFeature(tf.int64),
+        'image/object/area': tf.io.VarLenFeature(tf.float32),
+        'image/object/is_crowd': tf.io.VarLenFeature(tf.int64),
     }
     if include_mask:
       self._keys_to_features.update({
           'image/object/mask':
-              tf.VarLenFeature(tf.string),
+              tf.io.VarLenFeature(tf.string),
       })
 
   def _decode_image(self, parsed_tensors):
     """Decodes the image and set its static shape."""
-    image = tf.io.decode_image(parsed_tensors['image/encoded'], channels=3)
-    image.set_shape([None, None, 3])
-    return image
+    return tf.io.decode_image(parsed_tensors['image/encoded'], channels=3, expand_animations=False)
 
   def _decode_boxes(self, parsed_tensors):
     """Concat box coordinates in the format of [ymin, xmin, ymax, xmax]."""
@@ -118,10 +116,10 @@ class TfExampleDecoder(object):
     for k in parsed_tensors:
       if isinstance(parsed_tensors[k], tf.SparseTensor):
         if parsed_tensors[k].dtype == tf.string:
-          parsed_tensors[k] = tf.sparse_tensor_to_dense(
+          parsed_tensors[k] = tf.sparse.to_dense(
               parsed_tensors[k], default_value='')
         else:
-          parsed_tensors[k] = tf.sparse_tensor_to_dense(
+          parsed_tensors[k] = tf.sparse.to_dense(
               parsed_tensors[k], default_value=0)
 
     image = self._decode_image(parsed_tensors)

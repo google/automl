@@ -108,8 +108,7 @@ def main(_):
                                             FLAGS.only_network, model_params)
 
     image_file = tf.io.read_file(FLAGS.input_image)
-    image_arrays = tf.io.decode_image(image_file)
-    image_arrays.set_shape((None, None, 3))
+    image_arrays = tf.io.decode_image(image_file, channels=3, expand_animations=False)
     image_arrays = tf.expand_dims(image_arrays, axis=0)
 
     detections_bs = driver.serve(image_arrays)
@@ -135,8 +134,7 @@ def main(_):
     batch_size = FLAGS.batch_size or 1
     if FLAGS.input_image:
       image_file = tf.io.read_file(FLAGS.input_image)
-      image_arrays = tf.image.decode_image(image_file)
-      image_arrays.set_shape((None, None, 3))
+      image_arrays = tf.io.decode_image(image_file, channels=3, expand_animations=False)
       image_arrays = tf.image.resize_with_pad(image_arrays, *model_config.image_size)
       image_arrays = tf.cast(tf.expand_dims(image_arrays, 0), tf.uint8)
       if batch_size > 1:
