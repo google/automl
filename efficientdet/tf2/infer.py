@@ -61,7 +61,7 @@ def main(_):
   model = efficientdet_keras.EfficientDetModel(config=config)
   model.build((None, None, None, 3))
   model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
-  model.summary()
+  model.summary(expand_nested=True)
 
   class ExportModel(tf.Module):
 

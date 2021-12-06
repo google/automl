@@ -240,6 +240,7 @@ def main(_):
       model = train_lib.EfficientDetNetTrain(config=config)
     model = setup_model(model, config)
     if FLAGS.debug:
+      tf.data.experimental.enable_debug_mode()
       tf.config.run_functions_eagerly(True)
     if tf.train.latest_checkpoint(FLAGS.model_dir):
       ckpt_path = tf.train.latest_checkpoint(FLAGS.model_dir)
