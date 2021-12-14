@@ -178,7 +178,8 @@ class ServingDriver:
     return visualize_image(image, boxes, classes.astype(int), scores,
                            self.label_map, **kwargs)
 
-  def benchmark(self, image_arrays, test_func, bm_runs=10, trace_filename=None):
+  def _benchmark(self, image_arrays, test_func, bm_runs=10,
+                 trace_filename=None):
     """Benchmark inference latency/throughput.
 
     Args:
@@ -261,10 +262,9 @@ class ServingDriver:
       spec = tf.TensorSpec(
           shape=[batch_size, *image_size, 3], dtype=tf.float32, name='images')
       return export_model, spec
-    else:
-      spec = tf.TensorSpec(
-          shape=[self.batch_size, None, None, 3], dtype=tf.uint8, name='images')
-      return export_model, spec
+    spec = tf.TensorSpec(
+        shape=[self.batch_size, None, None, 3], dtype=tf.uint8, name='images')
+    return export_model, spec
 
 
 class SavedModelDriver(ServingDriver):
@@ -301,7 +301,7 @@ class SavedModelDriver(ServingDriver):
         outputs=['Identity:0', 'Identity_1:0', 'Identity_2:0', 'Identity_3:0'])
 
   def benchmark(self, image_arrays, bm_runs=10, trace_filename=None):
-    super().benchmark(image_arrays, self.predict, bm_runs, trace_filename)
+    self._benchmark(image_arrays, self.predict, bm_runs, trace_filename)
 
   def serve(self, image_arrays):
     if self.only_network:
@@ -333,7 +333,7 @@ class TfliteDriver(ServingDriver):
 
   def benchmark(self, image_arrays, bm_runs=10, trace_filename=None):
     image_arrays = np.array(image_arrays)
-    super().benchmark(image_arrays, self.predict, bm_runs, trace_filename)
+    self._benchmark(image_arrays, self.predict, bm_runs, trace_filename)
 
   def serve(self, image_arrays):
     image_arrays, scales = self._preprocess(image_arrays)
@@ -450,7 +450,7 @@ class KerasDriver(ServingDriver):
     def test_func(image_arrays):
       return self.predict(image_arrays)
 
-    super().benchmark(image_arrays, test_func, bm_runs, trace_filename)
+    self._benchmark(image_arrays, test_func, bm_runs, trace_filename)
 
   def export(self,
              output_dir: Optional[Text] = None,
