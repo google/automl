@@ -82,6 +82,7 @@ class LiteRunner(object):
   def run(self, image):
     """Runs inference with Lite model."""
     interpreter = self.interpreter
+    signature_fn = interpreter.get_signature_runner()
     input_details = self.input_details
     output_details = self.output_details
 
@@ -91,12 +92,11 @@ class LiteRunner(object):
       image = image / scale + zero_point
       image = np.array(image, dtype=input_detail['dtype'])
 
-    interpreter.set_tensor(input_detail['index'], np.array(image))
-    interpreter.invoke()
+    output = signature_fn(images=image)
 
     def get_output(idx):
       output_detail = output_details[idx]
-      output_tensor = interpreter.get_tensor(output_detail['index'])
+      output_tensor = output[f'output_{idx}']
       if output_detail['quantization'] != (DEFAULT_SCALE, DEFAULT_ZERO_POINT):
         # Dequantize the output
         scale, zero_point = output_detail['quantization']
