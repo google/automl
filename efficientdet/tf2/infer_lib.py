@@ -87,7 +87,8 @@ class ExportModel(tf.Module):
 
   @tf.function
   def predict(self, imgs):
-    return tf.nest.flatten(self.model(imgs, training=False, pre_mode=None, post_mode=None))
+    return tf.nest.flatten(
+        self.model(imgs, training=False, pre_mode=None, post_mode=None))
 
   @tf.function
   def tflite(self, imgs):
@@ -133,6 +134,7 @@ class ServingDriver:
     for i in range(len(imgs)):
       driver.visualize(imgs[i], boxes[i], scores[i], classes[i])
   """
+
   @classmethod
   def create(cls, model_dir, debug, saved_model_dir, *args, **kwargs):
     if saved_model_dir:
@@ -214,6 +216,7 @@ class ServingDriver:
     raise NotImplemented
 
   def _preprocess(self, image_arrays):
+
     def map_fn(image):
       input_processor = dataloader.DetectionInputProcessor(
           image, self.params['image_size'])
@@ -231,7 +234,8 @@ class ServingDriver:
     return tf.vectorized_map(map_fn, image_arrays)
 
   def _postprocess(self, outputs, scales):
-    det_outputs = postprocess.postprocess_global(self.params, outputs[0], outputs[1], scales)
+    det_outputs = postprocess.postprocess_global(self.params, outputs[0],
+                                                 outputs[1], scales)
     return det_outputs + tuple(outputs[2:])
 
   def serve(self, image_arrays):
@@ -255,9 +259,7 @@ class ServingDriver:
         batch_size = 1
       image_size = utils.parse_image_size(self.params['image_size'])
       spec = tf.TensorSpec(
-          shape=[batch_size, *image_size, 3],
-          dtype=tf.float32,
-          name='images')
+          shape=[batch_size, *image_size, 3], dtype=tf.float32, name='images')
       return export_model, spec
     else:
       spec = tf.TensorSpec(
@@ -266,6 +268,7 @@ class ServingDriver:
 
 
 class SavedModelDriver(ServingDriver):
+
   def __init__(self, saved_model_dir_or_frozen_graph: Text, *args, **kwargs):
     """ Initialize the SavedModelDriver.
 
@@ -317,6 +320,7 @@ class SavedModelDriver(ServingDriver):
 
 
 class TfliteDriver(ServingDriver):
+
   def __init__(self, tflite_path: Text, *args, **kwargs):
     """ Initialize the inference driver.
 
@@ -324,7 +328,8 @@ class TfliteDriver(ServingDriver):
       tflite_path: tensorflow lite model path.
     """
     super().__init__(*args, **kwargs)
-    self.model = tf.lite.Interpreter(tflite_path, num_threads=multiprocessing.cpu_count())
+    self.model = tf.lite.Interpreter(
+        tflite_path, num_threads=multiprocessing.cpu_count())
 
   def benchmark(self, image_arrays, bm_runs=10, trace_filename=None):
     image_arrays = np.array(image_arrays)
@@ -339,7 +344,8 @@ class TfliteDriver(ServingDriver):
     else:
       val_indices, scores, classes, boxes = outputs
       height, width = utils.parse_image_size(self.params['image_size'])
-      normalize_factor = tf.constant([height, width, height, width], dtype=tf.float32)
+      normalize_factor = tf.constant([height, width, height, width],
+                                     dtype=tf.float32)
       boxes *= normalize_factor * scales
       classes += postprocess.CLASS_OFFSET
     return boxes, scores, classes, val_indices
@@ -356,7 +362,7 @@ class TfliteDriver(ServingDriver):
     signature = list(self.model.get_signature_list().keys())[0]
     infer_fn = self.model.get_signature_runner(signature)
     outputs = infer_fn(images=image_arrays)
-    
+
     def get_output(output_detail, output_tensor):
       if output_detail['quantization'] != (DEFAULT_SCALE, DEFAULT_ZERO_POINT):
         # Dequantize the output
@@ -365,13 +371,17 @@ class TfliteDriver(ServingDriver):
         output_tensor = (output_tensor - zero_point) * scale
       return output_tensor
 
-    outputs = [get_output(output_detail, output) for output_detail, output in zip(output_details, outputs.values())]
+    outputs = [
+        get_output(output_detail, output)
+        for output_detail, output in zip(output_details, outputs.values())
+    ]
     if self.only_network:
       outputs = tuple(outputs)
     return outputs
 
 
 class KerasDriver(ServingDriver):
+
   def __init__(self, ckpt_path, debug, *args, **kwargs):
     """ Initialize the inference driver.
 
@@ -389,9 +399,8 @@ class KerasDriver(ServingDriver):
     self.model = efficientdet_keras.EfficientDetModel(config=config)
     image_size = utils.parse_image_size(config.image_size)
     self.model.build((self.batch_size, *image_size, 3))
-    util_keras.restore_ckpt(self.model, ckpt_path,
-                            config.moving_average_decay,
-                            skip_mismatch=False)
+    util_keras.restore_ckpt(
+        self.model, ckpt_path, config.moving_average_decay, skip_mismatch=False)
     self.debug = debug
     if debug:
       tf.config.run_functions_eagerly(debug)
@@ -466,10 +475,16 @@ class KerasDriver(ServingDriver):
       tf.saved_model.save(
           export_model,
           output_dir,
-          signatures={tf.saved_model.DEFAULT_SERVING_SIGNATURE_DEF_KEY: export_model.__call__.get_concrete_function(input_spec),
-                      'tflite': export_model.tflite.get_concrete_function(tflite_input_spec),
-                      'predict': export_model.predict.get_concrete_function(tflite_input_spec)},
-          options=tf.saved_model.SaveOptions(function_aliases={'serve': export_model.__call__}))
+          signatures={
+              tf.saved_model.DEFAULT_SERVING_SIGNATURE_DEF_KEY:
+                  export_model.__call__.get_concrete_function(input_spec),
+              'tflite':
+                  export_model.tflite.get_concrete_function(tflite_input_spec),
+              'predict':
+                  export_model.predict.get_concrete_function(tflite_input_spec)
+          },
+          options=tf.saved_model.SaveOptions(
+              function_aliases={'serve': export_model.__call__}))
       logging.info('Model saved at %s', output_dir)
 
       # also save freeze pb file.
@@ -477,8 +492,7 @@ class KerasDriver(ServingDriver):
         call_fn = export_model.predict
       else:
         call_fn = export_model.__call__
-      graphdef = self.freeze(
-          call_fn.get_concrete_function(input_spec))
+      graphdef = self.freeze(call_fn.get_concrete_function(input_spec))
       proto_path = tf.io.write_graph(
           graphdef, output_dir, self.model_name + '_frozen.pb', as_text=False)
       logging.info('Frozen graph saved at %s', proto_path)
@@ -487,7 +501,8 @@ class KerasDriver(ServingDriver):
       input_spec = tflite_input_spec
       # from_saved_model supports advanced converter features like op fusing.
       signature_key = 'predict' if self.only_network else 'tflite'
-      converter = tf.lite.TFLiteConverter.from_saved_model(output_dir, [signature_key])
+      converter = tf.lite.TFLiteConverter.from_saved_model(
+          output_dir, [signature_key])
       if tflite == 'FP32':
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
         converter.target_spec.supported_types = [tf.float32]
@@ -501,14 +516,17 @@ class KerasDriver(ServingDriver):
           representative_dataset_gen = self._create_representative_dataset(
               file_pattern, num_calibration_steps)
         elif self.debug:  # Used for debugging, can remove later.
-          logging.warning('Use real representative dataset instead of fake ones.')
+          logging.warning(
+              'Use real representative dataset instead of fake ones.')
           num_calibration_steps = 10
+
           def representative_dataset_gen():  # rewrite this for real data.
             for _ in range(num_calibration_steps):
               yield [tf.ones(input_spec.shape, dtype=input_spec.dtype)]
         else:
-          raise ValueError('Please specific --file_pattern before export INT8 tflite model.'
-                           ' If you just want to debug the export process, add --debug')
+          raise ValueError(
+              'Please specific --file_pattern before export INT8 tflite model.'
+              ' If you just want to debug the export process, add --debug')
 
         converter.representative_dataset = representative_dataset_gen
         converter.optimizations = [tf.lite.Optimize.DEFAULT]

@@ -99,8 +99,11 @@ class InferenceTest(tf.test.TestCase):
     self.assertEqual(valid_lens.shape, (1,))
 
   def test_infer_lib_without_ema(self):
-    driver = infer_lib.KerasDriver(self.tmp_path, False, 'efficientdet-d0', 
-                                   model_params={'moving_average_decay': 0})
+    driver = infer_lib.KerasDriver(
+        self.tmp_path,
+        False,
+        'efficientdet-d0',
+        model_params={'moving_average_decay': 0})
     images = tf.ones((1, 512, 512, 3))
     boxes, scores, classes, valid_lens = driver.serve(images)
     self.assertEqual(tf.reduce_mean(boxes), 163.09)
@@ -121,8 +124,11 @@ class InferenceTest(tf.test.TestCase):
     self.assertLen(box_outputs, 5)
 
   def test_infer_lib_mixed_precision(self):
-    driver = infer_lib.KerasDriver(self.tmp_path, False, 'efficientdet-d0',
-                       model_params={'mixed_precision': True})
+    driver = infer_lib.KerasDriver(
+        self.tmp_path,
+        False,
+        'efficientdet-d0',
+        model_params={'mixed_precision': True})
     images = tf.ones((1, 512, 512, 3))
     boxes, scores, classes, valid_lens = driver.serve(images)
     policy = tf.keras.mixed_precision.experimental.global_policy()
