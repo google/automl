@@ -161,11 +161,15 @@ def restore_ckpt(model,
     if ema_decay > 0:
       ema = tf.train.ExponentialMovingAverage(decay=0.0)
       optimizer = model.optimizer
-      if isinstance(optimizer, tf.keras.mixed_precision.LossScaleOptimizer):
-        optimizer = optimizer.inner_optimizer
-      optimizer.shadow_copy(ema_vars.values())
+      if optimizer:
+        if isinstance(optimizer, tf.keras.mixed_precision.LossScaleOptimizer):
+          optimizer = optimizer.inner_optimizer
+        optimizer.shadow_copy(ema_vars.values())
+        opt_ema_fn = lambda var: optimizer.get_slot(var, 'average')
+      else:
+        opt_ema_fn = lambda var: var
       ema_var_dict = {
-          ema.average_name(var): optimizer.get_slot(var, 'average') for var in ema_vars.values()
+          ema.average_name(var): opt_ema_fn(var) for var in ema_vars.values()
       }
       var_dict.update(ema_var_dict)
     

@@ -37,6 +37,8 @@ def to_list(inputs):
     return [inputs[k] for k in sorted(inputs.keys())]
   if isinstance(inputs, list):
     return inputs
+  if isinstance(inputs, tuple):
+    return list(inputs)
 
 
 def batch_map_fn(map_fn, inputs, *args):

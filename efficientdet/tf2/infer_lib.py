@@ -232,7 +232,7 @@ class ServingDriver:
 
   def _postprocess(self, outputs, scales):
     det_outputs = postprocess.postprocess_global(self.params, outputs[0], outputs[1], scales)
-    return det_outputs + outputs[2:]
+    return det_outputs + tuple(outputs[2:])
 
   def serve(self, image_arrays):
     """Serve a list of image arrays.
@@ -262,7 +262,6 @@ class ServingDriver:
     else:
       spec = tf.TensorSpec(
           shape=[self.batch_size, None, None, 3], dtype=tf.uint8, name='images')
-      export_model = ExportModel(self.model)
       return export_model, spec
 
 
@@ -326,7 +325,6 @@ class TfliteDriver(ServingDriver):
     """
     super().__init__(*args, **kwargs)
     self.model = tf.lite.Interpreter(tflite_path, num_threads=multiprocessing.cpu_count())
-    self.model.allocate_tensors()
 
   def benchmark(self, image_arrays, bm_runs=10, trace_filename=None):
     image_arrays = np.array(image_arrays)
@@ -336,9 +334,10 @@ class TfliteDriver(ServingDriver):
     image_arrays, scales = self._preprocess(image_arrays)
     outputs = self.predict(image_arrays)
     if self.only_network:
+      outputs = [outputs[:5], outputs[5:]]
       boxes, scores, classes, val_indices = self._postprocess(outputs, scales)
     else:
-      boxes, classes, scores, val_indices = outputs
+      val_indices, scores, classes, boxes = outputs
       height, width = utils.parse_image_size(self.params['image_size'])
       normalize_factor = tf.constant([height, width, height, width], dtype=tf.float32)
       boxes *= normalize_factor * scales
@@ -352,13 +351,13 @@ class TfliteDriver(ServingDriver):
     if input_detail['quantization'] != (DEFAULT_SCALE, DEFAULT_ZERO_POINT):
       scale, zero_point = input_detail['quantization']
       image_arrays = image_arrays / scale + zero_point
-      image_arrays = np.array(image_arrays, dtype=input_detail['dtype'])
+      image_arrays = tf.cast(image_arrays, dtype=input_detail['dtype'])
 
-    self.model.set_tensor(input_detail['index'], np.array(image_arrays))
-    self.model.invoke()
-
-    def get_output(output_detail):
-      output_tensor = self.model.get_tensor(output_detail['index'])
+    signature = list(self.model.get_signature_list().keys())[0]
+    infer_fn = self.model.get_signature_runner(signature)
+    outputs = infer_fn(images=image_arrays)
+    
+    def get_output(output_detail, output_tensor):
       if output_detail['quantization'] != (DEFAULT_SCALE, DEFAULT_ZERO_POINT):
         # Dequantize the output
         scale, zero_point = output_detail['quantization']
@@ -366,9 +365,9 @@ class TfliteDriver(ServingDriver):
         output_tensor = (output_tensor - zero_point) * scale
       return output_tensor
 
-    outputs = [get_output(output_detail) for output_detail in output_details]
+    outputs = [get_output(output_detail, output) for output_detail, output in zip(output_details, outputs.values())]
     if self.only_network:
-      outputs = tuple(reversed(outputs))
+      outputs = tuple(outputs)
     return outputs
 
 
@@ -487,7 +486,8 @@ class KerasDriver(ServingDriver):
     if tflite:
       input_spec = tflite_input_spec
       # from_saved_model supports advanced converter features like op fusing.
-      converter = tf.lite.TFLiteConverter.from_concrete_functions([export_model.tflite.get_concrete_function(input_spec)])
+      signature_key = 'predict' if self.only_network else 'tflite'
+      converter = tf.lite.TFLiteConverter.from_saved_model(output_dir, [signature_key])
       if tflite == 'FP32':
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
         converter.target_spec.supported_types = [tf.float32]
