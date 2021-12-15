@@ -59,15 +59,20 @@ flags.DEFINE_enum('tflite', '', ['', 'FP32', 'FP16', 'INT8'], 'tflite type.')
 flags.DEFINE_string('file_pattern', None,
                     'Glob for tfrecords, e.g. coco/val-*.tfrecord.')
 flags.DEFINE_integer(
-    'num_calibration_steps', 2000,
+    'num_calibration_steps', 500,
     'Number of post-training quantization calibration steps to run.')
 flags.DEFINE_bool('debug', False, 'Debug mode.')
+flags.DEFINE_bool(
+    'use_xla', False,
+    'Use XLA even if strategy is not tpu. If strategy is tpu, always use XLA,'
+    ' and this flag has no effect.')
 flags.DEFINE_bool('only_network', False, 'Model only contains network')
 FLAGS = flags.FLAGS
 
 
 def main(_):
   tf.config.run_functions_eagerly(FLAGS.debug)
+  tf.config.optimizer.set_jit(FLAGS.use_xla)
   devices = tf.config.list_physical_devices('GPU')
   for device in devices:
     tf.config.experimental.set_memory_growth(device, True)
@@ -80,13 +85,11 @@ def main(_):
   model_config.image_size = utils.parse_image_size(model_config.image_size)
 
   model_params = model_config.as_dict()
-  ckpt_path_or_file = FLAGS.model_dir
-  if tf.io.gfile.isdir(ckpt_path_or_file):
-    ckpt_path_or_file = tf.train.latest_checkpoint(ckpt_path_or_file)
-  driver = infer_lib.ServingDriver(FLAGS.model_name, ckpt_path_or_file,
-                                   FLAGS.batch_size or None,
-                                   FLAGS.only_network, model_params)
+
   if FLAGS.mode == 'export':
+    driver = infer_lib.KerasDriver(FLAGS.model_dir, FLAGS.debug,
+                                   FLAGS.model_name, FLAGS.batch_size or None,
+                                   FLAGS.only_network, model_params)
     if not FLAGS.saved_model_dir:
       raise ValueError('Please specify --saved_model_dir=')
     model_dir = FLAGS.saved_model_dir
@@ -96,21 +99,19 @@ def main(_):
                   FLAGS.num_calibration_steps)
     print('Model are exported to %s' % model_dir)
   elif FLAGS.mode == 'infer':
+    driver = infer_lib.ServingDriver.create(
+        FLAGS.model_dir, FLAGS.debug, FLAGS.saved_model_dir, FLAGS.model_name,
+        FLAGS.batch_size or None, FLAGS.only_network, model_params)
+
     image_file = tf.io.read_file(FLAGS.input_image)
-    image_arrays = tf.io.decode_image(image_file)
-    image_arrays.set_shape((None, None, 3))
+    image_arrays = tf.io.decode_image(
+        image_file, channels=3, expand_animations=False)
     image_arrays = tf.expand_dims(image_arrays, axis=0)
-    if FLAGS.saved_model_dir:
-      driver.load(FLAGS.saved_model_dir)
-      if FLAGS.saved_model_dir.endswith('.tflite'):
-        image_size = utils.parse_image_size(model_config.image_size)
-        image_arrays = tf.image.resize_with_pad(image_arrays, *image_size)
-        image_arrays = tf.cast(image_arrays, tf.uint8)
+
     detections_bs = driver.serve(image_arrays)
     boxes, scores, classes, _ = tf.nest.map_structure(np.array, detections_bs)
-    raw_image = Image.fromarray(np.array(image_arrays)[0])
     img = driver.visualize(
-        raw_image,
+        np.array(image_arrays)[0],
         boxes[0],
         classes[0],
         scores[0],
@@ -120,15 +121,18 @@ def main(_):
     Image.fromarray(img).save(output_image_path)
     print('writing file to %s' % output_image_path)
   elif FLAGS.mode == 'benchmark':
-    if FLAGS.saved_model_dir:
-      driver.load(FLAGS.saved_model_dir)
+    driver = infer_lib.ServingDriver.create(
+        FLAGS.model_dir, FLAGS.debug, FLAGS.saved_model_dir, FLAGS.model_name,
+        FLAGS.batch_size or None, FLAGS.only_network, model_params)
 
     batch_size = FLAGS.batch_size or 1
     if FLAGS.input_image:
       image_file = tf.io.read_file(FLAGS.input_image)
-      image_arrays = tf.image.decode_image(image_file)
-      image_arrays.set_shape((None, None, 3))
-      image_arrays = tf.expand_dims(image_arrays, 0)
+      image_arrays = tf.io.decode_image(
+          image_file, channels=3, expand_animations=False)
+      image_arrays = tf.image.resize_with_pad(image_arrays,
+                                              *model_config.image_size)
+      image_arrays = tf.cast(tf.expand_dims(image_arrays, 0), tf.uint8)
       if batch_size > 1:
         image_arrays = tf.tile(image_arrays, [batch_size, 1, 1, 1])
     else:
@@ -136,18 +140,20 @@ def main(_):
       image_arrays = tf.ones((batch_size, *model_config.image_size, 3),
                              dtype=tf.uint8)
     if FLAGS.only_network:
-      image_arrays = tf.image.convert_image_dtype(image_arrays, tf.float32)
-      image_arrays = tf.image.resize(image_arrays, model_config.image_size)
+      image_arrays, _ = driver._preprocess(image_arrays)
     driver.benchmark(image_arrays, FLAGS.bm_runs, FLAGS.trace_filename)
   elif FLAGS.mode == 'dry':
     # transfer to tf2 format ckpt
-    driver.build()
+    driver = infer_lib.KerasDriver(FLAGS.model_dir, FLAGS.debug,
+                                   FLAGS.model_name, FLAGS.batch_size or None,
+                                   FLAGS.only_network, model_params)
     if FLAGS.export_ckpt:
       driver.model.save_weights(FLAGS.export_ckpt)
   elif FLAGS.mode == 'video':
     import cv2  # pylint: disable=g-import-not-at-top
-    if FLAGS.saved_model_dir:
-      driver.load(FLAGS.saved_model_dir)
+    driver = infer_lib.ServingDriver.create(
+        FLAGS.model_dir, FLAGS.debug, FLAGS.saved_model_dir, FLAGS.model_name,
+        FLAGS.batch_size or None, FLAGS.only_network, model_params)
     cap = cv2.VideoCapture(FLAGS.input_video)
     if not cap.isOpened():
       print('Error opening input video: {}'.format(FLAGS.input_video))

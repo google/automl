@@ -80,26 +80,6 @@ def get_ema_vars(model):
   return ema_vars_dict
 
 
-def average_name(ema, var):
-  """Returns the name of the `Variable` holding the average for `var`.
-
-  A hacker for tf2.
-
-  Args:
-    ema: A `ExponentialMovingAverage` object.
-    var: A `Variable` object.
-
-  Returns:
-    A string: The name of the variable that will be used or was used
-    by the `ExponentialMovingAverage class` to hold the moving average of `var`.
-  """
-
-  if var.ref() in ema._averages:  # pylint: disable=protected-access
-    return ema._averages[var.ref()].name.split(':')[0]  # pylint: disable=protected-access
-  return tf.compat.v1.get_default_graph().unique_name(
-      var.name.split(':')[0] + '/' + ema.name, mark_as_used=False)
-
-
 def load_from_hub_checkpoint(model, ckpt_path_or_file):
   """Loads EfficientDetNet weights from EfficientDetNetTrainHub checkpoint."""
 
@@ -156,6 +136,7 @@ def restore_ckpt(model,
     try:
       # Use custom checkpoint solves mismatch shape issue.
       keys = {var[0].split('/')[0] for var in var_list}
+      keys.add('optimizer')
       keys.discard('_CHECKPOINTABLE_OBJECT_GRAPH')
       if exclude_layers:
         exclude_layers = set(exclude_layers)
@@ -172,21 +153,30 @@ def restore_ckpt(model,
       # manually load the model checkpoint.
       load_from_hub_checkpoint(model, ckpt_path_or_file)
   else:
+    ema_vars = get_ema_vars(model)
+    var_dict = {
+        var.name[:-len(":0")]: var for var in ema_vars.values()
+    }
+    
     if ema_decay > 0:
       ema = tf.train.ExponentialMovingAverage(decay=0.0)
-      ema_vars = get_ema_vars(model)
-      var_dict = {
-          average_name(ema, var): var for (ref, var) in ema_vars.items()
+      optimizer = model.optimizer
+      if optimizer:
+        if isinstance(optimizer, tf.keras.mixed_precision.LossScaleOptimizer):
+          optimizer = optimizer.inner_optimizer
+        optimizer.shadow_copy(ema_vars.values())
+        opt_ema_fn = lambda var: optimizer.get_slot(var, 'average')
+      else:
+        opt_ema_fn = lambda var: var
+      ema_var_dict = {
+          ema.average_name(var): opt_ema_fn(var) for var in ema_vars.values()
       }
-    else:
-      ema_vars = get_ema_vars(model)
-      var_dict = {
-          var.name.split(':')[0]: var for (ref, var) in ema_vars.items()
-      }
+      var_dict.update(ema_var_dict)
+    
     # add variables that not in var_dict
     for v in model.weights:
       if v.ref() not in ema_vars:
-        var_dict[v.name.split(':')[0]] = v
+        var_dict[v.name[:-len(":0")]] = v
     # try to load graph-based checkpoint with ema support,
     # else load checkpoint via keras.load_weights which doesn't support ema.
     reader = tf.train.load_checkpoint(ckpt_path_or_file)
@@ -194,7 +184,8 @@ def restore_ckpt(model,
     for key, var in var_dict.items():
       if key in var_shape_map:
         if var_shape_map[key] != var.shape:
-          msg = 'Shape mismatch: %s' % key
+          msg = 'Shape mismatch: %s, expected %s, but got %s' % (
+              key, str(var.shape), str(var_shape_map[key]))
           if skip_mismatch:
             logging.warning(msg)
           else:

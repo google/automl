@@ -60,8 +60,7 @@ def image_preprocess(image, image_size, mean_rgb, stddev_rgb):
 def batch_image_files_decode(image_files):
   raw_images = tf.TensorArray(tf.uint8, size=0, dynamic_size=True)
   for i in tf.range(tf.shape(image_files)[0]):
-    image = tf.io.decode_image(image_files[i])
-    image.set_shape([None, None, None])
+    image = tf.io.decode_image(image_files[i], expand_animations=False)
     raw_images = raw_images.write(i, image)
   return raw_images.stack()
 

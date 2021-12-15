@@ -39,17 +39,18 @@ class InferenceTest(tf.test.TestCase):
 
   def test_export(self):
     saved_model_path = os.path.join(self.tmp_path, 'saved_model')
-    driver = infer_lib.ServingDriver('efficientdet-d0', self.tmp_path)
+    driver = infer_lib.KerasDriver(self.tmp_path, False, 'efficientdet-d0')
     driver.export(saved_model_path)
     has_saved_model = tf.saved_model.contains_saved_model(saved_model_path)
     self.assertAllEqual(has_saved_model, True)
-    driver.load(saved_model_path)
-    driver.load(os.path.join(saved_model_path, 'efficientdet-d0_frozen.pb'))
+    driver = infer_lib.SavedModelDriver(saved_model_path, 'efficientdet-d0')
+    fg_path = os.path.join(saved_model_path, 'efficientdet-d0_frozen.pb')
+    driver = infer_lib.SavedModelDriver(fg_path, 'efficientdet-d0')
 
   def test_export_tflite_only_network(self):
     saved_model_path = os.path.join(self.lite_tmp_path, 'saved_model')
-    driver = infer_lib.ServingDriver(
-        'efficientdet-lite0', self.lite_tmp_path, only_network=True)
+    driver = infer_lib.KerasDriver(
+        self.lite_tmp_path, False, 'efficientdet-lite0', only_network=True)
     driver.export(saved_model_path, tflite='FP32')
     self.assertTrue(
         tf.io.gfile.exists(os.path.join(saved_model_path, 'fp32.tflite')))
@@ -69,8 +70,8 @@ class InferenceTest(tf.test.TestCase):
 
   def test_export_tflite_with_post_processing(self):
     saved_model_path = os.path.join(self.lite_tmp_path, 'saved_model')
-    driver = infer_lib.ServingDriver(
-        'efficientdet-lite0', self.lite_tmp_path, only_network=False)
+    driver = infer_lib.KerasDriver(
+        self.lite_tmp_path, False, 'efficientdet-lite0', only_network=False)
     driver.export(saved_model_path, tflite='FP32')
     self.assertTrue(
         tf.io.gfile.exists(os.path.join(saved_model_path, 'fp32.tflite')))
@@ -85,7 +86,7 @@ class InferenceTest(tf.test.TestCase):
         tf.io.gfile.exists(os.path.join(saved_model_path, 'int8.tflite')))
 
   def test_infer_lib(self):
-    driver = infer_lib.ServingDriver('efficientdet-d0', self.tmp_path)
+    driver = infer_lib.KerasDriver(self.tmp_path, False, 'efficientdet-d0')
     images = tf.ones((1, 512, 512, 3))
     boxes, scores, classes, valid_lens = driver.serve(images)
     self.assertEqual(tf.reduce_mean(boxes), 163.09)
@@ -98,8 +99,11 @@ class InferenceTest(tf.test.TestCase):
     self.assertEqual(valid_lens.shape, (1,))
 
   def test_infer_lib_without_ema(self):
-    driver = infer_lib.ServingDriver('efficientdet-d0', self.tmp_path)
-    driver.build({'moving_average_decay': 0})
+    driver = infer_lib.KerasDriver(
+        self.tmp_path,
+        False,
+        'efficientdet-d0',
+        model_params={'moving_average_decay': 0})
     images = tf.ones((1, 512, 512, 3))
     boxes, scores, classes, valid_lens = driver.serve(images)
     self.assertEqual(tf.reduce_mean(boxes), 163.09)
@@ -112,16 +116,19 @@ class InferenceTest(tf.test.TestCase):
     self.assertEqual(valid_lens.shape, (1,))
 
   def test_network_infer_lib(self):
-    driver = infer_lib.ServingDriver(
-        'efficientdet-d0', self.tmp_path, only_network=True)
+    driver = infer_lib.KerasDriver(
+        self.tmp_path, False, 'efficientdet-d0', only_network=True)
     images = tf.ones((1, 512, 512, 3))
-    class_outputs, box_outputs = driver.serve(images)
+    class_outputs, box_outputs = driver.predict(images)
     self.assertLen(class_outputs, 5)
     self.assertLen(box_outputs, 5)
 
   def test_infer_lib_mixed_precision(self):
-    driver = infer_lib.ServingDriver('efficientdet-d0', self.tmp_path)
-    driver.build({'mixed_precision': True})
+    driver = infer_lib.KerasDriver(
+        self.tmp_path,
+        False,
+        'efficientdet-d0',
+        model_params={'mixed_precision': True})
     images = tf.ones((1, 512, 512, 3))
     boxes, scores, classes, valid_lens = driver.serve(images)
     policy = tf.keras.mixed_precision.experimental.global_policy()

@@ -939,7 +939,7 @@ def add_cdf_image_summary(values, name):
         np.arange(cumulative_values.size, dtype=np.float32) /
         cumulative_values.size)
     fig = plt.figure(frameon=False)
-    ax = fig.add_subplot('111')
+    ax = fig.add_subplot(111)
     ax.plot(fraction_of_examples, cumulative_values)
     ax.set_ylabel('cumulative normalized values')
     ax.set_xlabel('fraction of examples')
@@ -950,7 +950,7 @@ def add_cdf_image_summary(values, name):
         dtype='uint8').reshape(1, int(height), int(width), 3)
     return image
 
-  cdf_plot = tf.py_func(cdf_plot, [values], tf.uint8)
+  cdf_plot = tf.numpy_function(cdf_plot, [values], tf.uint8)
   tf.summary.image(name, cdf_plot)
 
 
@@ -969,7 +969,7 @@ def add_hist_image_summary(values, bins, name):
   def hist_plot(values, bins):
     """Numpy function to plot hist."""
     fig = plt.figure(frameon=False)
-    ax = fig.add_subplot('111')
+    ax = fig.add_subplot(111)
     y, x = np.histogram(values, bins=bins)
     ax.plot(x[:-1], y)
     ax.set_ylabel('count')
@@ -981,7 +981,7 @@ def add_hist_image_summary(values, bins, name):
         dtype='uint8').reshape(1, int(height), int(width), 3)
     return image
 
-  hist_plot = tf.py_func(hist_plot, [values, bins], tf.uint8)
+  hist_plot = tf.numpy_function(hist_plot, [values, bins], tf.uint8)
   tf.summary.image(name, hist_plot)
 
 

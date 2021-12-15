@@ -3,7 +3,7 @@
 [1] Mingxing Tan, Ruoming Pang, Quoc V. Le. EfficientDet: Scalable and Efficient Object Detection. CVPR 2020.
 Arxiv link: https://arxiv.org/abs/1911.09070
 
-**Quick start tutorial: [tutorial.ipynb](tutorial.ipynb)**
+**Quick start tutorial: [tutorial.ipynb](./tutorial.ipynb)**
 
 **Quick install dependencies: ```pip install -r requirements.txt```**
 

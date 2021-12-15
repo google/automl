@@ -16,6 +16,7 @@
 from absl import app
 from absl import flags
 from absl import logging
+import multiprocessing
 import numpy as np
 import tensorflow as tf
 
@@ -46,7 +47,7 @@ def define_flags():
       'only_network', False,
       'TFLite model only contains EfficientDetNet without post-processing NMS op.'
   )
-  flags.DEFINE_bool('pre_class_nms', False, 'Use pre_class_nms for evaluation.')
+  flags.DEFINE_bool('per_class_nms', False, 'Use per_class_nms for evaluation.')
   flags.DEFINE_string('hparams', '', 'Comma separated k=v pairs or a yaml file')
   flags.mark_flag_as_required('val_file_pattern')
   flags.mark_flag_as_required('tflite_path')
@@ -64,7 +65,8 @@ class LiteRunner(object):
         without post-processing NMS op. If False, TFLite model contains custom
         NMS op.
     """
-    self.interpreter = tf.lite.Interpreter(tflite_model_path)
+    self.interpreter = tf.lite.Interpreter(tflite_model_path,
+                                           num_threads=multiprocessing.cpu_count())
     self.interpreter.allocate_tensors()
     # Get input and output tensors.
     self.input_details = self.interpreter.get_input_details()
@@ -175,7 +177,7 @@ def main(_):
           box_outputs,
           labels['image_scales'],
           labels['source_ids'],
-          pre_class_nms=FLAGS.pre_class_nms)
+          per_class_nms=FLAGS.per_class_nms)
 
     detections = postprocess.transform_detections(detections)
     evaluator.update_state(labels['groundtruth_data'].numpy(),

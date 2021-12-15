@@ -21,7 +21,6 @@ import neural_structured_learning as nsl
 import numpy as np
 
 import tensorflow as tf
-from tensorflow_addons.callbacks import AverageModelCheckpoint
 import tensorflow_hub as hub
 
 import coco_metric
@@ -33,120 +32,6 @@ from tf2 import efficientdet_keras
 from tf2 import label_util
 from tf2 import postprocess
 from tf2 import util_keras
-from tensorflow_model_optimization.python.core.sparsity.keras import pruning_wrapper
-
-
-def _collect_prunable_layers(model):
-  """Recursively collect the prunable layers in the model."""
-  prunable_layers = []
-  for layer in model._flatten_layers(recursive=False, include_self=False):  # pylint: disable=protected-access
-    # A keras model may have other models as layers.
-    if isinstance(layer, pruning_wrapper.PruneLowMagnitude):
-      prunable_layers.append(layer)
-    elif isinstance(layer, (tf.keras.Model, tf.keras.layers.Layer)):
-      prunable_layers += _collect_prunable_layers(layer)
-
-  return prunable_layers
-
-
-class UpdatePruningStep(tf.keras.callbacks.Callback):
-  """Keras callback which updates pruning wrappers with the optimizer step.
-
-  This callback must be used when training a model which needs to be pruned. Not
-  doing so will throw an error.
-  Example:
-  ```python
-  model.fit(x, y,
-      callbacks=[UpdatePruningStep()])
-  ```
-  """
-
-  def __init__(self):
-    super(UpdatePruningStep, self).__init__()
-    self.prunable_layers = []
-
-  def on_train_begin(self, logs=None):
-    # Collect all the prunable layers in the model.
-    self.prunable_layers = _collect_prunable_layers(self.model)
-    self.step = tf.keras.backend.get_value(self.model.optimizer.iterations)
-
-  def on_train_batch_begin(self, batch, logs=None):
-    tuples = []
-
-    for layer in self.prunable_layers:
-      if layer.built:
-        tuples.append((layer.pruning_step, self.step))
-
-    tf.keras.backend.batch_set_value(tuples)
-    self.step = self.step + 1
-
-  def on_epoch_end(self, batch, logs=None):
-    # At the end of every epoch, remask the weights. This ensures that when
-    # the model is saved after completion, the weights represent mask*weights.
-    weight_mask_ops = []
-
-    for layer in self.prunable_layers:
-      if layer.built and isinstance(layer, pruning_wrapper.PruneLowMagnitude):
-        if tf.executing_eagerly():
-          layer.pruning_obj.weight_mask_op()
-        else:
-          weight_mask_ops.append(layer.pruning_obj.weight_mask_op())
-
-    tf.keras.backend.batch_get_value(weight_mask_ops)
-
-
-class PruningSummaries(tf.keras.callbacks.TensorBoard):
-  """A Keras callback for adding pruning summaries to tensorboard.
-
-  Logs the sparsity(%) and threshold at a given iteration step.
-  """
-
-  def __init__(self, log_dir, update_freq='epoch', **kwargs):
-    if not isinstance(log_dir, str) or not log_dir:
-      raise ValueError(
-          '`log_dir` must be a non-empty string. You passed `log_dir`='
-          '{input}.'.format(input=log_dir))
-
-    super().__init__(log_dir=log_dir, update_freq=update_freq, **kwargs)
-
-    log_dir = self.log_dir + '/metrics'
-    self._file_writer = tf.summary.create_file_writer(log_dir)
-
-  def _log_pruning_metrics(self, logs, step):
-    with self._file_writer.as_default():
-      for name, value in logs.items():
-        tf.summary.scalar(name, value, step=step)
-
-      self._file_writer.flush()
-
-  def on_epoch_begin(self, epoch, logs=None):
-    if logs is not None:
-      super().on_epoch_begin(epoch, logs)
-
-    pruning_logs = {}
-    params = []
-    prunable_layers = _collect_prunable_layers(self.model)
-    for layer in prunable_layers:
-      for _, mask, threshold in layer.pruning_vars:
-        params.append(mask)
-        params.append(threshold)
-
-    params.append(self.model.optimizer.iterations)
-
-    values = tf.keras.backend.batch_get_value(params)
-    iteration = values[-1]
-    del values[-1]
-    del params[-1]
-
-    param_value_pairs = list(zip(params, values))
-
-    for mask, mask_value in param_value_pairs[::2]:
-      pruning_logs.update({mask.name + '/sparsity': 1 - np.mean(mask_value)})
-
-    for threshold, threshold_value in param_value_pairs[1::2]:
-      pruning_logs.update({threshold.name + '/threshold': threshold_value})
-
-    self._log_pruning_metrics(pruning_logs, iteration)
 
 
 def update_learning_rate_schedule_parameters(params):
@@ -303,7 +188,6 @@ def get_optimizer(params):
 
   moving_average_decay = params['moving_average_decay']
   if moving_average_decay:
-    # TODO(tanmingxing): potentially add dynamic_decay for new tfa release.
     from tensorflow_addons import optimizers as tfa_optimizers  # pylint: disable=g-import-not-at-top
     optimizer = tfa_optimizers.MovingAverage(
         optimizer, average_decay=moving_average_decay, dynamic_decay=True)
@@ -409,7 +293,8 @@ class DisplayCallback(tf.keras.callbacks.Callback):
 def get_callbacks(params, val_dataset=None):
   """Get callbacks for given params."""
   if params['moving_average_decay']:
-    avg_callback = AverageModelCheckpoint(
+    from tensorflow_addons import callbacks as tfa_callbacks # pylint: disable=g-import-not-at-top
+    avg_callback = tfa_callbacks.AverageModelCheckpoint(
         filepath=os.path.join(params['model_dir'], 'emackpt-{epoch:d}'),
         verbose=params['verbose'],
         save_freq=params['save_freq'],
@@ -423,19 +308,11 @@ def get_callbacks(params, val_dataset=None):
         save_freq=params['save_freq'],
         save_weights_only=True)
     callbacks = [ckpt_callback]
-  if params['model_optimizations'] and 'prune' in params['model_optimizations']:
-    prune_callback = UpdatePruningStep()
-    prune_summaries = PruningSummaries(
-        log_dir=params['model_dir'],
-        update_freq=params['steps_per_execution'],
-        profile_batch=2 if params['profile'] else 0)
-    callbacks += [prune_callback, prune_summaries]
-  else:
-    tb_callback = tf.keras.callbacks.TensorBoard(
-        log_dir=params['model_dir'],
-        update_freq=params['steps_per_execution'],
-        profile_batch=2 if params['profile'] else 0)
-    callbacks.append(tb_callback)
+  tb_callback = tf.keras.callbacks.TensorBoard(
+      log_dir=params['model_dir'],
+      update_freq=params['steps_per_execution'],
+      profile_batch=2 if params['profile'] else 0)
+  callbacks.append(tb_callback)
   if params.get('sample_image', None):
     display_callback = DisplayCallback(
         params.get('sample_image', None), params['model_dir'],

@@ -25,7 +25,6 @@ from backbone import backbone_factory
 from backbone import efficientnet_builder
 from tf2 import fpn_configs
 from tf2 import postprocess
-from tf2 import tfmot
 from tf2 import util_keras
 
 
@@ -56,7 +55,6 @@ class FNode(tf.keras.layers.Layer):
                strategy,
                weight_method,
                data_format,
-               model_optimizations,
                name='fnode'):
     super().__init__(name=name)
     self.feat_level = feat_level
@@ -73,7 +71,6 @@ class FNode(tf.keras.layers.Layer):
     self.conv_bn_act_pattern = conv_bn_act_pattern
     self.resample_layers = []
     self.vars = []
-    self.model_optimizations = model_optimizations
 
   def fuse_features(self, nodes):
     """Fuse features from different resolutions and return a weighted sum.
@@ -141,7 +138,6 @@ class FNode(tf.keras.layers.Layer):
               self.conv_after_downsample,
               strategy=self.strategy,
               data_format=self.data_format,
-              model_optimizations=self.model_optimizations,
               name=name))
     if self.weight_method == 'attn':
       self._add_wsm('ones')
@@ -161,7 +157,6 @@ class FNode(tf.keras.layers.Layer):
         self.act_type,
         self.data_format,
         self.strategy,
-        self.model_optimizations,
         name='op_after_combine{}'.format(len(feats_shape)))
     self.built = True
     super().build(feats_shape)
@@ -188,7 +183,6 @@ class OpAfterCombine(tf.keras.layers.Layer):
                act_type,
                data_format,
                strategy,
-               model_optimizations,
                name='op_after_combine'):
     super().__init__(name=name)
     self.conv_bn_act_pattern = conv_bn_act_pattern
@@ -211,10 +205,6 @@ class OpAfterCombine(tf.keras.layers.Layer):
         use_bias=not self.conv_bn_act_pattern,
         data_format=self.data_format,
         name='conv')
-    if model_optimizations:
-      for method in model_optimizations.keys():
-        self.conv_op = (
-            tfmot.get_method(method)(self.conv_op))
     self.bn = util_keras.build_batch_norm(
         is_training_bn=self.is_training_bn,
         data_format=self.data_format,
@@ -244,7 +234,6 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
                data_format=None,
                pooling_type=None,
                upsampling_type=None,
-               model_optimizations=None,
                name='resample_p0'):
     super().__init__(name=name)
     self.apply_bn = apply_bn
@@ -262,9 +251,6 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
         padding='same',
         data_format=self.data_format,
         name='conv2d')
-    if model_optimizations:
-      for method in model_optimizations.keys():
-        self.conv2d = tfmot.get_method(method)(self.conv2d)
     self.bn = util_keras.build_batch_norm(
         is_training_bn=self.is_training_bn,
         data_format=self.data_format,
@@ -291,14 +277,14 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
 
   def _upsample2d(self, inputs, target_height, target_width):
     if self.data_format == 'channels_first':
-      inputs = tf.compat.v1.transpose(inputs, perm=[0, 2, 3, 1])
-    outputs = tf.cast(
+      inputs = tf.transpose(inputs, [0, 2, 3, 1])
+    resized = tf.cast(
         tf.compat.v1.image.resize_nearest_neighbor(
             tf.cast(inputs, tf.float32), [target_height, target_width]),
         inputs.dtype)
     if self.data_format == 'channels_first':
-      outputs = tf.compat.v1.transpose(outputs, perm=[0, 3, 1, 2])
-    return outputs
+      resized = tf.transpose(resized, [0, 3, 1, 2])
+    return resized
 
   def _maybe_apply_1x1(self, feat, training, num_channels):
     """Apply 1x1 conv to change layer width if necessary."""
@@ -428,7 +414,6 @@ class ClassNet(tf.keras.layers.Layer):
   def _conv_bn_act(self, image, i, level_id, training):
     conv_op = self.conv_ops[i]
     bn = self.bns[i][level_id]
-    act_type = self.act_type
 
     @utils.recompute_grad(self.grad_checkpoint)
     def _call(image):
@@ -436,7 +421,7 @@ class ClassNet(tf.keras.layers.Layer):
       image = conv_op(image)
       image = bn(image, training=training)
       if self.act_type:
-        image = utils.activation_fn(image, act_type)
+        image = utils.activation_fn(image, self.act_type)
       if i > 0 and self.survival_prob:
         image = utils.drop_connect(image, training, self.survival_prob)
         image = image + original_image
@@ -590,7 +575,6 @@ class BoxNet(tf.keras.layers.Layer):
   def _conv_bn_act(self, image, i, level_id, training):
     conv_op = self.conv_ops[i]
     bn = self.bns[i][level_id]
-    act_type = self.act_type
 
     @utils.recompute_grad(self.grad_checkpoint)
     def _call(image):
@@ -598,7 +582,7 @@ class BoxNet(tf.keras.layers.Layer):
       image = conv_op(image)
       image = bn(image, training=training)
       if self.act_type:
-        image = utils.activation_fn(image, act_type)
+        image = utils.activation_fn(image, self.act_type)
       if i > 0 and self.survival_prob:
         image = utils.drop_connect(image, training, self.survival_prob)
         image = image + original_image
@@ -754,6 +738,7 @@ class FPNCell(tf.keras.layers.Layer):
 
   def __init__(self, config, name='fpn_cell'):
     super().__init__(name=name)
+    logging.info('building FPNCell %s', name)
     self.config = config
     if config.fpn_config:
       self.fpn_config = config.fpn_config
@@ -778,7 +763,6 @@ class FPNCell(tf.keras.layers.Layer):
           strategy=config.strategy,
           weight_method=self.fpn_config.weight_method,
           data_format=config.data_format,
-          model_optimizations=config.model_optimizations,
           name='fnode%d' % i)
       self.fnodes.append(fnode)
 
@@ -839,7 +823,6 @@ class EfficientDetNet(tf.keras.Model):
               conv_after_downsample=config.conv_after_downsample,
               strategy=config.strategy,
               data_format=config.data_format,
-              model_optimizations=config.model_optimizations,
               name='resample_p%d' % level,
           ))
     self.fpn_cells = FPNCells(config)
@@ -953,7 +936,7 @@ class EfficientDetModel(EfficientDetNet):
     if raw_images.shape.as_list()[0]:  # fixed batch size.
       batch_size = raw_images.shape.as_list()[0]
       outputs = [map_fn(raw_images[i]) for i in range(batch_size)]
-      return [tf.stack(y) for y in zip(*outputs)]
+      return [tf.stop_gradient(tf.stack(y)) for y in zip(*outputs)]
 
     # otherwise treat it as dynamic batch size.
     return tf.vectorized_map(map_fn, raw_images)
@@ -999,6 +982,8 @@ class EfficientDetModel(EfficientDetNet):
                                          config.mean_rgb, config.stddev_rgb,
                                          pre_mode)
     # network.
+    if config.data_format == 'channels_first':
+      inputs = tf.transpose(inputs, [0, 3, 1, 2])
     outputs = super().call(inputs, training)
 
     if 'object_detection' in config.heads and post_mode:

@@ -23,7 +23,6 @@ import tensorflow as tf
 import dataloader
 import hparams_config
 import utils
-from tf2 import tfmot
 from tf2 import train_lib
 from tf2 import util_keras
 
@@ -234,8 +233,6 @@ def main(_):
             config.as_dict())
 
   with ds_strategy.scope():
-    if config.model_optimizations:
-      tfmot.set_config(config.model_optimizations.as_dict())
     if FLAGS.hub_module_url:
       model = train_lib.EfficientDetNetTrainHub(
           config=config, hub_module_url=FLAGS.hub_module_url)
@@ -243,14 +240,21 @@ def main(_):
       model = train_lib.EfficientDetNetTrain(config=config)
     model = setup_model(model, config)
     if FLAGS.debug:
+      tf.data.experimental.enable_debug_mode()
       tf.config.run_functions_eagerly(True)
-    if FLAGS.pretrained_ckpt and not FLAGS.hub_module_url:
+    if tf.train.latest_checkpoint(FLAGS.model_dir):
+      ckpt_path = tf.train.latest_checkpoint(FLAGS.model_dir)
+      util_keras.restore_ckpt(
+          model,
+          ckpt_path,
+          config.moving_average_decay)
+    elif FLAGS.pretrained_ckpt and not FLAGS.hub_module_url:
       ckpt_path = tf.train.latest_checkpoint(FLAGS.pretrained_ckpt)
       util_keras.restore_ckpt(
           model,
           ckpt_path,
           config.moving_average_decay,
-          exclude_layers=['class_net'])
+          exclude_layers=['class_net', 'optimizer', 'box_net'])
     init_experimental(config)
     if 'train' in FLAGS.mode:
       val_dataset = get_dataset(False, config) if 'eval' in FLAGS.mode else None
@@ -258,6 +262,7 @@ def main(_):
           get_dataset(True, config),
           epochs=config.num_epochs,
           steps_per_epoch=steps_per_epoch,
+          initial_epoch=model.optimizer.iterations.numpy() // steps_per_epoch,
           callbacks=train_lib.get_callbacks(config.as_dict(), val_dataset),
           validation_data=val_dataset,
           validation_steps=(FLAGS.eval_samples // FLAGS.batch_size))
@@ -274,7 +279,7 @@ def main(_):
 
         val_dataset = get_dataset(False, config)
         logging.info('start loading model.')
-        model.load_weights(tf.train.latest_checkpoint(FLAGS.model_dir))
+        model.load_weights(ckpt)
         logging.info('finish loading model.')
         coco_eval = train_lib.COCOCallback(val_dataset, 1)
         coco_eval.set_model(model)
