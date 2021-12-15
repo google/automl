@@ -88,8 +88,7 @@ def main(_):
 
   if FLAGS.mode == 'export':
     driver = infer_lib.KerasDriver(FLAGS.model_dir, FLAGS.debug,
-                                   FLAGS.model_name,
-                                   FLAGS.batch_size or None,
+                                   FLAGS.model_name, FLAGS.batch_size or None,
                                    FLAGS.only_network, model_params)
     if not FLAGS.saved_model_dir:
       raise ValueError('Please specify --saved_model_dir=')
@@ -100,15 +99,13 @@ def main(_):
                   FLAGS.num_calibration_steps)
     print('Model are exported to %s' % model_dir)
   elif FLAGS.mode == 'infer':
-    driver = infer_lib.ServingDriver.create(FLAGS.model_dir,
-                                            FLAGS.debug,
-                                            FLAGS.saved_model_dir,
-                                            FLAGS.model_name,
-                                            FLAGS.batch_size or None,
-                                            FLAGS.only_network, model_params)
+    driver = infer_lib.ServingDriver.create(
+        FLAGS.model_dir, FLAGS.debug, FLAGS.saved_model_dir, FLAGS.model_name,
+        FLAGS.batch_size or None, FLAGS.only_network, model_params)
 
     image_file = tf.io.read_file(FLAGS.input_image)
-    image_arrays = tf.io.decode_image(image_file, channels=3, expand_animations=False)
+    image_arrays = tf.io.decode_image(
+        image_file, channels=3, expand_animations=False)
     image_arrays = tf.expand_dims(image_arrays, axis=0)
 
     detections_bs = driver.serve(image_arrays)
@@ -124,44 +121,39 @@ def main(_):
     Image.fromarray(img).save(output_image_path)
     print('writing file to %s' % output_image_path)
   elif FLAGS.mode == 'benchmark':
-    driver = infer_lib.ServingDriver.create(FLAGS.model_dir,
-                                            FLAGS.debug,
-                                            FLAGS.saved_model_dir,
-                                            FLAGS.model_name,
-                                            FLAGS.batch_size or None,
-                                            FLAGS.only_network, model_params)
+    driver = infer_lib.ServingDriver.create(
+        FLAGS.model_dir, FLAGS.debug, FLAGS.saved_model_dir, FLAGS.model_name,
+        FLAGS.batch_size or None, FLAGS.only_network, model_params)
 
     batch_size = FLAGS.batch_size or 1
     if FLAGS.input_image:
       image_file = tf.io.read_file(FLAGS.input_image)
-      image_arrays = tf.io.decode_image(image_file, channels=3, expand_animations=False)
-      image_arrays = tf.image.resize_with_pad(image_arrays, *model_config.image_size)
+      image_arrays = tf.io.decode_image(
+          image_file, channels=3, expand_animations=False)
+      image_arrays = tf.image.resize_with_pad(image_arrays,
+                                              *model_config.image_size)
       image_arrays = tf.cast(tf.expand_dims(image_arrays, 0), tf.uint8)
       if batch_size > 1:
         image_arrays = tf.tile(image_arrays, [batch_size, 1, 1, 1])
     else:
       # use synthetic data if no image is provided.
       image_arrays = tf.ones((batch_size, *model_config.image_size, 3),
-                              dtype=tf.uint8)
+                             dtype=tf.uint8)
     if FLAGS.only_network:
       image_arrays, _ = driver._preprocess(image_arrays)
     driver.benchmark(image_arrays, FLAGS.bm_runs, FLAGS.trace_filename)
   elif FLAGS.mode == 'dry':
     # transfer to tf2 format ckpt
-    driver = infer_lib.KerasDriver(FLAGS.model_dir, FLAGS.debug, 
-                                   FLAGS.model_name,
-                                   FLAGS.batch_size or None,
+    driver = infer_lib.KerasDriver(FLAGS.model_dir, FLAGS.debug,
+                                   FLAGS.model_name, FLAGS.batch_size or None,
                                    FLAGS.only_network, model_params)
     if FLAGS.export_ckpt:
       driver.model.save_weights(FLAGS.export_ckpt)
   elif FLAGS.mode == 'video':
     import cv2  # pylint: disable=g-import-not-at-top
-    driver = infer_lib.ServingDriver.create(FLAGS.model_dir,
-                                            FLAGS.debug,
-                                            FLAGS.saved_model_dir,
-                                            FLAGS.model_name,
-                                            FLAGS.batch_size or None,
-                                            FLAGS.only_network, model_params)
+    driver = infer_lib.ServingDriver.create(
+        FLAGS.model_dir, FLAGS.debug, FLAGS.saved_model_dir, FLAGS.model_name,
+        FLAGS.batch_size or None, FLAGS.only_network, model_params)
     cap = cv2.VideoCapture(FLAGS.input_video)
     if not cap.isOpened():
       print('Error opening input video: {}'.format(FLAGS.input_video))
