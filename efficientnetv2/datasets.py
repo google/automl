@@ -362,7 +362,7 @@ class ImageNetInput():
     # Read the data from disk in parallel
     dataset = dataset.interleave(
         self.fetch_dataset,
-        num_parallel_calls=tf.data.experimental.AUTOTUNE,
+        num_parallel_calls=tf.data.AUTOTUNE,
         deterministic=self.debug)
 
     if self.is_training and self.cache:
@@ -403,7 +403,7 @@ class ImageNetInput():
     dataset = self.make_source_dataset(current_host, num_hosts)
     dataset = dataset.map(
         self.dataset_parser,
-        num_parallel_calls=tf.data.experimental.AUTOTUNE).batch(
+        num_parallel_calls=tf.data.AUTOTUNE).batch(
             batch_size, drop_remainder=True)
 
     # Apply Mixup
@@ -411,12 +411,12 @@ class ImageNetInput():
       dataset = dataset.map(
           functools.partial(self.mixing, batch_size, self.mixup_alpha,
                             self.cutmix_alpha),
-          num_parallel_calls=tf.data.experimental.AUTOTUNE)
+          num_parallel_calls=tf.data.AUTOTUNE)
 
     # Assign static batch size dimension
     dataset = dataset.map(
         functools.partial(self.set_shapes, batch_size),
-        num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        num_parallel_calls=tf.data.AUTOTUNE)
 
     def transpose_image(features):
       # NHWC -> HWCN
@@ -426,14 +426,14 @@ class ImageNetInput():
     if self.transpose_image:
       dataset = dataset.map(
           lambda features, labels: (transpose_image(features), labels),
-          num_parallel_calls=tf.data.experimental.AUTOTUNE)
+          num_parallel_calls=tf.data.AUTOTUNE)
 
     # Prefetch overlaps in-feed with training
-    dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
+    dataset = dataset.prefetch(tf.data.AUTOTUNE)
     options = tf.data.Options()
-    options.experimental_deterministic = self.debug
-    options.experimental_threading.max_intra_op_parallelism = 1
-    options.experimental_threading.private_threadpool_size = 48
+    options.deterministic = self.debug
+    options.threading.max_intra_op_parallelism = 1
+    options.threading.private_threadpool_size = 48
     dataset = dataset.with_options(options)
     return dataset
 
@@ -542,7 +542,7 @@ class CIFAR10Input(ImageNetInput):
       ds = ds.repeat()
 
     ds = ds.map(
-        self.preprocess, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        self.preprocess, num_parallel_calls=tf.data.AUTOTUNE)
     ds = ds.prefetch(1)
 
     ds = ds.batch(batch_size, drop_remainder=True)
