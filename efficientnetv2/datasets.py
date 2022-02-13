@@ -549,7 +549,7 @@ class CIFAR10Input(ImageNetInput):
     ds = ds.prefetch(1)
 
     options = tf.data.Options()
-    options.experimental_optimization.autotune = True
+    options.autotune.enabled = True
     return ds.with_options(options)
 
 
