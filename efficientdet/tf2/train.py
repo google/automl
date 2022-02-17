@@ -164,11 +164,11 @@ def main(_):
       tf.config.experimental.set_memory_growth(gpu, True)
 
   if FLAGS.tf_random_seed:
-    tf.random.set_seed(FLAGS.tf_random_seed)
+    tf.keras.utils.set_random_seed(FLAGS.tf_random_seed)
+    tf.config.experimental.enable_op_determinism()
   
   if FLAGS.debug:
     tf.debugging.set_log_device_placement(True)
-    os.environ['TF_DETERMINISTIC_OPS'] = '1'
     logging.set_verbosity(logging.DEBUG)
 
   if FLAGS.strategy == 'tpu':
@@ -241,9 +241,11 @@ def main(_):
     else:
       model = train_lib.EfficientDetNetTrain(config=config)
     model = setup_model(model, config)
+
     if FLAGS.debug:
       tf.data.experimental.enable_debug_mode()
       tf.config.run_functions_eagerly(True)
+
     if tf.train.latest_checkpoint(FLAGS.model_dir):
       ckpt_path = tf.train.latest_checkpoint(FLAGS.model_dir)
       util_keras.restore_ckpt(
