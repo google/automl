@@ -397,8 +397,8 @@ class InputReader:
   def dataset_options(self):
     options = tf.data.Options()
     options.deterministic = self._debug or not self._is_training
-    options.optimization.map_parallelization = True
-    options.optimization.parallel_batch = True
+    options.experimental_optimization.map_parallelization = True
+    options.experimental_optimization.parallel_batch = True
     return options
 
   def __call__(self, params, input_context=None, batch_size=None):
@@ -429,7 +429,7 @@ class InputReader:
       return dataset
 
     dataset = dataset.interleave(
-        _prefetch_dataset, num_parallel_calls=tf.data.AUTOTUNE)
+        _prefetch_dataset, num_parallel_calls=tf.data.AUTOTUNE, deterministic=bool(seed))
     dataset = dataset.with_options(self.dataset_options)
     if self._is_training:
       dataset = dataset.shuffle(64, seed=seed)
