@@ -55,6 +55,12 @@ For comparison with EfficientNetV1, we have also provided a few smaller V2 model
 |    EffNetV2-B2     |    80.5%   |   10.1M    | 1.7B     | [ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-b2.tgz),  [tensorboard](https://tensorboard.dev/experiment/KrdCweUDRoCkREMTJTLvuQ/)
 |    EffNetV2-B3     |    82.1%   |   14.4M    | 3.0B     | [ckpt](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-b3.tgz),  [tensorboard](https://tensorboard.dev/experiment/0nYo4rMDTQuQcqOFzUMddA/)
 
+Here are the ImageNet21k checkpoints and finetuned models for B0-B3:
+
+* EffNetV2-B0: [ImageNet21k](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-b0-21k.tgz), [ImageNet21k-ft1k](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-b0-21k-ft1k.tgz)
+* EffNetV2-B1: [ImageNet21k](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-b1-21k.tgz), [ImageNet21k-ft1k](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-b1-21k-ft1k.tgz)
+* EffNetV2-B2: [ImageNet21k](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-b2-21k.tgz), [ImageNet21k-ft1k](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-b2-21k-ft1k.tgz)
+* EffNetV2-B3: [ImageNet21k](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-b3-21k.tgz), [ImageNet21k-ft1k](https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/v2/efficientnetv2-b3-21k-ft1k.tgz)
 
 ## 3. Training & Finetuning
 
