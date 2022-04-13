@@ -131,7 +131,7 @@ class InferenceTest(tf.test.TestCase):
         model_params={'mixed_precision': True})
     images = tf.ones((1, 512, 512, 3))
     boxes, scores, classes, valid_lens = driver.serve(images)
-    policy = tf.keras.mixed_precision.experimental.global_policy()
+    policy = tf.keras.mixed_precision.global_policy()
     if policy.name == 'float32':
       self.assertEqual(tf.reduce_mean(boxes), 163.09)
       self.assertEqual(tf.reduce_mean(scores), 0.01000005)
