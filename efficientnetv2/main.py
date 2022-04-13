@@ -168,6 +168,11 @@ def model_fn(features, labels, mode, params):
     utils.scalar('train/lr', learning_rate)
     optimizer = utils.build_optimizer(
         learning_rate, optimizer_name=config.train.optimizer)
+
+    if config.runtime.mixed_precision and precision=='mixed_float16':
+        # Wrap optimizer with loss scale when precision is mixed_float16
+        optimizer = tf.keras.mixed_precision.LossScaleOptimizer(optimizer)
+
     if FLAGS.use_tpu:
       # When using TPU, wrap the optimizer with CrossShardOptimizer which
       # handles synchronization details between different TPU cores. To the

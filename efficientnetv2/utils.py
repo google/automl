@@ -396,7 +396,7 @@ def float16_scope():
     yield varscope
 
 
-def set_precision_policy(policy_name=None, loss_scale=False):
+def set_precision_policy(policy_name=None):
   """Set precision policy according to the name.
 
   Args:
@@ -410,14 +410,8 @@ def set_precision_policy(policy_name=None, loss_scale=False):
   assert policy_name in ('mixed_float16', 'mixed_bfloat16', 'float32')
   logging.info('use mixed precision policy name %s', policy_name)
   tf.compat.v1.keras.layers.enable_v2_dtype_behavior()
-  # mixed_float16 training is not supported for now, so disable loss_scale.
-  # float32 and mixed_bfloat16 do not need loss scale for training.
-  if loss_scale:
-    policy = tf.keras.mixed_precision.experimental.Policy(policy_name)
-  else:
-    policy = tf.keras.mixed_precision.experimental.Policy(
-        policy_name, loss_scale=None)
-  tf.keras.mixed_precision.experimental.set_policy(policy)
+  policy = tf.keras.mixed_precision.Policy(policy_name)
+  tf.keras.mixed_precision.set_policy(policy)
 
 
 def build_model_with_precision(pp, mm, ii, tt, *args, **kwargs):
@@ -438,6 +432,7 @@ def build_model_with_precision(pp, mm, ii, tt, *args, **kwargs):
   Returns:
     the output of mm model.
   """
+  del tt
   if pp == 'mixed_bfloat16':
     set_precision_policy(pp)
     inputs = tf.cast(ii, tf.bfloat16)
@@ -445,7 +440,7 @@ def build_model_with_precision(pp, mm, ii, tt, *args, **kwargs):
       outputs = mm(inputs, *args, **kwargs)
     set_precision_policy('float32')
   elif pp == 'mixed_float16':
-    set_precision_policy(pp, loss_scale=tt)
+    set_precision_policy(pp)
     inputs = tf.cast(ii, tf.float16)
     with float16_scope():
       outputs = mm(inputs, *args, **kwargs)
