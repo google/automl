@@ -76,7 +76,7 @@ In addition, the following table includes a list of models trained with fixed 64
 Run the following command line to export models:
 
     !rm  -rf savedmodeldir
-    !python inspector.py --mode=saved_model --model_name=efficientdet-d0 \
+    !python inspector.py --mode=export --model_name=efficientdet-d0 \
       --model_dir=efficientdet-d0 --saved_model_dir=savedmodeldir \
       --tensorrt=FP32  --tflite=FP32 \
       --hparams=voc_config.yaml
