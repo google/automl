@@ -336,6 +336,7 @@ class FusedMBConvBlock(MBConvBlock):
           strides=block_args.strides,
           kernel_initializer=conv_kernel_initializer,
           padding='same',
+          data_format=self._data_format,
           use_bias=False,
           name=get_conv_name())
       self._norm0 = utils.normalization(
@@ -359,6 +360,7 @@ class FusedMBConvBlock(MBConvBlock):
         kernel_size=1 if block_args.expand_ratio != 1 else kernel_size,
         strides=1 if block_args.expand_ratio != 1 else block_args.strides,
         kernel_initializer=conv_kernel_initializer,
+        data_format=mconfig.data_format,
         padding='same',
         use_bias=False,
         name=get_conv_name())
@@ -575,7 +577,12 @@ class EffNetV2Model(tf.keras.Model):
     else:
       self._fc = None
 
-  def summary(self, input_shape=(224, 224, 3), **kargs):
+  def summary(self, input_shape=None, **kargs):
+    if not input_shape:
+      if self.cfg.model.data_format == 'channels_first':
+        input_shape = (3, 224, 224) 
+      else:
+        input_shape = (224, 224, 3) 
     x = tf.keras.Input(shape=input_shape)
     model = tf.keras.Model(inputs=[x], outputs=self.call(x, training=True))
     return model.summary()
@@ -680,7 +687,11 @@ def get_model(model_name,
     A single tensor if with_endpoints if False; otherwise, a list of tensor.
   """
   net = EffNetV2Model(model_name, model_config, include_top, **kwargs)
-  net(tf.keras.Input(shape=(None, None, 3)),
+  if net.cfg.model.data_format == 'channels_first':
+    input_shape = (3, None, None)
+  else:
+    input_shape = (None, None, 3)
+  net(tf.keras.Input(shape=input_shape),
       training=training,
       with_endpoints=with_endpoints)
 
