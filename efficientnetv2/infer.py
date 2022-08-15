@@ -89,6 +89,7 @@ def tf2_eval_dataset():
 def tf2_benchmark():
   """Run TF2 benchmark and inference."""
   model = build_tf2_model()
+  model_cfg = model.cfg
   isize = FLAGS.image_size or model.cfg.eval.isize
   if FLAGS.export_dir:
     tf.saved_model.save(model, FLAGS.export_dir)
@@ -97,7 +98,7 @@ def tf2_benchmark():
   batch_size = FLAGS.batch_size
   data_dtype = tf.float16 if FLAGS.mixed_precision else tf.float32
   imgs = tf.ones((batch_size, isize, isize, 3), dtype=data_dtype)
-  if model.cfg.model.data_format == 'channels_first':
+  if model_cfg.model.data_format == 'channels_first':
     imgs = tf.transpose(imgs, [0, 3, 1, 2])
 
   @tf.function
