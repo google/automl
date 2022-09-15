@@ -214,7 +214,7 @@ class ServingDriver:
     Returns:
       Model outputs.
     """
-    raise NotImplemented
+    raise NotImplementedError
 
   def _preprocess(self, image_arrays):
 
@@ -249,7 +249,7 @@ class ServingDriver:
     Returns:
       A list of detections.
     """
-    raise NotImplemented
+    raise NotImplementedError
 
   def _get_model_and_spec(self, tflite=None):
     """Get model instance and export spec."""

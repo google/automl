@@ -661,7 +661,10 @@ class EfficientDetNetTrain(efficientdet_keras.EfficientDetNet):
         scaled_loss = total_loss
         optimizer = self.optimizer
     loss_vals['loss'] = total_loss
-    loss_vals['learning_rate'] = optimizer.learning_rate(optimizer.iterations)
+    if callable(optimizer.learning_rate):
+      loss_vals['learning_rate'] = optimizer.learning_rate(optimizer.iterations)
+    else:
+      loss_vals['learning_rate'] = optimizer.learning_rate
     trainable_vars = self._freeze_vars()
     scaled_gradients = tape.gradient(scaled_loss, trainable_vars)
     if isinstance(self.optimizer,
