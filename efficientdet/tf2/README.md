@@ -264,7 +264,19 @@ If you want to continue to train the model, simply re-run the above command beca
 
 Just add ```--strategy=gpus```
 
-## 10. Training EfficientDets on TPUs.
+## 10. Train on multi node GPUs.
+Following scripts will start a training task with 2 nodes.
+
+Start Chief training node.
+```
+python -m tf2.train --strategy=multi-gpus --worker=server_address1:12345,server_address2:23456 --worker_index=0 --mode=train --train_file_pattern=tfrecord/pascal*.tfrecord --model_name=efficientdet-d0 --model_dir=/tmp/efficientdet-d0 --batch_size=64 --num_examples_per_epoch=5717 --num_epochs=50 --hparams=voc_config.yaml
+```
+Start the other training node.
+```
+python -m tf2.train --strategy=multi-gpus --worker=server_address1:12345,server_address2:23456 --worker_index=1 --mode=train --train_file_pattern=tfrecord/pascal*.tfrecord --model_name=efficientdet-d0 --model_dir=/tmp/efficientdet-d0_1 --batch_size=64 --num_examples_per_epoch=5717 --num_epochs=50 --hparams=voc_config.yaml
+```
+
+## 11. Training EfficientDets on TPUs.
 
 To train this model on Cloud TPU, you will need:
 
@@ -286,7 +298,7 @@ For more instructions about training on TPUs, please refer to the following tuto
 
   * EfficientNet tutorial: https://cloud.google.com/tpu/docs/tutorials/efficientnet
 
-## 11. Reducing Memory Usage when Training EfficientDets on GPU.
+## 12. Reducing Memory Usage when Training EfficientDets on GPU.
 
 EfficientDets use a lot of GPU memory for a few reasons:
 
@@ -306,7 +318,7 @@ If set to True, keras model uses ```tf.recompute_grad``` to achieve gradient che
 Testing shows that:
 * It allows to train a d7x network with batch size of 2 on a 11Gb (1080Ti) GPU
 
-## 12. Visualize TF-Records.
+## 13. Visualize TF-Records.
 
 You can visualize tf-records with following commands:
 
@@ -331,7 +343,7 @@ python dataset/inspect_tfrecords.py --file_pattern dataset/sample.record\
 * save_samples_dir: save dir.
 * eval: flag for eval data.
 
-## 13. Export to ONNX
+## 14. Export to ONNX
 (1)  Install tf2onnx
 ```
 pip install tf2onnx
@@ -352,7 +364,7 @@ nms_configs:
 python -m tf2onnx.convert --saved-model=<saved model directory> --output=<onnx filename> --opset=11
 ```
 
-## 14. Debug
+## 15. Debug
 Just add ```--debug``` after command, then you could use pdb debug the model with eager execution and deterministic operations.
 
 NOTE: this is not an official Google product.
