@@ -254,7 +254,7 @@ You can run inference for a video and show the results online:
     !mkdir tfrecord
     !PYTHONPATH=".:$PYTHONPATH"  python dataset/create_coco_tfrecord.py \
         --image_dir=val2017 \
-        --caption_annotations_file=annotations/captions_val2017.json \
+        --object_annotations_file=annotations/instances_val2017.json \
         --output_file_prefix=tfrecord/val \
         --num_shards=32
 
