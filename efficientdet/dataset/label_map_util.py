@@ -14,7 +14,6 @@
 # ==============================================================================
 """Label map utility functions."""
 from absl import logging
-from six.moves import range
 
 
 def _validate_label_map(label_map):

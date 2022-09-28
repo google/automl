@@ -13,7 +13,6 @@
 # limitations under the License.
 # ==============================================================================
 """Utils used to manipulate tensor shapes."""
-from six.moves import zip
 import tensorflow.compat.v1 as tf
 
 from visualize import static_shape
