@@ -260,11 +260,11 @@ Finetune needs to use --pretrained_ckpt.
 
 If you want to continue to train the model, simply re-run the above command because the `num_epochs` is a maximum number of epochs. For example, to reproduce the result of efficientdet-d0, set `--num_epochs=300` then run the command multiple times until the training is finished.
 
-## 9. Train on multi GPUs.
+## 9. Training on single node GPUs.
 
 Just add ```--strategy=gpus```
 
-## 10. Train on multi node GPUs.
+## 10. Training on multi node GPUs.
 Following scripts will start a training task with 2 nodes.
 
 Start Chief training node.

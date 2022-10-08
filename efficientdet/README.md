@@ -335,7 +335,7 @@ If you want to do inference for custom data, you can run
 
 You should check more details of runmode which is written in caption-4.
 
-## 9. Train on multi GPUs.
+## 9. Training on single node GPUs.
 
 Create a config file for the PASCAL VOC dataset called voc_config.yaml and put this in it.
 
