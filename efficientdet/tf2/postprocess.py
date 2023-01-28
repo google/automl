@@ -50,7 +50,7 @@ def batch_map_fn(map_fn, inputs, *args):
 
   if not batch_size:
     # handle dynamic batch size: tf.vectorized_map is faster than tf.map_fn.
-    return tf.vectorized_map(map_fn, inputs, *args)
+    return tf.vectorized_map(map_fn, inputs, *args, warn=False)
 
   outputs = []
   for i in range(batch_size):

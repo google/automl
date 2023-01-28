@@ -56,8 +56,10 @@ def define_flags():
       help='GRPC URL of the eval master. Set to an appropriate value when '
       'running on CPU/GPU')
   flags.DEFINE_string('eval_name', default=None, help='Eval job name')
-  flags.DEFINE_enum('strategy', '', ['tpu', 'gpus', ''],
+  flags.DEFINE_enum('strategy', '', ['tpu', 'gpus', 'multi-gpus', ''],
                     'Training: gpus for multi-gpu, if None, use TF default.')
+  flags.DEFINE_string('worker', default=None, help='Workers server address')
+  flags.DEFINE_integer('worker_index', default=0, help='Worker index')
 
   flags.DEFINE_integer(
       'num_cores', default=8, help='Number of TPU cores for training')
@@ -170,7 +172,8 @@ def main(_):
   if FLAGS.debug:
     tf.debugging.set_log_device_placement(True)
     logging.set_verbosity(logging.DEBUG)
-
+    tf.debugging.disable_traceback_filtering()
+    
   if FLAGS.strategy == 'tpu':
     tpu_cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
         FLAGS.tpu, zone=FLAGS.tpu_zone, project=FLAGS.gcp_project)
@@ -193,6 +196,16 @@ def main(_):
     ds_strategy = tf.distribute.MirroredStrategy(
         cross_device_ops=cross_device_ops)
     logging.info('All devices: %s', gpus)
+  elif FLAGS.strategy == 'multi-gpus':
+    import json
+    tf_config = {
+      'cluster': {
+        'worker': FLAGS.worker.split(',')
+      },
+      'task': {'type': 'worker', 'index': FLAGS.worker_index}
+    }
+    os.environ['TF_CONFIG'] = json.dumps(tf_config)
+    ds_strategy = tf.distribute.MultiWorkerMirroredStrategy()
   else:
     if tf.config.list_physical_devices('GPU'):
       ds_strategy = tf.distribute.OneDeviceStrategy('device:GPU:0')
@@ -259,14 +272,19 @@ def main(_):
           ckpt_path,
           config.moving_average_decay,
           exclude_layers=['class_net', 'optimizer', 'box_net'])
+
     init_experimental(config)
     if 'train' in FLAGS.mode:
       val_dataset = get_dataset(False, config) if 'eval' in FLAGS.mode else None
+      if FLAGS.strategy == 'multi-gpus':
+        initial_epoch = 0
+      else:
+        initial_epoch = model.optimizer.iterations.numpy() // steps_per_epoch
       model.fit(
           get_dataset(True, config),
           epochs=config.num_epochs,
           steps_per_epoch=steps_per_epoch,
-          initial_epoch=model.optimizer.iterations.numpy() // steps_per_epoch,
+          initial_epoch=initial_epoch,
           callbacks=train_lib.get_callbacks(config.as_dict(), val_dataset),
           validation_data=val_dataset,
           validation_steps=(FLAGS.eval_samples // FLAGS.batch_size))

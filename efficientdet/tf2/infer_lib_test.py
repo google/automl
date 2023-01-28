@@ -90,7 +90,7 @@ class InferenceTest(tf.test.TestCase):
     images = tf.ones((1, 512, 512, 3))
     boxes, scores, classes, valid_lens = driver.serve(images)
     self.assertEqual(tf.reduce_mean(boxes), 163.09)
-    self.assertEqual(tf.reduce_mean(scores), 0.01000005)
+    self.assertEqual(tf.reduce_mean(scores), 0.01)
     self.assertEqual(tf.reduce_mean(classes), 1)
     self.assertEqual(tf.reduce_mean(valid_lens), 100)
     self.assertEqual(boxes.shape, (1, 100, 4))
@@ -107,7 +107,7 @@ class InferenceTest(tf.test.TestCase):
     images = tf.ones((1, 512, 512, 3))
     boxes, scores, classes, valid_lens = driver.serve(images)
     self.assertEqual(tf.reduce_mean(boxes), 163.09)
-    self.assertEqual(tf.reduce_mean(scores), 0.01000005)
+    self.assertEqual(tf.reduce_mean(scores), 0.01)
     self.assertEqual(tf.reduce_mean(classes), 1)
     self.assertEqual(tf.reduce_mean(valid_lens), 100)
     self.assertEqual(boxes.shape, (1, 100, 4))
@@ -134,7 +134,7 @@ class InferenceTest(tf.test.TestCase):
     policy = tf.keras.mixed_precision.global_policy()
     if policy.name == 'float32':
       self.assertEqual(tf.reduce_mean(boxes), 163.09)
-      self.assertEqual(tf.reduce_mean(scores), 0.01000005)
+      self.assertEqual(tf.reduce_mean(scores), 0.01)
       self.assertEqual(tf.reduce_mean(classes), 1)
       self.assertEqual(tf.reduce_mean(valid_lens), 100)
     elif policy.name == 'float16':

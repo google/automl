@@ -781,8 +781,11 @@ def get_model(model_name,
       'efficientnet-b8': {
           'imagenet': v1url + 'efficientnet-b8.tar.gz',
       },
-      'efficientnet-l2': {
+      'efficientnet-l2_475': {
           'jft': v1jfturl + 'noisy_student_efficientnet-l2_475.tar.gz',
+      },
+      'efficientnet-l2': {
+          'jft': v1jfturl + 'noisy_student_efficientnet-l2.tar.gz',
       },
   }
 

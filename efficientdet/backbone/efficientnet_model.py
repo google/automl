@@ -26,7 +26,6 @@ import math
 from absl import logging
 import numpy as np
 import six
-from six.moves import xrange
 import tensorflow as tf
 
 import utils
@@ -701,7 +700,7 @@ class Model(tf.keras.Model):
         block_args = block_args._replace(
             input_filters=block_args.output_filters, strides=[1, 1])
         # pylint: enable=protected-access
-      for _ in xrange(block_args.num_repeat - 1):
+      for _ in range(block_args.num_repeat - 1):
         self._blocks.append(
             conv_block(block_args, self._global_params, name=block_name()))
 

@@ -27,8 +27,6 @@ import PIL.ImageColor as ImageColor
 import PIL.ImageDraw as ImageDraw
 import PIL.ImageFont as ImageFont
 import six
-from six.moves import range
-from six.moves import zip
 import tensorflow.compat.v1 as tf
 
 from visualize import shape_utils
@@ -105,7 +103,7 @@ def save_image_array_as_png(image, output_path):
     output_path: path to which image should be written.
   """
   image_pil = Image.fromarray(np.uint8(image)).convert('RGB')
-  with tf.gfile.Open(output_path, 'w') as fid:
+  with tf.io.gfile.open(output_path, 'w') as fid:
     image_pil.save(fid, 'PNG')
 
 
@@ -214,7 +212,7 @@ def draw_bounding_box_on_image(image,
   # If the total height of the display strings added to the top of the bounding
   # box exceeds the top of the image, stack the strings below the bounding box
   # instead of above.
-  display_str_heights = [font.getsize(ds)[1] for ds in display_str_list]
+  display_str_heights = [font.getbbox(ds)[3] - font.getbbox(ds)[1] for ds in display_str_list]
   # Each display_str has a top and bottom margin of 0.05x.
   total_display_str_height = (1 + 2 * 0.05) * sum(display_str_heights)
 
@@ -224,7 +222,8 @@ def draw_bounding_box_on_image(image,
     text_bottom = bottom + total_display_str_height
   # Reverse list and print from bottom to top.
   for display_str in display_str_list[::-1]:
-    text_width, text_height = font.getsize(display_str)
+    left, top, right, bottom = font.getbbox(display_str)
+    text_width, text_height = (right - left, bottom - top)
     margin = np.ceil(0.05 * text_height)
     draw.rectangle([(left, text_bottom - text_height - 2 * margin),
                     (left + text_width, text_bottom)],
@@ -300,9 +299,9 @@ def create_visualization_fn(category_index,
                             include_keypoints=False,
                             include_track_ids=False,
                             **kwargs):
-  """Constructs a visualization function that can be wrapped in a py_func.
+  """Constructs a visualization function that can be wrapped in a numpy_function.
 
-  py_funcs only accept positional arguments. This function returns a suitable
+  numpy_functions only accept positional arguments. This function returns a suitable
   function with the correct positional argument mapping. The positional
   arguments in order are:
   0: image
@@ -317,7 +316,7 @@ def create_visualization_fn(category_index,
   vis_only_masks_fn = create_visualization_fn(category_index,
     include_masks=True, include_keypoints=False, include_track_ids=False,
     **kwargs)
-  image = tf.py_func(vis_only_masks_fn,
+  image = tf.numpy_function(vis_only_masks_fn,
                      inp=[image, boxes, classes, scores, masks],
                      Tout=tf.uint8)
 
@@ -325,7 +324,7 @@ def create_visualization_fn(category_index,
   vis_masks_and_track_ids_fn = create_visualization_fn(category_index,
     include_masks=True, include_keypoints=False, include_track_ids=True,
     **kwargs)
-  image = tf.py_func(vis_masks_and_track_ids_fn,
+  image = tf.numpy_function(vis_masks_and_track_ids_fn,
                      inp=[image, boxes, classes, scores, masks, track_ids],
                      Tout=tf.uint8)
 
@@ -346,7 +345,7 @@ def create_visualization_fn(category_index,
   """
 
   def visualization_py_func_fn(*args):
-    """Visualization function that can be wrapped in a tf.py_func.
+    """Visualization function that can be wrapped in a tf.numpy_function.
 
     Args:
       *args: First 4 positional arguments must be: image - uint8 numpy array
@@ -496,11 +495,11 @@ def draw_bounding_boxes_on_image_tensors(images,
     if original_image_spatial_shape is not None:
       image_and_detections[2] = _resize_original_image(image, original_shape)
 
-    image_with_boxes = tf.py_func(visualize_boxes_fn, image_and_detections[2:],
+    image_with_boxes = tf.numpy_function(visualize_boxes_fn, image_and_detections[2:],
                                   tf.uint8)
     return image_with_boxes
 
-  images = tf.map_fn(draw_boxes, elems, dtype=tf.uint8, back_prop=False)
+  images = tf.map_fn(draw_boxes, elems, fn_output_signature=tf.uint8, back_prop=False)
   return images
 
 
@@ -1106,8 +1105,8 @@ class EvalMetricOpsVisualization(six.with_metaclass(abc.ABCMeta, object)):
       update_op = self.add_images([[images[0]]])  # pylint: disable=assignment-from-none
       image_tensors = get_images()
     else:
-      update_op = tf.py_func(self.add_images, [[images[0]]], [])
-      image_tensors = tf.py_func(get_images, [],
+      update_op = tf.numpy_function(self.add_images, [[images[0]]], [])
+      image_tensors = tf.numpy_function(get_images, [],
                                  [tf.uint8] * self._max_examples_to_draw)
     eval_metric_ops = {}
     for i, image in enumerate(image_tensors):

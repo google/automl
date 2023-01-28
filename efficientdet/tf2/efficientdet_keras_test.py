@@ -17,6 +17,7 @@ import os
 import tempfile
 from absl import logging
 import tensorflow.compat.v1 as tf
+import tensorflow.compat.v2 as tf2
 import efficientdet_arch as legacy_arch
 import hparams_config
 from tf2 import efficientdet_keras
@@ -38,9 +39,9 @@ class EfficientDetKerasTest(tf.test.TestCase):
     inputs_shape = [1, 512, 512, 3]
     config = hparams_config.get_efficientdet_config('efficientdet-d0')
     config.heads = ['object_detection', 'segmentation']
+    tf2.keras.utils.set_random_seed(SEED)
     with tf.Session(graph=tf.Graph()) as sess:
       feats = tf.ones(inputs_shape)
-      tf.random.set_random_seed(SEED)
       model = efficientdet_keras.EfficientDetNet(config=config)
       outputs = model(feats, True)
       sess.run(tf.global_variables_initializer())
@@ -48,15 +49,26 @@ class EfficientDetKerasTest(tf.test.TestCase):
       grads = tf.nest.map_structure(lambda output: tf.gradients(output, feats),
                                     outputs)
       keras_class_grads, keras_box_grads, _ = sess.run(grads)
+      vars = list(filter(
+          lambda var: not var.name.startswith('segmentation'),
+          tf.global_variables()))
+      vars.sort(key=lambda var: var.name)
+      keras_vars_names = [var.name for var in vars]
+      keras_vars_values = sess.run(vars)
+
     with tf.Session(graph=tf.Graph()) as sess:
       feats = tf.ones(inputs_shape)
-      tf.random.set_random_seed(SEED)
       outputs = legacy_arch.efficientdet(feats, config=config)
-      sess.run(tf.global_variables_initializer())
+      vars = tf.global_variables()
+      vars.sort(key=lambda var: var.name)
+      legacy_vars_names = [var.name for var in vars]
+      sess.run([var.assign(val) for val, var in zip(keras_vars_values, vars)])
       legacy_class_out, legacy_box_out = sess.run(outputs)
       grads = tf.nest.map_structure(lambda output: tf.gradients(output, feats),
                                     outputs)
       legacy_class_grads, legacy_box_grads = sess.run(grads)
+
+    self.assertAllEqual(keras_vars_names, legacy_vars_names)
 
     for i in range(3, 8):
       self.assertAllEqual(
@@ -76,7 +88,7 @@ class EfficientDetKerasTest(tf.test.TestCase):
 
     with tf.Session(graph=tf.Graph()) as sess:
       feats = tf.ones(inputs_shape)
-      tf.random.set_random_seed(SEED)
+      tf2.keras.utils.set_random_seed(SEED)
       model = efficientdet_keras.EfficientDetNet(config=config)
       outputs = model(feats, True)
       grads = tf.nest.map_structure(lambda output: tf.gradients(output, feats),
@@ -120,7 +132,7 @@ class EfficientDetKerasTest(tf.test.TestCase):
           tf.ones([1, 32, 32, 112]),  # level 4
           tf.ones([1, 16, 16, 320]),  # level 5
       ]
-      tf.random.set_random_seed(SEED)
+      tf2.keras.utils.set_random_seed(SEED)
       fpn_cell = efficientdet_keras.FPNCells(config)
       new_feats1 = fpn_cell(inputs, True)
       sess.run(tf.global_variables_initializer())
@@ -137,7 +149,7 @@ class EfficientDetKerasTest(tf.test.TestCase):
           4: tf.ones([1, 32, 32, 112]),
           5: tf.ones([1, 16, 16, 320])
       }
-      tf.random.set_random_seed(SEED)
+      tf2.keras.utils.set_random_seed(SEED)
       new_feats2 = legacy_arch.build_feature_network(inputs, config)
       sess.run(tf.global_variables_initializer())
       legacy_feats = sess.run(new_feats2)
@@ -185,7 +197,7 @@ class EfficientDetKerasTest(tf.test.TestCase):
         for strategy in ['tpu', '']:
           with self.subTest(
               apply_bn=apply_bn, training=training, strategy=strategy):
-            tf.random.set_random_seed(SEED)
+            tf2.keras.utils.set_random_seed(SEED)
             expect_result = legacy_arch.resample_feature_map(
                 feat,
                 name='resample_p0',
@@ -195,7 +207,7 @@ class EfficientDetKerasTest(tf.test.TestCase):
                 apply_bn=apply_bn,
                 is_training=training,
                 strategy=strategy)
-            tf.random.set_random_seed(SEED)
+            tf2.keras.utils.set_random_seed(SEED)
             resample_layer = efficientdet_keras.ResampleFeatureMap(
                 name='resample_p0',
                 feat_level=0,

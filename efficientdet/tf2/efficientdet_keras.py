@@ -246,16 +246,10 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     self.pooling_type = pooling_type or 'max'
     self.upsampling_type = upsampling_type or 'nearest'
 
-    self.conv2d = tf.keras.layers.Conv2D(
-        self.target_num_channels, (1, 1),
-        padding='same',
-        data_format=self.data_format,
-        name='conv2d')
-    self.bn = util_keras.build_batch_norm(
-        is_training_bn=self.is_training_bn,
-        data_format=self.data_format,
-        strategy=self.strategy,
-        name='bn')
+  def build(self, input_shape):
+    idx = 1 if self.data_format == 'channels_first' else 3
+    num_channels = input_shape[idx]
+    self._maybe_init_1x1(num_channels)
 
   def _pool2d(self, inputs, height, width, target_height, target_width):
     """Pool the inputs to target height and width."""
@@ -285,6 +279,21 @@ class ResampleFeatureMap(tf.keras.layers.Layer):
     if self.data_format == 'channels_first':
       resized = tf.transpose(resized, [0, 3, 1, 2])
     return resized
+
+  def _maybe_init_1x1(self, num_channels):
+    """Init 1x1 conv to change layer width if necessary."""
+    if num_channels != self.target_num_channels:
+      self.conv2d = tf.keras.layers.Conv2D(
+          self.target_num_channels, (1, 1),
+          padding='same',
+          data_format=self.data_format,
+          name='conv2d')
+      if self.apply_bn:
+        self.bn = util_keras.build_batch_norm(
+            is_training_bn=self.is_training_bn,
+            data_format=self.data_format,
+            strategy=self.strategy,
+            name='bn')
 
   def _maybe_apply_1x1(self, feat, training, num_channels):
     """Apply 1x1 conv to change layer width if necessary."""
@@ -451,8 +460,8 @@ class ClassNet(tf.keras.layers.Layer):
           tf.keras.layers.SeparableConv2D,
           depth_multiplier=1,
           data_format=data_format,
-          pointwise_initializer=tf.initializers.variance_scaling(),
-          depthwise_initializer=tf.initializers.variance_scaling())
+          pointwise_initializer='variance_scaling',
+          depthwise_initializer='variance_scaling')
     else:
       conv2d_layer = functools.partial(
           tf.keras.layers.Conv2D,
@@ -537,8 +546,8 @@ class BoxNet(tf.keras.layers.Layer):
             tf.keras.layers.SeparableConv2D(
                 filters=self.num_filters,
                 depth_multiplier=1,
-                pointwise_initializer=tf.initializers.variance_scaling(),
-                depthwise_initializer=tf.initializers.variance_scaling(),
+                pointwise_initializer='variance_scaling',
+                depthwise_initializer='variance_scaling',
                 data_format=self.data_format,
                 kernel_size=3,
                 activation=None,
@@ -612,8 +621,8 @@ class BoxNet(tf.keras.layers.Layer):
       return tf.keras.layers.SeparableConv2D(
           filters=4 * num_anchors,
           depth_multiplier=1,
-          pointwise_initializer=tf.initializers.variance_scaling(),
-          depthwise_initializer=tf.initializers.variance_scaling(),
+          pointwise_initializer='variance_scaling',
+          depthwise_initializer='variance_scaling',
           data_format=data_format,
           kernel_size=3,
           activation=None,
@@ -939,7 +948,7 @@ class EfficientDetModel(EfficientDetNet):
       return [tf.stop_gradient(tf.stack(y)) for y in zip(*outputs)]
 
     # otherwise treat it as dynamic batch size.
-    return tf.vectorized_map(map_fn, raw_images)
+    return tf.vectorized_map(map_fn, raw_images, warn=False)
 
   def _postprocess(self, cls_outputs, box_outputs, scales, mode='global'):
     """Postprocess class and box predictions."""

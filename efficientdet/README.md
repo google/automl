@@ -254,7 +254,7 @@ You can run inference for a video and show the results online:
     !mkdir tfrecord
     !PYTHONPATH=".:$PYTHONPATH"  python dataset/create_coco_tfrecord.py \
         --image_dir=val2017 \
-        --caption_annotations_file=annotations/captions_val2017.json \
+        --object_annotations_file=annotations/instances_val2017.json \
         --output_file_prefix=tfrecord/val \
         --num_shards=32
 
@@ -335,7 +335,7 @@ If you want to do inference for custom data, you can run
 
 You should check more details of runmode which is written in caption-4.
 
-## 9. Train on multi GPUs.
+## 9. Training on single node GPUs.
 
 Create a config file for the PASCAL VOC dataset called voc_config.yaml and put this in it.
 

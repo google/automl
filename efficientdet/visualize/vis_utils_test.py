@@ -18,7 +18,6 @@ from absl import logging
 import numpy as np
 import PIL.Image as Image
 import six
-from six.moves import range
 import tensorflow.compat.v1 as tf
 
 from visualize import standard_fields as fields

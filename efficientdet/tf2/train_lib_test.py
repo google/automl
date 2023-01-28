@@ -196,8 +196,8 @@ class TrainLibTest(tf.test.TestCase):
     # skip gnorm test because it is flaky.
 
   def test_recompute_grad(self):
-    tf.config.run_functions_eagerly(True)
     _, x, labels, model = self._build_model(False)
+    weights = model.get_weights()
     with tf.GradientTape() as tape:
       loss_vals = {}
       cls_outputs, box_outputs, _ = model(x, training=True)
@@ -206,6 +206,7 @@ class TrainLibTest(tf.test.TestCase):
       grads1 = tape.gradient(det_loss, model.trainable_variables)
 
     _, x, labels, model = self._build_model(True)
+    model.set_weights(weights)
     with tf.GradientTape() as tape:
       loss_vals = {}
       cls_outputs2, box_outputs2, _ = model(x, training=True)

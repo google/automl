@@ -214,7 +214,7 @@ class ServingDriver:
     Returns:
       Model outputs.
     """
-    raise NotImplemented
+    raise NotImplementedError
 
   def _preprocess(self, image_arrays):
 
@@ -232,7 +232,7 @@ class ServingDriver:
       outputs = [map_fn(image_arrays[i]) for i in range(self.batch_size)]
       return [tf.stop_gradient(tf.stack(y)) for y in zip(*outputs)]
 
-    return tf.vectorized_map(map_fn, image_arrays)
+    return tf.vectorized_map(map_fn, image_arrays, warn=False)
 
   def _postprocess(self, outputs, scales):
     det_outputs = postprocess.postprocess_global(self.params, outputs[0],
@@ -249,7 +249,7 @@ class ServingDriver:
     Returns:
       A list of detections.
     """
-    raise NotImplemented
+    raise NotImplementedError
 
   def _get_model_and_spec(self, tflite=None):
     """Get model instance and export spec."""
@@ -484,6 +484,7 @@ class KerasDriver(ServingDriver):
                   export_model.predict.get_concrete_function(tflite_input_spec)
           },
           options=tf.saved_model.SaveOptions(
+              experimental_custom_gradients=False,
               function_aliases={'serve': export_model.__call__}))
       logging.info('Model saved at %s', output_dir)
 

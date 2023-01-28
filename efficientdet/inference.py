@@ -92,7 +92,7 @@ def batch_image_preprocess(raw_images,
         image_size=image_size,
         mean_rgb=mean_rgb,
         stddev_rgb=stddev_rgb)
-    images, scales = tf.vectorized_map(map_fn, raw_images)
+    images, scales = tf.vectorized_map(map_fn, raw_images, warn=False)
     images = tf.stop_gradient(tf.cast(images, tf.float32))
     scales = tf.stop_gradient(tf.cast(scales, tf.float32))
     return (images, scales)
