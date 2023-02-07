@@ -30,11 +30,7 @@ Another practical benefit is that Lion has faster runtime (steps / sec) in our e
 
 - Save up to 3-5x pre-training cost on JFT-300M.
 
-<div style="background: #FFFFFF; color: #000">
-<img src="./fig/jft-i1k.png" width="33%">
-<img src="./fig/jft-real.png" width="33%">
-<img src="./fig/jft-v2.png" width="33%">
-</div>
+<img src="./fig/jft-ft.png" width="100%">
 
 - Results after fine-tuned with higher resolution and Polyak averaging.
 Our obtained ViT-L/16 matches the previous ViT-H/14 results trained by AdamW while being 2x smaller.
@@ -47,16 +43,8 @@ Our ViT-G/14 further achieves a 90.71% accuracy on ImageNet.
 - On LiT, Lion beats AdamW on zero-shot image classification and image-text retrieval.
 
 <img src="./fig/lit.png" width="45%">
-<div style="background: #FFFFFF; color: #000">
-<img src="./fig/coco_i2t_r1.png" width="24.5%">
-<img src="./fig/coco_i2t_r10.png" width="24.5%">
-<img src="./fig/coco_t2i_r1.png" width="24.5%">
-<img src="./fig/coco_t2i_r10.png" width="24.5%">
-<img src="./fig/flickr_i2t_r1.png" width="24.5%">
-<img src="./fig/flickr_i2t_r10.png" width="24.5%">
-<img src="./fig/flickr_t2i_r1.png" width="24.5%">
-<img src="./fig/flickr_t2i_r10.png" width="24.5%">
-</div>
+<img src="./fig/retrieval.png" width="100%">
+
 
 - On BASIC-L, Lion achieves new SOTAs on zero-shot and fine-tuning ImageNet accuracy. Note that the 88.3% zero-shot result is 2% higher than the previous SOTA by COCA.
 
@@ -66,9 +54,7 @@ Our ViT-G/14 further achieves a 90.71% accuracy on ImageNet.
 
 - Save up to 2.3x compute regarding the FID compared to AdamW (Left to right: 64x64, 128x128, 256x256 image generation trained on ImageNet).
 
-<div style="background: #FFFFFF; color: #000">
 <img src="./fig/diffusion.png" width="100%">
-</div>
 
 ### **Language modeling**
 
@@ -113,10 +99,7 @@ With a small 64 batch size, Lion still performs on par with AdamW.
 When the batch size enlarges to 32K with only 11K training steps,
 Lion achieves a significant 2.5\% accuracy gain over AdamW (77.9\% vs. 75.4\%), revealing its effectiveness under the large batch training setting.
 
-<div style="background: #FFFFFF; color: #000">
-<img src="./fig/bs.png" width="33%">
-<img src="./fig/sensitivity.png" width="66%">
-</div>
+<img src="./fig/ablation.png" width="100%">
 
 Left: Ablation for the effect of batch size. Lion prefers a larger batch than AdamW.
 ImageNet accuracy of ViT-B/16 trained from scratch when we vary $lr$ and $\lambda$ for AdamW (Middle) and Lion (Right). Lion is more robust to different hyperparameter choices.
