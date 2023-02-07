@@ -1,7 +1,7 @@
 
 # Symbolic Discovery of Optimization Algorithms
 
-This repository contains PyTorch implementation of the Lion optimizer discovered by AutoML.
+This repository contains PyTorch implementation of the Lion optimizer discovered by AutoML. The JAX implementation is available [here](https://github.com/google/praxis/blob/main/praxis/optimizers.py).
 
 ## Table of Contents
 
