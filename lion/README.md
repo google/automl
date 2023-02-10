@@ -51,7 +51,7 @@ Our ViT-G/14 further achieves a 90.71% accuracy on ImageNet.
 
 ### **Diffusion model**
 
-- On diffusion models, \name{} exceeds AdamW in terms of the FID score and saves up to 2.3x the training compute. Left to right: 64x64, 128x128, 256x256 image generation trained on ImageNet.
+- On diffusion models, Lion exceeds AdamW in terms of the FID score and saves up to 2.3x the training compute. Left to right: 64x64, 128x128, 256x256 image generation trained on ImageNet.
 
 <img src="./fig/diffusion.png" width="100%">
 
