@@ -12,6 +12,7 @@ This repository contains JAX, TensorFlow and PyTorch implementations of the Lion
   - [Diffusion model](#diffusion-model)
   - [Language modeling](#language-modeling)
 - [Hyperparameter and batch size choices](#hyperparameter-and-batch-size-choices)
+- [Citation](#citation)
 
 ## Simple, memory efficient, faster runtime
 
