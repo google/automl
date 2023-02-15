@@ -1,17 +1,18 @@
 
 # Symbolic Discovery of Optimization Algorithms
 
-This repository contains PyTorch and JAX implementations of the Lion optimizer discovered by symbnolic program search. Lion is also available on [Praxis](https://github.com/google/praxis/blob/main/praxis/optimizers.py).
+This repository contains JAX, TensorFlow and PyTorch implementations of the Lion optimizer discovered by symbolic program search in the ["Symbolic Discovery of Optimization Algorithms"](https://arxiv.org/abs/2302.06675) paper. Lion is also available on [Praxis](https://github.com/google/praxis/blob/main/praxis/optimizers.py).
 
 ## Table of Contents
 
 - [Simple, memory efficient, faster runtime](#simple-memory-efficient-faster-runtime)
 - Superior performance on various architectures, tasks, and domains
   - [Image classification](#image-classification)
-  - [Vision-language constrastive training](#vision-language-contrastive-training)
+  - [Vision-language contrastive training](#vision-language-contrastive-training)
   - [Diffusion model](#diffusion-model)
   - [Language modeling](#language-modeling)
 - [Hyperparameter and batch size choices](#hyperparameter-and-batch-size-choices)
+- [Citation](#citation)
 
 ## Simple, memory efficient, faster runtime
 
@@ -98,3 +99,19 @@ Lion achieves a significant 2.5\% accuracy gain over AdamW (77.9\% vs. 75.4\%), 
 
 **Left**: Ablation for the effect of batch size. Lion prefers a larger batch than AdamW.
 ImageNet accuracy of ViT-B/16 trained from scratch when we vary $lr$ and $\lambda$ for AdamW (**Middle**) and Lion (**Right**). Lion is more robust to different hyperparameter choices.
+
+
+## Citation
+
+If you find this work helpful, please cite:
+
+```
+@misc{chen2023symbolic,
+      title={Symbolic Discovery of Optimization Algorithms}, 
+      author={Xiangning Chen and Chen Liang and Da Huang and Esteban Real and Kaiyuan Wang and Yao Liu and Hieu Pham and Xuanyi Dong and Thang Luong and Cho-Jui Hsieh and Yifeng Lu and Quoc V. Le},
+      year={2023},
+      eprint={2302.06675},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
+```
