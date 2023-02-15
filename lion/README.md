@@ -1,14 +1,14 @@
 
 # Symbolic Discovery of Optimization Algorithms
 
-This repository contains PyTorch and JAX implementations of the Lion optimizer discovered by symbnolic program search. Lion is also available on [Praxis](https://github.com/google/praxis/blob/main/praxis/optimizers.py).
+This repository contains PyTorch and JAX implementations of the Lion optimizer discovered by symbolic program search. Lion is also available on [Praxis](https://github.com/google/praxis/blob/main/praxis/optimizers.py).
 
 ## Table of Contents
 
 - [Simple, memory efficient, faster runtime](#simple-memory-efficient-faster-runtime)
 - Superior performance on various architectures, tasks, and domains
   - [Image classification](#image-classification)
-  - [Vision-language constrastive training](#vision-language-contrastive-training)
+  - [Vision-language contrastive training](#vision-language-contrastive-training)
   - [Diffusion model](#diffusion-model)
   - [Language modeling](#language-modeling)
 - [Hyperparameter and batch size choices](#hyperparameter-and-batch-size-choices)
