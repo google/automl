@@ -28,8 +28,8 @@ class Lion(Optimizer):
         parameter groups
       lr (float, optional): learning rate (default: 1e-4)
       betas (Tuple[float, float], optional): coefficients used for computing
-        running averages of gradient and its square (default: (0.9, 0.999))
-      weight_decay (float, optional): weight decay coefficient (default: 1e-1)
+        running averages of gradient and its square (default: (0.9, 0.99))
+      weight_decay (float, optional): weight decay coefficient (default: 0)
     """
 
     if not 0.0 <= lr:
@@ -68,7 +68,7 @@ class Lion(Optimizer):
         grad = p.grad
         state = self.state[p]
         # State initialization
-        if not state:
+        if len(state) == 0:
           # Exponential moving average of gradient values
           state['exp_avg'] = torch.zeros_like(p)
 

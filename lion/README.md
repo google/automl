@@ -1,7 +1,7 @@
 
 # Symbolic Discovery of Optimization Algorithms
 
-This repository contains PyTorch and JAX implementations of the Lion optimizer discovered by symbolic program search. Lion is also available on [Praxis](https://github.com/google/praxis/blob/main/praxis/optimizers.py).
+This repository contains JAX, TensorFlow and PyTorch implementations of the Lion optimizer discovered by symbolic program search. Lion is also available on [Praxis](https://github.com/google/praxis/blob/main/praxis/optimizers.py).
 
 ## Table of Contents
 
