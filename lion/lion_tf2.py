@@ -15,9 +15,15 @@
 """TF2 implementation of the Lion optimizer."""
 
 import tensorflow as tf
-from tensorflow import keras
+from packaging.version import parse
 
-class Lion(keras.optimizers.Optimizer):
+if parse(tf.__version__) > parse('2.11.0'):
+    from tensorflow.keras.optimizers.legacy import Optimizer as keras_opt
+else:
+    from tensorflow.keras.optimizers import Optimizer as keras_opt
+    
+
+class Lion(keras_opt):
     def __init__(
         self,
         learning_rate=0.0001,
