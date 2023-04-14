@@ -15,7 +15,7 @@ Lion is available on multiple codebases, including [Praxis](https://github.com/g
   - [Vision-language contrastive training](#vision-language-contrastive-training)
   - [Diffusion model](#diffusion-model)
   - [Language modeling](#language-modeling)
-- [Hyperparameter and batch size choices](#hyperparameter-and-batch-size-choices)
+- [Instructions for hyperparameter tuning and batch size choices](#instructions-for-hyperparameter-tuning-and-batch-size-choices)
 - [Citation](#citation)
 
 ## Simple, memory efficient, fast runtime
@@ -41,7 +41,7 @@ Another practical benefit is that Lion has faster runtime (steps / sec) in our e
 - Results after fine-tuning with higher resolution and Polyak averaging.
 Our obtained ViT-L/16 matches the previous ViT-H/14 results trained by AdamW while being 2x smaller.
 
-<img src="./fig/jft.png" width="80%">
+<img src="./fig/jft.png" width="75%">
 
 ### **Vision-language contrastive training**
 
@@ -74,7 +74,7 @@ Our obtained ViT-L/16 matches the previous ViT-H/14 results trained by AdamW whi
 
 <img src="./fig/ft.png" width="90%">
 
-## Hyperparameter and batch size choices
+## Instructions for hyperparameter tuning and batch size choices
 
 - Lion is simple and has fewer hyperparameters compared to AdamW and Adafactor as it does not require $\epsilon$ and factorization-related ones.
 To ensure a fair comparison, we tune the peak learning rate $lr$ and decoupled weight decay $\lambda$ for both AdamW (Adafactor) and our Lion using a logarithmic scale.
