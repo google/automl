@@ -1,9 +1,11 @@
 
 # Symbolic Discovery of Optimization Algorithms
 
-This repository contains JAX, TensorFlow and PyTorch implementations of the Lion optimizer discovered by symbolic program search in the [Symbolic Discovery of Optimization Algorithms](https://arxiv.org/abs/2302.06675) paper.  
-Lion is available on several codebases, including [Praxis](https://github.com/google/praxis), [Optax](https://github.com/deepmind/optax), [Keras](https://github.com/keras-team/keras/blob/901950201d867c85ec34f4d0c9201aea2c15a65d/keras/optimizers/lion.py), [Timm](https://github.com/huggingface/pytorch-image-models/blob/main/timm/optim/lion.py), and a popular PyTorch implementation by [lucidtrains](https://github.com/lucidrains) available [here](https://github.com/lucidrains/lion-pytorch).  
+This repository contains JAX, TensorFlow and PyTorch implementations of the Lion optimizer discovered by symbolic program search in the [Symbolic Discovery of Optimization Algorithms](https://arxiv.org/abs/2302.06675) paper. 
+
 Lion is deployed in production for training Google Ads pCTR model.
+
+Lion is available on several codebases, including [Praxis](https://github.com/google/praxis), [Optax](https://github.com/deepmind/optax), [Keras](https://github.com/keras-team/keras/blob/901950201d867c85ec34f4d0c9201aea2c15a65d/keras/optimizers/lion.py), [Timm](https://github.com/huggingface/pytorch-image-models/blob/main/timm/optim/lion.py), and a popular PyTorch implementation by [lucidtrains](https://github.com/lucidrains) available [here](https://github.com/lucidrains/lion-pytorch).  
 
 ## Table of Contents
 
@@ -92,7 +94,7 @@ For instance,
     - $lr=3e-5$, $\lambda=0.1$ in Lion and $lr=3e-4$, $\lambda=0.01$ in AdamW for diffusion models,
     - $lr=1e-4$, $\lambda=0.01$ in Lion and $lr=1e-3$, $\lambda=0.001$ in Adafactor for the 7.5B language modeling. 
 
-Please see our paper for all hyperparameters.
+  Please see our paper for all hyperparameters.
 
 - Apart from the peak performance, the sensitivity to hyperparameters and the difficulty in tuning them and are also critical for the adoption of an optimizer in practice. In the figure below, we alter both $lr$ and $\lambda$ when training ViT-B/16 from scratch on ImageNet. Suggested by the heatmaps, Lion is more robust to different hyperparameter choices compared to AdamW.
 
