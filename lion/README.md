@@ -32,11 +32,11 @@ Another practical benefit is that Lion has faster runtime (steps / sec) in our e
 
 - Lion outperforms AdamW on various architectures trained from scratch on ImageNet or pre-trained on ImageNet-21K.
 
-<img src="./fig/i1k.png" width="60%">
+<img src="./fig/i1k.png" width="65%">
 
 - Lion saves up to 5x the pre-training cost on JFT-300M.
 
-<img src="./fig/jft-ft.png" width="100%">
+<img src="./fig/jft-ft.png" width="90%">
 
 - Results after fine-tuning with higher resolution and Polyak averaging.
 Our obtained ViT-L/16 matches the previous ViT-H/14 results trained by AdamW while being 2x smaller.
@@ -58,13 +58,13 @@ Our obtained ViT-L/16 matches the previous ViT-H/14 results trained by AdamW whi
 
 - On diffusion models, Lion exceeds AdamW in terms of the FID score and saves up to 2.3x the training compute. Left to right: 64x64, 128x128, 256x256 image generation trained on ImageNet.
 
-<img src="./fig/diffusion.png" width="100%">
+<img src="./fig/diffusion.png" width="90%">
 
 ### **Language modeling**
 
 - Lion saves up to 2x compute on the validation perplexity when performing the language modeling task (Left: on Wiki-40B, Right: on PG-19). Lion achieves larger gains on larger Transformers.
 
-<img src="./fig/lm.png" width="70%">
+<img src="./fig/lm.png" width="65%">
 
 - Lion achieves better average in-context learning ability when training LMs compared to Adafactor.
 
