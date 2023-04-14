@@ -5,7 +5,7 @@ This repository contains JAX, TensorFlow and PyTorch implementations of the Lion
 
 Lion is deployed in production for training Google Ads pCTR model.
 
-Lion is available on several codebases, including [Praxis](https://github.com/google/praxis), [Optax](https://github.com/deepmind/optax), [Keras](https://github.com/keras-team/keras/blob/901950201d867c85ec34f4d0c9201aea2c15a65d/keras/optimizers/lion.py), [Timm](https://github.com/huggingface/pytorch-image-models/blob/main/timm/optim/lion.py), and a popular PyTorch implementation by [lucidtrains](https://github.com/lucidrains) available [here](https://github.com/lucidrains/lion-pytorch).  
+Lion is available on multiple codebases, including [Praxis](https://github.com/google/praxis), [Optax](https://github.com/deepmind/optax), [Keras](https://github.com/keras-team/keras/blob/901950201d867c85ec34f4d0c9201aea2c15a65d/keras/optimizers/lion.py), [Timm](https://github.com/huggingface/pytorch-image-models/blob/main/timm/optim/lion.py), and a popular [PyTorch implementation by lucidtrains](https://github.com/lucidrains/lion-pytorch).
 
 ## Table of Contents
 
