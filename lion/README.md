@@ -1,7 +1,7 @@
 
 # Symbolic Discovery of Optimization Algorithms
 
-This repository contains JAX, TensorFlow and PyTorch implementations of the Lion optimizer discovered by symbolic program search in the [Symbolic Discovery of Optimization Algorithms](https://arxiv.org/abs/2302.06675) paper. 
+This repository contains JAX, TensorFlow and PyTorch implementations of the Lion optimizer discovered by symbolic program search in the [Symbolic Discovery of Optimization Algorithms](https://arxiv.org/abs/2302.06675) paper. The symbolic program search space (codenamed "Hero") is open sourced at [here](https://github.com/google/automl/tree/master/hero).
 
 <!-- Lion is also successfully deployed in production systems such as Google’s search ads CTR model. -->
 
