@@ -35,7 +35,7 @@ Processor = Callable[[Batch], Batch]
 ################################################################################
 # Tokenizers / vocabularies.
 
-T5_CC_VOCAB = 'gs://t5-data/vocabs/cc_all.32000.100extra/sentencepiece.model'
+T5_CC_VOCAB = 'vb32000_t5_cc.model'
 
 ################################################################################
 # PT datasets.
