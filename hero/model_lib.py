@@ -1159,8 +1159,8 @@ class Adam(Optimizer):
   """Adam Optimizer."""
 
   beta1: float = 0.9
-  beta2: float = 0.999
-  epsilon: float = 1e-6
+  beta2: float = 0.95
+  epsilon: float = 1e-8
 
   def init(self, params):
     state = {}
