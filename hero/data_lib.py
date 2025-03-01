@@ -115,6 +115,25 @@ def add_c4_task():
 add_c4_task()
 
 
+def add_imdb_reviews_task():
+  """Adds imdb_reviews tasks."""
+  source = seqio.TfdsDataSource(
+      tfds_name='imdb_reviews:1.0.0',
+      splits={
+          'train': 'train[:90%]',
+          'validation': 'train[90%:]',
+          'test': 'test'})
+  vocabs = []
+  vocabs += [('vb32000_t5_cc', T5_CC_VOCAB)]
+  name = 'imdb_reviews'
+  for vocab_name, vocab in vocabs:
+    task_name = f'{name}.{vocab_name}'
+    add_pt_task_v1(task_name, source, vocab,
+                   use_reduce_concat_split=False)
+
+add_imdb_reviews_task()
+
+
 # ###############################################################################
 # # Dataset utilities.
 
