@@ -253,7 +253,7 @@ class Flops2e17TFM41MC4L2048BS128(BaseExperimentConfig):
   seq_len: int = 2048
 
   # 40645632 * 16.69 / 2048 / 128 = 2588 steps
-  dataset_name: str = 'c4.vb100864_openmix_v1.l2048'
+  dataset_name: str = 'c4.vb100864_openmix_v1'
   batch_size: int = 128
   num_train_steps: int = 2588
   lr_schedule_name: str = 'cosine_decay'
