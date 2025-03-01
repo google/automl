@@ -13,6 +13,7 @@
 # limitations under the License.
 """All modeling components including architecture, training and inference."""
 
+import abc
 import collections
 import copy
 import dataclasses
@@ -1120,17 +1121,27 @@ class TransformerLM(SimplyModule):
 ## Optimizers.
 
 
+
 def get_init_steps():
   return jax.lax.with_sharding_constraint(
       jnp.array(0, dtype=jnp.int32), mesh_sharding(None))
 
 
-@OptimizerRegistry.register
-class SGD:
-  """Stochastic gradient descent optimizer."""
+class Optimizer(abc.ABC):
+  """An untra-simplified version of `flax.nn.Module`."""
 
-  def __init__(self):
-    pass
+  def init(self, params):
+    """Initializes the state associated with the optimizer."""
+
+  @abc.abstractmethod
+  def apply(self, state, grad):
+    """Applies the update rule to the optimizer state and the gradient."""
+
+
+@OptimizerRegistry.register
+@dataclasses.dataclass(frozen=True)
+class SGD(Optimizer):
+  """Stochastic Gradient Descent Optimizer."""
 
   def init(self, params):
     state = {}
@@ -1143,17 +1154,15 @@ class SGD:
 
 
 @OptimizerRegistry.register
-class Adam:
-  """The Adam optimizer."""
+@dataclasses.dataclass(frozen=True)
+class Adam(Optimizer):
+  """Adam Optimizer."""
 
-  def __init__(self, beta1: float = 0.9, beta2: float = 0.999,
-               epsilon: float = 1e-6):
-    self.beta1 = beta1
-    self.beta2 = beta2
-    self.epsilon = epsilon
+  beta1: float = 0.9
+  beta2: float = 0.999
+  epsilon: float = 1e-6
 
   def init(self, params):
-    """Initializes the optimizer state."""
     state = {}
     state['params'] = params
     state['m'] = jax.tree_util.tree_map(
@@ -1181,14 +1190,13 @@ class Adam:
 
 
 @OptimizerRegistry.register
-class Lion:
-  """The Lion optimizer."""
+@dataclasses.dataclass(frozen=True)
+class Lion(Optimizer):
+  """Lion Optimizer."""
 
-  def __init__(self, beta1: float = 0.95, beta2: float = 0.98,
-               momentum_use_bf16=True):
-    self.momentum_dtype = jnp.bfloat16 if momentum_use_bf16 else jnp.float32
-    self.beta1 = jnp.array(beta1, dtype=self.momentum_dtype)
-    self.beta2 = jnp.array(beta2, dtype=self.momentum_dtype)
+  beta1: float = 0.95
+  beta2: float = 0.98
+  momentum_dtype: jax.typing.DTypeLike = 'bfloat16'
 
   def init(self, params):
     state = {}
