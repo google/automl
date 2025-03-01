@@ -1697,6 +1697,7 @@ def run_experiment(
   while steps < config.num_train_steps:
     with jax.profiler.StepTraceAnnotation('train', step_num=steps):
       logging.info('steps: %s', steps)
+      print(f'steps: {steps}')
       t1 = time.time()
       batch = next(train_set_iter)
       batch = jax.tree_util.tree_map(build_global_array_fn, batch)
@@ -1734,8 +1735,10 @@ def run_experiment(
       train_loss = loss.addressable_data(0)
       train_loss = np.array(train_loss)
       logging.info('train_loss: %s', train_loss)
+      print(f'train_loss: {train_loss}')
       step_time = time.time() - prev_step_timestamp
       logging.info('%s secs per step.', step_time)
+      print(f'{step_time} secs per step')
       prev_step_timestamp = time.time()
       metrics_aggregator.add('train_loss', train_loss)
 
@@ -1802,6 +1805,8 @@ def run_experiment(
                    validation_tokens=total_num_tokens,
                    validation_eval_time=validation_eval_time))
           writer.flush()
+          print(f'validation_loss: {mean_eval_loss}')
+          print(f'validation_eval_time: {validation_eval_time}')
       steps += 1
   # Ensure all the checkpoints are saved.
   mngr.close()
