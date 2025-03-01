@@ -257,7 +257,7 @@ class Flops2e17TFM41MC4L2048BS128(BaseExperimentConfig):
   batch_size: int = 128
   num_train_steps: int = 2588
   lr_schedule_name: str = 'cosine_decay'
-  weight_decay: float = 3e-4
+  weight_decay: float = 1e-1
   lr_schedule_config: Tuple[Tuple[str, Any], ...] = (
       ('lr', 3e-3), ('steps_after_decay', 0),
       ('end_decay', 0.1))
@@ -294,7 +294,7 @@ class Flops1e18TFM111MC4L2048BS256(Flops2e17TFM41MC4L2048BS128):
   batch_size: int = 256
   num_train_steps: int = 3626
   lr_schedule_name: str = 'cosine_decay'
-  weight_decay: float = 3e-4
+  weight_decay: float = 1e-1
   lr_schedule_config: Tuple[Tuple[str, Any], ...] = (
       ('lr', 3e-3), ('steps_after_decay', 0),
       ('end_decay', 0.1))
@@ -329,7 +329,7 @@ class Flops1e19TFM338MC4L2048BS512(Flops2e17TFM41MC4L2048BS128):
   batch_size: int = 512
   num_train_steps: int = 5800
   lr_schedule_name: str = 'cosine_decay'
-  weight_decay: float = 3e-4
+  weight_decay: float = 1e-1
   lr_schedule_config: Tuple[Tuple[str, Any], ...] = (
       ('lr', 3e-3),
       ('steps_after_decay', 0),
