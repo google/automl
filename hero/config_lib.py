@@ -253,7 +253,7 @@ class Flops2e17TFM41MC4L2048BS128(BaseExperimentConfig):
   seq_len: int = 2048
 
   # 40645632 * 16.69 / 2048 / 128 = 2588 steps
-  dataset_name: str = 'simply_det:c4.vb100864_openmix_v1.l2048'
+  dataset_name: str = 'c4.vb100864_openmix_v1.l2048'
   batch_size: int = 128
   num_train_steps: int = 2588
   lr_schedule_name: str = 'cosine_decay'
@@ -366,7 +366,7 @@ class TransformerLMTest(BaseExperimentConfig):
 
   vocab_size: int = 32_000
   seq_len: int = 64
-  dataset_name: str = 'lm1b.vb32000_t5_cc'
+  dataset_name: str = 'imdb_reviews.vb32000_t5_cc'
   lr_schedule_name: str = 'cosine_decay'
   lr_schedule_config: Tuple[Tuple[str, Any], ...] = (
       ('lr', 1e-3),
