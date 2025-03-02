@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# Install dependencies.
+# JAX installation is environment-specific (CPU, GPU, TPU). Check the official JAX installation guide at https://docs.jax.dev/en/latest/installation.html.
+# Examples:
+# CPU: `pip install -U jax`
+# GPU: `pip install -U "jax[cuda12]"` (Replace `cuda12`; ensure CUDA/cuDNN/drivers are correct)
+# TPU: `pip install -U "jax[tpu]"`
+pip install -r requirements.txt
+
 # Example command for local run. 
 # Add "export JAX_DISABLE_JIT=True;" to disable `jit` for easier debugging.
 # Change "TransformerLMTest" to other experiment config names in `config_lib.py` to run other experiments.
