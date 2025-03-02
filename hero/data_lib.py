@@ -36,6 +36,10 @@ Processor = Callable[[Batch], Batch]
 # Tokenizers / vocabularies.
 
 T5_CC_VOCAB = 'vb32000_t5_cc.model'
+OPENMIX_V1_VOCAB = 'vb100864_openmix_v1.model'
+
+ALL_VOCABS = [('vb32000_t5_cc', T5_CC_VOCAB),
+              ('vb100864_openmix_v1', OPENMIX_V1_VOCAB)]
 
 ################################################################################
 # PT datasets.
@@ -90,11 +94,9 @@ def add_lm1b_task():
           'train': 'train[:500]',
           'validation': 'train[500:1000]',
           'test': 'test'})
-  vocabs = []
-  vocabs += [('vb32000_t5_cc', T5_CC_VOCAB)]
   for name, source in [('lm1b', lm1b_source),
                        ('minilm1b', minilm1b_source)]:
-    for vocab_name, vocab in vocabs:
+    for vocab_name, vocab in ALL_VOCABS:
       task_name = f'{name}.{vocab_name}'
       add_pt_task_v1(task_name, source, vocab,
                      use_reduce_concat_split=False)
@@ -105,9 +107,7 @@ add_lm1b_task()
 def add_c4_task():
   """Adds C4 tasks."""
   source = seqio.TfdsDataSource(tfds_name='c4:3.1.0')
-  vocabs = []
-  vocabs += [('vb32000_t5_cc', T5_CC_VOCAB)]
-  for vocab_name, vocab in vocabs:
+  for vocab_name, vocab in ALL_VOCABS:
     task_name = f'c4.{vocab_name}'
     add_pt_task_v1(task_name, source, vocab,
                    use_reduce_concat_split=True)
@@ -123,10 +123,8 @@ def add_imdb_reviews_task():
           'train': 'train[:90%]',
           'validation': 'train[90%:]',
           'test': 'test'})
-  vocabs = []
-  vocabs += [('vb32000_t5_cc', T5_CC_VOCAB)]
   name = 'imdb_reviews'
-  for vocab_name, vocab in vocabs:
+  for vocab_name, vocab in ALL_VOCABS:
     task_name = f'{name}.{vocab_name}'
     add_pt_task_v1(task_name, source, vocab,
                    use_reduce_concat_split=False)
