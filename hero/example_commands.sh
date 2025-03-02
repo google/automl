@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Install dependencies.
+# Example command for installing dependencies.
 # JAX installation is environment-specific (CPU, GPU, TPU). Check the official JAX installation guide at https://docs.jax.dev/en/latest/installation.html.
 # Examples:
 # CPU: `pip install -U jax`
@@ -13,5 +13,5 @@ pip install -r requirements.txt
 # Change "TransformerLMTest" to other experiment config names in `config_lib.py` to run other experiments.
 EXP=local_test_1; rm -rf /tmp/${EXP}; python main.py --experiment_config TransformerLMTest --experiment_dir /tmp/${EXP} --verbosity=-1
 
-# Check training curves.
+# Example command for checking learning curves with tensorboard.
 tensorboard --logdir /tmp/${EXP}
