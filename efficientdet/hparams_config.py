@@ -252,7 +252,7 @@ def default_detection_configs():
   h.apply_bn_for_resampling = True
   h.conv_after_downsample = False
   h.conv_bn_act_pattern = False
-  h.drop_remainder = True  # drop remainder for the final batch eval.
+  h.drop_remainder = False  # drop remainder for the final batch eval.
 
   # For post-processing nms, must be a dict.
   h.nms_configs = {
